@@ -51,6 +51,14 @@ Each dimension is a self-contained file in `dimensions/`. An assessor can refere
 | [papers/paper-2-preregistration.md](papers/paper-2-preregistration.md) | Pre-registration for the independent instrument validation study |
 | [validation/protocol.md](validation/protocol.md) | Validation protocol details |
 
+## Tools
+
+Reference implementations of audit instruments for specific stacks. These are NOT canonical — the methodology is stack-agnostic; tools demonstrate how to mechanise an audit for a particular pattern.
+
+| Tool | Purpose |
+|---|---|
+| [tools/ui-audit/](tools/ui-audit/) | One example implementation for stacks that use the playground/enhance component pattern. Compares playground controls against the component library's enhance functions and reports dead controls, hidden features, and wiring mismatches. Maps to one aspect of dimension 4.18 (UX from code). |
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).

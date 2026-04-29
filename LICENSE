@@ -51,7 +51,7 @@ aic-coe repository, including:
   not licensed under Apache 2.0. They are held by the Honest Foundation and
   licensed only by written agreement. See `governance/README.md` for details.
 - The **curriculum** that teaches this methodology is in `curriculum/` and is
-  released under CC-BY-SA-4.0, not Apache 2.0.
+  released under CC-BY-NC-4.0, not Apache 2.0.
 - The **commercial materials** in `track-a-cpc-package/`,
   `track-b-delivery-kit/`, and `track-c-administrator-enablement/` are
   proprietary and not released under any open license.

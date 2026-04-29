@@ -85,5 +85,7 @@ This dimension applies only to systems that have a user-facing interface (web ap
 
 **Time budget.** Approximately 45 to 75 minutes for an experienced assessor on a system with a user-facing interface: 20 minutes for the Layer 2 mechanical inspection (Lighthouse, axe-core, keyboard pass, error triggering, density count), 25 to 55 minutes for the Layer 3 marker assessment (which includes sampling source code for accessibility patterns and reading error-handling code paths). For a system with no user-facing interface, the dimension scores *Not applicable* in approximately 5 minutes.
 
+**Reference tools.** `ui-audit` (in [`../tools/ui-audit/`](../tools/ui-audit/)) is one example implementation for stacks that use the playground/enhance component pattern. It compares the controls declared in a playground configurator against the `enhance()` functions in the component library and reports dead controls (declared but not implemented), hidden features (implemented but not exposed in the playground), and wiring mismatches. It is *not* the canonical UX-from-code scanner — it instruments one specific aspect of this dimension for one architectural pattern. Stacks using different component patterns require different tooling, but the Layer 2 inspection procedure above remains stack-agnostic.
+
 ---
 

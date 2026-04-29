@@ -1,0 +1,12 @@
+[project]
+name = "ui-audit"
+version = "0.1.0"
+description = "Polymorphic UI component audit: compares playground controls against enhance functions"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+visual = ["playwright>=1.40"]
+
+[project.scripts]
+ui-audit = "ui_audit.__main__:main"

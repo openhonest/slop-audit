@@ -1,0 +1,2 @@
+[console_scripts]
+ui-audit = ui_audit.__main__:main

@@ -9,3 +9,4 @@ __pycache__/
 # AI-context tier (workspace convention)
 AGENTS.md
 .agents.md
+CLAUDE.md
