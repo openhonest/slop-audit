@@ -5,7 +5,7 @@
 A **Slop Report**: a structured technical assessment of one client codebase against the 18 enterprise audit dimensions, with quantified findings and per-dimension evidence citations. The Slop Report is the central deliverable of Phase 0 of an Open Honest engagement. It serves three downstream purposes:
 
 1. **Internal evidence for the client's CIO.** The findings come from the client's own repository. They are not disputable as "vendor narrative" because they are produced from material the client themselves provided. This is what makes the Slop Report politically actionable inside the client organization.
-2. **Input to the Self-Service Gap Analysis** (the second Phase 0 deliverable). The audit identifies which architectural conditions are absent in the client's existing codebase, which in turn constrains what business-user self-service can be safely supported on the existing substrate.
+2. **Input to the Self-Service Gap Analysis** (the second Phase 0 deliverable). The audit identifies which architectural conditions are absent in the client's existing codebase, which in turn constrains what business-user self-service can be safely supported on the existing code base.
 3. **Input to the Escape Pod Proposal** (the third Phase 0 deliverable). The audit findings determine which greenfield candidate modules are most defensible as the first Phase 1 build target, by showing which audit dimensions are most catastrophically absent in the existing landscape.
 
 ### 1.2 What the slop audit does not produce

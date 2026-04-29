@@ -73,7 +73,7 @@ Same procedure as Day 2 for dimensions 10 through 18. End of Day 3 produces a co
 **Afternoon (3 hours)**
 
 - Use the audit findings to draft the **Escape Pod Proposal** (the third Phase 0 deliverable). The proposal identifies one greenfield candidate module scoped for an 8 to 12 week Phase 1 build, drawing on the audit's identification of which dimensions are most catastrophically absent in the existing landscape
-- Use the audit findings to draft the **Self-Service Gap Analysis** (the second Phase 0 deliverable), which identifies which business-user requests cannot currently be safely supported because the underlying substrate fails specific audit dimensions
+- Use the audit findings to draft the **Self-Service Gap Analysis** (the second Phase 0 deliverable), which identifies which business-user requests cannot currently be safely supported because the underlying code base fails specific audit dimensions
 
 **Day 5 deliverable.** All three Phase 0 deliverables (Slop Report, Self-Service Gap Analysis, Escape Pod Proposal) complete. Phase 0 is now ready to hand off to the CIO for the CPC packaging step.
 

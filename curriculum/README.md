@@ -20,7 +20,7 @@ open-honest/
 ├── methodology/
 │   └── methodology/ (see methodology/README.md for reading guide)          ← the methodology document Track 1 teaches
 ├── governance/                            ← Honest Foundation (Constitution, Charter, CoC, Mission)
-├── administrator/                               ← first commercial administrator (the audit partner)
+├── administrator/                         ← first commercial administrator (the audit partner)
 │   ├── delivery-kit/                      ← what the commercial administrator delivers
 │   ├── cpc-package/                       ← CPC go-to-market kit
 │   └── enablement/                        ← BD/sales internal materials
