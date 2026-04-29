@@ -1,0 +1,14 @@
+# Slop Audit Methodology (v0 — frame draft)
+
+**Status:** v0 frame. Sections 1, 2, 3, 5, 6, 7 drafted. Section 4 (the per-dimension catalog) is the next layer of work and is currently a stub.
+
+**Document purpose.** This is the methodology a trained assessor follows to produce a Slop Report against a client codebase during Phase 0 of an Open Honest engagement. It is the load-bearing artifact of the entire Open Honest project: every Phase 0 deliverable, every CPC pitch, and every downstream Phase 1 scoping decision depends on this methodology being runnable by someone other than the original architect.
+
+**Author and attribution.** This methodology is operationalized from the analytical framework developed by Adam Zachary Wasserman in *Process Discipline as the Key Variable in AI-Assisted Enterprise Software Development: A Natural Experiment* (Zenodo, 2026, https://doi.org/10.5281/zenodo.19355460) and the working analysis document that produced the paper. The 18 dimensions, the threshold definitions, the industry-standard citations, and the Honest Code chapter mappings used in this document derive from that material. The operational layer (evidence inspection procedures, scoring rubrics, walkthrough, validation protocol) is added here to make the framework transferable to assessors other than the original architect.
+
+**Lineage.** The methodology is not a recent invention. It is the latest implementation of a vision Wasserman first articulated in *The Chaos Factory* (2017), which traced the history of software development from machine code through modern IT industrialization and argued for a technology-neutral approach that would let business stakeholders build the systems they need. David Norfolk, senior analyst at Bloor Research, reviewed the book in 2020 and noted its "practical applicability for business stakeholders and citizen developers." The 18-dimension methodology, the natural experiment that validated it, and the Honest Code / Honest Framework / Honest Builder progression are the working implementation of that 2017 vision, with the Bloor review as independent third-party validation in the middle of the arc. The Bloor review is publicly accessible at https://www.bloorresearch.com/the-chaos-factory-by-adam-wasserman/.
+
+**Confidential material excluded.** This document deliberately excludes IP-sensitive material from the source analysis: the IDD-specific assessment scores, salary and cost data, internal Buckler context, and patent-pending architectural details. The author's biographical credibility framing has been broken out into a separate the audit partner internal document at `aic-coe/administrator/enablement/04-methodology-author-credibility.md`, which is for BD/sales internal use only and is not part of the methodology a third party would execute.
+
+---
+

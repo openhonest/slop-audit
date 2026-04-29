@@ -1,0 +1,91 @@
+# Curriculum License
+
+Copyright 2026 Adam Zachary Wasserman
+
+The contents of this `curriculum/` directory are licensed under the
+**Creative Commons Attribution-ShareAlike 4.0 International License**
+(CC-BY-SA-4.0).
+
+To view a copy of this license, visit:
+https://creativecommons.org/licenses/by-sa/4.0/
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+---
+
+## Scope of this license
+
+This license applies to all files in the `curriculum/` directory, including:
+
+- `README.md` (the curriculum master plan)
+- Any future per-level course materials (reading lists, exercises, assessments,
+  diagnostic interviews, sign-off criteria, trainer notes)
+- The four-lens self-assessment framework once promoted from `outreach/`
+- Any calibration codebase annotations, cross-rater test protocols, and
+  trainer guides
+
+## What this license permits
+
+- **Share** — copy and redistribute the curriculum in any medium or format
+- **Adapt** — remix, transform, and build upon the curriculum for any purpose,
+  including commercial purposes (for example, a commercial training provider
+  may use this curriculum as the basis for paid courses)
+- **Translate** the curriculum into other languages
+- **Excerpt** parts of the curriculum into other educational works
+
+## What this license requires
+
+- **Attribution** — credit Adam Zachary Wasserman as the original author,
+  provide a link to the license, and indicate if changes were made
+- **ShareAlike** — if you remix, transform, or build upon the curriculum,
+  your contributions must be distributed under the same CC-BY-SA-4.0 license
+- **No additional restrictions** — you may not apply legal terms or
+  technological measures that legally restrict others from doing anything
+  the license permits
+
+## Why CC-BY-SA-4.0 (and not Apache 2.0 like the methodology)
+
+The methodology is released under Apache 2.0 because Apache 2.0 is the
+recognized standard for open-source software and includes the patent grant
+that downstream users in regulated industries need.
+
+The curriculum is released under CC-BY-SA-4.0 because:
+
+1. **Curriculum is not software.** Creative Commons licenses are designed for
+   educational and creative works; software licenses are designed for code.
+   Using the right tool for the job reduces ambiguity for adopters.
+
+2. **ShareAlike protects against enclosure.** A commercial training provider
+   may use this curriculum to build a paid course (good — that is the point
+   of releasing it openly), but they cannot then take the curriculum private
+   and prevent others from doing the same. Improvements to the curriculum
+   flow back to the public.
+
+3. **Compatible with academic and creative reuse.** CC-BY-SA-4.0 is the
+   default license for educational materials in most academic, library, and
+   open-courseware contexts (Wikipedia, OpenStax, MIT OpenCourseWare,
+   Wikiversity). Releasing the curriculum under the same license that those
+   communities already use eliminates licensing friction for adopters.
+
+## What this license does not cover
+
+- The **Honest trademark** and the **Certified Honest Practitioner** mark are
+  not licensed under CC-BY-SA-4.0. They are held by the Honest Foundation and
+  licensed only by written agreement. A commercial training provider may use
+  the curriculum freely under CC-BY-SA-4.0, but may not market the resulting
+  course as "Certified Honest Practitioner training" without a separate
+  trademark license from the Foundation.
+- The **methodology document** in `methodology/` is licensed under Apache 2.0,
+  not CC-BY-SA-4.0. When adapting the curriculum, the methodology document is
+  a separately-licensed dependency.
+- The **commercial materials** in `track-a-cpc-package/`,
+  `track-b-delivery-kit/`, and `track-c-administrator-enablement/` are
+  proprietary and are not part of the curriculum's open release.
+
+## Trademark notice
+
+The use of the Honest framework's trademarks in connection with any course,
+training program, or certification offered under adaptation of this curriculum
+is governed separately by the Honest Foundation. See `governance/README.md`
+and `governance/FOUNDATION_CHARTER.md` for the trademark policy. Adapting the
+curriculum under CC-BY-SA-4.0 does not grant any right to use the trademarks.
