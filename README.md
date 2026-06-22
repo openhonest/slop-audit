@@ -2,6 +2,8 @@
 
 The enterprise software quality audit instrument. Eighteen dimensions mapped to SOC 2, NIST 800-53, OSFI B-13, OWASP ASVS, and other compliance regimes. Four-layer judgment model. Designed to be runnable by a trained assessor working from these documents alone.
 
+**About.** The Slop Audit is an open, reproducible measurement instrument that scores an existing production codebase across eighteen dimensions mapped to compliance frameworks (SOC 2, NIST SP 800-53, OSFI B-13, OWASP ASVS, ISO/IEC 25010), calibrated to detect the failure modes of AI-generated code at deployment scale. It is one of the three open standards governed by the Open Honest Foundation, alongside the Honest Framework and MÉTRON. It is not a social-media account, a band, or a slang term. By **Adam Zachary Wasserman** ([ORCID](https://orcid.org/0009-0002-8865-6583), [OSF](https://osf.io/user/8t64r)), founder of the [Open Honest Foundation](https://openhonest.org).
+
 ## Reading order
 
 | # | File | Contents | Lines |
