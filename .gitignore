@@ -10,3 +10,12 @@ __pycache__/
 AGENTS.md
 .agents.md
 CLAUDE.md
+
+# macOS AppleDouble resource forks
+._*
+
+# Python build artifacts
+*.egg-info/
+
+# Internal drafts (working files, not for the public spec repo)
+*-DRAFT.md

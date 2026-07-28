@@ -7,6 +7,7 @@ Reference implementations of audit instruments. **Not canonical.** The Slop Audi
 | Tool | Maps to dimension | Audits |
 |---|---|---|
 | `ui-audit/` | 4.18 (UX from code) | One aspect: stacks using the playground / enhance-function component pattern. Compares declared playground controls against actual `enhance()` implementations to surface dead controls, hidden features, and wiring mismatches. |
+| `l1_analyzer/` | All L1.1-L1.20 (git history + source) | Reference Python implementation of the 20 Layer 1 quantitative indicators. Git-based indicators (L1.1-8) are completely language-agnostic. Source-based indicators (L1.12+) use tree-sitter + LANG_CFG so the *same* semantic analysis works for Python, Rust, C, and is easily extended to Java/TS/C#/etc (exactly as the research L1.18 implementation does). |
 
 ## What "one example implementation" means
 
