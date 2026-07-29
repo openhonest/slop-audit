@@ -7,6 +7,7 @@ Reference Python implementation of all 20 Slop Audit Layer 1 indicators.
 - Git-history indicators (L1.1–L1.8): completely language-agnostic.
 - Config indicators (L1.9–L1.11): file presence.
 - Source-analysis indicators (L1.12+): use tree-sitter + `LANG_CFG` dispatch tables (same architecture as the research L1.18 / bound-literal analyzers). Wired up for Python, Java, JavaScript, TypeScript, C#, Ruby, Go, Rust, and C. Each language has verified tree-sitter node types and a regression test in `tests/test_basic.py`. Ruby mutable state is detected via `@instance`/`$global` variables and Go via method-receiver field access, not just `self.`/`this.`.
+- Runtime indicators L1.19 (decision-space coverage) and L1.20 (test determinism): implemented in `pytest_trace.py` for Python. L1.19 runs the suite under `coverage run --branch` and reports `covered_branches / num_branches`; L1.20 runs the suite five times in randomized order (pytest-randomly) and counts clean passes. The pytest-under-coverage recipe and the process-group timeout kill mirror the sibling Slop Audit instrument [Umbra](https://slopaudit.org/umbra.html). These two indicators execute the target repo's test suite (untrusted code, run in an isolated process group with a hard timeout); pass `--no-exec` to skip execution, in which case L1.19 falls back to a static decision-point count with coverage explicitly marked not-measured. Non-Python targets report `n/a` for now. Never a guessed number.
 
 ## Usage
 

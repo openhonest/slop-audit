@@ -32,6 +32,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Primary language for source-based indicators (L1.12+). 'auto' detects from files.",
     )
     parser.add_argument("--format", choices=["text", "json"], default="text")
+    parser.add_argument(
+        "--no-exec",
+        action="store_true",
+        help="Do not execute the target repo's test suite (skips the runtime half of L1.19 and all of L1.20).",
+    )
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args(argv)
@@ -58,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
         if lang == "auto":
             lang = indicators.detect_primary_language(args.repo)
         source_results = indicators.compute_source_indicators(
-            args.repo, lang=lang, since=args.since, until=args.until
+            args.repo, lang=lang, since=args.since, until=args.until, exec_tests=not args.no_exec
         )
         results.update(source_results)
 

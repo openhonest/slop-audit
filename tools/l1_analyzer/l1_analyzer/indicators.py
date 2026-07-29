@@ -32,6 +32,8 @@ import tree_sitter_rust
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
+from l1_analyzer import pytest_trace
+
 # ---------------------------------------------------------------------------
 # Data shapes (TypedDicts)
 # ---------------------------------------------------------------------------
@@ -523,7 +525,7 @@ def _run_external(cmd: list[str], cwd: Path) -> str:
     except Exception:
         return ""
 
-def compute_source_indicators(repo: Path, lang: str = "auto", **kwargs) -> dict[str, L1Result]:
+def compute_source_indicators(repo: Path, lang: str = "auto", exec_tests: bool = True, **kwargs) -> dict[str, L1Result]:
     if lang == "auto":
         lang = detect_primary_language(repo)
 
@@ -578,13 +580,39 @@ def compute_source_indicators(repo: Path, lang: str = "auto", **kwargs) -> dict[
     # L1.15 - Type escape density (tree-sitter)
     results["L1.15"] = _compute_type_escapes(repo, lang)
 
-    # L1.19 - Basic decision space (static enumeration via tree-sitter)
-    results["L1.19"] = _compute_decision_space(repo, lang)
+    # L1.19 - decision-space coverage. Prefer the real runtime measurement
+    # (coverage.py branch tracing); fall back to the honest static enumeration
+    # (a decision-point count, coverage explicitly not measured) when the suite
+    # cannot be run.
+    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests)
 
-    # L1.12,13,14,20 - External / runtime tools (auto-dispatch)
+    # L1.12,13,14 - External static tools (auto-dispatch)
     results.update(_compute_external_indicators(repo, lang))
 
+    # L1.20 - test determinism (runs the suite; Python-only for now)
+    results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests)
+
     return results
+
+def _decision_space_l19(repo: Path, lang: str, exec_tests: bool) -> L1Result:
+    """Real branch coverage when the suite can run; otherwise the static
+    decision-point enumeration with coverage clearly marked not-measured."""
+    static = _compute_decision_space(repo, lang)
+    if not exec_tests:
+        static["details"] += "; coverage not measured (test execution disabled)"
+        return static
+    cov = pytest_trace.decision_space_coverage(repo, lang)
+    if cov.get("band") != "n/a":
+        return cov
+    # Runtime coverage unavailable: keep the static count but stay honest that
+    # the exercised-coverage fraction was not measured, and say why.
+    static["details"] += f"; coverage not measured: {cov.get('details', 'unavailable')}"
+    return static
+
+def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool) -> L1Result:
+    if not exec_tests:
+        return {"value": "not run", "band": "n/a", "details": "test execution disabled"}
+    return pytest_trace.test_determinism(repo, lang)
 
 def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
     if lang not in LANG_CFG:
@@ -724,13 +752,5 @@ def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
             res["L1.13"] = {"value": "n/a", "band": "n/a", "details": "jscpd produced no parseable duplication percentage"}
     else:
         res["L1.13"] = {"value": "n/a", "band": "n/a", "details": "install jscpd to compute L1.13"}
-
-    # L1.20 test determinism - not auto-run (executing an arbitrary repo's suite
-    # is unsafe/environment-dependent). Report the exact reproducible command.
-    res["L1.20"] = {
-        "value": "not run",
-        "band": "n/a",
-        "details": "run the suite 5x in randomized order and compare (e.g. pytest -p randomly -q); order-dependent results fail L1.20",
-    }
 
     return res

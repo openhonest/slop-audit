@@ -21,6 +21,23 @@ LANG_SAMPLES = {
 }
 
 
+def test_l1_19_l1_20_non_python_is_na(tmp_path):
+    from l1_analyzer import pytest_trace
+    cov = pytest_trace.decision_space_coverage(tmp_path, "go")
+    det = pytest_trace.test_determinism(tmp_path, "go")
+    assert cov["band"] == "n/a" and det["band"] == "n/a"
+
+
+def test_l1_19_static_fallback_when_exec_disabled(tmp_path):
+    # A Python file with two branches; exec disabled -> honest static count, no run.
+    (tmp_path / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
+    from l1_analyzer import indicators
+    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=False)
+    assert res["band"] == "n/a"
+    assert "coverage not measured" in res["details"]
+    assert isinstance(res["value"], int) and res["value"] >= 1  # decision points enumerated
+
+
 @pytest.mark.parametrize("lang", sorted(LANG_SAMPLES))
 def test_l1_18_runs_and_discriminates_per_language(tmp_path, lang):
     fname, code = LANG_SAMPLES[lang]
