@@ -6,7 +6,7 @@ Reference Python implementation of all 20 Slop Audit Layer 1 indicators.
 
 - Git-history indicators (L1.1–L1.8): completely language-agnostic.
 - Config indicators (L1.9–L1.11): file presence.
-- Source-analysis indicators (L1.12+): use tree-sitter + `LANG_CFG` dispatch tables (same architecture as the research L1.18 / bound-literal analyzers). Currently implemented for Python, Rust, and C; trivial to add Java, TypeScript, C#, etc.
+- Source-analysis indicators (L1.12+): use tree-sitter + `LANG_CFG` dispatch tables (same architecture as the research L1.18 / bound-literal analyzers). Wired up for Python, Java, JavaScript, TypeScript, C#, Ruby, Go, Rust, and C. Each language has verified tree-sitter node types and a regression test in `tests/test_basic.py`. Ruby mutable state is detected via `@instance`/`$global` variables and Go via method-receiver field access, not just `self.`/`this.`.
 
 ## Usage
 

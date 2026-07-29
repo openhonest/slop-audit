@@ -1,7 +1,7 @@
 [project]
 name = "slop-audit-l1"
 version = "0.1.0"
-description = "Reference Python implementation of Slop Audit Layer 1 indicators (L1.1-L1.20). Language-agnostic where possible; tree-sitter based for source analysis (Python, Rust, C, and extensible to Java/TS/C# etc.)."
+description = "Reference Python implementation of Slop Audit Layer 1 indicators (L1.1-L1.20). Language-agnostic where possible; tree-sitter based for source analysis (Python, Java, JavaScript, TypeScript, C#, Ruby, Go, Rust, C)."
 authors = [{ name = "Open Honest Foundation" }]
 license = { text = "Apache-2.0" }
 requires-python = ">=3.12"
@@ -10,10 +10,12 @@ dependencies = [
     "tree-sitter-python>=0.25",
     "tree-sitter-rust>=0.24",
     "tree-sitter-c>=0.24",
-    # Add more parsers as needed: tree-sitter-java, tree-sitter-typescript, tree-sitter-c-sharp
     "tree-sitter-java>=0.23.5",
     "tree-sitter-typescript>=0.23.2",
     "tree-sitter-c-sharp>=0.23.5",
+    "tree-sitter-ruby>=0.23.1",
+    "tree-sitter-go>=0.25.0",
+    "tree-sitter-javascript>=0.25.0",
 ]
 
 [project.scripts]

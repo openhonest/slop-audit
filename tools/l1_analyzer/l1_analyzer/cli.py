@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--lang",
         default="auto",
-        choices=["auto", "python", "rust", "c", "java", "typescript", "csharp"],
+        choices=["auto", *sorted(indicators.LANG_CFG)],
         help="Primary language for source-based indicators (L1.12+). 'auto' detects from files.",
     )
     parser.add_argument("--format", choices=["text", "json"], default="text")

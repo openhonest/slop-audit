@@ -22,8 +22,11 @@ from typing import Any, TypedDict
 
 import tree_sitter_c
 import tree_sitter_c_sharp
+import tree_sitter_go
 import tree_sitter_java
+import tree_sitter_javascript
 import tree_sitter_python
+import tree_sitter_ruby
 import tree_sitter_rust
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
@@ -260,7 +263,48 @@ LANG_CFG: dict[str, dict[str, Any]] = {
         "module_level_assign": ("field_declaration", "local_declaration_statement"),
         "type_escape_patterns": ("object", "dynamic"),
     },
+    "javascript": {
+        "language": Language(tree_sitter_javascript.language()),
+        "extensions": (".js", ".jsx", ".mjs", ".cjs"),
+        "function_types": ("function_declaration", "function_expression", "generator_function_declaration", "method_definition", "arrow_function"),
+        "class_types": ("class_declaration", "class"),
+        "member_access": "member_expression",
+        "this_ident": {"this"},
+        "module_level_assign": ("variable_declaration", "lexical_declaration"),
+        "type_escape_patterns": (),  # untyped
+        # `const` bindings are immutable; `let`/`var` are mutable module state
+        "const_keywords": ("const ",),
+    },
+    "ruby": {
+        "language": Language(tree_sitter_ruby.language()),
+        "extensions": (".rb",),
+        "function_types": ("method", "singleton_method"),
+        "class_types": ("class", "module", "singleton_class"),
+        "member_access": "call",
+        "this_ident": {"self"},
+        # Ruby signals external mutable state through @instance and $global variables,
+        # not a `self.`-prefixed member access.
+        "instance_field_types": ("instance_variable", "global_variable"),
+        "module_level_assign": ("assignment", "operator_assignment"),
+        "type_escape_patterns": (),  # untyped
+    },
+    "go": {
+        "language": Language(tree_sitter_go.language()),
+        "extensions": (".go",),
+        "function_types": ("function_declaration", "method_declaration"),
+        "class_types": ("type_declaration",),
+        "member_access": "selector_expression",
+        # Go has no fixed receiver keyword; the receiver name is parsed per method
+        # and passed to the detector dynamically.
+        "this_ident": set(),
+        "module_level_assign": ("var_declaration",),
+        "type_escape_patterns": ("any", "interface{}"),
+        "const_keywords": ("const ",),
+    },
 }
+
+# Body node types that hold a function/method's statements, across all grammars.
+_BODY_NODE_TYPES = ("block", "compound_statement", "body", "function_body", "body_statement", "statement_block")
 
 def _get_parser(lang: str) -> Parser:
     cfg = LANG_CFG[lang]
@@ -282,46 +326,12 @@ def detect_primary_language(repo: Path) -> str:
 # Paper A replication package with all the bound-literal logic etc.
 # ---------------------------------------------------------------------------
 
-def _count_mutable_refs(body: Node, cfg: dict, source: bytes) -> int:
-    """Count references to external mutable state (self/this, &mut self, global, static mut, etc.).
-    Very simplified reference implementation. Production version (in the Paper A
-    replication package) has full walks for instance fields, module mutables,
-    bound-literal exclusion, etc.
-    """
-    count = 0
-    member_type = cfg.get("member_access", "attribute")
-    this_set = cfg.get("this_ident", {"self"})
-    lang = "python"  # passed via closure or global in real; here we infer from cfg
-
-    def walk(n: Node):
-        nonlocal count
-        text = n.text.decode("utf8", errors="ignore") if n.text else ""
-
-        # Python: self.foo
-        if n.type == "attribute" and any(text.startswith(t + ".") for t in this_set):
-            count += 1
-
-        # Rust: &mut self or self. in methods
-        if n.type in ("self_parameter", "reference_expression", "field_expression"):
-            if "mut self" in text or any(t in text for t in ("self.", "&mut self")):
-                count += 1
-
-        # C: global or -> on struct (very rough)
-        if n.type in ("identifier", "field_expression"):
-            if text in ("global_state",) or "->" in text:  # simplistic
-                count += 1
-
-        for c in n.children:
-            walk(c)
-
-    walk(body)
-    return count
-
 def _find_module_mutable_names(root: Node, cfg: dict[str, Any], source: bytes) -> set[str]:
     """Detect top-level names that are likely mutable (assigned and not const/Final/readonly)."""
     mutables: set[str] = set()
     assign_types = cfg.get("module_level_assign", ("assignment",))
     this_idents = cfg.get("this_ident", set())
+    const_keywords = cfg.get("const_keywords", ("const ", "final ", "readonly ", "let ", "val "))
 
     for node in root.children:
         if node.type in assign_types:
@@ -330,7 +340,7 @@ def _find_module_mutable_names(root: Node, cfg: dict[str, Any], source: bytes) -
             # very simple: look for NAME = ... at top level
             # In real impl this is a proper tree walk per language (see research l1_18.py)
             for line in text.splitlines():
-                if "=" in line and not any(kw in line.lower() for kw in ("const ", "final ", "readonly ", "let ", "val ")):
+                if "=" in line and not any(kw in line.lower() for kw in const_keywords):
                     parts = line.split("=")[0].strip().split()
                     if parts:
                         name = parts[-1].strip("()[]:,")
@@ -338,36 +348,74 @@ def _find_module_mutable_names(root: Node, cfg: dict[str, Any], source: bytes) -
                             mutables.add(name)
     return mutables
 
-def _count_mutable_refs(body: Node, cfg: dict[str, Any], source: bytes, module_mutables: set[str]) -> int:
+def _count_mutable_refs(
+    body: Node,
+    cfg: dict[str, Any],
+    source: bytes,
+    module_mutables: set[str],
+    receiver_names: set[str],
+) -> int:
     """Count references inside a function body to external mutable state.
-    Handles self/this, module globals, static mut, etc. Basic bound-literal awareness.
+
+    Handles, per-language via cfg:
+    - receiver/member access (self./this./<go-receiver>.<field>) via member_access node
+    - Ruby-style @instance / $global variables via instance_field_types nodes
+    - module-level mutable globals referenced by bare identifier
+    - Rust/C raw patterns (&mut self, static mut)
+
+    Simplified reference implementation; the production version (Paper A replication
+    package) adds bound-literal exclusion and full per-language field resolution.
     """
     count = 0
     member_type = cfg.get("member_access", "attribute")
-    this_set = cfg.get("this_ident", {"self"})
+    instance_field_types = cfg.get("instance_field_types", ())
 
     def walk(n: Node):
         nonlocal count
-        if n.type == member_type:
+        # Member/receiver access: self.x, this.x, or <go receiver>.field
+        if n.type == member_type and receiver_names:
             text = n.text.decode("utf8", errors="ignore")
-            if any(text.startswith(t + ".") or t + "." in text for t in this_set):
+            if any(text.startswith(r + ".") for r in receiver_names):
                 count += 1
-        # module level name usage
+        # Ruby @instance / $global variables are themselves external-state references
+        if n.type in instance_field_types:
+            count += 1
+        # module-level mutable global referenced by bare name
         if n.type == "identifier":
             name = n.text.decode("utf8", errors="ignore")
             if name in module_mutables:
                 count += 1
-        # Rust/C specific patterns
+        # Rust/C raw patterns
         txt = n.text.decode("utf8", errors="ignore") if n.text else ""
         if "static mut" in txt or "&mut self" in txt or "mut self" in txt:
             count += 1
-        if n.type == "field_expression" and "self" in txt:
-            count += 1  # rough for methods touching self fields
 
         for c in n.children:
             walk(c)
     walk(body)
     return count
+
+def _receiver_names(func_node: Node, cfg: dict[str, Any]) -> set[str]:
+    """Names that denote the enclosing instance for this function.
+
+    For self/this languages it is the fixed keyword set. For Go it is the
+    method receiver identifier, parsed from the receiver parameter list.
+    """
+    fixed = set(cfg.get("this_ident", set()))
+    if fixed:
+        return fixed
+    # Go: `func (r *Foo) Bar(...)` -> receiver identifier is `r`
+    names: set[str] = set()
+    if func_node.type == "method_declaration":
+        for child in func_node.children:
+            if child.type == "parameter_list":
+                for decl in child.children:
+                    if decl.type == "parameter_declaration":
+                        for part in decl.children:
+                            if part.type == "identifier":
+                                names.add(part.text.decode("utf8", errors="ignore"))
+                break  # first parameter_list is the receiver
+    return names
 
 def analyze_mutable_state(repo: Path, lang: str = "python") -> L1Result:
     cfg = LANG_CFG.get(lang, LANG_CFG["python"])
@@ -393,11 +441,12 @@ def analyze_mutable_state(repo: Path, lang: str = "python") -> L1Result:
                         total_funcs += 1
                         body = None
                         for c in n.children:
-                            if c.type in ("block", "compound_statement", "body", "function_body"):
+                            if c.type in _BODY_NODE_TYPES:
                                 body = c
                                 break
                         if body:
-                            refs = _count_mutable_refs(body, cfg, src, module_mutables)
+                            receivers = _receiver_names(n, cfg)
+                            refs = _count_mutable_refs(body, cfg, src, module_mutables, receivers)
                             if refs > 0:
                                 mutable_funcs += 1
                     for c in n.children:
@@ -434,7 +483,7 @@ def compute_source_indicators(repo: Path, lang: str = "auto", **kwargs) -> dict[
     try:
         count = 0
         total = 0
-        exts = {".py", ".rs", ".c", ".h", ".js", ".ts", ".tsx", ".jsx", ".java", ".cs"}
+        exts = {".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"}
         for f in repo.rglob("*"):
             if f.suffix.lower() not in exts: continue
             if any(p in f.parts for p in (".git", "node_modules", "venv", "__pycache__", "target", "build", "dist")): continue
@@ -491,6 +540,10 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
     if lang not in LANG_CFG:
         return {"value": "n/a", "band": "n/a"}
     cfg = LANG_CFG[lang]
+    if not cfg.get("type_escape_patterns"):
+        # Untyped or no configured escape hatch (Ruby, JavaScript, Rust, C):
+        # a type-escape density is not meaningful, so report it honestly.
+        return {"value": "n/a", "band": "n/a", "details": f"type-escape density not applicable for {lang}"}
     parser = _get_parser(lang)
     escape_count = 0
     total_loc = 0
