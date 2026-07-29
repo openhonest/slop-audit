@@ -19,8 +19,8 @@ reason rather than a guessed number. Python-only for now (pytest + coverage.py);
 other languages report n/a.
 
 Note: L1.19 and L1.20 execute the target repository's test suite, i.e. they run
-untrusted code. Execution happens in a new process group with a hard timeout so
-a hung or runaway suite is killed. Pass exec_tests=False to skip it entirely.
+untrusted code. Execution happens in a new process group with a hard timeout
+(passed in explicitly by the caller) so a hung or runaway suite is killed.
 """
 
 from __future__ import annotations
@@ -32,27 +32,20 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
-
-L1Result = dict[str, Any]
-
-DEFAULT_TIMEOUT_SECONDS = 300.0
+from typing import TypedDict
 
 
-def _timeout_seconds() -> float:
-    raw = os.environ.get("L1_TEST_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS))
-    try:
-        parsed = float(raw)
-    except ValueError:
-        return DEFAULT_TIMEOUT_SECONDS
-    return parsed if parsed > 0 else DEFAULT_TIMEOUT_SECONDS
+class L1Result(TypedDict, total=False):
+    value: float | int | str
+    band: str
+    details: str
 
 
-def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str], timeout_seconds: float) -> subprocess.CompletedProcess[str]:
     """Run untrusted test code in a new process group; kill the whole group on
     timeout. Mirrors umbra.process.run_untrusted. Returncode 124 signals timeout.
     """
-    full_env = {**os.environ, **(env or {})}
+    full_env = {**os.environ, **env}
     process = subprocess.Popen(
         command,
         cwd=str(cwd),
@@ -63,7 +56,7 @@ def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str] | None = N
         start_new_session=True,
     )
     try:
-        stdout, stderr = process.communicate(timeout=_timeout_seconds())
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
         return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     except subprocess.TimeoutExpired:
         try:
@@ -75,9 +68,9 @@ def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str] | None = N
 
 
 def _module_available(module: str) -> bool:
-    """True if `python -m module` (or an importable module) is present in this
-    interpreter. The suite runs under sys.executable, so this reflects the
-    environment the analyzer was launched in (e.g. the target repo's venv)."""
+    """True if `import module` succeeds in this interpreter. The suite runs under
+    sys.executable, so this reflects the environment the analyzer was launched in
+    (e.g. the target repo's venv)."""
     try:
         result = subprocess.run(
             [sys.executable, "-c", f"import {module}"],
@@ -103,7 +96,7 @@ def _first_line(text: str) -> str:
 # L1.19 decision-space coverage
 # ---------------------------------------------------------------------------
 
-def decision_space_coverage(repo: Path, lang: str) -> L1Result:
+def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float) -> L1Result:
     """L1.19: branch-level decision coverage from coverage.py.
 
     Bands (spec 03-layer1-indicators.md): >90% Healthy, 60-90% Not Healthy,
@@ -120,7 +113,7 @@ def decision_space_coverage(repo: Path, lang: str) -> L1Result:
         env = {"COVERAGE_FILE": str(data_file)}
         run = _run_untrusted(
             [sys.executable, "-m", "coverage", "run", "--branch", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
-            cwd=repo, env=env,
+            cwd=repo, env=env, timeout_seconds=timeout_seconds,
         )
         if run.returncode == 5:
             return _na("pytest collected no tests")
@@ -145,11 +138,11 @@ def decision_space_coverage(repo: Path, lang: str) -> L1Result:
         return _na("no enumerable decision branches found in the measured tree")
 
     pct = covered_branches / num_branches * 100
-    band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
+    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
     suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
     return {
         "value": round(pct, 1),
-        "band": band,
+        "band": result_band,
         "details": f"{covered_branches}/{num_branches} decision branches exercised by tests ({suite})",
     }
 
@@ -158,7 +151,7 @@ def decision_space_coverage(repo: Path, lang: str) -> L1Result:
 # L1.20 test determinism
 # ---------------------------------------------------------------------------
 
-def test_determinism(repo: Path, lang: str, runs: int = 5) -> L1Result:
+def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float) -> L1Result:
     """L1.20: run the suite `runs` times in randomized order and count the runs
     where every test passes. Value is "passing/runs".
 
@@ -176,7 +169,7 @@ def test_determinism(repo: Path, lang: str, runs: int = 5) -> L1Result:
     for seed in range(1, runs + 1):
         run = _run_untrusted(
             [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", f"--randomly-seed={seed}"],
-            cwd=repo,
+            cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
         if run.returncode == 5:
             return _na("pytest collected no tests")
@@ -185,9 +178,9 @@ def test_determinism(repo: Path, lang: str, runs: int = 5) -> L1Result:
         if run.returncode == 0:
             passing += 1
 
-    band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
+    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
     return {
         "value": f"{passing}/{runs}",
-        "band": band,
+        "band": result_band,
         "details": f"{passing} of {runs} randomized-order runs passed cleanly",
     }

@@ -2,14 +2,20 @@
 Reference implementations of Slop Audit L1.1-L1.20 indicators.
 
 Design goal: runnable against *any* language.
-- L1.1-L1.8: pure git log (completely language-agnostic)
-- L1.9-L1.11: file presence (agnostic)
-- L1.12-L1.17, L1.18-L1.20: where source analysis is needed, use tree-sitter
-  with per-language CFG so the *same* semantic metric works for Python, Rust, C,
-  and can be extended to Java/TS/C#/etc. exactly as L1.18 does in the research.
+- L1.1-L1.8: pure git log (language-agnostic)
+- L1.9-L1.11: file presence (language-agnostic)
+- L1.12-L1.20: where source analysis is needed, use tree-sitter with a
+  per-language CFG (LANG_CFG) so the *same* semantic metric works across
+  Python, Java, JavaScript, TypeScript, C#, Ruby, Go, Rust, and C.
 
-This file (and the package) tries to follow Honest Code principles:
-pure functions, TypedDict data, dict dispatch for language differences, I/O at edges.
+Honest Code shape (enforced, not aspirational):
+- Data is TypedDict, never a class.
+- Scoring is a pure function of counts (see `band` and the `_score_*` helpers);
+  file reading is done by boundary readers (`_read_*`) that return the raw data
+  plus a count of files they could not read. No metric silently scans a subset:
+  an unreadable file is counted and surfaced in `details`, never swallowed.
+- An unknown language returns n/a; it is never silently analyzed as something
+  else.
 """
 
 from __future__ import annotations
@@ -35,7 +41,7 @@ from tree_sitter import Language, Node, Parser
 from l1_analyzer import pytest_trace
 
 # ---------------------------------------------------------------------------
-# Data shapes (TypedDicts)
+# Data shape + pure scoring
 # ---------------------------------------------------------------------------
 
 class L1Result(TypedDict, total=False):
@@ -43,31 +49,72 @@ class L1Result(TypedDict, total=False):
     band: str  # Healthy / Not Healthy / Slop / n/a
     details: str
 
-# Vendored / generated / tooling directories that no source metric should scan.
-# (Note: ".venv" and "venv" are distinct path parts; both must be listed.)
+def band(value: float, healthy: float, slop: float, *, higher_is_better: bool) -> str:
+    """Pure map from a numeric value to a threshold band.
+
+    higher_is_better=True: larger is healthier (e.g. doc-line ratio) - Healthy at
+    value >= healthy, Not Healthy at value >= slop, else Slop.
+    higher_is_better=False: smaller is healthier (e.g. mutable-state ratio) -
+    Healthy at value < healthy, Not Healthy at value < slop, else Slop.
+    """
+    if higher_is_better:
+        return "Healthy" if value >= healthy else ("Not Healthy" if value >= slop else "Slop")
+    return "Healthy" if value < healthy else ("Not Healthy" if value < slop else "Slop")
+
+def _with_skipped(details: str, skipped: int) -> str:
+    """Append an honest note when some files could not be read."""
+    return details if skipped == 0 else f"{details}; {skipped} file(s) unreadable and excluded"
+
+# ---------------------------------------------------------------------------
+# Boundary readers (I/O). Each returns (data, skipped_count) so callers can
+# surface partial scans instead of silently dropping unreadable files.
+# ---------------------------------------------------------------------------
+
 _IGNORE_DIRS = frozenset({
     ".git", "node_modules", "venv", ".venv", "env", "__pycache__",
     ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
     "site-packages", "target", "build", "dist", "vendor",
 })
 
-def _in_ignored_dir(path: Path, extra: tuple[str, ...] = ()) -> bool:
+def _in_ignored_dir(path: Path, extra: tuple[str, ...]) -> bool:
     """True if any path component is a vendored/tooling dir (or one of `extra`)."""
     parts = set(path.parts)
     return bool(parts & _IGNORE_DIRS) or any(e in parts for e in extra)
 
+def _read_source_bytes(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> tuple[list[tuple[Path, bytes]], int]:
+    """Read every source file with one of `extensions` as bytes. Returns the
+    files read and the number that could not be read."""
+    files: list[tuple[Path, bytes]] = []
+    skipped = 0
+    for ext in extensions:
+        for f in repo.rglob(f"*{ext}"):
+            if _in_ignored_dir(f, extra_ignore):
+                continue
+            try:
+                files.append((f, f.read_bytes()))
+            except OSError:
+                skipped += 1
+    return files, skipped
+
+def _read_text_files(repo: Path, extensions: frozenset[str], extra_ignore: tuple[str, ...]) -> tuple[list[tuple[Path, str]], int]:
+    """Read every file whose suffix is in `extensions` as text. Returns the files
+    read and the number that could not be read."""
+    files: list[tuple[Path, str]] = []
+    skipped = 0
+    for f in repo.rglob("*"):
+        if f.suffix.lower() not in extensions:
+            continue
+        if _in_ignored_dir(f, extra_ignore):
+            continue
+        try:
+            files.append((f, f.read_text(errors="ignore")))
+        except OSError:
+            skipped += 1
+    return files, skipped
+
 # ---------------------------------------------------------------------------
 # Git-based (L1.1-L1.8) - language agnostic
 # ---------------------------------------------------------------------------
-
-def _run_git_log(repo: Path, since: str | None = None, until: str | None = None) -> list[str]:
-    cmd = ["git", "-C", str(repo), "log", "--pretty=format:%H", "--name-only"]
-    if since:
-        cmd += ["--since", since]
-    if until:
-        cmd += ["--until", until]
-    out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
-    return [line for line in out.splitlines() if line.strip()]
 
 def _classify_file(path: str) -> str:
     p = path.lower()
@@ -77,11 +124,14 @@ def _classify_file(path: str) -> str:
         return "code"
     return "other"
 
-def compute_git_indicators(repo: Path, since: str | None = None, until: str | None = None) -> dict[str, L1Result]:
-    """Robust git log based indicators. Uses --numstat and --name-status for reliable counts."""
-    # `--numstat` alone carries added/deleted counts AND the path (enough to both
-    # classify each commit's files and sum line changes). Combining it with
-    # `--name-status` makes git drop the numeric counts, so we use numstat only.
+def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> dict[str, L1Result]:
+    """L1.1-L1.8 from `git log --numstat`. `since`/`until` are the explicit
+    Optional date bounds (None = unbounded); resolved here at the boundary.
+
+    `--numstat` alone carries added/deleted counts AND the path (enough to both
+    classify each commit's files and sum line changes). Combining it with
+    `--name-status` makes git drop the numeric counts, so we use numstat only.
+    """
     cmd = ["git", "-C", str(repo), "log", "--numstat", "--pretty=format:COMMIT %H"]
     if since:
         cmd += ["--since", since]
@@ -90,8 +140,8 @@ def compute_git_indicators(repo: Path, since: str | None = None, until: str | No
 
     try:
         out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
-    except Exception:
-        return {f"L1.{i}": {"value": 0, "band": "n/a", "details": "git log failed"} for i in range(1, 9)}
+    except (subprocess.CalledProcessError, FileNotFoundError) as error:
+        return {f"L1.{i}": {"value": 0, "band": "n/a", "details": f"git log failed: {error}"} for i in range(1, 9)}
 
     total_commits = 0
     doc_only = code_only = mixed = 0
@@ -102,51 +152,11 @@ def compute_git_indicators(repo: Path, since: str | None = None, until: str | No
     current_commit_files: set[str] = set()
     current_add = current_del = 0
 
-    for line in out.splitlines():
-        if line.startswith("COMMIT "):
-            if current_commit_files:
-                total_commits += 1
-                kinds = {_classify_file(f) for f in current_commit_files}
-                if "doc" in kinds and "code" not in kinds:
-                    doc_only += 1
-                elif "code" in kinds and "doc" not in kinds:
-                    code_only += 1
-                elif "doc" in kinds and "code" in kinds:
-                    mixed += 1
-
-            if current_add or current_del:
-                total_added += current_add
-                total_deleted += current_del
-                if current_del > current_add:
-                    net_negative_commits += 1
-                if current_add > 0 and (current_del / current_add) > 0.4:
-                    high_delete_commits += 1
-
-            current_commit_files = set()
-            current_add = current_del = 0
-            continue
-
-        if "\t" not in line:
-            continue
-
-        # numstat line: "added<TAB>deleted<TAB>path" (added/deleted are "-" for binary)
-        parts = line.split("\t")
-        if len(parts) < 3:
-            continue
-        added_s, deleted_s, path = parts[0], parts[1], parts[-1]
-        current_commit_files.add(path)  # every touched file counts toward commit classification
-        if added_s.isdigit() and deleted_s.isdigit():
-            a, d = int(added_s), int(deleted_s)
-            current_add += a
-            current_del += d
-            kind = _classify_file(path)
-            if kind == "doc":
-                doc_added += a
-            elif kind == "code":
-                code_added += a
-
-    # last commit
-    if current_commit_files:
+    def close_commit() -> None:
+        nonlocal total_commits, doc_only, code_only, mixed
+        nonlocal total_added, total_deleted, net_negative_commits, high_delete_commits
+        if not current_commit_files:
+            return
         total_commits += 1
         kinds = {_classify_file(f) for f in current_commit_files}
         if "doc" in kinds and "code" not in kinds:
@@ -163,67 +173,86 @@ def compute_git_indicators(repo: Path, since: str | None = None, until: str | No
             if current_add > 0 and (current_del / current_add) > 0.4:
                 high_delete_commits += 1
 
+    for line in out.splitlines():
+        if line.startswith("COMMIT "):
+            close_commit()
+            current_commit_files = set()
+            current_add = current_del = 0
+            continue
+        if "\t" not in line:
+            continue
+        # numstat line: "added<TAB>deleted<TAB>path" (added/deleted are "-" for binary)
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        added_s, deleted_s, path = parts[0], parts[1], parts[-1]
+        current_commit_files.add(path)  # every touched file counts toward commit classification
+        if added_s.isdigit() and deleted_s.isdigit():
+            a, d = int(added_s), int(deleted_s)
+            current_add += a
+            current_del += d
+            kind = _classify_file(path)
+            if kind == "doc":
+                doc_added += a
+            elif kind == "code":
+                code_added += a
+    close_commit()
+
     if total_commits == 0:
-        return {f"L1.{i}": {"value": 0, "band": "n/a"} for i in range(1, 9)}
+        return {f"L1.{i}": {"value": 0, "band": "n/a", "details": "no commits in range"} for i in range(1, 9)}
 
     results: dict[str, L1Result] = {}
 
-    l1 = (doc_only / total_commits) * 100
-    results["L1.1"] = {"value": round(l1, 1), "band": "Healthy" if l1 >= 10 else ("Not Healthy" if l1 >= 1 else "Slop")}
+    l1 = doc_only / total_commits * 100
+    results["L1.1"] = {"value": round(l1, 1), "band": band(l1, 10, 1, higher_is_better=True)}
 
-    l2 = (code_only / total_commits) * 100
-    results["L1.2"] = {"value": round(l2, 1), "band": "Healthy" if l2 < 70 else ("Not Healthy" if l2 <= 85 else "Slop")}
+    l2 = code_only / total_commits * 100
+    results["L1.2"] = {"value": round(l2, 1), "band": band(l2, 70, 85, higher_is_better=False)}
 
-    l3 = (mixed / total_commits) * 100
-    results["L1.3"] = {"value": round(l3, 1), "band": "Healthy" if l3 >= 12 else ("Not Healthy" if l3 >= 3 else "Slop")}
+    l3 = mixed / total_commits * 100
+    results["L1.3"] = {"value": round(l3, 1), "band": band(l3, 12, 3, higher_is_better=True)}
 
-    # L1.4 doc lines as % of total lines added
     l4 = (doc_added / total_added * 100) if total_added > 0 else 0.0
-    results["L1.4"] = {"value": round(l4, 1), "band": "Healthy" if l4 >= 25 else ("Not Healthy" if l4 >= 5 else "Slop"), "details": f"{doc_added} doc / {total_added} total lines added"}
+    results["L1.4"] = {"value": round(l4, 1), "band": band(l4, 25, 5, higher_is_better=True), "details": f"{doc_added} doc / {total_added} total lines added"}
 
-    l5 = (total_deleted / total_added * 100) if total_added > 0 else 0
-    results["L1.5"] = {"value": round(l5, 1), "band": "Healthy" if l5 >= 60 else ("Not Healthy" if l5 >= 30 else "Slop")}
+    l5 = (total_deleted / total_added * 100) if total_added > 0 else 0.0
+    results["L1.5"] = {"value": round(l5, 1), "band": band(l5, 60, 30, higher_is_better=True)}
 
-    l6 = (net_negative_commits / total_commits * 100)
-    results["L1.6"] = {"value": round(l6, 1), "band": "Healthy" if l6 >= 15 else ("Not Healthy" if l6 >= 5 else "Slop")}
+    l6 = net_negative_commits / total_commits * 100
+    results["L1.6"] = {"value": round(l6, 1), "band": band(l6, 15, 5, higher_is_better=True)}
 
-    l7 = (high_delete_commits / total_commits * 100)
-    results["L1.7"] = {"value": round(l7, 1), "band": "Healthy" if l7 >= 20 else ("Not Healthy" if l7 >= 5 else "Slop")}
+    l7 = high_delete_commits / total_commits * 100
+    results["L1.7"] = {"value": round(l7, 1), "band": band(l7, 20, 5, higher_is_better=True)}
 
-    l8 = _test_to_prod_ratio(repo)
-    results["L1.8"] = l8
+    results["L1.8"] = _test_to_prod_ratio(repo)
 
     return results
 
 # Files whose path marks them as test code (used by L1.8).
-_TEST_PATH_MARKERS = ("test", "tests", "spec", "specs", "__tests__")
+_TEST_PATH_MARKERS = frozenset({"test", "tests", "spec", "specs", "__tests__"})
 _SRC_EXTS = frozenset({".py", ".rs", ".c", ".h", ".cpp", ".js", ".jsx", ".mjs", ".cjs",
                        ".ts", ".tsx", ".java", ".cs", ".go", ".rb", ".kt", ".swift", ".php"})
 
+def _is_test_file(path: Path) -> bool:
+    lowered = {p.lower() for p in path.parts}
+    name = path.name.lower()
+    suffix = path.suffix.lower()
+    return bool(lowered & _TEST_PATH_MARKERS) or name.startswith("test_") or name.endswith(("_test" + suffix, ".test" + suffix, ".spec" + suffix))
+
 def _test_to_prod_ratio(repo: Path) -> L1Result:
-    """L1.8: lines of test code / lines of production code, via a filesystem walk."""
+    """L1.8: lines of test code / lines of production code."""
+    files, skipped = _read_text_files(repo, _SRC_EXTS, extra_ignore=())
     test_loc = prod_loc = 0
-    for f in repo.rglob("*"):
-        if f.suffix.lower() not in _SRC_EXTS:
-            continue
-        if _in_ignored_dir(f):
-            continue
-        try:
-            n = len(f.read_text(errors="ignore").splitlines())
-        except Exception:
-            continue
-        lowered = {p.lower() for p in f.parts}
-        name = f.name.lower()
-        is_test = bool(lowered & set(_TEST_PATH_MARKERS)) or name.startswith("test_") or name.endswith(("_test" + f.suffix.lower(), ".test" + f.suffix.lower(), ".spec" + f.suffix.lower()))
-        if is_test:
+    for path, text in files:
+        n = len(text.splitlines())
+        if _is_test_file(path):
             test_loc += n
         else:
             prod_loc += n
     if prod_loc == 0:
-        return {"value": "n/a", "band": "n/a", "details": "no production source files found"}
+        return {"value": "n/a", "band": "n/a", "details": _with_skipped("no production source files found", skipped)}
     ratio = test_loc / prod_loc
-    band = "Healthy" if ratio >= 0.4 else ("Not Healthy" if ratio >= 0.1 else "Slop")
-    return {"value": round(ratio, 2), "band": band, "details": f"{test_loc} test / {prod_loc} production LOC"}
+    return {"value": round(ratio, 2), "band": band(ratio, 0.4, 0.1, higher_is_better=True), "details": _with_skipped(f"{test_loc} test / {prod_loc} production LOC", skipped)}
 
 # ---------------------------------------------------------------------------
 # Config (L1.9-11)
@@ -236,18 +265,9 @@ def compute_config_indicators(repo: Path) -> dict[str, L1Result]:
     has_docker = (repo / "Dockerfile").exists() or (repo / "docker-compose.yml").exists()
 
     return {
-        "L1.9": {
-            "value": "present" if has_precommit else "absent",
-            "band": "Healthy" if has_precommit else "Slop",
-        },
-        "L1.10": {
-            "value": ci_count,
-            "band": "Healthy" if ci_count >= 5 else ("Not Healthy" if ci_count >= 1 else "Slop"),
-        },
-        "L1.11": {
-            "value": "present and parameterized" if has_docker else "absent",
-            "band": "Healthy" if has_docker else "Slop",
-        },
+        "L1.9": {"value": "present" if has_precommit else "absent", "band": "Healthy" if has_precommit else "Slop"},
+        "L1.10": {"value": ci_count, "band": band(ci_count, 5, 1, higher_is_better=True)},
+        "L1.11": {"value": "present and parameterized" if has_docker else "absent", "band": "Healthy" if has_docker else "Slop"},
     }
 
 # ---------------------------------------------------------------------------
@@ -346,8 +366,7 @@ LANG_CFG: dict[str, dict[str, Any]] = {
         "function_types": ("function_declaration", "method_declaration"),
         "class_types": ("type_declaration",),
         "member_access": "selector_expression",
-        # Go has no fixed receiver keyword; the receiver name is parsed per method
-        # and passed to the detector dynamically.
+        # Go has no fixed receiver keyword; the receiver name is parsed per method.
         "this_ident": set(),
         "module_level_assign": ("var_declaration",),
         "type_escape_patterns": ("any", "interface{}"),
@@ -358,18 +377,23 @@ LANG_CFG: dict[str, dict[str, Any]] = {
 # Body node types that hold a function/method's statements, across all grammars.
 _BODY_NODE_TYPES = ("block", "compound_statement", "body", "function_body", "body_statement", "statement_block")
 
+# Every LANG_CFG entry must define these keys; access them directly (a missing
+# key is a config bug that should raise, not silently default). Genuinely
+# optional keys (instance_field_types, const_keywords) still use .get().
+_LANGUAGE_UNKNOWN = "unknown"
+
 def _get_parser(lang: str) -> Parser:
-    cfg = LANG_CFG[lang]
-    p = Parser(cfg["language"])
-    return p
+    return Parser(LANG_CFG[lang]["language"])
 
 def detect_primary_language(repo: Path) -> str:
+    """Return the LANG_CFG key with the most files, or "unknown" when the repo
+    contains no recognized source (callers report n/a rather than guess)."""
     counts: Counter[str] = Counter()
     for lang, cfg in LANG_CFG.items():
         for ext in cfg["extensions"]:
             counts[lang] += len(list(repo.rglob(f"*{ext}")))
-    if not counts:
-        return "python"
+    if not counts or counts.most_common(1)[0][1] == 0:
+        return _LANGUAGE_UNKNOWN
     return counts.most_common(1)[0][0]
 
 # ---------------------------------------------------------------------------
@@ -378,19 +402,16 @@ def detect_primary_language(repo: Path) -> str:
 # Paper A replication package with all the bound-literal logic etc.
 # ---------------------------------------------------------------------------
 
-def _find_module_mutable_names(root: Node, cfg: dict[str, Any], source: bytes) -> set[str]:
+def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
     """Detect top-level names that are likely mutable (assigned and not const/Final/readonly)."""
     mutables: set[str] = set()
-    assign_types = cfg.get("module_level_assign", ("assignment",))
-    this_idents = cfg.get("this_ident", set())
+    assign_types = cfg["module_level_assign"]
+    this_idents = cfg["this_ident"]
     const_keywords = cfg.get("const_keywords", ("const ", "final ", "readonly ", "let ", "val "))
 
     for node in root.children:
         if node.type in assign_types:
-            # crude extraction of left-hand side identifiers
             text = node.text.decode("utf8", errors="ignore")
-            # very simple: look for NAME = ... at top level
-            # In real impl this is a proper tree walk per language (see research l1_18.py)
             for line in text.splitlines():
                 if "=" in line and not any(kw in line.lower() for kw in const_keywords):
                     parts = line.split("=")[0].strip().split()
@@ -400,65 +421,48 @@ def _find_module_mutable_names(root: Node, cfg: dict[str, Any], source: bytes) -
                             mutables.add(name)
     return mutables
 
-def _count_mutable_refs(
-    body: Node,
-    cfg: dict[str, Any],
-    source: bytes,
-    module_mutables: set[str],
-    receiver_names: set[str],
-) -> int:
+def _count_mutable_refs(body: Node, cfg: dict[str, Any], module_mutables: set[str], receiver_names: set[str]) -> int:
     """Count references inside a function body to external mutable state.
 
-    Handles, per-language via cfg:
-    - receiver/member access (self./this./<go-receiver>.<field>) via member_access node
-    - Ruby-style @instance / $global variables via instance_field_types nodes
-    - module-level mutable globals referenced by bare identifier
-    - Rust/C raw patterns (&mut self, static mut)
+    Handles, per-language via cfg: receiver/member access (self./this./<go
+    receiver>.field), Ruby @instance / $global variables, module-level mutable
+    globals referenced by bare identifier, and Rust/C raw patterns.
 
-    Simplified reference implementation; the production version (Paper A replication
-    package) adds bound-literal exclusion and full per-language field resolution.
+    Simplified reference implementation; the production version (Paper A) adds
+    bound-literal exclusion and full per-language field resolution.
     """
     count = 0
-    member_type = cfg.get("member_access", "attribute")
+    member_type = cfg["member_access"]
     instance_field_types = cfg.get("instance_field_types", ())
 
     def walk(n: Node):
         nonlocal count
-        # Member/receiver access: self.x, this.x, or <go receiver>.field
         if n.type == member_type and receiver_names:
             text = n.text.decode("utf8", errors="ignore")
             if any(text.startswith(r + ".") for r in receiver_names):
                 count += 1
-        # Ruby @instance / $global variables are themselves external-state references
         if n.type in instance_field_types:
             count += 1
-        # module-level mutable global referenced by bare name
         if n.type == "identifier":
-            name = n.text.decode("utf8", errors="ignore")
-            if name in module_mutables:
+            if n.text.decode("utf8", errors="ignore") in module_mutables:
                 count += 1
-        # Rust/C raw patterns
         txt = n.text.decode("utf8", errors="ignore") if n.text else ""
         if "static mut" in txt or "&mut self" in txt or "mut self" in txt:
             count += 1
-
         for c in n.children:
             walk(c)
     walk(body)
     return count
 
 def _receiver_names(func_node: Node, cfg: dict[str, Any]) -> set[str]:
-    """Names that denote the enclosing instance for this function.
-
-    For self/this languages it is the fixed keyword set. For Go it is the
-    method receiver identifier, parsed from the receiver parameter list.
-    """
-    fixed = set(cfg.get("this_ident", set()))
+    """Names that denote the enclosing instance for this function. For self/this
+    languages it is the fixed keyword set; for Go it is the method receiver
+    identifier, parsed from the receiver parameter list."""
+    fixed = set(cfg["this_ident"])
     if fixed:
         return fixed
-    # Go: `func (r *Foo) Bar(...)` -> receiver identifier is `r`
     names: set[str] = set()
-    if func_node.type == "method_declaration":
+    if func_node.type == "method_declaration":  # Go: `func (r *Foo) Bar(...)`
         for child in func_node.children:
             if child.type == "parameter_list":
                 for decl in child.children:
@@ -469,50 +473,38 @@ def _receiver_names(func_node: Node, cfg: dict[str, Any]) -> set[str]:
                 break  # first parameter_list is the receiver
     return names
 
-def analyze_mutable_state(repo: Path, lang: str = "python") -> L1Result:
-    cfg = LANG_CFG.get(lang, LANG_CFG["python"])
+def analyze_mutable_state(repo: Path, lang: str) -> L1Result:
+    """L1.18: percentage of functions that reference external mutable state."""
+    if lang not in LANG_CFG:
+        return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
+    cfg = LANG_CFG[lang]
     parser = _get_parser(lang)
+    files, skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
 
     total_funcs = 0
     mutable_funcs = 0
+    for _path, src in files:
+        root = parser.parse(src).root_node
+        module_mutables = _find_module_mutable_names(root, cfg)
 
-    for ext in cfg["extensions"]:
-        for f in list(repo.rglob(f"*{ext}")):
-            if _in_ignored_dir(f, extra=("tests", "test")):
-                continue
-            try:
-                src = f.read_bytes()
-                tree = parser.parse(src)
-                root = tree.root_node
-
-                module_mutables = _find_module_mutable_names(root, cfg, src)
-
-                def find_functions(n: Node):
-                    nonlocal total_funcs, mutable_funcs
-                    if n.type in cfg["function_types"]:
-                        total_funcs += 1
-                        body = None
-                        for c in n.children:
-                            if c.type in _BODY_NODE_TYPES:
-                                body = c
-                                break
-                        if body:
-                            receivers = _receiver_names(n, cfg)
-                            refs = _count_mutable_refs(body, cfg, src, module_mutables, receivers)
-                            if refs > 0:
-                                mutable_funcs += 1
-                    for c in n.children:
-                        find_functions(c)
-                find_functions(root)
-            except Exception:
-                continue
+        def find_functions(n: Node):
+            nonlocal total_funcs, mutable_funcs
+            if n.type in cfg["function_types"]:
+                total_funcs += 1
+                body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
+                if body is not None:
+                    receivers = _receiver_names(n, cfg)
+                    if _count_mutable_refs(body, cfg, module_mutables, receivers) > 0:
+                        mutable_funcs += 1
+            for c in n.children:
+                find_functions(c)
+        find_functions(root)
 
     ratio = (mutable_funcs / total_funcs * 100) if total_funcs > 0 else 0.0
-    band = "Healthy" if ratio < 15 else ("Not Healthy" if ratio < 40 else "Slop")
     return {
         "value": round(ratio, 1),
-        "band": band,
-        "details": f"{mutable_funcs}/{total_funcs} functions reference external mutable state ({lang})",
+        "band": band(ratio, 15, 40, higher_is_better=False),
+        "details": _with_skipped(f"{mutable_funcs}/{total_funcs} functions reference external mutable state ({lang})", skipped),
     }
 
 # ---------------------------------------------------------------------------
@@ -522,195 +514,143 @@ def analyze_mutable_state(repo: Path, lang: str = "python") -> L1Result:
 def _run_external(cmd: list[str], cwd: Path) -> str:
     try:
         return subprocess.check_output(cmd, cwd=str(cwd), text=True, stderr=subprocess.DEVNULL)
-    except Exception:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return ""
 
-def compute_source_indicators(repo: Path, lang: str = "auto", exec_tests: bool = True, **kwargs) -> dict[str, L1Result]:
+def compute_source_indicators(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float) -> dict[str, L1Result]:
+    """L1.12-L1.20. `lang` may be "auto" (resolved here) or a concrete key.
+    `exec_tests` gates the two runtime indicators (L1.19 coverage, L1.20);
+    `timeout_seconds` bounds each test-suite execution."""
     if lang == "auto":
         lang = detect_primary_language(repo)
 
     results: dict[str, L1Result] = {"lang": lang}
-
-    # L1.16 - trailing whitespace (language agnostic, fast)
-    try:
-        count = 0
-        total = 0
-        exts = {".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"}
-        for f in repo.rglob("*"):
-            if f.suffix.lower() not in exts: continue
-            if _in_ignored_dir(f): continue
-            try:
-                lines = f.read_text(errors="ignore").splitlines()
-                total += len(lines)
-                count += sum(1 for ln in lines if ln.rstrip() != ln and ln.strip())
-            except Exception:
-                pass
-        ws_pct = (count / total * 100) if total > 0 else 0.0
-        band = "Healthy" if ws_pct < 0.5 else ("Not Healthy" if ws_pct < 3 else "Slop")
-        results["L1.16"] = {"value": round(ws_pct, 2), "band": band, "details": f"{count} lines with trailing ws"}
-    except Exception as e:
-        results["L1.16"] = {"value": 0, "band": "n/a", "details": str(e)}
-
-    # L1.17 - god files (language agnostic)
-    try:
-        prod_files = 0
-        god_files = 0
-        big_files = 0
-        for f in repo.rglob("*"):
-            if _in_ignored_dir(f, extra=("tests", "test")): continue
-            if f.suffix.lower() in {".py", ".rs", ".c", ".h", ".js", ".ts", ".java", ".cs", ".go", ".rb"}:
-                try:
-                    lines = len(f.read_text(errors="ignore").splitlines())
-                    prod_files += 1
-                    if lines > 1000:
-                        god_files += 1
-                    if lines > 4000:
-                        big_files += 1
-                except Exception:
-                    pass
-        god_pct = (god_files / prod_files * 100) if prod_files > 0 else 0.0
-        band = "Healthy" if god_pct < 0.5 and big_files == 0 else ("Not Healthy" if god_pct < 2 and big_files == 0 else "Slop")
-        results["L1.17"] = {"value": round(god_pct, 2), "band": band, "details": f"{god_files}/{prod_files} files >1k LOC, {big_files} >4k LOC"}
-    except Exception:
-        results["L1.17"] = {"value": 0, "band": "n/a"}
-
-    # L1.18 - Mutable state (core multi-lang tree-sitter impl)
+    results["L1.16"] = _trailing_whitespace(repo)
+    results["L1.17"] = _god_files(repo)
     results["L1.18"] = analyze_mutable_state(repo, lang)
-
-    # L1.15 - Type escape density (tree-sitter)
     results["L1.15"] = _compute_type_escapes(repo, lang)
-
-    # L1.19 - decision-space coverage. Prefer the real runtime measurement
-    # (coverage.py branch tracing); fall back to the honest static enumeration
-    # (a decision-point count, coverage explicitly not measured) when the suite
-    # cannot be run.
-    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests)
-
-    # L1.12,13,14 - External static tools (auto-dispatch)
+    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds)
     results.update(_compute_external_indicators(repo, lang))
-
-    # L1.20 - test determinism (runs the suite; Python-only for now)
-    results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests)
-
+    results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds)
     return results
 
-def _decision_space_l19(repo: Path, lang: str, exec_tests: bool) -> L1Result:
+_WHITESPACE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"})
+_GOD_FILE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".ts", ".java", ".cs", ".go", ".rb"})
+
+def _trailing_whitespace(repo: Path) -> L1Result:
+    """L1.16: percentage of non-blank lines with trailing whitespace."""
+    files, skipped = _read_text_files(repo, _WHITESPACE_EXTS, extra_ignore=())
+    count = total = 0
+    for _path, text in files:
+        lines = text.splitlines()
+        total += len(lines)
+        count += sum(1 for ln in lines if ln.rstrip() != ln and ln.strip())
+    ws_pct = (count / total * 100) if total > 0 else 0.0
+    return {"value": round(ws_pct, 2), "band": band(ws_pct, 0.5, 3, higher_is_better=False), "details": _with_skipped(f"{count} lines with trailing ws", skipped)}
+
+def _god_files(repo: Path) -> L1Result:
+    """L1.17: concentration of files over 1k LOC (any file over 4k forces Slop)."""
+    files, skipped = _read_text_files(repo, _GOD_FILE_EXTS, extra_ignore=("tests", "test"))
+    prod_files = god_files = big_files = 0
+    for _path, text in files:
+        lines = len(text.splitlines())
+        prod_files += 1
+        if lines > 1000:
+            god_files += 1
+        if lines > 4000:
+            big_files += 1
+    god_pct = (god_files / prod_files * 100) if prod_files > 0 else 0.0
+    band_value = "Slop" if big_files > 0 else band(god_pct, 0.5, 2, higher_is_better=False)
+    return {"value": round(god_pct, 2), "band": band_value, "details": _with_skipped(f"{god_files}/{prod_files} files >1k LOC, {big_files} >4k LOC", skipped)}
+
+def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float) -> L1Result:
     """Real branch coverage when the suite can run; otherwise the static
     decision-point enumeration with coverage clearly marked not-measured."""
     static = _compute_decision_space(repo, lang)
     if not exec_tests:
         static["details"] += "; coverage not measured (test execution disabled)"
         return static
-    cov = pytest_trace.decision_space_coverage(repo, lang)
+    cov = pytest_trace.decision_space_coverage(repo, lang, timeout_seconds)
     if cov.get("band") != "n/a":
         return cov
-    # Runtime coverage unavailable: keep the static count but stay honest that
-    # the exercised-coverage fraction was not measured, and say why.
     static["details"] += f"; coverage not measured: {cov.get('details', 'unavailable')}"
     return static
 
-def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool) -> L1Result:
+def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float) -> L1Result:
     if not exec_tests:
         return {"value": "not run", "band": "n/a", "details": "test execution disabled"}
-    return pytest_trace.test_determinism(repo, lang)
+    return pytest_trace.test_determinism(repo, lang, 5, timeout_seconds)
+
+_COMMENT_TYPE_ESCAPES = ("# type: ignore", "// @ts-ignore", "/* @ts-ignore", "@SuppressWarnings")
 
 def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
+    """L1.15: density of type-escape hatches (Any/object/dynamic and ignore comments)."""
     if lang not in LANG_CFG:
-        return {"value": "n/a", "band": "n/a"}
+        return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
     cfg = LANG_CFG[lang]
-    if not cfg.get("type_escape_patterns"):
-        # Untyped or no configured escape hatch (Ruby, JavaScript, Rust, C):
-        # a type-escape density is not meaningful, so report it honestly.
+    if not cfg["type_escape_patterns"]:
+        # Untyped or no configured escape hatch (Ruby, JavaScript, Rust, C).
         return {"value": "n/a", "band": "n/a", "details": f"type-escape density not applicable for {lang}"}
     parser = _get_parser(lang)
+    files, skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+
     escape_count = 0
     total_loc = 0
+    for _path, src in files:
+        total_loc += len(src.decode("utf8", errors="ignore").splitlines())
+        root = parser.parse(src).root_node
 
-    escape_nodes = set(cfg.get("type_escape_patterns", []))
-    comment_escape = {"# type: ignore", "// @ts-ignore", "/* @ts-ignore", "@SuppressWarnings"}
-
-    for ext in cfg["extensions"]:
-        for f in repo.rglob(f"*{ext}"):
-            if _in_ignored_dir(f, extra=("tests", "test")): continue
-            try:
-                src = f.read_bytes()
-                text = src.decode("utf8", errors="ignore")
-                total_loc += len(text.splitlines())
-                tree = parser.parse(src)
-                root = tree.root_node
-
-                def walk(n: Node):
-                    nonlocal escape_count
-                    t = n.text.decode("utf8", errors="ignore") if n.text else ""
-                    if n.type in ("type_identifier", "predefined_type", "any", "object", "dynamic_type"):
-                        if t.lower() in ("any", "object", "dynamic", "unknown"):
-                            escape_count += 1
-                    if any(pat in t for pat in comment_escape):
-                        escape_count += 1
-                    for c in n.children:
-                        walk(c)
-                walk(root)
-            except Exception:
-                pass
+        def walk(n: Node):
+            nonlocal escape_count
+            t = n.text.decode("utf8", errors="ignore") if n.text else ""
+            if n.type in ("type_identifier", "predefined_type", "any", "object", "dynamic_type"):
+                if t.lower() in ("any", "object", "dynamic", "unknown"):
+                    escape_count += 1
+            if any(pat in t for pat in _COMMENT_TYPE_ESCAPES):
+                escape_count += 1
+            for c in n.children:
+                walk(c)
+        walk(root)
 
     density = (escape_count / (total_loc / 1000)) if total_loc > 1000 else 0.0
-    band = "Healthy" if density < 1 else ("Not Healthy" if density < 5 else "Slop")
-    return {"value": round(density, 2), "band": band, "details": f"{escape_count} escapes in ~{total_loc//1000}kLOC"}
+    return {"value": round(density, 2), "band": band(density, 1, 5, higher_is_better=False), "details": _with_skipped(f"{escape_count} escapes in ~{total_loc // 1000}kLOC", skipped)}
 
 # Control-flow branch node types across the supported grammars. Exact-type
 # matches (not substring) so short Ruby types like "if"/"case"/"when" are safe.
 _DECISION_NODE_TYPES = frozenset({
-    # if / conditional
     "if_statement", "if_expression", "if", "elif_clause", "else_if_clause",
     "conditional_expression", "ternary_expression",
-    # switch / match
     "switch_statement", "switch_expression", "switch_section", "switch_case",
     "expression_switch_statement", "type_switch_statement", "expression_case",
     "type_case", "default_case", "communication_case", "select_statement",
     "match_expression", "match_statement", "match_arm", "case_clause",
-    # ruby
-    "case", "when", "case_match", "in_clause",
+    "case", "when", "case_match", "in_clause",  # ruby
 })
 
 def _compute_decision_space(repo: Path, lang: str) -> L1Result:
-    """L1.19, static half: enumerate the finite decision points (the size of the
-    decision space) via tree-sitter. The *coverage* half of L1.19 (what fraction
-    of these a test suite exercises) requires a runtime test-execution trace, which
-    this reference implementation does not run, so it is reported as not-run rather
-    than fabricated. The production analyzer (Paper A l1_19_decision_coverage.py)
-    instruments the suite to compute the exercised fraction.
-    """
+    """L1.19, static half: enumerate the finite decision points via tree-sitter.
+    The exercised-coverage fraction requires a runtime trace (see
+    pytest_trace.decision_space_coverage); when the suite cannot be run this is
+    reported as not-measured rather than fabricated."""
     if lang not in LANG_CFG:
         return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
     parser = _get_parser(lang)
+    files, skipped = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], extra_ignore=("tests", "test"))
+
     decision_points = 0
-    files_scanned = 0
+    for _path, src in files:
+        root = parser.parse(src).root_node
 
-    for ext in LANG_CFG[lang]["extensions"]:
-        for f in repo.rglob(f"*{ext}"):
-            if _in_ignored_dir(f, extra=("tests", "test")): continue
-            try:
-                root = parser.parse(f.read_bytes()).root_node
-                files_scanned += 1
+        def walk(n: Node):
+            nonlocal decision_points
+            if n.type in _DECISION_NODE_TYPES:
+                decision_points += 1
+            for c in n.children:
+                walk(c)
+        walk(root)
 
-                def walk(n: Node):
-                    nonlocal decision_points
-                    if n.type in _DECISION_NODE_TYPES:
-                        decision_points += 1
-                    for c in n.children:
-                        walk(c)
-                walk(root)
-            except Exception:
-                pass
-
-    return {
-        "value": decision_points,
-        "band": "n/a",
-        "details": (
-            f"{decision_points} finite decision points enumerated across {files_scanned} files; "
-            "exercised-coverage fraction requires a test-execution trace (not run by this reference implementation)"
-        ),
-    }
+    detail = f"{decision_points} finite decision points enumerated across {len(files)} files; exercised-coverage fraction requires a test-execution trace (not run by this reference implementation)"
+    return {"value": decision_points, "band": "n/a", "details": _with_skipped(detail, skipped)}
 
 def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
     """Indicators that delegate to an external tool. Each reports an honest
@@ -723,11 +663,11 @@ def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
     if shutil.which("gitleaks"):
         out = _run_external(["gitleaks", "detect", "--no-git", "--source", ".", "--report-format", "json", "--report-path", "/dev/stdout"], repo)
         hits = out.count('"RuleID"')
-        res["L1.14"] = {"value": hits, "band": "Healthy" if hits == 0 else ("Not Healthy" if hits <= 2 else "Slop"), "details": "gitleaks findings"}
+        res["L1.14"] = {"value": hits, "band": band(hits, 1, 3, higher_is_better=False), "details": "gitleaks findings"}
     elif shutil.which("detect-secrets"):
         out = _run_external(["detect-secrets", "scan", "."], repo)
         hits = out.count('"is_verified"')
-        res["L1.14"] = {"value": hits, "band": "Healthy" if hits == 0 else ("Not Healthy" if hits <= 2 else "Slop"), "details": "detect-secrets findings"}
+        res["L1.14"] = {"value": hits, "band": band(hits, 1, 3, higher_is_better=False), "details": "detect-secrets findings"}
     else:
         res["L1.14"] = {"value": "n/a", "band": "n/a", "details": "install gitleaks or detect-secrets to compute L1.14"}
 
@@ -747,7 +687,7 @@ def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
         m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", out)
         if m:
             clone_pct = float(m.group(1))
-            res["L1.13"] = {"value": clone_pct, "band": "Healthy" if clone_pct < 3 else ("Not Healthy" if clone_pct < 10 else "Slop"), "details": "jscpd duplication percentage"}
+            res["L1.13"] = {"value": clone_pct, "band": band(clone_pct, 3, 10, higher_is_better=False), "details": "jscpd duplication percentage"}
         else:
             res["L1.13"] = {"value": "n/a", "band": "n/a", "details": "jscpd produced no parseable duplication percentage"}
     else:

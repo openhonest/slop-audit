@@ -37,6 +37,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Do not execute the target repo's test suite (skips the runtime half of L1.19 and all of L1.20).",
     )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=300.0,
+        help="Seconds allowed for each test-suite execution in L1.19/L1.20 (default 300).",
+    )
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args(argv)
@@ -57,13 +63,10 @@ def main(argv: list[str] | None = None) -> int:
         config_results = indicators.compute_config_indicators(args.repo)
         results.update(config_results)
 
-    # L1.12-17,18-20: source based -> use tree-sitter for language-agnostic where implemented
+    # L1.12-20: source based -> tree-sitter, plus the runtime L1.19/L1.20 harness
     if inds is None or any(i in ("12","13","14","15","16","17","18","19","20","all") for i in (inds or [])):
-        lang = args.lang
-        if lang == "auto":
-            lang = indicators.detect_primary_language(args.repo)
         source_results = indicators.compute_source_indicators(
-            args.repo, lang=lang, since=args.since, until=args.until, exec_tests=not args.no_exec
+            args.repo, lang=args.lang, exec_tests=not args.no_exec, timeout_seconds=args.timeout
         )
         results.update(source_results)
 
@@ -71,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"repo": str(args.repo), "results": results}, indent=2))
     else:
         print(f"LAYER 1: Slop Audit indicators for {args.repo}")
-        print(f"Language (for source indicators): {results.get('lang', lang)}")
+        print(f"Language (for source indicators): {results.get('lang', args.lang)}")
         for k, v in sorted(results.items()):
             if k.startswith("L1."):
                 print(f"  {k}: {v}")
