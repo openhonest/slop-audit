@@ -443,9 +443,8 @@ def _count_mutable_refs(body: Node, cfg: dict[str, Any], module_mutables: set[st
                 count += 1
         if n.type in instance_field_types:
             count += 1
-        if n.type == "identifier":
-            if n.text.decode("utf8", errors="ignore") in module_mutables:
-                count += 1
+        if n.type == "identifier" and n.text.decode("utf8", errors="ignore") in module_mutables:
+            count += 1
         txt = n.text.decode("utf8", errors="ignore") if n.text else ""
         if "static mut" in txt or "&mut self" in txt or "mut self" in txt:
             count += 1
@@ -473,6 +472,25 @@ def _receiver_names(func_node: Node, cfg: dict[str, Any]) -> set[str]:
                 break  # first parameter_list is the receiver
     return names
 
+def _count_file_functions(root: Node, cfg: dict[str, Any], module_mutables: set[str]) -> tuple[int, int]:
+    """Pure per-file walk: return (total functions, functions touching external
+    mutable state). Module-level (not a loop closure) so it binds no caller state."""
+    totals = [0, 0]  # [total, mutable]
+
+    def find_functions(n: Node):
+        if n.type in cfg["function_types"]:
+            totals[0] += 1
+            body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
+            if body is not None:
+                receivers = _receiver_names(n, cfg)
+                if _count_mutable_refs(body, cfg, module_mutables, receivers) > 0:
+                    totals[1] += 1
+        for c in n.children:
+            find_functions(c)
+
+    find_functions(root)
+    return totals[0], totals[1]
+
 def analyze_mutable_state(repo: Path, lang: str) -> L1Result:
     """L1.18: percentage of functions that reference external mutable state."""
     if lang not in LANG_CFG:
@@ -486,19 +504,9 @@ def analyze_mutable_state(repo: Path, lang: str) -> L1Result:
     for _path, src in files:
         root = parser.parse(src).root_node
         module_mutables = _find_module_mutable_names(root, cfg)
-
-        def find_functions(n: Node):
-            nonlocal total_funcs, mutable_funcs
-            if n.type in cfg["function_types"]:
-                total_funcs += 1
-                body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
-                if body is not None:
-                    receivers = _receiver_names(n, cfg)
-                    if _count_mutable_refs(body, cfg, module_mutables, receivers) > 0:
-                        mutable_funcs += 1
-            for c in n.children:
-                find_functions(c)
-        find_functions(root)
+        file_total, file_mutable = _count_file_functions(root, cfg, module_mutables)
+        total_funcs += file_total
+        mutable_funcs += file_mutable
 
     ratio = (mutable_funcs / total_funcs * 100) if total_funcs > 0 else 0.0
     return {
@@ -603,9 +611,8 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
         def walk(n: Node):
             nonlocal escape_count
             t = n.text.decode("utf8", errors="ignore") if n.text else ""
-            if n.type in ("type_identifier", "predefined_type", "any", "object", "dynamic_type"):
-                if t.lower() in ("any", "object", "dynamic", "unknown"):
-                    escape_count += 1
+            if n.type in ("type_identifier", "predefined_type", "any", "object", "dynamic_type") and t.lower() in ("any", "object", "dynamic", "unknown"):
+                escape_count += 1
             if any(pat in t for pat in _COMMENT_TYPE_ESCAPES):
                 escape_count += 1
             for c in n.children:
@@ -674,7 +681,7 @@ def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
     # L1.12 dead code - language-specific tool; only Python (vulture) is wired here
     if lang == "python" and shutil.which("vulture"):
         out = _run_external(["vulture", ".", "--min-confidence", "80"], repo)
-        unreach = len([l for l in out.splitlines() if l.strip()])
+        unreach = len([line for line in out.splitlines() if line.strip()])
         res["L1.12"] = {"value": unreach, "band": "Healthy" if unreach < 50 else "Slop", "details": "vulture unreachable/unused symbols"}
     elif lang == "python":
         res["L1.12"] = {"value": "n/a", "band": "n/a", "details": "install vulture to compute L1.12 for Python"}

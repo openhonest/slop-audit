@@ -8,7 +8,6 @@ import os
 import subprocess
 
 import pytest
-
 from l1_analyzer import indicators, pytest_trace
 from l1_analyzer.indicators import (
     analyze_mutable_state,

@@ -1,0 +1,21 @@
+# Pre-commit hooks for the Slop Audit repository.
+# Modifying hooks are scoped to the L1 analyzer so the Markdown specification
+# tree is not reformatted. check-yaml validates the whole repo (workflows too).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^tools/l1_analyzer/.*\.(py|toml)$
+      - id: end-of-file-fixer
+        files: ^tools/l1_analyzer/.*\.(py|toml)$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: check-yaml
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^tools/l1_analyzer/.*\.py$

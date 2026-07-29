@@ -74,7 +74,7 @@ def _module_available(module: str) -> bool:
     try:
         result = subprocess.run(
             [sys.executable, "-c", f"import {module}"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=30, check=False,
         )
         return result.returncode == 0
     except (subprocess.SubprocessError, OSError):

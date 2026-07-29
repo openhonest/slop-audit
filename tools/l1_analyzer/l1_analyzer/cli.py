@@ -15,6 +15,7 @@ from typing import Any
 
 from l1_analyzer import indicators
 
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="l1-analyzer")
     parser.add_argument("repo", type=Path, help="Path to git repository root")
@@ -78,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         for k, v in sorted(results.items()):
             if k.startswith("L1."):
                 print(f"  {k}: {v}")
-        print(f"\nSlop signal count (demo thresholds): see individual bands above.")
+        print("\nSlop signal count (demo thresholds): see individual bands above.")
 
     return 0
 
