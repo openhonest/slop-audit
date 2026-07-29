@@ -14,9 +14,10 @@ pure functions, TypedDict data, dict dispatch for language differences, I/O at e
 
 from __future__ import annotations
 
+import re
+import shutil
 import subprocess
-from collections import Counter, defaultdict
-from dataclasses import dataclass
+from collections import Counter
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -39,6 +40,19 @@ class L1Result(TypedDict, total=False):
     value: float | int | str
     band: str  # Healthy / Not Healthy / Slop / n/a
     details: str
+
+# Vendored / generated / tooling directories that no source metric should scan.
+# (Note: ".venv" and "venv" are distinct path parts; both must be listed.)
+_IGNORE_DIRS = frozenset({
+    ".git", "node_modules", "venv", ".venv", "env", "__pycache__",
+    ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
+    "site-packages", "target", "build", "dist", "vendor",
+})
+
+def _in_ignored_dir(path: Path, extra: tuple[str, ...] = ()) -> bool:
+    """True if any path component is a vendored/tooling dir (or one of `extra`)."""
+    parts = set(path.parts)
+    return bool(parts & _IGNORE_DIRS) or any(e in parts for e in extra)
 
 # ---------------------------------------------------------------------------
 # Git-based (L1.1-L1.8) - language agnostic
@@ -63,8 +77,10 @@ def _classify_file(path: str) -> str:
 
 def compute_git_indicators(repo: Path, since: str | None = None, until: str | None = None) -> dict[str, L1Result]:
     """Robust git log based indicators. Uses --numstat and --name-status for reliable counts."""
-    # Use a single robust git log command
-    cmd = ["git", "-C", str(repo), "log", "--numstat", "--name-status", "--pretty=format:COMMIT %H"]
+    # `--numstat` alone carries added/deleted counts AND the path (enough to both
+    # classify each commit's files and sum line changes). Combining it with
+    # `--name-status` makes git drop the numeric counts, so we use numstat only.
+    cmd = ["git", "-C", str(repo), "log", "--numstat", "--pretty=format:COMMIT %H"]
     if since:
         cmd += ["--since", since]
     if until:
@@ -78,6 +94,7 @@ def compute_git_indicators(repo: Path, since: str | None = None, until: str | No
     total_commits = 0
     doc_only = code_only = mixed = 0
     total_added = total_deleted = 0
+    doc_added = code_added = 0
     net_negative_commits = high_delete_commits = 0
 
     current_commit_files: set[str] = set()
@@ -110,18 +127,21 @@ def compute_git_indicators(repo: Path, since: str | None = None, until: str | No
         if "\t" not in line:
             continue
 
+        # numstat line: "added<TAB>deleted<TAB>path" (added/deleted are "-" for binary)
         parts = line.split("\t")
-        if len(parts) >= 2:
-            # numstat lines: added deleted path
-            if parts[0].replace("-", "").isdigit() and parts[1].replace("-", "").isdigit():
-                a = int(parts[0]) if parts[0] != "-" else 0
-                d = int(parts[1]) if parts[1] != "-" else 0
-                current_add += a
-                current_del += d
-            else:
-                # name-status line
-                path = parts[-1]
-                current_commit_files.add(path)
+        if len(parts) < 3:
+            continue
+        added_s, deleted_s, path = parts[0], parts[1], parts[-1]
+        current_commit_files.add(path)  # every touched file counts toward commit classification
+        if added_s.isdigit() and deleted_s.isdigit():
+            a, d = int(added_s), int(deleted_s)
+            current_add += a
+            current_del += d
+            kind = _classify_file(path)
+            if kind == "doc":
+                doc_added += a
+            elif kind == "code":
+                code_added += a
 
     # last commit
     if current_commit_files:
@@ -155,23 +175,53 @@ def compute_git_indicators(repo: Path, since: str | None = None, until: str | No
     l3 = (mixed / total_commits) * 100
     results["L1.3"] = {"value": round(l3, 1), "band": "Healthy" if l3 >= 12 else ("Not Healthy" if l3 >= 3 else "Slop")}
 
-    # L1.4 approximate
-    l4 = min(40.0, max(0.0, l3 * 1.8))
-    results["L1.4"] = {"value": round(l4, 1), "band": "Healthy" if l4 >= 25 else ("Not Healthy" if l4 >= 5 else "Slop")}
+    # L1.4 doc lines as % of total lines added
+    l4 = (doc_added / total_added * 100) if total_added > 0 else 0.0
+    results["L1.4"] = {"value": round(l4, 1), "band": "Healthy" if l4 >= 25 else ("Not Healthy" if l4 >= 5 else "Slop"), "details": f"{doc_added} doc / {total_added} total lines added"}
 
     l5 = (total_deleted / total_added * 100) if total_added > 0 else 0
     results["L1.5"] = {"value": round(l5, 1), "band": "Healthy" if l5 >= 60 else ("Not Healthy" if l5 >= 30 else "Slop")}
 
-    total_for_deltas = max(1, net_negative_commits + (total_commits - net_negative_commits))  # rough
     l6 = (net_negative_commits / total_commits * 100)
     results["L1.6"] = {"value": round(l6, 1), "band": "Healthy" if l6 >= 15 else ("Not Healthy" if l6 >= 5 else "Slop")}
 
     l7 = (high_delete_commits / total_commits * 100)
     results["L1.7"] = {"value": round(l7, 1), "band": "Healthy" if l7 >= 20 else ("Not Healthy" if l7 >= 5 else "Slop")}
 
-    results["L1.8"] = {"value": "n/a (needs full tree LOC count)", "band": "n/a"}
+    l8 = _test_to_prod_ratio(repo)
+    results["L1.8"] = l8
 
     return results
+
+# Files whose path marks them as test code (used by L1.8).
+_TEST_PATH_MARKERS = ("test", "tests", "spec", "specs", "__tests__")
+_SRC_EXTS = frozenset({".py", ".rs", ".c", ".h", ".cpp", ".js", ".jsx", ".mjs", ".cjs",
+                       ".ts", ".tsx", ".java", ".cs", ".go", ".rb", ".kt", ".swift", ".php"})
+
+def _test_to_prod_ratio(repo: Path) -> L1Result:
+    """L1.8: lines of test code / lines of production code, via a filesystem walk."""
+    test_loc = prod_loc = 0
+    for f in repo.rglob("*"):
+        if f.suffix.lower() not in _SRC_EXTS:
+            continue
+        if _in_ignored_dir(f):
+            continue
+        try:
+            n = len(f.read_text(errors="ignore").splitlines())
+        except Exception:
+            continue
+        lowered = {p.lower() for p in f.parts}
+        name = f.name.lower()
+        is_test = bool(lowered & set(_TEST_PATH_MARKERS)) or name.startswith("test_") or name.endswith(("_test" + f.suffix.lower(), ".test" + f.suffix.lower(), ".spec" + f.suffix.lower()))
+        if is_test:
+            test_loc += n
+        else:
+            prod_loc += n
+    if prod_loc == 0:
+        return {"value": "n/a", "band": "n/a", "details": "no production source files found"}
+    ratio = test_loc / prod_loc
+    band = "Healthy" if ratio >= 0.4 else ("Not Healthy" if ratio >= 0.1 else "Slop")
+    return {"value": round(ratio, 2), "band": band, "details": f"{test_loc} test / {prod_loc} production LOC"}
 
 # ---------------------------------------------------------------------------
 # Config (L1.9-11)
@@ -426,7 +476,7 @@ def analyze_mutable_state(repo: Path, lang: str = "python") -> L1Result:
 
     for ext in cfg["extensions"]:
         for f in list(repo.rglob(f"*{ext}")):
-            if any(part in (".git", "node_modules", "venv", "__pycache__", "target", "build", "tests", "test") for part in f.parts):
+            if _in_ignored_dir(f, extra=("tests", "test")):
                 continue
             try:
                 src = f.read_bytes()
@@ -486,7 +536,7 @@ def compute_source_indicators(repo: Path, lang: str = "auto", **kwargs) -> dict[
         exts = {".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"}
         for f in repo.rglob("*"):
             if f.suffix.lower() not in exts: continue
-            if any(p in f.parts for p in (".git", "node_modules", "venv", "__pycache__", "target", "build", "dist")): continue
+            if _in_ignored_dir(f): continue
             try:
                 lines = f.read_text(errors="ignore").splitlines()
                 total += len(lines)
@@ -505,7 +555,7 @@ def compute_source_indicators(repo: Path, lang: str = "auto", **kwargs) -> dict[
         god_files = 0
         big_files = 0
         for f in repo.rglob("*"):
-            if any(p in f.parts for p in (".git", "node_modules", "venv", "__pycache__", "target", "build", "dist", "tests", "test")): continue
+            if _in_ignored_dir(f, extra=("tests", "test")): continue
             if f.suffix.lower() in {".py", ".rs", ".c", ".h", ".js", ".ts", ".java", ".cs", ".go", ".rb"}:
                 try:
                     lines = len(f.read_text(errors="ignore").splitlines())
@@ -553,7 +603,7 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
 
     for ext in cfg["extensions"]:
         for f in repo.rglob(f"*{ext}"):
-            if any(p in f.parts for p in (".git", "node_modules", "venv", "test", "tests")): continue
+            if _in_ignored_dir(f, extra=("tests", "test")): continue
             try:
                 src = f.read_bytes()
                 text = src.decode("utf8", errors="ignore")
@@ -579,69 +629,108 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
     band = "Healthy" if density < 1 else ("Not Healthy" if density < 5 else "Slop")
     return {"value": round(density, 2), "band": band, "details": f"{escape_count} escapes in ~{total_loc//1000}kLOC"}
 
+# Control-flow branch node types across the supported grammars. Exact-type
+# matches (not substring) so short Ruby types like "if"/"case"/"when" are safe.
+_DECISION_NODE_TYPES = frozenset({
+    # if / conditional
+    "if_statement", "if_expression", "if", "elif_clause", "else_if_clause",
+    "conditional_expression", "ternary_expression",
+    # switch / match
+    "switch_statement", "switch_expression", "switch_section", "switch_case",
+    "expression_switch_statement", "type_switch_statement", "expression_case",
+    "type_case", "default_case", "communication_case", "select_statement",
+    "match_expression", "match_statement", "match_arm", "case_clause",
+    # ruby
+    "case", "when", "case_match", "in_clause",
+})
+
 def _compute_decision_space(repo: Path, lang: str) -> L1Result:
-    """Basic static decision point enumeration (if/elif, switch/match, enum usage in control).
-    Full L1.19 also needs test execution trace. This is the static part.
+    """L1.19, static half: enumerate the finite decision points (the size of the
+    decision space) via tree-sitter. The *coverage* half of L1.19 (what fraction
+    of these a test suite exercises) requires a runtime test-execution trace, which
+    this reference implementation does not run, so it is reported as not-run rather
+    than fabricated. The production analyzer (Paper A l1_19_decision_coverage.py)
+    instruments the suite to compute the exercised fraction.
     """
     if lang not in LANG_CFG:
-        return {"value": "n/a", "band": "n/a"}
-    # Very rough count of control flow decision points using tree-sitter
-    # In production this would be much more sophisticated (like the paper's l1_19).
+        return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
     parser = _get_parser(lang)
     decision_points = 0
-    exercised_estimate = 0  # we can't know without running tests; assume low for demo
+    files_scanned = 0
 
     for ext in LANG_CFG[lang]["extensions"]:
         for f in repo.rglob(f"*{ext}"):
-            if any(p in f.parts for p in (".git", "node_modules", "venv", "test", "tests")): continue
+            if _in_ignored_dir(f, extra=("tests", "test")): continue
             try:
-                src = f.read_bytes()
-                tree = parser.parse(src)
-                root = tree.root_node
-                for node in root.children:
-                    if node.type in ("if_statement", "if_expression", "switch_statement", "match_expression", "switch_expression"):
-                        decision_points += 2  # rough
-                    # count enum arms etc. would go here
+                root = parser.parse(f.read_bytes()).root_node
+                files_scanned += 1
+
+                def walk(n: Node):
+                    nonlocal decision_points
+                    if n.type in _DECISION_NODE_TYPES:
+                        decision_points += 1
+                    for c in n.children:
+                        walk(c)
+                walk(root)
             except Exception:
                 pass
 
-    # Without test run, we report the static points and note that coverage requires execution
-    coverage = 40.0  # placeholder; real L1.19 runs the test suite
-    band = "Not Healthy"
     return {
-        "value": round(coverage, 1),
-        "band": band,
-        "details": f"~{decision_points} static decision points; full L1.19 requires test tracing (see l1_19_decision_coverage.py in research)"
+        "value": decision_points,
+        "band": "n/a",
+        "details": (
+            f"{decision_points} finite decision points enumerated across {files_scanned} files; "
+            "exercised-coverage fraction requires a test-execution trace (not run by this reference implementation)"
+        ),
     }
 
 def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
-    res = {}
-    # L1.14 secrets - prefer gitleaks or detect-secrets
-    secrets_output = _run_external(["gitleaks", "detect", "--no-git", "--source", "."], repo)
-    if not secrets_output:
-        secrets_output = _run_external(["detect-secrets", "scan", "."], repo)
-    hits = secrets_output.count("\n") if secrets_output else 0
-    band = "Healthy" if hits == 0 else ("Not Healthy" if hits <= 2 else "Slop")
-    res["L1.14"] = {"value": hits, "band": band, "details": "secret scanner hits"}
+    """Indicators that delegate to an external tool. Each reports an honest
+    `n/a` when the tool it needs is not installed, rather than a fabricated
+    number or a misleading "Healthy" that only means "nothing ran".
+    """
+    res: dict[str, L1Result] = {}
 
-    # L1.12 dead code - language specific tool
-    if lang == "python":
-        out = _run_external(["vulture", ".", "--min-confidence", "80"], repo)
-        unreach = len([l for l in out.splitlines() if l.strip()]) if out else 0
+    # L1.14 secrets - prefer gitleaks, then detect-secrets
+    if shutil.which("gitleaks"):
+        out = _run_external(["gitleaks", "detect", "--no-git", "--source", ".", "--report-format", "json", "--report-path", "/dev/stdout"], repo)
+        hits = out.count('"RuleID"')
+        res["L1.14"] = {"value": hits, "band": "Healthy" if hits == 0 else ("Not Healthy" if hits <= 2 else "Slop"), "details": "gitleaks findings"}
+    elif shutil.which("detect-secrets"):
+        out = _run_external(["detect-secrets", "scan", "."], repo)
+        hits = out.count('"is_verified"')
+        res["L1.14"] = {"value": hits, "band": "Healthy" if hits == 0 else ("Not Healthy" if hits <= 2 else "Slop"), "details": "detect-secrets findings"}
     else:
-        unreach = 0  # would call staticcheck, etc.
-    # approximate LOC
-    loc = sum(1 for f in repo.rglob(f"*.{lang[:2] if lang != 'python' else 'py'}") for _ in f.read_text(errors='ignore').splitlines()) or 10000
-    pct = (unreach / (loc / 100)) if loc else 0  # rough per 100 LOC? better per KLOC later
-    # Simplified
-    res["L1.12"] = {"value": f"{unreach} (tool output)", "band": "Healthy" if unreach < 50 else "Slop"}
+        res["L1.14"] = {"value": "n/a", "band": "n/a", "details": "install gitleaks or detect-secrets to compute L1.14"}
 
-    # L1.13 clones - jscpd supports many languages
-    clone_out = _run_external(["jscpd", "--mode", "weak", "--min-tokens", "50", "."], repo)
-    clone_pct = 5.0  # parse output in real impl
-    res["L1.13"] = {"value": clone_pct, "band": "Not Healthy"}
+    # L1.12 dead code - language-specific tool; only Python (vulture) is wired here
+    if lang == "python" and shutil.which("vulture"):
+        out = _run_external(["vulture", ".", "--min-confidence", "80"], repo)
+        unreach = len([l for l in out.splitlines() if l.strip()])
+        res["L1.12"] = {"value": unreach, "band": "Healthy" if unreach < 50 else "Slop", "details": "vulture unreachable/unused symbols"}
+    elif lang == "python":
+        res["L1.12"] = {"value": "n/a", "band": "n/a", "details": "install vulture to compute L1.12 for Python"}
+    else:
+        res["L1.12"] = {"value": "n/a", "band": "n/a", "details": f"no dead-code tool wired for {lang} (Python uses vulture)"}
 
-    # L1.20 - test determinism (suggest command, don't auto-run heavy)
-    res["L1.20"] = {"value": "run pytest --randomly-seed=random -q 5 times", "band": "n/a", "details": "requires executing test suite with randomization"}
+    # L1.13 clones - jscpd, parse the reported duplication percentage
+    if shutil.which("jscpd"):
+        out = _run_external(["jscpd", "--mode", "weak", "--min-tokens", "50", "--reporters", "console", "."], repo)
+        m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", out)
+        if m:
+            clone_pct = float(m.group(1))
+            res["L1.13"] = {"value": clone_pct, "band": "Healthy" if clone_pct < 3 else ("Not Healthy" if clone_pct < 10 else "Slop"), "details": "jscpd duplication percentage"}
+        else:
+            res["L1.13"] = {"value": "n/a", "band": "n/a", "details": "jscpd produced no parseable duplication percentage"}
+    else:
+        res["L1.13"] = {"value": "n/a", "band": "n/a", "details": "install jscpd to compute L1.13"}
+
+    # L1.20 test determinism - not auto-run (executing an arbitrary repo's suite
+    # is unsafe/environment-dependent). Report the exact reproducible command.
+    res["L1.20"] = {
+        "value": "not run",
+        "band": "n/a",
+        "details": "run the suite 5x in randomized order and compare (e.g. pytest -p randomly -q); order-dependent results fail L1.20",
+    }
 
     return res
