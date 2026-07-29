@@ -34,3 +34,10 @@ packages = ["l1_analyzer"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 bdd_features_base_dir = "tests/features"
+
+# Coverage is scoped to the package under audit, not the test scaffolding, so
+# decision-space coverage (L1.19) measures the source's branches - the subject
+# of the audit - rather than being diluted by branches in the tests themselves.
+[tool.coverage.run]
+branch = true
+source = ["l1_analyzer"]

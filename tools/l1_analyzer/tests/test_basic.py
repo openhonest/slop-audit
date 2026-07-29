@@ -86,7 +86,21 @@ def test_unreadable_file_is_counted_not_swallowed(tmp_path):
     blocked.write_text("def g(x):\n    return x\n")
     blocked.chmod(0o000)
     try:
-        res = analyze_mutable_state(tmp_path, "python")
+        res = analyze_mutable_state(tmp_path, "python")   # bytes reader
+    finally:
+        blocked.chmod(0o644)
+    assert "unreadable" in res["details"]
+
+
+def test_unreadable_file_surfaced_by_text_reader(tmp_path):
+    if os.geteuid() == 0:
+        pytest.skip("root ignores file permissions")
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    blocked = tmp_path / "blocked.py"
+    blocked.write_text("y = 2\n")
+    blocked.chmod(0o000)
+    try:
+        res = indicators._trailing_whitespace(tmp_path)   # text reader
     finally:
         blocked.chmod(0o644)
     assert "unreadable" in res["details"]
@@ -271,6 +285,256 @@ def test_l1_19_l1_20_pass_on_a_clean_fixture(tmp_path):
     assert cov["value"] == 100.0 and cov["band"] == "Healthy"  # both branches exercised
     det = pytest_trace.test_determinism(tmp_path, "python", 5, 60.0)
     assert det["value"] == "5/5" and det["band"] == "Healthy"
+
+
+# --- L1.12/13/14 external tools: real stub binaries on a controlled PATH -----
+# Not mocks - genuine executables at the process boundary, the way the real
+# tools are invoked. PATH is set to a dir we own so presence is deterministic.
+
+def _stub(bin_dir, name, body):
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    f = bin_dir / name
+    f.write_text("#!/bin/sh\n" + body + "\n")
+    f.chmod(0o755)
+
+
+def test_external_tools_absent_are_na(tmp_path, monkeypatch):
+    bind = tmp_path / "bin"
+    bind.mkdir()
+    monkeypatch.setenv("PATH", str(bind))  # no gitleaks/vulture/jscpd on PATH
+    res = indicators._compute_external_indicators(tmp_path, "python")
+    assert res["L1.14"]["band"] == "n/a"
+    assert res["L1.12"]["band"] == "n/a"
+    assert res["L1.13"]["band"] == "n/a"
+
+
+def test_l1_14_gitleaks_present_counts_findings(tmp_path, monkeypatch):
+    bind = tmp_path / "bin"
+    _stub(bind, "gitleaks", "printf '{\"RuleID\":\"a\"}\\n{\"RuleID\":\"b\"}\\n'")
+    monkeypatch.setenv("PATH", str(bind))
+    res = indicators._compute_external_indicators(tmp_path, "python")
+    assert res["L1.14"]["value"] == 2
+    assert res["L1.14"]["band"] == "Not Healthy"  # band(2, 1, 3, lower-is-better)
+
+
+def test_l1_12_vulture_present_and_non_python(tmp_path, monkeypatch):
+    bind = tmp_path / "bin"
+    _stub(bind, "vulture", "printf 'a\\nb\\nc\\n'")
+    monkeypatch.setenv("PATH", str(bind))
+    res = indicators._compute_external_indicators(tmp_path, "python")
+    assert res["L1.12"]["value"] == 3 and res["L1.12"]["band"] == "Healthy"
+    # non-Python has no dead-code tool wired
+    res_go = indicators._compute_external_indicators(tmp_path, "go")
+    assert res_go["L1.12"]["band"] == "n/a" and "no dead-code tool" in res_go["L1.12"]["details"]
+
+
+def test_l1_13_jscpd_present_parseable_and_not(tmp_path, monkeypatch):
+    bind = tmp_path / "bin"
+    _stub(bind, "jscpd", "echo 'Total duplication: 4.5 %'")
+    monkeypatch.setenv("PATH", str(bind))
+    assert indicators._compute_external_indicators(tmp_path, "python")["L1.13"]["value"] == 4.5
+    _stub(bind, "jscpd", "echo 'no percentage in this output'")
+    assert indicators._compute_external_indicators(tmp_path, "python")["L1.13"]["band"] == "n/a"
+
+
+# --- L1.8 / L1.15 / L1.19 remaining branches --------------------------------
+
+def test_l1_8_no_production_files_is_na(tmp_path):
+    (tmp_path / "test_only.py").write_text("def test_x():\n    assert True\n")
+    assert indicators._test_to_prod_ratio(tmp_path)["band"] == "n/a"
+
+
+def test_l1_15_density_over_a_kloc_is_slop(tmp_path):
+    (tmp_path / "a.py").write_text("v: Any = 1\n" * 1100)  # >1000 LOC, all escapes
+    res = indicators._compute_type_escapes(tmp_path, "python")
+    assert res["value"] > 0 and res["band"] == "Slop"
+
+
+def test_l1_19_falls_back_to_static_when_no_tests(tmp_path):
+    (tmp_path / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
+    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=True, timeout_seconds=60.0)
+    assert res["band"] == "n/a" and "coverage not measured" in res["details"]
+    assert isinstance(res["value"], int) and res["value"] >= 1
+
+
+# --- pytest_trace edge paths (real execution) -------------------------------
+
+def test_l1_19_no_tests_is_na(tmp_path):
+    (tmp_path / "m.py").write_text("def f(x):\n    return x\n")
+    res = pytest_trace.decision_space_coverage(tmp_path, "python", 60.0)
+    assert res["band"] == "n/a" and "no tests" in res["details"]
+
+
+def test_l1_19_no_branches_is_na(tmp_path):
+    (tmp_path / "m.py").write_text("def f():\n    return 1\n")  # straight-line, no branches
+    (tmp_path / "test_m.py").write_text("from m import f\ndef test_f():\n    assert f() == 1\n")
+    res = pytest_trace.decision_space_coverage(tmp_path, "python", 60.0)
+    assert res["band"] == "n/a" and "no enumerable decision branches" in res["details"]
+
+
+def test_l1_19_timeout_is_na(tmp_path):
+    (tmp_path / "m.py").write_text("def f(x):\n    return x\n")
+    (tmp_path / "test_slow.py").write_text("import time\ndef test_slow():\n    time.sleep(3)\n    assert True\n")
+    res = pytest_trace.decision_space_coverage(tmp_path, "python", 0.5)  # far too short
+    assert res["band"] == "n/a" and "timed out" in res["details"]
+
+
+def test_l1_20_no_tests_is_na(tmp_path):
+    (tmp_path / "m.py").write_text("def f(x):\n    return x\n")
+    assert pytest_trace.test_determinism(tmp_path, "python", 5, 60.0)["band"] == "n/a"
+
+
+def test_l1_20_not_run_when_exec_disabled(tmp_path):
+    res = indicators._test_determinism_l20(tmp_path, "python", exec_tests=False, timeout_seconds=30.0)
+    assert res["value"] == "not run" and res["band"] == "n/a"
+
+
+def test_l1_20_order_dependent_scores_below_five(tmp_path):
+    (tmp_path / "test_order.py").write_text("_s = {'x': False}\ndef test_a():\n    _s['x'] = True\ndef test_b():\n    assert _s['x'] is True\n")
+    res = pytest_trace.test_determinism(tmp_path, "python", 5, 60.0)
+    assert res["value"] != "5/5" and res["band"] in ("Not Healthy", "Slop")
+
+
+def test_l1_20_timeout_is_na(tmp_path):
+    (tmp_path / "test_slow.py").write_text("import time\ndef test_slow():\n    time.sleep(3)\n    assert True\n")
+    res = pytest_trace.test_determinism(tmp_path, "python", 5, 0.5)
+    assert res["band"] == "n/a" and "timed out" in res["details"]
+
+
+def test_l1_14_detect_secrets_fallback(tmp_path, monkeypatch):
+    # gitleaks absent, detect-secrets present -> the elif branch
+    bind = tmp_path / "bin"
+    _stub(bind, "detect-secrets", "printf '\"is_verified\": false\\n\"is_verified\": false\\n'")
+    monkeypatch.setenv("PATH", str(bind))
+    res = indicators._compute_external_indicators(tmp_path, "python")
+    assert res["L1.14"]["value"] == 2 and res["L1.14"]["details"].startswith("detect-secrets")
+
+
+def test_git_indicators_binary_file_numstat(tmp_path):
+    # a binary file yields "-\t-\tpath" numstat, exercising the non-digit branch
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "data.bin").write_bytes(bytes(range(256)))
+    (tmp_path / "a.py").write_text("x = 1\n")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "add code and binary")
+    res = compute_git_indicators(tmp_path, None, None)
+    assert res["L1.2"]["band"] in ("Healthy", "Not Healthy", "Slop")
+
+
+def test_git_indicators_empty_repo_is_na(tmp_path):
+    _git(tmp_path, "init", "-q")  # initialized but no commits
+    res = compute_git_indicators(tmp_path, None, None)
+    assert res["L1.1"]["band"] == "n/a"
+
+
+def test_git_indicators_bad_path_is_na(tmp_path):
+    # git cannot chdir here -> non-zero exit -> the failure branch
+    res = compute_git_indicators(tmp_path / "does-not-exist", None, None)
+    assert res["L1.1"]["band"] == "n/a" and "git log failed" in res["L1.1"]["details"]
+
+
+def test_git_indicators_since_bound_is_applied(tmp_path):
+    # a past --since keeps the commit; exercises the `if since:` append branch
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "a.py").write_text("x = 1\n")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "init")
+    res = compute_git_indicators(tmp_path, "2000-01-01", None)
+    assert res["L1.1"]["band"] in ("Healthy", "Not Healthy", "Slop")
+
+
+def test_git_indicators_until_past_leaves_no_commits(tmp_path):
+    # a past --until filters out every commit -> the "no commits in range" path
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "a.py").write_text("x = 1\n")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "init")
+    res = compute_git_indicators(tmp_path, None, "2000-01-01")
+    assert res["L1.1"]["band"] == "n/a" and "no commits" in res["L1.1"]["details"]
+
+
+# --- Rust and C configs (advertised languages, previously untested) ---------
+
+def test_l1_18_rust_config_runs(tmp_path):
+    (tmp_path / "a.rs").write_text(
+        "static mut counter: i32 = 0;\n"
+        "fn bump() { unsafe { counter += 1; } }\n"
+        "fn pure(a: i32, b: i32) -> i32 { a + b }\n"
+    )
+    assert detect_primary_language(tmp_path) == "rust"
+    res = analyze_mutable_state(tmp_path, "rust")
+    assert res["band"] in ("Healthy", "Not Healthy", "Slop")
+    assert res["details"].endswith("(rust)")
+
+
+def test_l1_18_java_interface_method_has_no_body(tmp_path):
+    # An abstract interface method has no block, exercising the no-body path.
+    (tmp_path / "I.java").write_text(
+        "interface I {\n"
+        "    int compute(int x);\n"                       # no body
+        "    default int twice(int x) { return x * 2; }\n"  # has a body
+        "}\n"
+    )
+    res = analyze_mutable_state(tmp_path, "java")
+    assert res["band"] in ("Healthy", "Not Healthy", "Slop")
+
+
+def test_l1_18_go_receiver_and_plain_function(tmp_path):
+    # A method has a receiver; a plain function does not - both receiver paths.
+    (tmp_path / "a.go").write_text(
+        "package main\n"
+        "type Box struct { n int }\n"
+        "func (b *Box) Set(v int) { b.n = v }\n"   # receiver -> mutable
+        "func Add(a, b int) int { return a + b }\n"  # plain function -> pure
+    )
+    res = analyze_mutable_state(tmp_path, "go")
+    assert res["details"].startswith("1/2")
+
+
+def test_l1_18_c_config_runs(tmp_path):
+    (tmp_path / "a.c").write_text(
+        "int g;\n"
+        "void touch(void) { g = 1; }\n"
+        "int add(int a, int b) { return a + b; }\n"
+    )
+    assert detect_primary_language(tmp_path) == "c"
+    res = analyze_mutable_state(tmp_path, "c")
+    assert res["band"] in ("Healthy", "Not Healthy", "Slop")
+
+
+# --- CLI end to end (exercises cli.main's argument dispatch) ----------------
+
+def test_cli_git_and_config_json(tmp_path, capsys):
+    from l1_analyzer import cli
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "a.py").write_text("x = 1\n")
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "init")
+    rc = cli.main([str(tmp_path), "--indicators", "1,9,10", "--format", "json"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert '"L1.1"' in out and '"L1.9"' in out
+
+
+def test_cli_source_indicators_no_exec_text(tmp_path, capsys):
+    from l1_analyzer import cli
+    (tmp_path / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
+    rc = cli.main([str(tmp_path), "--indicators", "16,17,18,19", "--lang", "python", "--no-exec"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "L1.18" in out and "L1.19" in out
+
+
+def test_cli_all_indicators_auto_lang(tmp_path, capsys):
+    from l1_analyzer import cli
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "m.py").write_text("def f():\n    return 1\n")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "init")
+    rc = cli.main([str(tmp_path), "--indicators", "all", "--no-exec"])
+    assert rc == 0
+    assert "Language (for source indicators): python" in capsys.readouterr().out
 
 
 # --- per-language L1.18 (runs and discriminates) ----------------------------
