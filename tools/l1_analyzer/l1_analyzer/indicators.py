@@ -283,7 +283,7 @@ LANG_CFG: dict[str, dict[str, Any]] = {
         "member_access": "attribute",
         "this_ident": {"self"},
         "module_level_assign": ("assignment", "augmented_assignment"),
-        "type_escape_patterns": ("any",),  # plus comments # type: ignore
+        "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
     },
     "rust": {
         "language": Language(tree_sitter_rust.language()),
@@ -369,7 +369,7 @@ LANG_CFG: dict[str, dict[str, Any]] = {
         # Go has no fixed receiver keyword; the receiver name is parsed per method.
         "this_ident": set(),
         "module_level_assign": ("var_declaration",),
-        "type_escape_patterns": ("any", "interface{}"),
+        "type_escape_patterns": ("any",),  # Go's `any` alias for interface{}
         "const_keywords": ("const ",),
     },
 }
@@ -409,16 +409,28 @@ def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
     this_idents = cfg["this_ident"]
     const_keywords = cfg.get("const_keywords", ("const ", "final ", "readonly ", "let ", "val "))
 
+    # Top-level assignments, allowing one wrapper: Python nests `x = 0` inside an
+    # `expression_statement`, so the `assignment` node is a child of a root child.
+    candidates: list[Node] = []
     for node in root.children:
         if node.type in assign_types:
-            text = node.text.decode("utf8", errors="ignore")
-            for line in text.splitlines():
-                if "=" in line and not any(kw in line.lower() for kw in const_keywords):
-                    parts = line.split("=")[0].strip().split()
-                    if parts:
-                        name = parts[-1].strip("()[]:,")
-                        if name and name not in this_idents:
-                            mutables.add(name)
+            candidates.append(node)
+        else:
+            candidates.extend(c for c in node.children if c.type in assign_types)
+
+    for node in candidates:
+        text = node.text.decode("utf8", errors="ignore")
+        for line in text.splitlines():
+            if "=" in line and not any(kw in line.lower() for kw in const_keywords):
+                parts = line.split("=")[0].strip().split()
+                if parts:
+                    name = parts[-1].strip("()[]:,")
+                    # An UPPERCASE-named binding is a constant by universal
+                    # convention (Python has no `const` keyword). Reading an
+                    # immutable constant is not mutable-state access, so exclude
+                    # it - counting it inflates L1.18 with false positives.
+                    if name and name not in this_idents and not name.isupper():
+                        mutables.add(name)
     return mutables
 
 def _count_mutable_refs(body: Node, cfg: dict[str, Any], module_mutables: set[str], receiver_names: set[str]) -> int:
@@ -591,6 +603,34 @@ def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool, timeout_secon
 
 _COMMENT_TYPE_ESCAPES = ("# type: ignore", "// @ts-ignore", "/* @ts-ignore", "@SuppressWarnings")
 
+def _count_type_escapes_in_tree(root: Node, escape_tokens: frozenset[str]) -> int:
+    """Count type-escape hatches in one parsed tree.
+
+    A type token (Any, object, dynamic, ...) is matched only on a leaf node whose
+    exact text is one of `escape_tokens`, so it catches real annotations without
+    matching parent nodes (which would double count) or the builtin `any()` call.
+    An ignore-comment is matched only on a comment node, so string literals that
+    happen to contain "# type: ignore" (like this module's own pattern list) are
+    not counted - the false positive that made L1.15 report escapes it never saw.
+    """
+    count = 0
+
+    def walk(n: Node):
+        nonlocal count
+        if not n.children:  # leaf token
+            text = n.text.decode("utf8", errors="ignore") if n.text else ""
+            if text in escape_tokens:
+                count += 1
+        if "comment" in n.type:
+            text = n.text.decode("utf8", errors="ignore") if n.text else ""
+            if any(pat in text for pat in _COMMENT_TYPE_ESCAPES):
+                count += 1
+        for c in n.children:
+            walk(c)
+
+    walk(root)
+    return count
+
 def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
     """L1.15: density of type-escape hatches (Any/object/dynamic and ignore comments)."""
     if lang not in LANG_CFG:
@@ -600,24 +640,14 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
         # Untyped or no configured escape hatch (Ruby, JavaScript, Rust, C).
         return {"value": "n/a", "band": "n/a", "details": f"type-escape density not applicable for {lang}"}
     parser = _get_parser(lang)
+    escape_tokens = frozenset(cfg["type_escape_patterns"])
     files, skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
 
     escape_count = 0
     total_loc = 0
     for _path, src in files:
         total_loc += len(src.decode("utf8", errors="ignore").splitlines())
-        root = parser.parse(src).root_node
-
-        def walk(n: Node):
-            nonlocal escape_count
-            t = n.text.decode("utf8", errors="ignore") if n.text else ""
-            if n.type in ("type_identifier", "predefined_type", "any", "object", "dynamic_type") and t.lower() in ("any", "object", "dynamic", "unknown"):
-                escape_count += 1
-            if any(pat in t for pat in _COMMENT_TYPE_ESCAPES):
-                escape_count += 1
-            for c in n.children:
-                walk(c)
-        walk(root)
+        escape_count += _count_type_escapes_in_tree(parser.parse(src).root_node, escape_tokens)
 
     density = (escape_count / (total_loc / 1000)) if total_loc > 1000 else 0.0
     return {"value": round(density, 2), "band": band(density, 1, 5, higher_is_better=False), "details": _with_skipped(f"{escape_count} escapes in ~{total_loc // 1000}kLOC", skipped)}
