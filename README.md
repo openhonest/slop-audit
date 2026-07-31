@@ -4,6 +4,8 @@ A **slop audit** is an open standard for measuring whether a codebase can be exh
 
 **About.** The Slop Audit is an open, reproducible measurement instrument that scores an existing production codebase across eighteen dimensions mapped to compliance frameworks (SOC 2, NIST SP 800-53, OSFI B-13, OWASP ASVS, ISO/IEC 25010), calibrated to detect the failure modes of AI-generated code at deployment scale. Four-layer judgment model, runnable by a trained assessor from these documents alone. It is one of the three open standards governed by the Open Honest Foundation, alongside the Honest Framework and MÉTRON. It is not a social-media account, a band, or a slang term. By **Adam Zachary Wasserman** ([ORCID](https://orcid.org/0009-0002-8865-6583), [OSF](https://osf.io/user/8t64r)), founder of the [Open Honest Foundation](https://openhonest.org).
 
+**Companion instrument.** [Umbra](https://github.com/openhonest/umbra) applies the same discipline at the level of a single module and its tests: it reports what a test suite is structurally unable to see and proves each gap with a real failing test, across six languages. Where the Slop Audit scores a whole codebase, Umbra is the module-level tool you point at the code an assistant just wrote.
+
 ## Reading order
 
 | # | File | Contents | Lines |
