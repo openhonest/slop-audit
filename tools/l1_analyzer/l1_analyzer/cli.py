@@ -44,6 +44,12 @@ def main(argv: list[str] | None = None) -> int:
         default=300.0,
         help="Seconds allowed for each test-suite execution in L1.19/L1.20 (default 300).",
     )
+    parser.add_argument(
+        "--no-state-bounds",
+        action="store_true",
+        help="Turn off the additive L1.18b state-bounds classifier. Pre-registered runs use this "
+             "so the output is exactly the frozen L1.18 set; on by default for everyone else.",
+    )
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args(argv)
@@ -67,12 +73,20 @@ def main(argv: list[str] | None = None) -> int:
     # L1.12-20: source based -> tree-sitter, plus the runtime L1.19/L1.20 harness
     if inds is None or any(i in ("12","13","14","15","16","17","18","19","20","all") for i in (inds or [])):
         source_results = indicators.compute_source_indicators(
-            args.repo, lang=args.lang, exec_tests=not args.no_exec, timeout_seconds=args.timeout
+            args.repo, lang=args.lang, exec_tests=not args.no_exec, timeout_seconds=args.timeout,
+            classify_state_bounds=not args.no_state_bounds,
         )
         results.update(source_results)
 
     if args.format == "json":
-        print(json.dumps({"repo": str(args.repo), "results": results}, indent=2))
+        # Provenance: record which mode produced this, so a result is never
+        # ambiguous about whether the additive L1.18b classifier was active.
+        envelope = {
+            "repo": str(args.repo),
+            "state_bounds": "off" if args.no_state_bounds else "on",
+            "results": results,
+        }
+        print(json.dumps(envelope, indent=2))
     else:
         print(f"LAYER 1: Slop Audit indicators for {args.repo}")
         print(f"Language (for source indicators): {results.get('lang', args.lang)}")

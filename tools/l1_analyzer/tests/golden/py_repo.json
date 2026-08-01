@@ -1,0 +1,48 @@
+{
+  "L1.12": {
+    "band": "n/a",
+    "details": "install vulture to compute L1.12 for Python",
+    "value": "n/a"
+  },
+  "L1.13": {
+    "band": "n/a",
+    "details": "install jscpd to compute L1.13",
+    "value": "n/a"
+  },
+  "L1.14": {
+    "band": "Healthy",
+    "details": "gitleaks findings",
+    "value": 0
+  },
+  "L1.15": {
+    "band": "Healthy",
+    "details": "0 escapes in ~0kLOC",
+    "value": 0.0
+  },
+  "L1.16": {
+    "band": "Healthy",
+    "details": "0 lines with trailing ws",
+    "value": 0.0
+  },
+  "L1.17": {
+    "band": "Healthy",
+    "details": "0/1 files >1k LOC, 0 >4k LOC",
+    "value": 0.0
+  },
+  "L1.18": {
+    "band": "Slop",
+    "details": "5/6 functions reference external mutable state (python)",
+    "value": 83.3
+  },
+  "L1.19": {
+    "band": "n/a",
+    "details": "2 finite decision points enumerated across 1 files; exercised-coverage fraction requires a test-execution trace (not run by this reference implementation); coverage not measured (test execution disabled)",
+    "value": 2
+  },
+  "L1.20": {
+    "band": "n/a",
+    "details": "test execution disabled",
+    "value": "not run"
+  },
+  "lang": "python"
+}

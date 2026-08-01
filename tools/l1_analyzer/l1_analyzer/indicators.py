@@ -294,6 +294,12 @@ LANG_CFG: dict[str, dict[str, Any]] = {
         "this_ident": set(),
         "module_level_assign": ("let_declaration", "static_item", "const_item"),
         "type_escape_patterns": (),
+        # Rust signals mutable state through `static mut` / `&mut self` rather than
+        # a receiver member access. This raw-text heuristic is Rust-only: running
+        # it for other languages produces false positives on any source that merely
+        # contains these strings (e.g. this analyzer's own pattern list). See
+        # docs/amendment-2026-07-31-rust-raw-pattern-scope.md.
+        "raw_mut_patterns": ("static mut", "&mut self", "mut self"),
     },
     "c": {
         "language": Language(tree_sitter_c.language()),
@@ -446,6 +452,7 @@ def _count_mutable_refs(body: Node, cfg: dict[str, Any], module_mutables: set[st
     count = 0
     member_type = cfg["member_access"]
     instance_field_types = cfg.get("instance_field_types", ())
+    raw_mut_patterns = cfg.get("raw_mut_patterns", ())
 
     def walk(n: Node):
         nonlocal count
@@ -457,9 +464,12 @@ def _count_mutable_refs(body: Node, cfg: dict[str, Any], module_mutables: set[st
             count += 1
         if n.type == "identifier" and n.text.decode("utf8", errors="ignore") in module_mutables:
             count += 1
-        txt = n.text.decode("utf8", errors="ignore") if n.text else ""
-        if "static mut" in txt or "&mut self" in txt or "mut self" in txt:
-            count += 1
+        # Raw-text mutable patterns are language-scoped (Rust only). Running them
+        # for every language flagged any source that merely contained the strings.
+        if raw_mut_patterns:
+            txt = n.text.decode("utf8", errors="ignore") if n.text else ""
+            if any(p in txt for p in raw_mut_patterns):
+                count += 1
         for c in n.children:
             walk(c)
     walk(body)
@@ -537,10 +547,21 @@ def _run_external(cmd: list[str], cwd: Path) -> str:
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ""
 
-def compute_source_indicators(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float) -> dict[str, L1Result]:
+def compute_source_indicators(
+    repo: Path,
+    lang: str,
+    exec_tests: bool,
+    timeout_seconds: float,
+    classify_state_bounds: bool = True,
+) -> dict[str, L1Result]:
     """L1.12-L1.20. `lang` may be "auto" (resolved here) or a concrete key.
     `exec_tests` gates the two runtime indicators (L1.19 coverage, L1.20);
-    `timeout_seconds` bounds each test-suite execution."""
+    `timeout_seconds` bounds each test-suite execution.
+
+    `classify_state_bounds` gates the additive L1.18b state-bounds refinement. It
+    is ON by default for real users (CLI, web). The pre-registered experiments
+    pass False, which leaves the registered output byte-for-byte unchanged: this
+    is the ONLY line the flag touches, so off-mode cannot alter any L1.18 number."""
     if lang == "auto":
         lang = detect_primary_language(repo)
 
@@ -552,6 +573,11 @@ def compute_source_indicators(repo: Path, lang: str, exec_tests: bool, timeout_s
     results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds)
     results.update(_compute_external_indicators(repo, lang))
     results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds)
+    if classify_state_bounds:
+        from l1_analyzer import state_bounds
+        results["L1.18b"] = state_bounds.classify(repo, lang)
+        from l1_analyzer import path_cover
+        results["path_cover"] = path_cover.cover_paths(repo, lang)
     return results
 
 _WHITESPACE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"})
