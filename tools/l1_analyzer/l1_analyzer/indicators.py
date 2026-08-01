@@ -284,6 +284,9 @@ LANG_CFG: dict[str, dict[str, Any]] = {
         "this_ident": {"self"},
         "module_level_assign": ("assignment", "augmented_assignment"),
         "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
+        # Read the binding name from the assignment's `left` field, not by text-
+        # splitting the node. See docs/amendment-2026-08-01-l1-18-module-global.md.
+        "field_based_globals": True,
     },
     "rust": {
         "language": Language(tree_sitter_rust.language()),
@@ -408,12 +411,81 @@ def detect_primary_language(repo: Path) -> str:
 # Paper A replication package with all the bound-literal logic etc.
 # ---------------------------------------------------------------------------
 
-def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
-    """Detect top-level names that are likely mutable (assigned and not const/Final/readonly)."""
+# Container literals/constructors whose empty form seeds an accumulator.
+_PY_CONTAINER_CTORS = frozenset({
+    "dict", "list", "set", "frozenset", "defaultdict", "OrderedDict", "deque", "Counter", "bytearray",
+})
+
+
+def _py_is_type_expression(n: Node) -> bool:
+    """A pure type expression: a bare name, a dotted name, a subscript
+    (Iterable[X]), or a `|` union of those. No call, no container literal."""
+    if n.type in ("identifier", "attribute", "subscript"):
+        return True
+    if n.type == "binary_operator":
+        op = n.child_by_field_name("operator")
+        left, right = n.child_by_field_name("left"), n.child_by_field_name("right")
+        return (op is not None and op.text == b"|" and left is not None and right is not None
+                and _py_is_type_expression(left) and _py_is_type_expression(right))
+    return False
+
+
+def _py_is_type_alias(node: Node, rhs: Node | None) -> bool:
+    annot = node.child_by_field_name("type")
+    if annot is not None and annot.text.decode("utf8", errors="ignore").split("[", 1)[0].strip() == "TypeAlias":
+        return True
+    return rhs is not None and _py_is_type_expression(rhs)
+
+
+def _py_is_empty_container(rhs: Node | None) -> bool:
+    """An accumulator seed: {}, [], or set()/dict()/list()/... with no elements."""
+    if rhs is None:
+        return False
+    if rhs.type in ("dictionary", "list"):
+        return not rhs.named_children
+    if rhs.type == "call":
+        fn = rhs.child_by_field_name("function")
+        args = rhs.child_by_field_name("arguments")
+        if fn is not None and fn.type == "identifier" and fn.text.decode("utf8", errors="ignore") in _PY_CONTAINER_CTORS:
+            return args is None or not args.named_children
+    return False
+
+
+def _module_mutables_python(candidates: list[Node], this_idents: set[str]) -> set[str]:
+    """Field-based module-global detection for Python. The binding name is read
+    from the assignment's `left` field, so string literals and annotation tails
+    are never scanned as source. Type aliases are skipped. An uppercase name is a
+    constant by convention, unless it is seeded with an empty container, which is
+    an accumulator (e.g. `CACHE = {}`), the pattern the indicator exists to catch."""
     mutables: set[str] = set()
+    for node in candidates:
+        left = node.child_by_field_name("left")
+        if left is None or left.type != "identifier":  # skip subscripts, tuples, attributes
+            continue
+        name = left.text.decode("utf8", errors="ignore")
+        # Dunders (__all__, __version__, ...) are module metadata, not state.
+        if name in this_idents or (name.startswith("__") and name.endswith("__")):
+            continue
+        rhs = node.child_by_field_name("right")
+        if _py_is_type_alias(node, rhs):
+            continue
+        if name.isupper():
+            if _py_is_empty_container(rhs):
+                mutables.add(name)
+        else:
+            mutables.add(name)
+    return mutables
+
+
+def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
+    """Detect top-level names that are likely mutable module state.
+
+    Candidate assignments are collected structurally; for Python the binding name
+    is read from the assignment's fields, never by splitting the node's text
+    (which harvested annotation tails and identifiers out of string literals).
+    Languages not yet migrated keep the legacy text heuristic."""
     assign_types = cfg["module_level_assign"]
     this_idents = cfg["this_ident"]
-    const_keywords = cfg.get("const_keywords", ("const ", "final ", "readonly ", "let ", "val "))
 
     # Top-level assignments, allowing one wrapper: Python nests `x = 0` inside an
     # `expression_statement`, so the `assignment` node is a child of a root child.
@@ -424,6 +496,12 @@ def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
         else:
             candidates.extend(c for c in node.children if c.type in assign_types)
 
+    if cfg.get("field_based_globals"):
+        return _module_mutables_python(candidates, this_idents)
+
+    # Legacy text heuristic (unchanged), for languages not yet migrated.
+    const_keywords = cfg.get("const_keywords", ("const ", "final ", "readonly ", "let ", "val "))
+    mutables: set[str] = set()
     for node in candidates:
         text = node.text.decode("utf8", errors="ignore")
         for line in text.splitlines():
@@ -431,10 +509,6 @@ def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
                 parts = line.split("=")[0].strip().split()
                 if parts:
                     name = parts[-1].strip("()[]:,")
-                    # An UPPERCASE-named binding is a constant by universal
-                    # convention (Python has no `const` keyword). Reading an
-                    # immutable constant is not mutable-state access, so exclude
-                    # it - counting it inflates L1.18 with false positives.
                     if name and name not in this_idents and not name.isupper():
                         mutables.add(name)
     return mutables
