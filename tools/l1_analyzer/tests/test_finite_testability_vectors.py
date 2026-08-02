@@ -23,17 +23,11 @@ and to whether it drives-a-decision, so the meter can publish the two-dimensiona
 coverage matrix (spec section 7) whose UNRESOLVED-and-drives-a-decision cell is
 the headline blind spot.
 
-STATUS. These tests are the TARGET. The current classifier implements value-count
-with a two/three-way {bounded, unbounded, undetermined} split at function scope,
-so every test here is expected to fail until state_bounds.py is aligned. They are
-marked xfail(strict=True): they report XFAIL now, and the day the classifier
-catches up they XPASS -> strict turns that into a failure, forcing the marker to
-come off. To enumerate the exact remaining gap:
-
-    uv run pytest tests/test_finite_testability_vectors.py -rx
-
-When the framework ships finite-testability-vectors.json, the VECTORS table below
-is replaced by a load from it; the case ids already match spec section 8.
+This is the live conformance suite for state_bounds.classify: it implements the
+partition-count predicate (class/module scope, three verdicts, returns-are-output,
+fail-close on unknown callee and dynamic dispatch). When the framework ships
+finite-testability-vectors.json, the VECTORS table below is replaced by a load from
+it; the case ids already match spec section 8.
 
 Contract under test (state_bounds.classify(repo, "python") returns):
   - verdict: repo rollup, worst-first ("promiscuous" | "unresolved" | "neutral" | "n/a")
@@ -44,15 +38,7 @@ Contract under test (state_bounds.classify(repo, "python") returns):
 """
 
 import pytest
-
 from l1_analyzer import state_bounds
-
-pytestmark = pytest.mark.xfail(
-    strict=True,
-    reason="target contract: state_bounds.py is still value-count at function scope; "
-    "align it to specs/finite-testability.md, then remove this marker",
-)
-
 
 # --- the ten locked conformance vectors (spec section 8) --------------------
 # Each: the case id, a minimal Python source, the culprit state key, and the
