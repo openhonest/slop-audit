@@ -36,7 +36,10 @@ from l1_analyzer.indicators import (
     _find_module_mutable_names,
     _get_parser,
     _read_source_bytes,
+    bucketed_paths,
 )
+
+_IGNORE = ("tests", "test", "conformance")
 
 NEUTRAL = "neutral"
 PROMISCUOUS = "promiscuous"
@@ -329,6 +332,7 @@ def _na(lang: str) -> dict[str, Any]:
         "coverage": {v: {"observe_only": 0, "drives_decision": 0} for v in (NEUTRAL, PROMISCUOUS, UNRESOLVED)},
         "resolvable_fraction": "n/a",
         "findings": [],
+        "bucketed": {"counts": {}, "paths": []},
         "details": f"finite-testability classifier not implemented for {lang} yet (python only)",
     }
 
@@ -341,8 +345,11 @@ def classify(repo: Path, lang: str) -> dict[str, Any]:
     cfg = LANG_CFG["python"]
     parser = _get_parser("python")
     # conformance/ holds law/spec scaffolding and test doubles (fault-injection
-    # markers, failing connections), not production state; skip it like tests.
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test", "conformance"))
+    # markers, failing connections), not production state; skip it like tests. docs,
+    # tooling, and loose entry-point scripts are scoped out by _read_source_bytes and
+    # disclosed below (never a silent skip).
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=_IGNORE)
+    bucketed = bucketed_paths(repo, cfg["extensions"], _IGNORE)
 
     findings: list[dict[str, Any]] = []
     for path, src in files:
@@ -377,6 +384,7 @@ def classify(repo: Path, lang: str) -> dict[str, Any]:
         "coverage": coverage,
         "resolvable_fraction": resolvable,
         "findings": findings,
+        "bucketed": bucketed,
         "details": (
             f"finite-testability: {counts[NEUTRAL]} neutral, {counts[PROMISCUOUS]} promiscuous, "
             f"{counts[UNRESOLVED]} unresolved across {total} pieces of state; "

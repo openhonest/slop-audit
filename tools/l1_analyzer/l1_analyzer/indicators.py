@@ -81,20 +81,76 @@ def _in_ignored_dir(path: Path, extra: tuple[str, ...]) -> bool:
     parts = set(path.parts)
     return bool(parts & _IGNORE_DIRS) or any(e in parts for e in extra)
 
+
+# Conventional build/test/dev tooling recognised by filename, not by directory.
+_TOOLING_FILES = frozenset({"setup.py", "noxfile.py", "conftest.py", "tasks.py", "manage.py"})
+
+
+def _repo_has_packages(repo: Path) -> bool:
+    """True if the repo is organised into importable packages (any __init__.py).
+    Used to tell a loose dev/entry-point script from a flat script-only repo."""
+    return any(not _in_ignored_dir(f, ()) for f in repo.rglob("__init__.py"))
+
+
+def _bucket_reason(path: Path, repo: Path, has_packages: bool, extra: tuple[str, ...]) -> str | None:
+    """Why this source file is scoped out of the audit, or None to keep it. General
+    and structural: it references no specific project. Disclosed, never silent."""
+    parts = set(path.parts)
+    if parts & _IGNORE_DIRS:
+        return "vendored"
+    for e in extra:
+        if e in parts:
+            return e
+    if "docs" in parts:
+        return "docs"
+    if path.name in _TOOLING_FILES:
+        return "tooling"
+    # A loose top-level .py sitting beside packages (its own dir is not a package,
+    # and the repo does have packages) is a dev/entry-point script, not the library.
+    # A flat, script-only repo (no packages anywhere) keeps its root scripts: they
+    # are the code.
+    if has_packages and path.parent == repo and not (repo / "__init__.py").exists():
+        return "root-script"
+    return None
+
+
 def _read_source_bytes(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> tuple[list[tuple[Path, bytes]], int]:
-    """Read every source file with one of `extensions` as bytes. Returns the
-    files read and the number that could not be read."""
+    """Read every source file with one of `extensions` as bytes, excluding scoped-out
+    files (see _bucket_reason). Returns the files read and the number unreadable."""
     files: list[tuple[Path, bytes]] = []
     skipped = 0
+    has_packages = _repo_has_packages(repo)
     for ext in extensions:
         for f in repo.rglob(f"*{ext}"):
-            if _in_ignored_dir(f, extra_ignore):
+            if _bucket_reason(f, repo, has_packages, extra_ignore) is not None:
                 continue
             try:
                 files.append((f, f.read_bytes()))
             except OSError:
                 skipped += 1
     return files, skipped
+
+
+def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> dict[str, Any]:
+    """The source files scoped out of the audit, with the reason for each, so a
+    reader sees exactly what was not looked at and can challenge it (the cone of
+    light on the meter's own choice of scope). `counts` covers every reason; `paths`
+    lists the judgment-call exclusions (docs / tooling / loose root scripts) that a
+    reader most needs to see, since over-bucketing a real entry point would hide
+    behind a silent skip otherwise. Vendored dependencies are counted, not listed."""
+    has_packages = _repo_has_packages(repo)
+    counts: dict[str, int] = {}
+    paths: list[dict[str, str]] = []
+    for ext in extensions:
+        for f in repo.rglob(f"*{ext}"):
+            reason = _bucket_reason(f, repo, has_packages, extra_ignore)
+            if reason is None:
+                continue
+            counts[reason] = counts.get(reason, 0) + 1
+            if reason in ("docs", "tooling", "root-script"):
+                rel = str(f.relative_to(repo)) if repo in f.parents else str(f)
+                paths.append({"path": rel, "reason": reason})
+    return {"counts": counts, "paths": sorted(paths, key=lambda d: d["path"])}
 
 def _read_text_files(repo: Path, extensions: frozenset[str], extra_ignore: tuple[str, ...]) -> tuple[list[tuple[Path, str]], int]:
     """Read every file whose suffix is in `extensions` as text. Returns the files
