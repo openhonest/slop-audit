@@ -224,6 +224,28 @@ VECTORS = [
             "    return False\n"
         ),
     },
+    {
+        # A constant tuple of SYMBOLIC constants (not literals) is still a fixed,
+        # finite collection: membership against it is a finite partition. Regression
+        # for the requests false positive on `status_code in REDIRECT_STATI`, where
+        # REDIRECT_STATI = (codes.moved, ...) is a Final tuple of named constants.
+        "id": "symbolic-constant-membership",
+        "state": "self.status_code",
+        "verdict": "neutral",
+        "drives_decision": True,
+        "src": (
+            "MOVED = 301\n"
+            "FOUND = 302\n"
+            "REDIRECT_STATI = (MOVED, FOUND)\n"             # tuple of symbolic constants, not literals
+            "class Response:\n"
+            "    def __init__(self):\n"
+            "        self.status_code = 0\n"
+            "    def set(self, code):\n"
+            "        self.status_code = code\n"
+            "    def is_redirect(self):\n"
+            "        return self.status_code in REDIRECT_STATI\n"
+        ),
+    },
 ]
 
 

@@ -75,29 +75,36 @@ def _same(a: Any, b: Any) -> bool:
 
 
 # --------------------------------------------------------------------------
-# Closed-set detection: a name bound to a frozenset / set-or-tuple of literals.
+# Closed-set detection. Membership `x in S` is a finite partition when S is a
+# statically fixed collection. Element *values* are irrelevant to the count: a
+# tuple of symbolic constants (REDIRECT_STATI = (codes.moved, ...)) bounds the
+# partition exactly as a tuple of literals does. What matters is that S cannot grow.
 # --------------------------------------------------------------------------
 
-def _rhs_is_closed_set(rhs: Any) -> bool:
+def _is_immutable_collection(rhs: Any) -> bool:
+    """A collection fixed at construction, safe to remember by NAME as closed: a
+    tuple literal, or frozenset(...). Element types do not matter. Mutable set/list
+    bindings are excluded, because a name bound to one can grow (the unbounded case,
+    e.g. a dedup set accumulated with .add)."""
     if rhs is None:
         return False
-    if rhs.type in ("set", "tuple", "list"):
-        return all(c.type in _LITERAL_TYPES for c in rhs.named_children)
+    if rhs.type == "tuple":
+        return True
     if rhs.type == "call":
-        fn = _field(rhs, "function")
-        return _text(fn) in ("frozenset", "set")
+        return _text(_field(rhs, "function")) == "frozenset"
     return False
 
 
 def _collect_closed_sets(root: Any) -> set[str]:
-    """Names (bare) bound anywhere to a closed set of literals: MODES = frozenset(...),
-    TABLE = {'a', 'b'}. Both `NAME` and `self.NAME`/`Cls.NAME` reference them."""
+    """Names bound anywhere to an immutable collection: MODES = frozenset(...),
+    REDIRECT_STATI = (codes.moved, ...). Both `NAME` and `self.NAME`/`Cls.NAME`
+    reference them."""
     names: set[str] = set()
 
     def walk(n: Any) -> None:
         if n.type == "assignment":
             left, rhs = _field(n, "left"), _field(n, "right")
-            if left is not None and _rhs_is_closed_set(rhs):
+            if left is not None and _is_immutable_collection(rhs):
                 if left.type == "identifier":
                     names.add(_text(left))
                 elif left.type == "attribute":
@@ -112,9 +119,14 @@ def _collect_closed_sets(root: Any) -> set[str]:
 
 
 def _is_closed_set(node: Any, closed_sets: set[str]) -> bool:
+    """The right operand of `x in RIGHT` bounds x's partition when RIGHT is a fixed
+    collection: a collection literal at the site (fixed size), a frozenset()/set()
+    call literal, or a name/attribute bound to an immutable collection."""
     if node is None:
         return False
-    if _rhs_is_closed_set(node):
+    if node.type in ("set", "tuple", "list"):            # a collection literal: fixed size
+        return True
+    if node.type == "call" and _text(_field(node, "function")) in ("frozenset", "set"):
         return True
     if node.type == "identifier":
         return _text(node) in closed_sets
