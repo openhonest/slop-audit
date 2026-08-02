@@ -418,8 +418,11 @@ def detect_primary_language(repo: Path) -> str:
 # ---------------------------------------------------------------------------
 
 # Container literals/constructors whose empty form seeds an accumulator.
+# Constructors of MUTABLE containers whose empty form is an accumulator seed.
+# frozenset/tuple/bytes are immutable and cannot accumulate, so they are excluded:
+# `X = frozenset()` is a constant, not mutable state.
 _PY_CONTAINER_CTORS = frozenset({
-    "dict", "list", "set", "frozenset", "defaultdict", "OrderedDict", "deque", "Counter", "bytearray",
+    "dict", "list", "set", "defaultdict", "OrderedDict", "deque", "Counter", "bytearray",
 })
 
 

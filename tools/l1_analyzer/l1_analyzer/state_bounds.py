@@ -213,7 +213,9 @@ def _flow(node: Any, closed_sets: set[str]) -> str:
         mem = _membership_operands(parent)
         if mem is not None:
             left, right = mem
-            if _same(node, right):         # x in S : S is the container, keyed by x
+            if _same(node, right):         # x in S : node is the container
+                if _is_closed_set(node, closed_sets):
+                    return _FINITE          # membership against a constant closed set: finite partition
                 return _UNBOUNDED if _is_unbounded_value(left) else _FINITE
             return _FINITE if _is_closed_set(right, closed_sets) else _UNBOUNDED  # S in Y
         return _FINITE                     # S <cmp> other : two classes
@@ -326,7 +328,9 @@ def classify(repo: Path, lang: str) -> dict[str, Any]:
         return _na(lang)
     cfg = LANG_CFG["python"]
     parser = _get_parser("python")
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    # conformance/ holds law/spec scaffolding and test doubles (fault-injection
+    # markers, failing connections), not production state; skip it like tests.
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test", "conformance"))
 
     findings: list[dict[str, Any]] = []
     for path, src in files:

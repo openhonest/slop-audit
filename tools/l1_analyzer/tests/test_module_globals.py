@@ -6,7 +6,12 @@ assert on the NAMES the extractor registers, not only on the ratio, because ever
 defect was visible in the name set and invisible in an aggregate count.
 """
 
-from l1_analyzer.indicators import LANG_CFG, _find_module_mutable_names, _get_parser, analyze_mutable_state
+from l1_analyzer.indicators import (
+    LANG_CFG,
+    _find_module_mutable_names,
+    _get_parser,
+    analyze_mutable_state,
+)
 
 
 def _names(src: str) -> set[str]:
@@ -38,6 +43,15 @@ def test_defect2_uppercase_empty_container_is_a_mutable_accumulator():
     assert _names("BUF = []\n") == {"BUF"}
     assert _names("MAX = 100\n") == set()                 # uppercase scalar constant
     assert _names('LABELS = {"a": "b"}\n') == set()       # uppercase populated -> constant table
+
+
+def test_empty_immutable_container_is_not_an_accumulator():
+    # frozenset()/tuple are immutable and cannot accumulate, so an empty one is a
+    # constant, not mutable state (regression for the honest-framework FIXABLE_RULES
+    # false positive). Contrast the mutable empties above, which do count.
+    assert _names("FIXABLE_RULES: frozenset = frozenset()\n") == set()
+    assert _names("SEEN = frozenset()\n") == set()
+    assert _names("EMPTY = ()\n") == set()
 
 
 def test_lowercase_binding_still_counts():

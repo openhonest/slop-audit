@@ -207,6 +207,23 @@ VECTORS = [
             "            self.level = new\n"
         ),
     },
+    {
+        # The dual of closed-set-dispatch: the STATE is the closed set, and an
+        # unbounded value is tested for membership in it. The partition is the
+        # fixed finite set, so it is NEUTRAL, not promiscuous. Regression for the
+        # honest-framework false positive on `FIXABLE_RULES = frozenset()`.
+        "id": "closed-set-membership",
+        "state": "allowed",
+        "verdict": "neutral",
+        "drives_decision": True,
+        "src": (
+            "allowed = frozenset({'a', 'b', 'c'})\n"
+            "def check(x):\n"
+            "    if x in allowed:\n"                        # x unbounded, but `allowed` is a closed set
+            "        return True\n"
+            "    return False\n"
+        ),
+    },
 ]
 
 
