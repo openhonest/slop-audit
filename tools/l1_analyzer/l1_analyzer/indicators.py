@@ -592,13 +592,35 @@ def _receiver_names(func_node: Node, cfg: dict[str, Any]) -> set[str]:
                 break  # first parameter_list is the receiver
     return names
 
+_BOUNDARY_MARKER = "honest: boundary"
+
+
+def _is_declared_boundary(func_node: Node) -> bool:
+    """True when a function carries an explicit boundary declaration: a comment
+    containing `honest: boundary` (`# honest: boundary`, `// honest: boundary`).
+
+    A declared boundary is where I/O legitimately touches external state, so L1.18
+    excludes it from the ratio entirely, numerator and denominator. Recognition is
+    by DECLARATION, never by guessing at function names or I/O calls: an unmarked
+    function is never excluded, so no repository's number moves unless its authors
+    opt in with the marker (the meter honoring the gate's declaration, per the
+    finite-testability asymmetry)."""
+    def find(n: Node) -> bool:
+        if "comment" in n.type and n.text and _BOUNDARY_MARKER in n.text.decode("utf8", errors="ignore").lower():
+            return True
+        return any(find(c) for c in n.children)
+
+    return find(func_node)
+
+
 def _count_file_functions(root: Node, cfg: dict[str, Any], module_mutables: set[str]) -> tuple[int, int]:
     """Pure per-file walk: return (total functions, functions touching external
-    mutable state). Module-level (not a loop closure) so it binds no caller state."""
+    mutable state). Module-level (not a loop closure) so it binds no caller state.
+    Functions declared as I/O boundaries are excluded from both counts."""
     totals = [0, 0]  # [total, mutable]
 
     def find_functions(n: Node):
-        if n.type in cfg["function_types"]:
+        if n.type in cfg["function_types"] and not _is_declared_boundary(n):
             totals[0] += 1
             body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
             if body is not None:
@@ -643,7 +665,7 @@ def _file_mutable_names(root: Node, cfg: dict[str, Any], module_mutables: set[st
     names: list[str] = []
 
     def find(n: Node) -> None:
-        if n.type in cfg["function_types"]:
+        if n.type in cfg["function_types"] and not _is_declared_boundary(n):
             body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
             if body is not None:
                 receivers = _receiver_names(n, cfg)

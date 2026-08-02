@@ -32,9 +32,9 @@ ANALYZER_SRC = Path(l1_analyzer.__file__).parent
 _EXT = {"python": "py", "rust": "rs", "c": "c"}
 
 _IO_BOUNDARY = {
-    "python": "CACHE = []\ndef handler():\n    # IO boundary\n    print(CACHE)\n    return len(CACHE)\n",
-    "rust": "static mut CACHE: Vec<i32> = Vec::new();\nfn handler() { unsafe { println!(\"{:?}\", CACHE); } }\n",
-    "c": "int global_state = 0;\nint handler() { printf(\"%d\", global_state); return global_state; }\n",
+    "python": "CACHE = []\ndef handler():\n    # honest: boundary\n    print(CACHE)\n    return len(CACHE)\n",
+    "rust": "static mut CACHE: Vec<i32> = Vec::new();\nfn handler() {\n    // honest: boundary\n    unsafe { println!(\"{:?}\", CACHE); }\n}\n",
+    "c": "int global_state = 0;\nint handler() {\n    // honest: boundary\n    printf(\"%d\", global_state);\n    return global_state;\n}\n",
 }
 
 

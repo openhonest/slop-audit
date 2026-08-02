@@ -497,6 +497,36 @@ def test_l1_18_rust_const_is_not_mutable_state(tmp_path):
     assert analyze_mutable_state(tmp_path, "rust")["value"] == 0.0
 
 
+def test_l1_18_declared_boundary_is_excluded(tmp_path):
+    # A function that declares itself an I/O boundary is excluded from the ratio,
+    # numerator and denominator, even though it touches a module global. An
+    # unmarked reader of the same global is still counted. Recognition is by
+    # declaration, never by guessing.
+    from l1_analyzer.indicators import mutable_function_names
+    (tmp_path / "m.py").write_text(
+        "CACHE = []\n"
+        "def handler():\n"
+        "    # honest: boundary\n"
+        "    print(CACHE)\n"
+        "    return len(CACHE)\n"
+        "def reader():\n"
+        "    return CACHE[0]\n"
+    )
+    res = analyze_mutable_state(tmp_path, "python")
+    assert res["details"].startswith("1/1")          # handler excluded; only reader counts
+    assert mutable_function_names(tmp_path, "python") == ["reader"]
+
+
+def test_l1_18_analyzer_is_self_clean(tmp_path):
+    # Dogfooding: the analyzer's own source passes its own L1.18. Guards the
+    # path_cover refactor (its stateful CFG builder used to score 11.7%).
+    from pathlib import Path
+
+    from l1_analyzer import indicators
+    pkg = Path(indicators.__file__).parent
+    assert analyze_mutable_state(pkg, "python")["value"] == 0.0
+
+
 def test_l1_18_java_interface_method_has_no_body(tmp_path):
     # An abstract interface method has no block, exercising the no-body path.
     (tmp_path / "I.java").write_text(

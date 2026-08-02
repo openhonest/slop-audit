@@ -68,10 +68,10 @@ Feature: L1.18 Mutable state ratio analyzer
     When I run L1.18 analysis on it
     Then the mutable state ratio is 1.0
 
-  # KNOWN GAP (xfail): the analyzer implements no IO-boundary exclusion. The
-  # boundary function is counted, so the ratio is not zero. Pending a decision:
-  # implement exclusion in LANG_CFG, or drop this claim.
-  @multi-lang @xfail
+  # A function that declares itself an I/O boundary (`# honest: boundary` /
+  # `// honest: boundary`) is excluded from the L1.18 ratio: I/O at the boundary
+  # legitimately touches state. Recognition is by declaration, never by guessing.
+  @multi-lang
   Scenario Outline: IO boundary functions are excluded from L1.18 count
     Given a <lang> source file containing an IO boundary function that also touches global state
     When I run L1.18 analysis on it
@@ -83,16 +83,13 @@ Feature: L1.18 Mutable state ratio analyzer
       | rust   |
       | c      |
 
-  # KNOWN GAP (xfail): the claim is false against the real analyzer. Its own
-  # source scores 11.7% (9/77 functions: __init__, node, edge, build_block, ...),
-  # not 0.0. The fabricated step hid this. Pending a decision: accept the real
-  # self-audit number as the bootstrap expectation, or treat 9/77 as a bug.
-  @xfail
   Scenario: Analyzer is self-consistent on its own source (bootstrap)
     Given the L1.18 analyzer source itself
     When I run L1.18 analysis in amended mode on it
     Then the mutable state ratio is 0.0
-    # because all top-level bindings used internally are bound literals or pure
+    # The stateful CFG builder in path_cover.py was refactored to pure functions
+    # that thread the accumulator explicitly, so the analyzer now passes its own
+    # L1.18 (0/N). See docs/amendment-2026-08-02-self-clean-path-cover.md.
 
   # More scenarios would cover: file discovery, decision coverage interaction (L1.19),
   # different syntaxes for methods, closures, etc. See full suite in paper replication package.
