@@ -246,6 +246,43 @@ VECTORS = [
             "        return self.status_code in REDIRECT_STATI\n"
         ),
     },
+    {
+        # A constant assigned once from an IMMUTABLE constructor (its return is a
+        # MappingProxyType, seen by a one-level follow), never mutated, never called,
+        # is a one-value domain: NEUTRAL even when passed to an unknown function,
+        # because no callee can mutate an immutable value. Resolves declared state
+        # machines on the evidence, reading no framework declaration.
+        "id": "immutable-constant-passed-to-function",
+        "state": "registry",
+        "verdict": "neutral",
+        "drives_decision": True,
+        "src": (
+            "from types import MappingProxyType\n"
+            "def make(t):\n"
+            "    return MappingProxyType(t)\n"
+            "def lookup(table, k):\n"
+            "    return table[k]\n"
+            "registry = make({'a': 1, 'b': 2})\n"          # module constant from an immutable ctor
+            "def get(k):\n"
+            "    return lookup(registry, k)\n"              # passed to an unknown function, never mutated
+        ),
+    },
+    {
+        # The soundness guard: a MUTABLE value assigned once and passed to an unknown
+        # callee stays UNRESOLVED. Single-assignment is not enough; the callee could
+        # mutate a mutable dict, so the meter cannot certify it bounded.
+        "id": "mutable-value-passed-to-unknown-callee",
+        "state": "self.buf",
+        "verdict": "unresolved",
+        "drives_decision": True,
+        "src": (
+            "class Sink:\n"
+            "    def __init__(self):\n"
+            "        self.buf = {}\n"
+            "    def run(self, sink):\n"
+            "        sink(self.buf)\n"
+        ),
+    },
 ]
 
 

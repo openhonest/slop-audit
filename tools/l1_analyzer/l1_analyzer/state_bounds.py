@@ -298,14 +298,106 @@ def _refs(scope: Any, predicate: Any) -> list[Any]:
     return out
 
 
-def _finding(key: str, refs: list[Any], rel: str, closed_sets: set[str]) -> dict[str, Any]:
-    cats = [_categorize(r, closed_sets) for r in refs]
-    verdict, drives = _verdict(cats)
+# --- immutable-constant recognition -----------------------------------------
+# A state key assigned once from an immutable construction, never mutated and never
+# called, has a one-value domain: it is a constant, NEUTRAL wherever it flows,
+# because no callee can mutate an immutable value. A one-level follow of the
+# constructor tells the meter its return is immutable, so a declared machine (a
+# MappingProxyType-wrapped table passed to a lookup) resolves on the evidence,
+# reading no framework declaration.
+
+_IMMUTABLE_WRAPPERS = frozenset({"MappingProxyType", "frozenset", "tuple", "bytes"})
+
+
+def _rhs_is_immutable(rhs: Any, immutable_ctors: set[str]) -> bool:
+    if rhs is None:
+        return False
+    if rhs.type in ("tuple", "true", "false", "none", "integer", "float", "string", "concatenated_string"):
+        return True
+    if rhs.type == "call":
+        fn = _text(_field(rhs, "function"))
+        return fn in _IMMUTABLE_WRAPPERS or fn in immutable_ctors
+    return False
+
+
+def _returns_immutable(func_node: Any) -> bool:
+    """True if every return in the function yields an immutable value (and there is
+    at least one): the function is an immutable constructor."""
+    returns = _refs(func_node, lambda n: n.type == "return_statement")
+    if not returns:
+        return False
+    for r in returns:
+        val = next((c for c in r.children if c.is_named), None)
+        if not _rhs_is_immutable(val, frozenset()):
+            return False
+    return True
+
+
+def _collect_immutable_ctors(root: Any) -> set[str]:
+    """Names of functions whose every return is an immutable value (frozenset /
+    tuple / MappingProxyType / bytes / literal). A one-level follow of these bottoms
+    out on a provably-immutable return, reading no declaration."""
+    out: set[str] = set()
+    for fn in _refs(root, lambda n: n.type == "function_definition"):
+        name = _field(fn, "name")
+        if name is not None and _returns_immutable(fn):
+            out.add(_text(name))
+    return out
+
+
+def _reaches_decision(refs: list[Any]) -> bool:
+    for r in refs:
+        p = r.parent
+        if p is None or p.type == "return_statement":
+            continue
+        if _is_write_target(r, p):
+            continue
+        return True
+    return False
+
+
+def _immutable_const_verdict(refs: list[Any], immutable_ctors: set[str]) -> tuple[str, bool] | None:
+    """(NEUTRAL, drives) if the state is an immutable constant: assigned exactly once
+    from an immutable construction, never mutated, never called. Else None (fall
+    through to the normal reaching-partition analysis)."""
+    assigns: list[Any] = []
+    for r in refs:
+        p = r.parent
+        if p is None:
+            continue
+        if p.type == "assignment" and _same(_field(p, "left"), r):
+            assigns.append(p)
+            continue
+        if p.type == "augmented_assignment" and _same(_field(p, "left"), r):
+            return None  # S += ... : reassignment
+        if p.type == "subscript" and _same(_field(p, "value"), r):
+            gp = p.parent
+            if gp is not None and gp.type in ("assignment", "augmented_assignment") and _same(_field(gp, "left"), p):
+                return None  # S[k] = v : mutation
+        if p.type == "call" and _same(_field(p, "function"), r):
+            return None  # called: dynamic dispatch, not a constant
+        if p.type == "attribute" and _same(_field(p, "object"), r):
+            gp = p.parent
+            if _text(_field(p, "attribute")) in _MUTATING_METHODS and gp is not None and gp.type == "call" and _same(_field(gp, "function"), p):
+                return None  # mutating method
+    if len(assigns) != 1:
+        return None
+    if not _rhs_is_immutable(_field(assigns[0], "right"), immutable_ctors):
+        return None
+    return NEUTRAL, _reaches_decision(refs)
+
+
+def _finding(key: str, refs: list[Any], rel: str, closed_sets: set[str], immutable_ctors: set[str]) -> dict[str, Any]:
+    const = _immutable_const_verdict(refs, immutable_ctors)
+    if const is not None:
+        verdict, drives = const
+    else:
+        verdict, drives = _verdict([_categorize(r, closed_sets) for r in refs])
     line = min((r.start_point[0] + 1 for r in refs), default=1)
     return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel, "line": line}
 
 
-def _analyze_file(root: Any, rel: str, cfg: dict[str, Any]) -> list[dict[str, Any]]:
+def _analyze_file(root: Any, rel: str, cfg: dict[str, Any], immutable_ctors: set[str]) -> list[dict[str, Any]]:
     closed_sets = _collect_closed_sets(root)
     module_mutables = _find_module_mutable_names(root, cfg)
     findings: list[dict[str, Any]] = []
@@ -313,14 +405,14 @@ def _analyze_file(root: Any, rel: str, cfg: dict[str, Any]) -> list[dict[str, An
     for name in module_mutables:
         refs = _refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm)
         if refs:
-            findings.append(_finding(name, refs, rel, closed_sets))
+            findings.append(_finding(name, refs, rel, closed_sets, immutable_ctors))
 
     for cls in _refs(root, lambda n: n.type == "class_definition"):
         for attr in _instance_state(cls):
             key = f"self.{attr}"
             refs = _refs(cls, lambda n, k=key: n.type == "attribute" and _text(n) == k)
             if refs:
-                findings.append(_finding(key, refs, rel, closed_sets))
+                findings.append(_finding(key, refs, rel, closed_sets, immutable_ctors))
 
     return findings
 
@@ -351,10 +443,20 @@ def classify(repo: Path, lang: str) -> dict[str, Any]:
     files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=_IGNORE)
     bucketed = bucketed_paths(repo, cfg["extensions"], _IGNORE)
 
-    findings: list[dict[str, Any]] = []
+    # First pass: parse every file and collect the repo's immutable constructors
+    # (functions whose returns are all immutable), so a constant built by one can be
+    # resolved by a one-level follow. Second pass: analyze with that knowledge.
+    roots: list[tuple[Any, str]] = []
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
-        findings.extend(_analyze_file(parser.parse(src).root_node, rel, cfg))
+        roots.append((parser.parse(src).root_node, rel))
+    immutable_ctors: set[str] = set()
+    for root, _rel in roots:
+        immutable_ctors |= _collect_immutable_ctors(root)
+
+    findings: list[dict[str, Any]] = []
+    for root, rel in roots:
+        findings.extend(_analyze_file(root, rel, cfg, immutable_ctors))
 
     counts = {NEUTRAL: 0, PROMISCUOUS: 0, UNRESOLVED: 0}
     coverage = {v: {"observe_only": 0, "drives_decision": 0} for v in (NEUTRAL, PROMISCUOUS, UNRESOLVED)}
