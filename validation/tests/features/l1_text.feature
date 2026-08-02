@@ -20,6 +20,6 @@ Feature: L1.15-L1.17 Text and structural indicators (type escapes, whitespace, g
     And the band is Slop
 
   Scenario: One 5000 LOC god file is Slop even if percentage low
-    Given one 5000 LOC file in a 100k LOC tree
+    Given one 5000 LOC file in a 100000 LOC tree
     When I compute L1.17
     Then the band is Slop

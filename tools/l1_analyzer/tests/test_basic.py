@@ -455,7 +455,11 @@ def test_git_indicators_until_past_leaves_no_commits(tmp_path):
 
 # --- Rust and C configs (advertised languages, previously untested) ---------
 
-def test_l1_18_rust_config_runs(tmp_path):
+def test_l1_18_rust_static_mut_global_is_detected(tmp_path):
+    # A `static mut` global read is mutable-state access; a pure fn is not. The
+    # old smoke test only checked the band string and missed that Rust detected
+    # nothing at all (0/2). This pins the real discrimination.
+    from l1_analyzer.indicators import mutable_function_names
     (tmp_path / "a.rs").write_text(
         "static mut counter: i32 = 0;\n"
         "fn bump() { unsafe { counter += 1; } }\n"
@@ -463,8 +467,34 @@ def test_l1_18_rust_config_runs(tmp_path):
     )
     assert detect_primary_language(tmp_path) == "rust"
     res = analyze_mutable_state(tmp_path, "rust")
-    assert res["band"] in ("Healthy", "Not Healthy", "Slop")
-    assert res["details"].endswith("(rust)")
+    assert res["value"] == 50.0
+    assert res["details"].startswith("1/2") and res["details"].endswith("(rust)")
+    assert mutable_function_names(tmp_path, "rust") == ["bump"]
+
+
+def test_l1_18_rust_receiver_mutation_is_detected(tmp_path):
+    # An `impl` method taking `&mut self` and touching `self.field` references
+    # external mutable state; a pure associated fn does not.
+    from l1_analyzer.indicators import mutable_function_names
+    (tmp_path / "a.rs").write_text(
+        "struct Counter { count: i32 }\n"
+        "impl Counter {\n"
+        "    fn increment(&mut self) { self.count += 1; }\n"
+        "    fn pure(a: i32, b: i32) -> i32 { a + b }\n"
+        "}\n"
+    )
+    res = analyze_mutable_state(tmp_path, "rust")
+    assert res["value"] == 50.0
+    assert mutable_function_names(tmp_path, "rust") == ["increment"]
+
+
+def test_l1_18_rust_const_is_not_mutable_state(tmp_path):
+    # `const` and plain `static` are immutable; only `static mut` counts.
+    (tmp_path / "a.rs").write_text(
+        "const MAX: i32 = 10;\n"
+        "fn check(x: i32) -> bool { x < MAX }\n"
+    )
+    assert analyze_mutable_state(tmp_path, "rust")["value"] == 0.0
 
 
 def test_l1_18_java_interface_method_has_no_body(tmp_path):

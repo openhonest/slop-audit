@@ -294,14 +294,20 @@ LANG_CFG: dict[str, dict[str, Any]] = {
         "function_types": ("function_item",),
         "class_types": ("struct_item", "enum_item", "trait_item"),
         "member_access": "field_expression",
-        "this_ident": set(),
+        # A Rust method is a `function_item` carrying a `self_parameter`; `self.field`
+        # is a `field_expression` reading "self.<field>". Treating `self` as the
+        # receiver counts that access exactly as Python's does. Free functions have
+        # no `self.` access, so this never over-counts them.
+        "this_ident": {"self"},
         "module_level_assign": ("let_declaration", "static_item", "const_item"),
+        # A Rust global is mutable state iff its declaration carries `mut`
+        # (`static mut NAME: TYPE`). The name is the declaration's identifier child;
+        # the legacy text split grabbed the type (`i32`) instead, so no global was
+        # ever recognized. See docs/amendment-2026-08-02-rust-receiver-and-static.md.
+        "mutable_specifier_globals": True,
         "type_escape_patterns": (),
-        # Rust signals mutable state through `static mut` / `&mut self` rather than
-        # a receiver member access. This raw-text heuristic is Rust-only: running
-        # it for other languages produces false positives on any source that merely
-        # contains these strings (e.g. this analyzer's own pattern list). See
-        # docs/amendment-2026-07-31-rust-raw-pattern-scope.md.
+        # Retained per docs/amendment-2026-07-31-rust-raw-pattern-scope.md; structural
+        # detection above now carries the load, and these never fire inside a body.
         "raw_mut_patterns": ("static mut", "&mut self", "mut self"),
     },
     "c": {
@@ -477,6 +483,21 @@ def _module_mutables_python(candidates: list[Node], this_idents: set[str]) -> se
     return mutables
 
 
+def _module_mutables_by_specifier(candidates: list[Node]) -> set[str]:
+    """Rust-style: a top-level binding is mutable state iff its declaration carries
+    a `mut` specifier (`static mut counter: i32 = 0`). The name is the declaration's
+    `identifier` child, read structurally so the type token is never mistaken for
+    the name. `const` and plain `static` are immutable and excluded."""
+    mutables: set[str] = set()
+    for node in candidates:
+        if not any(c.type == "mutable_specifier" for c in node.children):
+            continue
+        name = next((c.text.decode("utf8", errors="ignore") for c in node.children if c.type == "identifier"), None)
+        if name:
+            mutables.add(name)
+    return mutables
+
+
 def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
     """Detect top-level names that are likely mutable module state.
 
@@ -498,6 +519,9 @@ def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
 
     if cfg.get("field_based_globals"):
         return _module_mutables_python(candidates, this_idents)
+
+    if cfg.get("mutable_specifier_globals"):
+        return _module_mutables_by_specifier(candidates)
 
     # Legacy text heuristic (unchanged), for languages not yet migrated.
     const_keywords = cfg.get("const_keywords", ("const ", "final ", "readonly ", "let ", "val "))
@@ -610,6 +634,65 @@ def analyze_mutable_state(repo: Path, lang: str) -> L1Result:
         "band": band(ratio, 15, 40, higher_is_better=False),
         "details": _with_skipped(f"{mutable_funcs}/{total_funcs} functions reference external mutable state ({lang})", skipped),
     }
+
+
+def _file_mutable_names(root: Node, cfg: dict[str, Any], module_mutables: set[str]) -> list[str]:
+    """Names of the functions in one file that L1.18 counts as touching external
+    mutable state. Same predicate as _count_file_functions (module-level so it
+    binds no caller state), only it keeps the names instead of a tally."""
+    names: list[str] = []
+
+    def find(n: Node) -> None:
+        if n.type in cfg["function_types"]:
+            body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
+            if body is not None:
+                receivers = _receiver_names(n, cfg)
+                if _count_mutable_refs(body, cfg, module_mutables, receivers) > 0:
+                    nm = n.child_by_field_name("name")
+                    if nm is not None and nm.text:
+                        names.append(nm.text.decode("utf8", errors="ignore"))
+        for c in n.children:
+            find(c)
+
+    find(root)
+    return names
+
+
+def mutable_function_names(repo: Path, lang: str) -> list[str]:
+    """L1.18's culprits by name: functions that reference external mutable state.
+
+    Additive, read-only. A name appears here iff analyze_mutable_state counts that
+    function (identical _count_mutable_refs predicate), so this never moves L1.18's
+    value/band or the pre-registered number. Exists so the behavioural suite can
+    assert *which* function is flagged instead of fabricating the answer."""
+    if lang not in LANG_CFG:
+        return []
+    cfg = LANG_CFG[lang]
+    parser = _get_parser(lang)
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    names: list[str] = []
+    for _path, src in files:
+        root = parser.parse(src).root_node
+        module_mutables = _find_module_mutable_names(root, cfg)
+        names.extend(_file_mutable_names(root, cfg, module_mutables))
+    return names
+
+
+def module_mutable_names(repo: Path, lang: str) -> set[str]:
+    """The module-level bindings L1.18 treats as mutable state. A binding is a
+    *bound literal* (a constant, a frozen dispatch table) exactly when it is
+    absent from this set. Additive, read-only; never affects L1.18's number."""
+    if lang not in LANG_CFG:
+        return set()
+    cfg = LANG_CFG[lang]
+    parser = _get_parser(lang)
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    out: set[str] = set()
+    for _path, src in files:
+        root = parser.parse(src).root_node
+        out |= _find_module_mutable_names(root, cfg)
+    return out
+
 
 # ---------------------------------------------------------------------------
 # Full source-based indicators with tree-sitter for multi-lang support

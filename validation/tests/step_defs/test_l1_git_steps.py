@@ -1,105 +1,151 @@
-"""
-Step definitions for L1.1-L1.8 git indicators.
-Uses in-memory simulation of git history (no real git for speed and portability).
-In production the real l1_git.py / l1_runner would be used.
+"""Behavioural spec for L1.1-L1.8 (git-history indicators), wired to the REAL
+analyzer. Each step builds a real git repository with the described history and
+calls compute_git_indicators. There is no in-memory reimplementation of the git
+formulas (the old steps recomputed doc/total in the test and asserted that against
+the feature's number, which cannot catch a bug in the analyzer). State is threaded
+through a per-scenario `ctx` fixture, not module globals.
 """
 
+import subprocess
+
+import pytest
+from l1_analyzer.indicators import compute_git_indicators
 from pytest_bdd import given, parsers, scenarios, then, when
 
 scenarios("../features/l1_git.feature")
 
-# Simple state for the simulated history
-HISTORY = {}
-LAST_VALUES = {}
+
+@pytest.fixture
+def ctx():
+    return {}
+
+
+def _git(r, *a):
+    subprocess.run(["git", "-C", str(r), *a], check=True, capture_output=True)
+
+
+def _commit(r, m):
+    subprocess.run(
+        ["git", "-C", str(r), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", m],
+        check=True, capture_output=True,
+    )
+
+
+def _init(tmp_path):
+    _git(tmp_path, "init", "-q")
+    return tmp_path
+
+
+def _add(repo, name, text):
+    (repo / name).write_text(text)
+    _git(repo, "add", "-A")
+
+
+def _rows(datatable):
+    header, *body = datatable
+    return [dict(zip(header, row)) for row in body]
+
+
+def _commit_kind(repo, kind, i):
+    if kind == "doc":
+        _add(repo, f"doc{i}.md", "a\n"); _commit(repo, f"doc{i}")
+    elif kind == "code":
+        _add(repo, f"code{i}.py", "x = 1\n"); _commit(repo, f"code{i}")
+    elif kind == "mixed":
+        _add(repo, f"mix{i}.py", "x = 1\n"); _add(repo, f"mix{i}.md", "a\n"); _commit(repo, f"mix{i}")
+
+
+# --- given ------------------------------------------------------------------
 
 @given("a git history with:")
-def given_git_table(table):
-    global HISTORY
-    HISTORY = {}
-    for row in table:
-        kind = row['kind']
-        count = int(row['count'])
-        HISTORY[kind] = count
+def given_history(ctx, datatable, tmp_path):
+    repo = _init(tmp_path)
+    header = datatable[0]
+    rows = _rows(datatable)
+    if "kind" in header:
+        i = 0
+        for r in rows:
+            for _ in range(int(r["count"])):
+                _commit_kind(repo, r["kind"], i); i += 1
+    elif "delta_kind" in header:
+        counts = {r["delta_kind"]: int(r["count"]) for r in rows}
+        pos, neg = counts.get("positive", 0), counts.get("net-negative", 0)
+        seed_lines = 120 * max(neg, 1)
+        _add(repo, "big.py", "x = 1\n" * seed_lines); _commit(repo, "seed")   # positive #1
+        for i in range(pos - 1):
+            _add(repo, f"p{i}.py", "y = 2\n" * 5); _commit(repo, f"pos{i}")
+        lines = seed_lines
+        for i in range(neg):
+            lines -= 100
+            (repo / "big.py").write_text("x = 1\n" * max(lines, 1)); _git(repo, "add", "-A"); _commit(repo, f"neg{i}")
+    elif "delete_ratio" in header:
+        # A high-delete commit (analyzer definition) adds lines AND deletes >40% of
+        # them: current_add>0 and current_del/current_add>0.4. A pure deletion has
+        # current_add==0 and is net-negative, not high-delete. So each high commit
+        # rewrites a seeded 50-line file into 100 different lines (50 del / 100 add
+        # = 0.5, and not net-negative). The seeds are pure-add low commits.
+        counts = {r["delete_ratio"]: int(r["count"]) for r in rows}
+        high, low = counts.get(">40%", 0), counts.get("<40%", 0)
+        for i in range(high):
+            _add(repo, f"hi{i}.py", "".join(f"old{j}\n" for j in range(50))); _commit(repo, f"seed{i}")
+        for i in range(low - high):
+            _add(repo, f"low{i}.py", "y = 2\n" * 20); _commit(repo, f"low{i}")
+        for i in range(high):
+            (repo / f"hi{i}.py").write_text("".join(f"new{j}\n" for j in range(100)))
+            _git(repo, "add", "-A"); _commit(repo, f"high{i}")
+    ctx["repo"] = repo
 
-@given("a git history with:")
-def given_high_delete_table(table):
-    global HISTORY
-    HISTORY = {}
-    for row in table:
-        ratio = row.get('delete_ratio') or row.get('kind')
-        count = int(row.get('count') or row.get('count'))
-        if ratio and '40' in str(ratio):
-            HISTORY['>40%'] = count
-        else:
-            HISTORY['<40%'] = count
 
 @given("a git history with only code commits")
-def given_only_code():
-    global HISTORY
-    HISTORY = {'code': 10}
+def given_only_code(ctx, tmp_path):
+    repo = _init(tmp_path)
+    for i in range(5):
+        _add(repo, f"c{i}.py", "x = 1\n"); _commit(repo, f"c{i}")
+    ctx["repo"] = repo
+
+
+@given("a git history with added lines:")
+def given_added_lines(ctx, datatable, tmp_path):
+    repo = _init(tmp_path)
+    for r in _rows(datatable):
+        ext = "md" if r["kind"] == "doc" else "py"
+        _add(repo, f"{r['kind']}.{ext}", "line\n" * int(r["lines"]))
+    _commit(repo, "added lines")
+    ctx["repo"] = repo
+
 
 @given("a git history with code deltas:")
-def given_deltas(table):
-    global HISTORY
-    HISTORY = {'added': 0, 'deleted': 0}
-    for row in table:
-        HISTORY['added'] += int(row['added'])
-        HISTORY['deleted'] += int(row['deleted'])
+def given_deltas(ctx, datatable, tmp_path):
+    repo = _init(tmp_path)
+    r = _rows(datatable)[0]
+    added, deleted = int(r["added"]), int(r["deleted"])
+    _add(repo, "a.py", "x = 1\n" * added); _commit(repo, "seed")
+    (repo / "a.py").write_text("x = 1\n" * (added - deleted)); _git(repo, "add", "-A"); _commit(repo, "delete")
+    ctx["repo"] = repo
+
 
 @given(parsers.parse("a repo with {prod:d} prod LOC and {test:d} test LOC"))
-def given_loc(prod, test):
-    global HISTORY
-    HISTORY = {'prod_loc': prod, 'test_loc': test}
+def given_loc(ctx, prod, test, tmp_path):
+    repo = _init(tmp_path)
+    _add(repo, "app.py", "x = 1\n" * prod)
+    _add(repo, "test_app.py", "y = 2\n" * test)
+    _commit(repo, "seed")
+    ctx["repo"] = repo
+
+
+# --- when / then ------------------------------------------------------------
 
 @when(parsers.parse("I compute L1.{num:d}"))
-def when_compute(num):
-    global LAST_VALUES
-    if num == 1:
-        total = sum(HISTORY.values())
-        doc = HISTORY.get('doc', 0)
-        LAST_VALUES['L1.1'] = (doc / total * 100) if total else 0
-    elif num == 2:
-        total = sum(HISTORY.values())
-        code = HISTORY.get('code', 0)
-        LAST_VALUES['L1.2'] = (code / total * 100) if total else 0
-    elif num == 3:
-        total = sum(HISTORY.values())
-        mixed = HISTORY.get('mixed', 0)
-        LAST_VALUES['L1.3'] = (mixed / total * 100) if total else 0
-    elif num == 4:
-        doc_lines = HISTORY.get('doc_lines', HISTORY.get('doc', 0))
-        code_lines = HISTORY.get('code_lines', HISTORY.get('code', 1))
-        total = doc_lines + code_lines
-        LAST_VALUES['L1.4'] = (doc_lines / total * 100) if total else 0
-    elif num == 5:
-        added = HISTORY.get('added', 1)
-        deleted = HISTORY.get('deleted', 0)
-        LAST_VALUES['L1.5'] = (deleted / added * 100) if added else 0
-    elif num == 6:
-        total = sum(HISTORY.values())
-        neg = HISTORY.get('net-negative', 0)
-        LAST_VALUES['L1.6'] = (neg / total * 100) if total else 0
-    elif num == 7:
-        total = sum(HISTORY.values())
-        high = HISTORY.get('>40%', 0)
-        LAST_VALUES['L1.7'] = (high / total * 100) if total else 0
-    elif num == 8:
-        prod = HISTORY.get('prod_loc', 1)
-        test = HISTORY.get('test_loc', 0)
-        LAST_VALUES['L1.8'] = test / prod if prod else 0
+def when_compute(ctx, num):
+    ctx["result"] = compute_git_indicators(ctx["repo"], None, None)
+    ctx["num"] = num
+
 
 @then(parsers.parse("L1.{num:d} is {val:f}"))
-def then_value(num, val):
-    key = f"L1.{num}"
-    assert abs(LAST_VALUES.get(key, -999) - val) < 0.1
+def then_val(ctx, num, val):
+    assert ctx["result"][f"L1.{num}"]["value"] == pytest.approx(val, abs=0.05)
+
 
 @then(parsers.parse("the band is {band}"))
-def then_band(band):
-    # Use last computed value
-    val = next(iter(LAST_VALUES.values())) if LAST_VALUES else 0
-    if band == "Healthy":
-        assert val >= 10 or val >= 0.4 or val == 70.0 or val == 20.0 or val == 25.0 or val == 0.5
-    elif band == "Not Healthy":
-        assert 1 <= val < 10 or 0.1 <= val < 0.4
-    else:
-        assert val < 1 or val < 0.1
+def then_band(ctx, band):
+    assert ctx["result"][f"L1.{ctx['num']}"]["band"] == band

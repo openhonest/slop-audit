@@ -1,142 +1,125 @@
+"""Behavioural spec for L1.18 (mutable-state ratio), wired to the REAL analyzer.
+
+Every step runs l1_analyzer on a real temp file and asserts its real output. There
+is no in-memory simulation and no substring ladder: if the analyzer cannot be
+imported the suite fails loudly at import time, because a suite that stays green
+without the system under test is a lie (Honest Code applies to tests too).
+
+State is threaded through a per-scenario `ctx` fixture, not module globals, so no
+mutable state is shared between scenarios (which is exactly what L1.20 measures).
+
+Rewiring these steps to real code surfaced two contradictions the old fabricated
+steps hid; both are tagged @xfail in l1_18.feature with the reason:
+  - the analyzer implements no IO-boundary exclusion (Scenario: IO boundary ...);
+  - its own source scores 11.7%, not the 0.0 the bootstrap scenario claims.
 """
-Step definitions for L1.18 Gherkin test suite.
-This is the behavioural specification for the honest audit's mutable state indicator.
 
-To run: ensure the l1_18 package from the Paper A replication is importable
-(e.g. PYTHONPATH=../adamzwasserman/openhonest-paper-a-finite-testability pytest ...)
-
-Uses pytest-bdd (or honest-gherkin for full honest compliance).
-"""
-
-import sys
+import textwrap
 from pathlib import Path
+
+import l1_analyzer
+import pytest
+from l1_analyzer.indicators import (
+    analyze_mutable_state,
+    module_mutable_names,
+    mutable_function_names,
+)
 from pytest_bdd import given, parsers, scenarios, then, when
-
-# Make the real analyzer importable (adjust path as needed for your checkout)
-PAPER_DIR = Path(__file__).resolve().parents[5] / "adamzwasserman" / "openhonest-paper-a-finite-testability"
-if PAPER_DIR.exists():
-    sys.path.insert(0, str(PAPER_DIR))
-
-# Also make the new any-language implementation in this tree importable
-L1_ANALYZER_DIR = Path(__file__).resolve().parents[4] / "tools" / "l1_analyzer"
-if L1_ANALYZER_DIR.exists():
-    sys.path.insert(0, str(L1_ANALYZER_DIR))
-
-try:
-    from l1_analyzer import analyze_mutable_state  # the new any-language implementation
-except ImportError:
-    analyze_mutable_state = None  # type: ignore
-
-# The old paper package names for backward compat if present
-try:
-    from l1_18 import analyze_repo  # type: ignore
-except ImportError:
-    analyze_repo = None  # type: ignore
-
-try:
-    from bound_literal_detector import detect_bound_literals_in_source  # type: ignore
-except ImportError:
-    detect_bound_literals_in_source = None  # type: ignore
 
 scenarios("../features/l1_18.feature")
 
-# Simple in-memory "source under test" for the steps
-CURRENT_SOURCE = ""
-CURRENT_LANG = "python"
-LAST_RESULT = {}
+ANALYZER_SRC = Path(l1_analyzer.__file__).parent
+_EXT = {"python": "py", "rust": "rs", "c": "c"}
+
+_IO_BOUNDARY = {
+    "python": "CACHE = []\ndef handler():\n    # IO boundary\n    print(CACHE)\n    return len(CACHE)\n",
+    "rust": "static mut CACHE: Vec<i32> = Vec::new();\nfn handler() { unsafe { println!(\"{:?}\", CACHE); } }\n",
+    "c": "int global_state = 0;\nint handler() { printf(\"%d\", global_state); return global_state; }\n",
+}
+
+
+@pytest.fixture
+def ctx():
+    return {}
+
+
+def _run(ctx):
+    repo, lang = ctx["repo"], ctx["lang"]
+    ctx["result"] = analyze_mutable_state(repo, lang)
+    ctx["names"] = mutable_function_names(repo, lang)
+    ctx["module_mutables"] = module_mutable_names(repo, lang)
+
+
+# --- given ------------------------------------------------------------------
+
+@given("the L1.18 analyzer is available via import or CLI")
+def given_available():
+    # Guaranteed by the top-of-module import; if it failed, collection failed loudly.
+    assert analyze_mutable_state is not None
 
 
 @given(parsers.parse("a {lang} source file with:"))
-def given_source_with(lang: str, docstring: str):
-    global CURRENT_SOURCE, CURRENT_LANG
-    CURRENT_SOURCE = docstring.strip()
-    CURRENT_LANG = lang
+def given_source(ctx, lang, docstring, tmp_path):
+    lang = lang.lower()
+    (tmp_path / f"m.{_EXT[lang]}").write_text(textwrap.dedent(docstring).strip() + "\n")
+    ctx["repo"], ctx["lang"] = tmp_path, lang
 
 
-@given("a {lang} source file containing an IO boundary function that also touches global state")
-def given_io_boundary(lang: str):
-    global CURRENT_SOURCE, CURRENT_LANG
-    CURRENT_LANG = lang
-    if lang == "python":
-        CURRENT_SOURCE = "CACHE = []\ndef handler():\n    # IO boundary\n    print(CACHE)\n    return len(CACHE)"
-    elif lang == "rust":
-        CURRENT_SOURCE = "static mut CACHE: Vec<i32> = vec![];\nfn handler() { unsafe { println!(\"{:?}\", CACHE); } }"
-    else:
-        CURRENT_SOURCE = "int global = 0;\nint handler() { printf(\"%d\", global); return global; }"
+@given(parsers.parse("a {lang} source file containing an IO boundary function that also touches global state"))
+def given_io_boundary(ctx, lang, tmp_path):
+    lang = lang.lower()
+    (tmp_path / f"m.{_EXT[lang]}").write_text(_IO_BOUNDARY[lang])
+    ctx["repo"], ctx["lang"] = tmp_path, lang
 
 
 @given("the L1.18 analyzer source itself")
-def given_analyzer_source():
-    global CURRENT_SOURCE, CURRENT_LANG
-    CURRENT_LANG = "python"
-    # In practice load the real l1_18.py; here we use a stub that the real analyzer would score 0 on amended.
-    CURRENT_SOURCE = "# real source would be loaded from the package"
+def given_analyzer_source(ctx):
+    ctx["repo"], ctx["lang"] = ANALYZER_SRC, "python"
 
+
+# --- when (all three phrasings run the real analyzer; "amended" is the default
+#     bound-literal behaviour, so it is the same call) --------------------------
 
 @when("I run L1.18 analysis on it")
-def when_run_analysis():
-    global LAST_RESULT, CURRENT_SOURCE, CURRENT_LANG
-    src = CURRENT_SOURCE.lower()
-    # Produce exact values expected by the Gherkin behavioural spec in the feature file.
-    # The production implementation is in tools/l1_analyzer (multi-lang via tree-sitter).
-    if "cache = []" in src and "def get" in src:
-        LAST_RESULT = {"mutable_state_ratio": 1.0, "flagged_functions": ["get"]}
-    elif "def add" in src:
-        LAST_RESULT = {"mutable_state_ratio": 0.0, "flagged_functions": []}
-    elif "dispatch = frozenset" in src:
-        LAST_RESULT = {"mutable_state_ratio": 0.0, "flagged_functions": [], "bound_literals": ["DISPATCH"]}
-    elif "mut self" in src:
-        LAST_RESULT = {"mutable_state_ratio": 1.0, "flagged_functions": ["increment"]}
-    elif "global_state" in src or "global " in src:
-        LAST_RESULT = {"mutable_state_ratio": 1.0, "flagged_functions": ["get_state"]}
-    elif "handler" in src and any(x in src for x in ["cache", "global", "mut"]):
-        LAST_RESULT = {"mutable_state_ratio": 0.0, "flagged_functions": []}  # boundary excluded
-    elif "real source" in src:
-        LAST_RESULT = {"mutable_state_ratio": 0.0, "flagged_functions": []}  # bootstrap
-    else:
-        LAST_RESULT = {"mutable_state_ratio": 0.0, "flagged_functions": []}
-
-
-@when("I run L1.18 analysis in amended mode on it")
-def when_run_amended():
-    global LAST_RESULT
-    if "bound_literal_detector" in globals() and "DISPATCH = frozenset" in CURRENT_SOURCE:
-        LAST_RESULT = {"mutable_state_ratio": 0.0, "flagged_functions": [], "bound_literals": ["DISPATCH"]}
-    else:
-        LAST_RESULT = {"mutable_state_ratio": 0.0, "flagged_functions": []}
-
-
 @when("I run L1.18 analysis in amended mode")
-def when_run_amended_no_source():
-    global LAST_RESULT
-    LAST_RESULT = {"mutable_state_ratio": 0.0, "flagged_functions": []}
+@when("I run L1.18 analysis in amended mode on it")
+def when_run(ctx):
+    _run(ctx)
 
+
+# --- then -------------------------------------------------------------------
 
 @then(parsers.parse("the mutable state ratio is {ratio:f}"))
-def then_ratio(ratio: float):
-    assert abs(LAST_RESULT.get("mutable_state_ratio", -1) - ratio) < 0.01, \
-        f"Expected {ratio}, got {LAST_RESULT.get('mutable_state_ratio')}"
+def then_ratio(ctx, ratio):
+    # The feature states a 0..1 ratio; the analyzer reports a 0..100 percentage.
+    assert ctx["result"]["value"] == pytest.approx(ratio * 100, abs=0.05)
 
 
 @then("no functions are flagged as mutable")
-def then_no_flags():
-    assert not LAST_RESULT.get("flagged_functions"), f"Unexpected flags: {LAST_RESULT.get('flagged_functions')}"
+def then_no_flags(ctx):
+    assert ctx["names"] == []
 
 
 @then(parsers.parse('the function "{name}" is flagged'))
-def then_flagged(name: str):
-    assert name in LAST_RESULT.get("flagged_functions", []), \
-        f"{name} not in {LAST_RESULT.get('flagged_functions')}"
+def then_function_flagged(ctx, name):
+    assert name in ctx["names"], f"{name!r} not in {ctx['names']}"
+
+
+@then(parsers.parse('the method "{name}" is flagged'))
+def then_method_flagged(ctx, name):
+    assert name in ctx["names"], f"{name!r} not in {ctx['names']}"
 
 
 @then(parsers.parse('the binding "{name}" is recognized as a bound literal'))
-def then_bound_literal(name: str):
-    assert name in LAST_RESULT.get("bound_literals", []), \
-        f"{name} not recognized as bound literal"
+def then_bound_literal(ctx, name):
+    # A binding is a bound literal exactly when the analyzer excludes it from
+    # module mutable state.
+    assert name not in ctx["module_mutables"], f"{name!r} counted as mutable: {ctx['module_mutables']}"
 
 
 @then("the IO boundary function is excluded from the mutable state ratio")
-def then_io_excluded():
-    # In real analyzer, io_boundary_names in LANG_CFG cause exclusion.
-    # Here we just assert the result would be low if only the boundary touches state.
-    assert LAST_RESULT.get("mutable_state_ratio", 1.0) < 0.5
+def then_io_excluded(ctx):
+    # xfail: the analyzer implements no IO-boundary exclusion, so the boundary
+    # function is counted and the ratio is not zero. This assertion states the
+    # feature's intent; it fails until exclusion is implemented or the claim dropped.
+    assert ctx["result"]["value"] == 0.0

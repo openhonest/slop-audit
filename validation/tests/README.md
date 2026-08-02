@@ -1,34 +1,31 @@
-# Honest Audit Test Suite (L1.1–L1.20)
+# Honest Audit Test Suite (L1.1-L1.20)
 
 This directory contains the behavioural (Gherkin) specification and executable tests for the Slop Audit Layer 1 indicators.
 
-The suite is deliberately written in Gherkin so that the expected behaviour of each indicator is readable by auditors, assessors, and AI agents without reading the implementation scripts.
+The suite is written in Gherkin so the expected behaviour of each indicator is readable by auditors, assessors, and AI agents without reading the implementation scripts.
+
+## Every step runs the real analyzer
+
+The step definitions build a real fixture (a temp file, a real git repository, real stub binaries on `PATH`) and call the real `l1_analyzer` on it, then assert its real output. There is no in-memory simulation, no substring ladder, and no reimplementation of an indicator's formula inside the test. A step that cannot import the analyzer fails loudly at collection time. A suite that stays green without the system under test is a lie, so this suite cannot be green without it.
+
+Where a scenario carried a fabricated number in units the analyzer does not use (for example a dead-code density where the analyzer reports a finding count), the scenario states the real units, and the reconciliation is noted in a comment in the `.feature` file. Two L1.18 scenarios are tagged `@xfail` because wiring them to real code surfaced genuine gaps (no IO-boundary exclusion; the analyzer's own source is not self-clean); the tag reason records the finding rather than faking a pass.
 
 ## Structure
 
-- `features/` — one .feature file (or group file) per L1 family, using tables for git histories and code snippets.
-- `step_defs/` — pytest-bdd steps. They simulate git histories in memory for L1.1-8 and call (or stub) the real L1 analyzer scripts for L1.12+.
-- `fixtures/` — sample code and git fixtures for multi-language cases (Python, Rust, C, etc.).
+- `features/` - one `.feature` file (or group file) per L1 family, using tables for git histories and code snippets.
+- `step_defs/` - pytest-bdd steps. Each builds real fixtures and calls the real analyzer; state is threaded through a per-scenario `ctx` fixture, never module globals.
 
 ## Running
 
-The full production suite lives in the Paper A replication package (`adamzwasserman/openhonest-paper-a-finite-testability/tests/`).
-
-To run a local copy here:
+Run under the `l1_analyzer` package environment, which has `pytest-bdd` and the analyzer on the path:
 
 ```bash
-# from slop-audit/
-PYTHONPATH=../../adamzwasserman/openhonest-paper-a-finite-testability uv run pytest validation/tests/ -q --gherkin-terminal-reporter
+# from slop-audit/tools/l1_analyzer/
+uv run pytest ../../validation/tests/ -q
 ```
 
-The steps are written to fall back to in-memory simulation when the paper package is not on PYTHONPATH, so the suite is self-documenting even if the analyzers are not present.
-
-## Language-agnostic design
-
-Per L1.18 (and the finite-testability group), all static analysis indicators (L1.12, L1.13, L1.15, L1.18, L1.19) use tree-sitter + LANG_CFG dispatch tables exactly so the same semantic property can be measured in any language. The Gherkin scenarios include examples in Python, Rust, C, etc.
+Expected: the suite passes, with the L1.18 `@xfail` scenarios reported as xfail. Do not run it from the repository root: that environment loads an unrelated pytest plugin that fails to import, which blocks collection.
 
 ## Coverage goal
 
-Every L1 indicator has at least one scenario for each threshold band (Healthy / Not Healthy / Slop) plus adversarial and boundary cases (exactly on the threshold, zero, 100%, mixed language repos, IO-boundary exclusions, bound literals, etc.).
-
-See the replication package for the complete 300+ scenario suite that was used to validate the 200-repo corpus in Paper A.
+Every L1 indicator has at least one scenario per threshold band (Healthy / Not Healthy / Slop) plus adversarial and boundary cases (exactly on the threshold, zero, 100%, IO-boundary, bound literals). The complete corpus-scale suite lives in the Paper A replication package.

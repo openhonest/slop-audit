@@ -1,16 +1,22 @@
-"""Tests for the gated L1.18b state-bounds classifier.
+"""Surviving invariants for the L1.18b state-bounds classifier.
 
-Two jobs:
-  1. Prove the frozen path is untouched: with classify_state_bounds=False the
-     output equals the golden captured before the classifier existed, byte for
-     byte. This is the guarantee that "on by default" cannot compromise a
-     pre-registered run.
-  2. Exercise the classifier: bounded vs unbounded vs undetermined, the
-     observed-projection downgrade, and the per-function findings. Pure
-     assertions, no mocks.
+The classifier's *verdicts* are specified by the finite-testability conformance
+vectors in test_finite_testability_vectors.py (the ten cases of
+~/dev/honest/open-honest/honest-framework/specs/finite-testability.md section 8).
+This file keeps only the invariants that outlive the predicate change from
+value-count to partition-count:
+
+  1. The frozen path is untouched: with classify_state_bounds=False the output
+     equals the golden captured before the classifier existed, byte for byte.
+     This is the guarantee that "on by default" cannot move a pre-registered run,
+     and it is exactly the v1 side of the spec section 9 side-by-side rule.
+  2. On-mode is purely additive: L1.18's registered number never moves; the
+     classifier only adds the L1.18b and path_cover keys.
+  3. A non-Python target is n/a, never guessed.
 
 Fixtures are written under tmp_path (never committed into the source tree), so a
-self-audit of this repo never trips over its own test data.
+self-audit of this repo never trips over its own test data. Pure assertions, no
+mocks (Honest Code Rule 10).
 """
 
 import json
@@ -21,7 +27,8 @@ from l1_analyzer import indicators, state_bounds
 GOLDEN = Path(__file__).parent / "golden" / "py_repo.json"
 
 # A deliberately-sloppy sample: pure function + reads of dict/list/str/int/bool
-# state, plus one bounded projection (len). Written to tmp_path per test.
+# state, plus one bounded projection (len). Written to tmp_path per test. Kept
+# byte-identical because the frozen golden was captured against it.
 FIXTURE_SRC = '''"""Fixture exercising bounded / unbounded / undetermined mutable state."""
 
 counter_state = 0      # module-level mutable int -> unbounded (bare name)
@@ -76,61 +83,8 @@ def test_on_mode_is_additive_l18_identical_plus_l18b(tmp_path):
     assert set(on) - set(off) == {"L1.18b", "path_cover"}  # the additive enrichments
 
 
-def test_fixture_breakdown_is_three_unbounded_two_bounded(tmp_path):
-    # __init__, reads_cache, uses_global -> unbounded; reads_flag, cache_is_empty -> bounded.
-    result = state_bounds.classify(_fixture(tmp_path), "python")
-    assert result["verdict"] == "infinite"
-    assert result["unbounded_funcs"] == 3
-    assert result["bounded_funcs"] == 2
-    assert result["undetermined_funcs"] == 0
-
-
-def test_findings_name_the_function_and_the_culprit_state(tmp_path):
-    result = state_bounds.classify(_fixture(tmp_path), "python")
-    by_func = {f["function"]: f for f in result["findings"]}
-    assert by_func["reads_cache"]["verdict"] == "unbounded"
-    assert by_func["reads_cache"]["state"] == ["self.cache"]
-    assert by_func["reads_cache"]["file"] == "app.py"
-    assert by_func["reads_cache"]["line"] > 0
-    # Findings are ordered most-actionable first.
-    assert result["findings"][0]["verdict"] == "unbounded"
-
-
-def _classify_src(tmp_path, src):
-    (tmp_path / "m.py").write_text(src)
-    return state_bounds.classify(tmp_path, "python")
-
-
-def test_dict_state_read_in_full_is_unbounded(tmp_path):
-    src = "class S:\n    def __init__(self):\n        self.cache = {}\n    def get(self, k):\n        return self.cache[k]\n"
-    r = _classify_src(tmp_path, src)
-    assert r["unbounded_funcs"] >= 1
-    assert r["verdict"] == "infinite"
-
-
-def test_bool_state_is_bounded(tmp_path):
-    src = "class S:\n    def __init__(self):\n        self.on = False\n    def check(self):\n        return 1 if self.on else 0\n"
-    r = _classify_src(tmp_path, src)
-    assert r["bounded_funcs"] >= 1
-    assert r["unbounded_funcs"] == 0
-    assert r["verdict"] == "finite"
-
-
-def test_len_is_a_bounded_projection_of_an_unbounded_dict(tmp_path):
-    src = "class S:\n    def __init__(self):\n        self.cache = {}\n    def empty(self):\n        return len(self.cache) == 0\n"
-    r = _classify_src(tmp_path, src)
-    # __init__ writes the dict (unbounded); empty() only reads len() (bounded).
-    assert r["bounded_funcs"] >= 1
-
-
-def test_unknown_assignment_is_undetermined(tmp_path):
-    src = "class S:\n    def __init__(self):\n        self.thing = make_thing()\n    def use(self):\n        return self.thing.run()\n"
-    r = _classify_src(tmp_path, src)
-    assert r["undetermined_funcs"] >= 1
-    assert r["unbounded_funcs"] == 0
-
-
 def test_non_python_is_na_not_guessed(tmp_path):
+    # A language the classifier does not implement is n/a, never analyzed as Python.
     r = state_bounds.classify(tmp_path, "go")
     assert r["verdict"] == "n/a"
     assert r["value"] == "n/a"

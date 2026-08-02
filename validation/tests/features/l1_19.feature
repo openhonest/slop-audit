@@ -1,20 +1,24 @@
 Feature: L1.19 Decision-space coverage
-  Of the *enumerable* decisions (dispatch keys, enum arms, match cases), what % are exercised by tests.
-  Requires enumerating decisions + running the test suite with branch tracing.
+  Of the enumerable decision branches, what percent are exercised by the test
+  suite, measured by running the suite under branch tracing. (An earlier draft
+  asserted 95/50/30 against fabricated fixtures. These use a real 4-arm classifier
+  and the branch counts the tracer actually reports: 4 arms are 6 branches, so
+  exercising 4/3/2 arms is 100/83.3/50 percent.)
 
-  Scenario: 95% of dispatch keys exercised is Healthy
-    Given a codebase with 20 dispatch table entries and a test suite that hits 19
+  Scenario: All decision branches exercised is Healthy
+    Given a 4-arm classifier whose tests exercise 4 of 4 arms
     When I compute L1.19
-    Then L1.19 is 95.0
+    Then L1.19 is 100.0
     And the band is Healthy
 
-  Scenario: 50% decision coverage is Not Healthy
-    Given 100 enum variants but tests only exercise 50
+  Scenario: Most but not all branches exercised is Not Healthy
+    Given a 4-arm classifier whose tests exercise 3 of 4 arms
     When I compute L1.19
-    Then L1.19 is 50.0
+    Then L1.19 is 83.3
     And the band is Not Healthy
 
-  Scenario: 30% decision coverage is Slop
-    Given many if/elif chains and dispatch tables with <30% exercised
+  Scenario: Half the branches exercised is Slop
+    Given a 4-arm classifier whose tests exercise 2 of 4 arms
     When I compute L1.19
-    Then the band is Slop
+    Then L1.19 is 50.0
+    And the band is Slop
