@@ -86,8 +86,13 @@ _CS_MUTATING = frozenset({
 })
 # Map lookups keyed by an argument: like a subscript read, the key's domain decides
 # the partition (unbounded key -> unbounded partition).
+_RUST_MUTATING = frozenset({
+    "insert", "push", "push_back", "push_front", "remove", "pop", "pop_back", "pop_front",
+    "clear", "extend", "append", "retain", "set", "replace", "swap", "truncate", "drain",
+})
 _JAVA_KEYED_READ = frozenset({"get", "containsKey", "getOrDefault", "contains", "containsValue"})
 _CS_KEYED_READ = frozenset({"ContainsKey", "TryGetValue", "Contains", "ContainsValue", "GetValueOrDefault"})
+_RUST_KEYED_READ = frozenset({"get", "get_mut", "contains_key", "contains", "get_or_insert"})
 
 _PY_LITERALS = frozenset({"string", "integer", "float", "true", "false", "none", "concatenated_string"})
 _JS_LITERALS = frozenset({"number", "string", "true", "false", "null", "undefined", "template_string"})
@@ -99,6 +104,10 @@ _JAVA_LITERALS = frozenset({
 _CS_LITERALS = frozenset({
     "integer_literal", "real_literal", "string_literal", "character_literal",
     "null_literal", "boolean_literal",
+})
+_RUST_LITERALS = frozenset({
+    "integer_literal", "float_literal", "string_literal", "raw_string_literal",
+    "char_literal", "boolean_literal", "true", "false",
 })
 
 
@@ -201,6 +210,33 @@ LANG_SPEC: dict[str, dict[str, Any]] = {
         "mutating": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
         "literal_types": _CS_LITERALS,
     },
+    "rust": {
+        # No classes: state is struct fields used as self.<field> inside a separate
+        # impl block, so the impl is the scope and state is enumerated from usage.
+        "class_types": ("impl_item",),
+        "func_types": ("function_item",),
+        "assign_types": ("assignment_expression", "compound_assignment_expr"),
+        "assign_left": "left", "assign_right": "right",
+        "subscript_types": ("index_expression",), "sub_value": None, "sub_index": None,
+        "sub_positional": True,   # index_expression has no fields: [collection, key] by position
+        "member_types": ("field_expression",), "mem_object": "value", "mem_attr": "field",
+        "call_types": ("call_expression",), "flat_call": False,
+        "call_fn": "function", "call_args": "arguments", "call_name": None,
+        "arglist_types": ("arguments",),
+        "return_types": ("return_expression",),
+        "branch_types": ("if_expression", "while_expression"), "branch_cond": "condition",
+        "elif_types": (),
+        "passthrough_types": ("parenthesized_expression", "reference_expression", "unary_expression", "try_expression"),
+        "comparison_types": ("binary_expression",),
+        "membership": "none",
+        "this_idents": frozenset({"self"}),
+        "instance_ref_style": "member",
+        "instance_enum": "self_usage",
+        "field_decl_types": (),
+        "key_prefix": "",
+        "mutating": _RUST_MUTATING, "keyed_read": _RUST_KEYED_READ,
+        "literal_types": _RUST_LITERALS,
+    },
 }
 
 
@@ -229,8 +265,25 @@ def _arg_value(node: Any) -> Any:
     return node
 
 
+def _sub_named(subscript: Any) -> list[Any]:
+    return [c for c in subscript.children if c.is_named]
+
+
+def _sub_collection(subscript: Any, sp: dict[str, Any]) -> Any:
+    """The collection being indexed. Rust's index_expression has no fields, so the
+    collection is the first named child; other grammars name it."""
+    if sp.get("sub_positional"):
+        named = _sub_named(subscript)
+        return named[0] if named else None
+    return _field(subscript, sp["sub_value"])
+
+
 def _sub_key(subscript: Any, sp: dict[str, Any]) -> Any:
-    """The key/index node of a subscript. C# wraps it in a bracketed_argument_list."""
+    """The key/index node of a subscript. Rust indexes positionally (second named
+    child); C# wraps the key in a bracketed_argument_list; others name it."""
+    if sp.get("sub_positional"):
+        named = _sub_named(subscript)
+        return named[1] if len(named) > 1 else None
     idx = _field(subscript, sp["sub_index"])
     if idx is not None and idx.type == "bracketed_argument_list":
         return _arg_value(_first_named(idx))
@@ -336,7 +389,7 @@ def _is_write_target(ref: Any, parent: Any, sp: dict[str, Any]) -> bool:
     if parent.type in sp["assign_types"] and _same(_field(parent, sp["assign_left"]), ref):
         return True
     # S[k] = v  -> ref (S) is the collection of a subscript that is the assign target
-    if parent.type in sp["subscript_types"] and _same(_field(parent, sp["sub_value"]), ref):
+    if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
         gp = parent.parent
         if gp is not None and gp.type in sp["assign_types"] and _same(_field(gp, sp["assign_left"]), parent):
             return True
@@ -361,7 +414,7 @@ def _categorize(ref: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
         return _UNDECIDABLE
 
     # S[x] read : indexed by x. Unbounded key -> unbounded partition.
-    if parent.type in sp["subscript_types"] and _same(_field(parent, sp["sub_value"]), ref):
+    if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
         return _keyed_read(_sub_key(parent, sp), sp)
 
     # S.attr : mutating method -> write; keyed map read -> subscript-like; else flows on.
@@ -373,7 +426,9 @@ def _categorize(ref: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
             return _WRITE
         if called and attr in sp["keyed_read"]:
             return _keyed_read(_first_arg(gp, sp), sp)
-        return _flow(parent, sp, closed_sets)
+        if called:
+            return _flow(gp, sp, closed_sets)     # method result flows on (.clone(), .len(), an accessor)
+        return _flow(parent, sp, closed_sets)     # plain field access: self.x.y
 
     # S.method(args) flattened (Java method_invocation with an object receiver).
     if sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, "object"), ref):
@@ -403,6 +458,11 @@ def _flow(node: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
         return _OUTPUT
     if parent.type in sp["return_types"]:
         return _OUTPUT
+    # The state is invoked as a callable, possibly through a wrapper: `(self.f)(x)`
+    # in Rust reaches the call via a parenthesized_expression. Dynamic dispatch,
+    # unbounded callee. (Direct `S(x)` is caught earlier in _categorize.)
+    if not sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node):
+        return _UNDECIDABLE
     if parent.type in sp["passthrough_types"]:
         return _flow(parent, sp, closed_sets)
     if parent.type in sp["comparison_types"]:
@@ -428,7 +488,7 @@ def _flow(node: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
         if fname in _EFFECT_CALLS:
             return _OUTPUT
         return _UNDECIDABLE
-    if parent.type in sp["subscript_types"] and _same(_field(parent, sp["sub_value"]), node):
+    if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), node):
         return _keyed_read(_sub_key(parent, sp), sp)
     return _OUTPUT
 
@@ -498,6 +558,14 @@ def _enum_instance_state(cls: Any, sp: dict[str, Any]) -> set[str]:
     (self.x / this.x) and may also declare fields; identifier-style languages (Java,
     C#) reference fields by bare name, so the key is the field name itself."""
     keys: set[str] = set()
+    if sp.get("instance_enum") == "self_usage":
+        # Rust: the field list is on the struct, but state is used as self.<field> in
+        # the impl (reads and writes). Enumerate from that usage, not from assignments.
+        for m in _local_refs(cls, lambda n: n.type in sp["member_types"], sp):
+            obj = _field(m, sp["mem_object"])
+            if obj is not None and _text(obj) in sp["this_idents"]:
+                keys.add(_text(m))              # "self.<field>"
+        return keys
     if sp["instance_ref_style"] == "member":
         for n in _local_refs(cls, lambda n: n.type in sp["assign_types"], sp):
             left = _field(n, sp["assign_left"])
@@ -539,6 +607,16 @@ def _enum_module_state(root: Any, sp: dict[str, Any], cfg: dict[str, Any]) -> se
                     name = _field(vd, "name")
                     if name is not None and name.type == "identifier":
                         names.add(_text(name))
+        return names
+    if sp is LANG_SPEC["rust"]:
+        # `static mut NAME: T = ...` is Rust's module-mutable state. A plain `static`
+        # or `const` is immutable and not counted; the `mut` specifier is the marker.
+        names: set[str] = set()
+        for st in root.children:
+            if st.type == "static_item" and any(c.type == "mutable_specifier" for c in st.children):
+                name = _field(st, "name")
+                if name is not None:
+                    names.add(_text(name))
         return names
     return set()
 
