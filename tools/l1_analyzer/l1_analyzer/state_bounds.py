@@ -36,17 +36,21 @@ return n/a rather than guess.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
+
+from tree_sitter import Node
 
 from l1_analyzer.indicators import (
     LANG_CFG,
+    LangCfg,
     _find_module_mutable_names,
     _get_parser,
     _read_source_bytes,
     bucketed_paths,
 )
-from l1_analyzer.lang_spec import LANG_SPEC, _PY_MUTATING
+from l1_analyzer.lang_spec import _PY_MUTATING, LANG_SPEC, LangSpec
 
 _IGNORE = ("tests", "test", "conformance")
 
@@ -69,36 +73,45 @@ _EFFECT_CALLS = frozenset({"print", "repr", "str", "format", "log", "logging"})
 _COMPARISON_OPS = frozenset({"<", ">", "<=", ">=", "==", "!=", "===", "!==", "<>"})
 
 
-def _text(node: Any) -> str:
+class Finding(TypedDict):
+    """One piece of state and its verdict. Fixed keys, so a TypedDict, not a bag."""
+    state: str
+    verdict: str
+    drives_decision: bool
+    file: str
+    line: int
+
+
+def _text(node: Node | None) -> str:
     return node.text.decode("utf8", errors="ignore") if node is not None and node.text else ""
 
 
-def _field(node: Any, name: str) -> Any:
+def _field(node: Node | None, name: str | None) -> Node | None:
     return node.child_by_field_name(name) if node is not None and name else None
 
 
-def _same(a: Any, b: Any) -> bool:
+def _same(a: Node | None, b: Node | None) -> bool:
     """Node identity by id. child_by_field_name returns a fresh wrapper each call,
     so `is` is unreliable; compare the stable node id instead."""
     return a is not None and b is not None and a.id == b.id
 
 
-def _first_named(node: Any) -> Any:
+def _first_named(node: Node | None) -> Node | None:
     return next((c for c in node.children if c.is_named), None) if node is not None else None
 
 
-def _arg_value(node: Any) -> Any:
+def _arg_value(node: Node | None) -> Node | None:
     """Unwrap a C# `argument` wrapper to the expression it carries."""
     if node is not None and node.type == "argument":
         return _first_named(node)
     return node
 
 
-def _sub_named(subscript: Any) -> list[Any]:
+def _sub_named(subscript: Node) -> list[Node]:
     return [c for c in subscript.children if c.is_named]
 
 
-def _sub_collection(subscript: Any, sp: dict[str, Any]) -> Any:
+def _sub_collection(subscript: Node, sp: LangSpec) -> Node | None:
     """The collection being indexed. Rust's index_expression has no fields, so the
     collection is the first named child; other grammars name it."""
     if sp.get("sub_positional"):
@@ -107,7 +120,7 @@ def _sub_collection(subscript: Any, sp: dict[str, Any]) -> Any:
     return _field(subscript, sp["sub_value"])
 
 
-def _sub_key(subscript: Any, sp: dict[str, Any]) -> Any:
+def _sub_key(subscript: Node, sp: LangSpec) -> Node | None:
     """The key/index node of a subscript. Rust indexes positionally (second named
     child); C# wraps the key in a bracketed_argument_list; others name it."""
     if sp.get("sub_positional"):
@@ -119,11 +132,11 @@ def _sub_key(subscript: Any, sp: dict[str, Any]) -> Any:
     return idx
 
 
-def _first_arg(call: Any, sp: dict[str, Any]) -> Any:
+def _first_arg(call: Node | None, sp: LangSpec) -> Node | None:
     return _arg_value(_first_named(_field(call, sp["call_args"])))
 
 
-def _callee_name(call: Any, sp: dict[str, Any]) -> str:
+def _callee_name(call: Node | None, sp: LangSpec) -> str:
     if call is None or call.type not in sp["call_types"]:
         return ""
     return _text(_field(call, sp["call_name"] if sp["flat_call"] else sp["call_fn"]))
@@ -135,7 +148,7 @@ def _callee_name(call: Any, sp: dict[str, Any]) -> str:
 # count: a tuple of symbolic constants bounds the partition exactly as literals do.
 # --------------------------------------------------------------------------
 
-def _is_immutable_collection(rhs: Any) -> bool:
+def _is_immutable_collection(rhs: Node | None) -> bool:
     if rhs is None:
         return False
     if rhs.type == "tuple":
@@ -145,10 +158,10 @@ def _is_immutable_collection(rhs: Any) -> bool:
     return False
 
 
-def _collect_closed_sets(root: Any) -> set[str]:
+def _collect_closed_sets(root: Node) -> set[str]:
     names: set[str] = set()
 
-    def walk(n: Any) -> None:
+    def walk(n: Node) -> None:
         if n.type == "assignment":
             left, rhs = _field(n, "left"), _field(n, "right")
             if left is not None and _is_immutable_collection(rhs):
@@ -165,7 +178,7 @@ def _collect_closed_sets(root: Any) -> set[str]:
     return names
 
 
-def _is_closed_set(node: Any, closed_sets: set[str]) -> bool:
+def _is_closed_set(node: Node | None, closed_sets: set[str]) -> bool:
     if node is None:
         return False
     if node.type in ("set", "tuple", "list"):
@@ -180,7 +193,7 @@ def _is_closed_set(node: Any, closed_sets: set[str]) -> bool:
     return False
 
 
-def _is_unbounded_value(node: Any, sp: dict[str, Any]) -> bool:
+def _is_unbounded_value(node: Node | None, sp: LangSpec) -> bool:
     """A value used as a lookup key / index. Literals are bounded; anything else
     (a parameter, a variable) ranges over an unbounded domain."""
     return node is not None and node.type not in sp["literal_types"]
@@ -190,7 +203,7 @@ def _is_unbounded_value(node: Any, sp: dict[str, Any]) -> bool:
 # Membership and comparison helpers.
 # --------------------------------------------------------------------------
 
-def _membership_operands(node: Any, sp: dict[str, Any]) -> tuple[Any, Any] | None:
+def _membership_operands(node: Node | None, sp: LangSpec) -> tuple[Node, Node] | None:
     """(left, right) for an `in` / `not in` membership test, else None."""
     style = sp["membership"]
     if style == "comparison_in" and node.type == "comparison_operator":
@@ -198,13 +211,12 @@ def _membership_operands(node: Any, sp: dict[str, Any]) -> tuple[Any, Any] | Non
             return None
         named = [c for c in node.children if c.is_named]
         return (named[0], named[-1]) if len(named) >= 2 else None
-    if style == "binary_in" and node.type == "binary_expression":
-        if _text(_field(node, "operator")) == "in":
-            return _field(node, "left"), _field(node, "right")
+    if style == "binary_in" and node.type == "binary_expression" and _text(_field(node, "operator")) == "in":
+        return _field(node, "left"), _field(node, "right")
     return None
 
 
-def _is_comparison(node: Any, sp: dict[str, Any]) -> bool:
+def _is_comparison(node: Node | None, sp: LangSpec) -> bool:
     if node.type == "comparison_operator":       # Python: always a comparison
         return True
     return _text(_field(node, "operator")) in _COMPARISON_OPS
@@ -214,7 +226,7 @@ def _is_comparison(node: Any, sp: dict[str, Any]) -> bool:
 # Per-reference categorisation.
 # --------------------------------------------------------------------------
 
-def _is_lvalue(node: Any, sp: dict[str, Any]) -> bool:
+def _is_lvalue(node: Node | None, sp: LangSpec) -> bool:
     """True if `node` is the assigned lvalue of an assignment, unwrapping an optional
     lvalue wrapper (Go puts assignment targets inside an expression_list)."""
     wrapper = sp.get("lvalue_wrapper")
@@ -224,21 +236,18 @@ def _is_lvalue(node: Any, sp: dict[str, Any]) -> bool:
     return p is not None and p.type in sp["assign_types"] and _same(_field(p, sp["assign_left"]), node)
 
 
-def _is_write_target(ref: Any, parent: Any, sp: dict[str, Any]) -> bool:
+def _is_write_target(ref: Node, parent: Node, sp: LangSpec) -> bool:
     if _is_lvalue(ref, sp):
         return True
     # S[k] = v  -> ref (S) is the collection of a subscript that is the assign target
-    if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
-        if _is_lvalue(parent, sp):
-            return True
-    return False
+    return parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref) and _is_lvalue(parent, sp)
 
 
-def _keyed_read(key_node: Any, sp: dict[str, Any]) -> str:
+def _keyed_read(key_node: Node | None, sp: LangSpec) -> str:
     return _UNBOUNDED if _is_unbounded_value(key_node, sp) else _FINITE
 
 
-def _categorize(ref: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
+def _categorize(ref: Node, sp: LangSpec, closed_sets: set[str]) -> str:
     """How this single reference to a state value is consumed."""
     parent = ref.parent
     if parent is None:
@@ -295,7 +304,7 @@ def _categorize(ref: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
     return _flow(ref, sp, closed_sets)
 
 
-def _flow(node: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
+def _flow(node: Node | None, sp: LangSpec, closed_sets: set[str]) -> str:
     """Categorise how a value derived from the state (node) reaches a decision."""
     parent = node.parent
     if parent is None:
@@ -352,10 +361,10 @@ def _verdict(categories: list[str]) -> tuple[str, bool]:
 # State enumeration and file analysis.
 # --------------------------------------------------------------------------
 
-def _refs(scope: Any, predicate: Any) -> list[Any]:
-    out: list[Any] = []
+def _refs(scope: Node, predicate: Callable[[Node], bool]) -> list[Node]:
+    out: list[Node] = []
 
-    def walk(n: Any) -> None:
+    def walk(n: Node) -> None:
         if predicate(n):
             out.append(n)
         for c in n.children:
@@ -365,13 +374,13 @@ def _refs(scope: Any, predicate: Any) -> list[Any]:
     return out
 
 
-def _local_refs(scope: Any, predicate: Any, sp: dict[str, Any]) -> list[Any]:
+def _local_refs(scope: Node, predicate: Callable[[Node], bool], sp: LangSpec) -> list[Node]:
     """Like _refs, but does not descend into a nested class: an inner class owns its
     own fields and is analysed as its own scope, so the enclosing class must not
     harvest the inner class's state (which double-counts it)."""
-    out: list[Any] = []
+    out: list[Node] = []
 
-    def walk(n: Any, is_root: bool) -> None:
+    def walk(n: Node, is_root: bool) -> None:
         if not is_root and n.type in sp["class_types"]:
             return
         if predicate(n):
@@ -383,7 +392,7 @@ def _local_refs(scope: Any, predicate: Any, sp: dict[str, Any]) -> list[Any]:
     return out
 
 
-def _field_decl_names(fd: Any, sp: dict[str, Any]) -> list[str]:
+def _field_decl_names(fd: Node, sp: LangSpec) -> list[str]:
     """Declared field names inside a field-declaration node. TypeScript names the
     field directly; Java and C# nest one or more variable_declarators."""
     if fd.type == "public_field_definition":   # TypeScript
@@ -400,7 +409,7 @@ def _field_decl_names(fd: Any, sp: dict[str, Any]) -> list[str]:
     return names
 
 
-def _enum_instance_state(cls: Any, sp: dict[str, Any]) -> set[str]:
+def _enum_instance_state(cls: Node, sp: LangSpec) -> set[str]:
     """State keys for a class. Member-style languages name state through a receiver
     (self.x / this.x) and may also declare fields; identifier-style languages (Java,
     C#) reference fields by bare name, so the key is the field name itself."""
@@ -431,7 +440,7 @@ def _enum_instance_state(cls: Any, sp: dict[str, Any]) -> set[str]:
     return keys
 
 
-def _go_type_name(typ: Any) -> str | None:
+def _go_type_name(typ: Node | None) -> str | None:
     """The struct type a Go receiver binds to, unwrapping `*T` to `T`."""
     if typ is None:
         return None
@@ -442,7 +451,7 @@ def _go_type_name(typ: Any) -> str | None:
     return None
 
 
-def _go_receiver(method: Any) -> tuple[str | None, str | None]:
+def _go_receiver(method: Node) -> tuple[str | None, str | None]:
     """(receiver type, receiver variable name) for a Go method_declaration."""
     recv = _field(method, "receiver")               # parameter_list `(c *Cache)`
     pd = _first_named(recv) if recv is not None else None
@@ -452,20 +461,20 @@ def _go_receiver(method: Any) -> tuple[str | None, str | None]:
     return _go_type_name(_field(pd, "type")), (_text(name) if name is not None else None)
 
 
-def _go_receiver_findings(root: Any, rel: str, sp: dict[str, Any], closed_sets: set[str], immutable_ctors: set[str]) -> list[dict[str, Any]]:
+def _go_receiver_findings(root: Node, rel: str, sp: LangSpec, closed_sets: set[str], immutable_ctors: set[str]) -> list[Finding]:
     """Go state, grouped by receiver TYPE across all its methods (spec section 4:
     analyse state across the whole type, not one method). A field is `<recv>.<field>`
     inside a method; the key is `<Type>.<field>` so it is stable across methods whose
     receivers are named differently."""
-    by_type: dict[str, list[tuple[Any, str]]] = {}
+    by_type: dict[str, list[tuple[Node, str]]] = {}
     for m in _refs(root, lambda n: n.type == "method_declaration"):
         tname, rname = _go_receiver(m)
         if tname and rname:
             by_type.setdefault(tname, []).append((m, rname))
 
-    findings: list[dict[str, Any]] = []
+    findings: list[Finding] = []
     for tname, methods in by_type.items():
-        field_refs: dict[str, list[Any]] = {}
+        field_refs: dict[str, list[Node]] = {}
         for method, rname in methods:
             for sel in _refs(method, lambda n: n.type == "selector_expression"):
                 operand = _field(sel, "operand")
@@ -477,7 +486,7 @@ def _go_receiver_findings(root: Any, rel: str, sp: dict[str, Any], closed_sets: 
     return findings
 
 
-def _state_refs(scope: Any, key: str, sp: dict[str, Any]) -> list[Any]:
+def _state_refs(scope: Node, key: str, sp: LangSpec) -> list[Node]:
     if sp.get("instance_enum") == "ruby_ivar":
         return _local_refs(scope, lambda n: n.type == "instance_variable" and _text(n) == key, sp)
     if sp["instance_ref_style"] == "member":
@@ -485,7 +494,7 @@ def _state_refs(scope: Any, key: str, sp: dict[str, Any]) -> list[Any]:
     return _local_refs(scope, lambda n: n.type == "identifier" and _text(n) == key, sp)
 
 
-def _enum_module_state(root: Any, sp: dict[str, Any], cfg: dict[str, Any]) -> set[str]:
+def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> set[str]:
     """Top-level mutable bindings, per language (spec key module_enum). Java/C#/Ruby
     keep module/static state out of this prototype and rely on class scope; C is the
     reverse (no classes, so file-scope variables are the only state)."""
@@ -537,7 +546,7 @@ def _enum_module_state(root: Any, sp: dict[str, Any], cfg: dict[str, Any]) -> se
     return set()
 
 
-def _c_declarator_name(node: Any) -> str | None:
+def _c_declarator_name(node: Node | None) -> str | None:
     """The identifier a C declarator binds, unwrapping init/array/pointer declarators.
     Returns None for a function declarator (not a variable) or a non-declarator node."""
     if node is None:
@@ -562,7 +571,7 @@ def _c_declarator_name(node: Any) -> str | None:
 _IMMUTABLE_WRAPPERS = frozenset({"MappingProxyType", "frozenset", "tuple", "bytes"})
 
 
-def _rhs_is_immutable(rhs: Any, immutable_ctors: set[str]) -> bool:
+def _rhs_is_immutable(rhs: Node | None, immutable_ctors: set[str]) -> bool:
     if rhs is None:
         return False
     if rhs.type in ("tuple", "true", "false", "none", "integer", "float", "string", "concatenated_string"):
@@ -573,7 +582,7 @@ def _rhs_is_immutable(rhs: Any, immutable_ctors: set[str]) -> bool:
     return False
 
 
-def _returns_immutable(func_node: Any) -> bool:
+def _returns_immutable(func_node: Node) -> bool:
     returns = _refs(func_node, lambda n: n.type == "return_statement")
     if not returns:
         return False
@@ -584,7 +593,7 @@ def _returns_immutable(func_node: Any) -> bool:
     return True
 
 
-def _collect_immutable_ctors(root: Any) -> set[str]:
+def _collect_immutable_ctors(root: Node) -> set[str]:
     out: set[str] = set()
     for fn in _refs(root, lambda n: n.type == "function_definition"):
         name = _field(fn, "name")
@@ -593,7 +602,7 @@ def _collect_immutable_ctors(root: Any) -> set[str]:
     return out
 
 
-def _reaches_decision(refs: list[Any], sp: dict[str, Any]) -> bool:
+def _reaches_decision(refs: list[Node], sp: LangSpec) -> bool:
     for r in refs:
         p = r.parent
         if p is None or p.type in sp["return_types"]:
@@ -604,10 +613,10 @@ def _reaches_decision(refs: list[Any], sp: dict[str, Any]) -> bool:
     return False
 
 
-def _immutable_const_verdict(refs: list[Any], immutable_ctors: set[str], sp: dict[str, Any]) -> tuple[str, bool] | None:
+def _immutable_const_verdict(refs: list[Node], immutable_ctors: set[str], sp: LangSpec) -> tuple[str, bool] | None:
     """(NEUTRAL, drives) if the state is an immutable constant: assigned exactly once
     from an immutable construction, never mutated, never called. Else None."""
-    assigns: list[Any] = []
+    assigns: list[Node] = []
     for r in refs:
         p = r.parent
         if p is None:
@@ -634,7 +643,7 @@ def _immutable_const_verdict(refs: list[Any], immutable_ctors: set[str], sp: dic
     return NEUTRAL, _reaches_decision(refs, sp)
 
 
-def _finding(key: str, refs: list[Any], rel: str, sp: dict[str, Any], closed_sets: set[str], immutable_ctors: set[str]) -> dict[str, Any]:
+def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: set[str], immutable_ctors: set[str]) -> Finding:
     const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp is LANG_SPEC["python"] else None
     if const is not None:
         verdict, drives = const
@@ -644,9 +653,9 @@ def _finding(key: str, refs: list[Any], rel: str, sp: dict[str, Any], closed_set
     return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel, "line": line}
 
 
-def _analyze_file(root: Any, rel: str, sp: dict[str, Any], cfg: dict[str, Any], immutable_ctors: set[str]) -> list[dict[str, Any]]:
+def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ctors: set[str]) -> list[Finding]:
     closed_sets = _collect_closed_sets(root) if sp is LANG_SPEC["python"] else set()
-    findings: list[dict[str, Any]] = []
+    findings: list[Finding] = []
 
     for name in _enum_module_state(root, sp, cfg):
         refs = _refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm)
@@ -695,7 +704,7 @@ def classify(repo: Path, lang: str) -> dict[str, Any]:
     # First pass: parse every file and collect the repo's immutable constructors
     # (functions whose returns are all immutable), so a constant built by one can be
     # resolved by a one-level follow. Second pass: analyze with that knowledge.
-    roots: list[tuple[Any, str]] = []
+    roots: list[tuple[Node, str]] = []
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
         roots.append((parser.parse(src).root_node, rel))
@@ -704,7 +713,7 @@ def classify(repo: Path, lang: str) -> dict[str, Any]:
         for root, _rel in roots:
             immutable_ctors |= _collect_immutable_ctors(root)
 
-    findings: list[dict[str, Any]] = []
+    findings: list[Finding] = []
     for root, rel in roots:
         findings.extend(_analyze_file(root, rel, sp, cfg, immutable_ctors))
 

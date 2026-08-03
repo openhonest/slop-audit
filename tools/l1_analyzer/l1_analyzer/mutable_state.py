@@ -10,16 +10,15 @@ computations, so the two modules do not form a cycle.
 
 from __future__ import annotations
 
-from collections import Counter
 from pathlib import Path
-from typing import Any
 
 from tree_sitter import Node
 
 from l1_analyzer.indicators import (
+    _BODY_NODE_TYPES,
     LANG_CFG,
     L1Result,
-    _BODY_NODE_TYPES,
+    LangCfg,
     _get_parser,
     _read_source_bytes,
     _with_skipped,
@@ -116,7 +115,7 @@ def _module_mutables_by_specifier(candidates: list[Node]) -> set[str]:
     return mutables
 
 
-def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
+def _find_module_mutable_names(root: Node, cfg: LangCfg) -> set[str]:
     """Detect top-level names that are likely mutable module state.
 
     Candidate assignments are collected structurally; for Python the binding name
@@ -155,7 +154,7 @@ def _find_module_mutable_names(root: Node, cfg: dict[str, Any]) -> set[str]:
                         mutables.add(name)
     return mutables
 
-def _count_mutable_refs(body: Node, cfg: dict[str, Any], module_mutables: set[str], receiver_names: set[str]) -> int:
+def _count_mutable_refs(body: Node, cfg: LangCfg, module_mutables: set[str], receiver_names: set[str]) -> int:
     """Count references inside a function body to external mutable state.
 
     Handles, per-language via cfg: receiver/member access (self./this./<go
@@ -191,7 +190,7 @@ def _count_mutable_refs(body: Node, cfg: dict[str, Any], module_mutables: set[st
     walk(body)
     return count
 
-def _receiver_names(func_node: Node, cfg: dict[str, Any]) -> set[str]:
+def _receiver_names(func_node: Node, cfg: LangCfg) -> set[str]:
     """Names that denote the enclosing instance for this function. For self/this
     languages it is the fixed keyword set; for Go it is the method receiver
     identifier, parsed from the receiver parameter list."""
@@ -231,7 +230,7 @@ def _is_declared_boundary(func_node: Node) -> bool:
     return find(func_node)
 
 
-def _count_file_functions(root: Node, cfg: dict[str, Any], module_mutables: set[str]) -> tuple[int, int]:
+def _count_file_functions(root: Node, cfg: LangCfg, module_mutables: set[str]) -> tuple[int, int]:
     """Pure per-file walk: return (total functions, functions touching external
     mutable state). Module-level (not a loop closure) so it binds no caller state.
     Functions declared as I/O boundaries are excluded from both counts."""
@@ -276,7 +275,7 @@ def analyze_mutable_state(repo: Path, lang: str) -> L1Result:
     }
 
 
-def _file_mutable_names(root: Node, cfg: dict[str, Any], module_mutables: set[str]) -> list[str]:
+def _file_mutable_names(root: Node, cfg: LangCfg, module_mutables: set[str]) -> list[str]:
     """Names of the functions in one file that L1.18 counts as touching external
     mutable state. Same predicate as _count_file_functions (module-level so it
     binds no caller state), only it keeps the names instead of a tally."""

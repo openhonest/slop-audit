@@ -19,8 +19,11 @@ from __future__ import annotations
 
 import collections
 import itertools
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+
+from tree_sitter import Node
 
 from l1_analyzer.indicators import (
     _BODY_NODE_TYPES,
@@ -29,6 +32,10 @@ from l1_analyzer.indicators import (
     _read_source_bytes,
 )
 
+# A control-flow node: an integer basic-block id (from the counter), or the "entry"/
+# "exit" string sentinel. Control that does not fall through is None.
+CfgNode = int | str
+
 _INF = 10 ** 9
 
 
@@ -36,15 +43,15 @@ _INF = 10 ** 9
 # Minimum path cover: fewest s->t walks that cover every edge at least once.
 # --------------------------------------------------------------------------
 
-def _add(graph: dict[Any, list[list[Any]]], u: Any, v: Any, cap: int) -> None:
+def _add(graph: dict[CfgNode, list[list[CfgNode]]], u: CfgNode | None, v: CfgNode | None, cap: int) -> None:
     graph[u].append([v, cap, len(graph[v])])
     graph[v].append([u, 0, len(graph[u]) - 1])
 
 
-def _max_flow(graph: dict[Any, list[list[Any]]], s: Any, t: Any) -> int:
+def _max_flow(graph: dict[CfgNode, list[list[CfgNode]]], s: CfgNode, t: CfgNode) -> int:
     total = 0
     while True:
-        parent: dict[Any, Any] = {s: None}
+        parent: dict[CfgNode, tuple[CfgNode, int] | None] = {s: None}
         q = collections.deque([s])
         while q:
             u = q.popleft()
@@ -73,7 +80,7 @@ def _max_flow(graph: dict[Any, list[list[Any]]], s: Any, t: Any) -> int:
         total += bottleneck
 
 
-def min_path_cover(edges: list[tuple[Any, Any]], source: Any, sink: Any) -> int:
+def min_path_cover(edges: list[tuple[CfgNode, CfgNode]], source: CfgNode, sink: CfgNode) -> int:
     """Fewest source->sink walks covering every edge at least once (edges may be
     reused across walks). Minimum flow with lower bound 1 per edge.
 
@@ -82,8 +89,8 @@ def min_path_cover(edges: list[tuple[Any, Any]], source: Any, sink: Any) -> int:
     pushing back as much t->s flow as the real residual allows."""
     if not edges:
         return 0
-    graph: dict[Any, list[list[Any]]] = collections.defaultdict(list)
-    demand: dict[Any, int] = collections.defaultdict(int)
+    graph: dict[CfgNode, list[list[CfgNode]]] = collections.defaultdict(list)
+    demand: dict[CfgNode, int] = collections.defaultdict(int)
     for u, v in edges:
         _add(graph, u, v, _INF)  # upper INF; lower bound 1 handled via demand
         demand[v] += 1
@@ -131,12 +138,12 @@ _SIMPLE_SKIP = frozenset({"comment", "newline", ":", "pass_statement"})
 # create structure. `cur` is the current control point; None means control does
 # not fall through (after return/break/continue).
 
-def _cfg_edge(edges: list[tuple[Any, Any]], u: Any, v: Any) -> None:
+def _cfg_edge(edges: list[tuple[CfgNode, CfgNode]], u: CfgNode | None, v: CfgNode | None) -> None:
     if u is not None and v is not None:
         edges.append((u, v))
 
 
-def _build_block(edges: list, counter: Any, block: Any, cur: Any, brk: Any, cont: Any) -> Any:
+def _build_block(edges: list, counter: Iterator[int], block: Node | None, cur: CfgNode | None, brk: CfgNode | None, cont: CfgNode | None) -> CfgNode | None:
     for stmt in block.named_children if block is not None else []:
         if stmt.type in _SIMPLE_SKIP:
             continue
@@ -144,7 +151,7 @@ def _build_block(edges: list, counter: Any, block: Any, cur: Any, brk: Any, cont
     return cur
 
 
-def _build_stmt(edges: list, counter: Any, stmt: Any, cur: Any, brk: Any, cont: Any) -> Any:
+def _build_stmt(edges: list, counter: Iterator[int], stmt: Node, cur: CfgNode | None, brk: CfgNode | None, cont: CfgNode | None) -> CfgNode | None:
     kind = stmt.type
     if kind == "return_statement":
         _cfg_edge(edges, cur, _EXIT)
@@ -167,10 +174,10 @@ def _build_stmt(edges: list, counter: Any, stmt: Any, cur: Any, brk: Any, cont: 
     return cur  # straight-line statement: collapsed
 
 
-def _cfg_if(edges: list, counter: Any, stmt: Any, cur: Any, brk: Any, cont: Any) -> Any:
+def _cfg_if(edges: list, counter: Iterator[int], stmt: Node, cur: CfgNode | None, brk: CfgNode | None, cont: CfgNode | None) -> CfgNode | None:
     merge = next(counter)
 
-    def arm(block_node: Any) -> bool:
+    def arm(block_node: Node | None) -> bool:
         start = next(counter)
         _cfg_edge(edges, cur, start)
         end = _build_block(edges, counter, block_node, start, brk, cont)
@@ -194,7 +201,7 @@ def _cfg_if(edges: list, counter: Any, stmt: Any, cur: Any, brk: Any, cont: Any)
     return merge if reached else None
 
 
-def _cfg_loop(edges: list, counter: Any, stmt: Any, cur: Any, brk: Any, cont: Any) -> Any:
+def _cfg_loop(edges: list, counter: Iterator[int], stmt: Node, cur: CfgNode | None, brk: CfgNode | None, cont: CfgNode | None) -> CfgNode | None:
     header = next(counter)
     _cfg_edge(edges, cur, header)
     after = next(counter)
@@ -207,7 +214,7 @@ def _cfg_loop(edges: list, counter: Any, stmt: Any, cur: Any, brk: Any, cont: An
     return after
 
 
-def _cfg_match(edges: list, counter: Any, stmt: Any, cur: Any, brk: Any, cont: Any) -> Any:
+def _cfg_match(edges: list, counter: Iterator[int], stmt: Node, cur: CfgNode | None, brk: CfgNode | None, cont: CfgNode | None) -> CfgNode | None:
     merge = next(counter)
     arms = 0
     body = stmt.child_by_field_name("body")
@@ -224,9 +231,9 @@ def _cfg_match(edges: list, counter: Any, stmt: Any, cur: Any, brk: Any, cont: A
     return merge
 
 
-def function_cover(body: Any) -> int:
+def function_cover(body: Node) -> int:
     """Minimum entry-to-exit walks covering every branch in one function body."""
-    edges: list[tuple[Any, Any]] = []
+    edges: list[tuple[CfgNode, CfgNode]] = []
     counter = itertools.count(1)
     end = _build_block(edges, counter, body, _ENTRY, brk=_EXIT, cont=_ENTRY)
     _cfg_edge(edges, end, _EXIT)  # fall-through to exit
@@ -253,7 +260,7 @@ def cover_paths(repo: Path, lang: str) -> dict[str, Any]:
     for _path, src in files:
         root = parser.parse(src).root_node
 
-        def walk(n: Any) -> None:
+        def walk(n: Node) -> None:
             nonlocal total, functions
             if n.type in cfg["function_types"]:
                 body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)

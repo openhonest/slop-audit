@@ -13,7 +13,55 @@ every other constant here is referenced only through the LANG_SPEC table.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TypedDict
+
+
+class LangSpec(TypedDict, total=False):
+    """The node-type vocabulary of one grammar. total=False: each language populates
+    the subset it needs (Python has no call_recv; Rust has no field_decl_types), and
+    the algorithm reads optional keys through .get(). Typing this replaces the
+    dict[str, Any] the specs used to be, so a spec typo is a type error, not a
+    KeyError at run time."""
+    class_types: tuple[str, ...]
+    func_types: tuple[str, ...]
+    assign_types: tuple[str, ...]
+    assign_left: str
+    assign_right: str
+    subscript_types: tuple[str, ...]
+    sub_value: str | None
+    sub_index: str | None
+    sub_positional: bool
+    member_types: tuple[str, ...]
+    mem_object: str
+    mem_attr: str
+    call_types: tuple[str, ...]
+    flat_call: bool
+    call_fn: str
+    call_args: str
+    call_name: str | None
+    call_recv: str
+    arglist_types: tuple[str, ...]
+    return_types: tuple[str, ...]
+    branch_types: tuple[str, ...]
+    branch_cond: str
+    elif_types: tuple[str, ...]
+    passthrough_types: tuple[str, ...]
+    comparison_types: tuple[str, ...]
+    membership: str
+    this_idents: frozenset[str]
+    instance_ref_style: str
+    instance_enum: str
+    field_decl_types: tuple[str, ...]
+    key_prefix: str
+    mutating: frozenset[str]
+    keyed_read: frozenset[str]
+    dispatch_methods: frozenset[str]
+    literal_types: frozenset[str]
+    module_enum: str
+    lvalue_wrapper: str
+    scope_by_receiver: bool
+    extra_bounded: frozenset[str]
+
 
 _PY_MUTATING = frozenset({
     "append", "add", "update", "extend", "insert", "pop", "remove", "discard",
@@ -80,7 +128,7 @@ _GO_LITERALS = frozenset({
 # spec, never a hard-coded string, so one implementation serves every language.
 # --------------------------------------------------------------------------
 
-LANG_SPEC: dict[str, dict[str, Any]] = {
+LANG_SPEC: dict[str, LangSpec] = {
     "python": {
         "class_types": ("class_definition",),
         "func_types": ("function_definition",),

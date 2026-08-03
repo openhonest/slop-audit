@@ -348,7 +348,26 @@ def compute_config_indicators(repo: Path) -> dict[str, L1Result]:
 # Tree-sitter setup for language-agnostic source analysis
 # ---------------------------------------------------------------------------
 
-LANG_CFG: dict[str, dict[str, Any]] = {
+class LangCfg(TypedDict, total=False):
+    """Per-language tree-sitter config for L1.12-L1.20. total=False: each language
+    fills the subset it needs. Typing this replaces the dict[str, Any] the cfg params
+    used to be, so a config-key typo is a type error, not a silent KeyError."""
+    language: Language
+    extensions: tuple[str, ...]
+    function_types: tuple[str, ...]
+    class_types: tuple[str, ...]
+    member_access: str
+    this_ident: frozenset[str]
+    module_level_assign: tuple[str, ...]
+    type_escape_patterns: tuple[str, ...]
+    field_based_globals: bool
+    mutable_specifier_globals: bool
+    const_keywords: tuple[str, ...]
+    instance_field_types: tuple[str, ...]
+    raw_mut_patterns: tuple[str, ...]
+
+
+LANG_CFG: dict[str, LangCfg] = {
     "python": {
         "language": Language(tree_sitter_python.language()),
         "extensions": (".py",),
@@ -589,7 +608,7 @@ def _code_line_count(src: bytes, ext: str) -> int:
         return total
     try:
         root = _get_parser(_GOD_FILE_LANG[ext]).parse(src).root_node
-    except Exception:
+    except Exception:  # noqa: BLE001
         return total
     return total - _data_literal_lines(root, literal_types)
 
@@ -797,7 +816,7 @@ def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
 # public indicators API is unchanged. Imported at the bottom, after the primitives it
 # depends on (LANG_CFG, _get_parser, _read_source_bytes, band) are defined, to avoid a
 # circular import between the two modules.
-from l1_analyzer.mutable_state import (  # noqa: E402,F401
+from l1_analyzer.mutable_state import (  # noqa: F401
     _file_mutable_names,
     _find_module_mutable_names,
     analyze_mutable_state,
