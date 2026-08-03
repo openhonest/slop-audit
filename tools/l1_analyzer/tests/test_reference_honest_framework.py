@@ -6,22 +6,38 @@ python/app.py, is the file that once surfaced a meter false positive: `app.get(p
 (handler)` (route registration in call form) was misread as dynamic dispatch on `app`
 and flagged UNRESOLVED, downgrading the whole codebase from CAN to MIGHT.
 
-This pins the correct answer against a vendored, verbatim snapshot of that file
-(tests/reference/honest_framework_app.txt), so a future change to the classifier
-cannot silently re-dirty the reference. It is a frozen snapshot on purpose: it guards
-the METER, not honest-framework's own evolution. Refresh the snapshot deliberately if
-the reference server changes in a way this should track.
+This pins the correct answer, so a future change to the classifier cannot silently
+re-dirty the reference. The source is a local snapshot at tests/reference/
+honest_framework_app.txt, which is gitignored (a committed copy of another repo's file
+invites confusion); when it is absent the test reads the sibling honest-framework
+checkout instead, and skips if neither is present (a fresh clone or CI without the
+sibling). Regenerate the local snapshot with:
+
+    cp ../honest-framework/python/app.py tools/l1_analyzer/tests/reference/honest_framework_app.txt
 """
 
 from pathlib import Path
 
+import pytest
 from l1_analyzer import state_bounds
 
 _FIXTURE = Path(__file__).parent / "reference" / "honest_framework_app.txt"
+# slop-audit and honest-framework are siblings under .../open-honest/.
+_SIBLING = Path(__file__).resolve().parents[4] / "honest-framework" / "python" / "app.py"
+
+
+def _reference_source() -> str | None:
+    for path in (_FIXTURE, _SIBLING):
+        if path.exists():
+            return path.read_text()
+    return None
 
 
 def test_meter_gives_honest_framework_reference_server_a_clean_bill(tmp_path):
-    (tmp_path / "app.py").write_text(_FIXTURE.read_text())
+    src = _reference_source()
+    if src is None:
+        pytest.skip("honest-framework reference not available (gitignored snapshot and sibling checkout both absent)")
+    (tmp_path / "app.py").write_text(src)
     r = state_bounds.classify(tmp_path, "python")
 
     # The reference server is finitely testable: no unbounded state, nothing the meter

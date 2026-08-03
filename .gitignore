@@ -19,3 +19,9 @@ CLAUDE.md
 
 # Internal drafts (working files, not for the public spec repo)
 *-DRAFT.md
+
+# Vendored reference snapshot for the honest-framework reference test: a local,
+# regenerable copy of honest-framework/python/app.py. Not committed, to avoid a
+# confusing duplicate of another repo's file; the test falls back to the sibling
+# honest-framework checkout and skips if neither is present.
+tools/l1_analyzer/tests/reference/honest_framework_app.txt
