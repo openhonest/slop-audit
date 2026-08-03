@@ -141,6 +141,23 @@ VECTORS = [
         ),
     },
     {
+        # Regression: calling the RESULT of a method on state (a decorator / builder /
+        # fluent chain, e.g. FastAPI's `app.get(path)(handler)` in call form) invokes
+        # what the method returns, not the state. That is not the state being
+        # dispatched, so it must not fail-close to UNRESOLVED.
+        "id": "method-result-invoked-is-not-state-dispatch",
+        "state": "self.registry",
+        "verdict": "neutral",
+        "drives_decision": False,
+        "src": (
+            "class Server:\n"
+            "    def __init__(self):\n"
+            "        self.registry = build()\n"
+            "    def wire(self, handler):\n"
+            "        self.registry.route('/x')(handler)\n"   # calls route()'s result, not self.registry
+        ),
+    },
+    {
         "id": "module-global-in-branch",
         "state": "_seen",
         "verdict": "promiscuous",

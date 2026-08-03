@@ -311,10 +311,14 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: set[str]) -> str:
         return _OUTPUT
     if parent.type in sp["return_types"]:
         return _OUTPUT
-    # The state is invoked as a callable, possibly through a wrapper: `(self.f)(x)`
-    # in Rust reaches the call via a parenthesized_expression. Dynamic dispatch,
-    # unbounded callee. (Direct `S(x)` is caught earlier in _categorize.)
-    if not sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node):
+    # The state value itself is invoked as a callable, possibly through a wrapper:
+    # `(self.f)(x)` in Rust reaches the call via a parenthesized_expression. Dynamic
+    # dispatch, unbounded callee. (Direct `S(x)` is caught earlier in _categorize.)
+    # A call RESULT being invoked is method-chaining, not state dispatch: `app.get(p)
+    # (handler)` (FastAPI's decorator idiom in call form) calls what app.get returns,
+    # not app - so exclude nodes that are themselves a call.
+    if (not sp["flat_call"] and node.type not in sp["call_types"]
+            and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node)):
         return _UNDECIDABLE
     if parent.type in sp["passthrough_types"]:
         return _flow(parent, sp, closed_sets)

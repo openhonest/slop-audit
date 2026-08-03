@@ -35,3 +35,14 @@ repos:
         language: system
         pass_filenames: false
         files: ^tools/l1_analyzer/.*\.py$
+
+      # Reference: the meter's verdict on honest-framework's reference server (a
+      # vendored, verbatim snapshot) must stay a clean bill. Guards against a
+      # classifier change silently re-dirtying the reference implementation - it is
+      # how the app.get(path)(handler) false positive would have been caught.
+      - id: slop-audit-reference
+        name: slop audit reference (meter vs honest-framework reference server)
+        entry: uv run --project tools/l1_analyzer pytest tools/l1_analyzer/tests/test_reference_honest_framework.py -q
+        language: system
+        pass_filenames: false
+        files: ^tools/l1_analyzer/.*\.py$
