@@ -16,17 +16,33 @@ from typing import Any
 from l1_analyzer import indicators
 
 
-def _run_gate(repo: Path, lang: str) -> int:
+def _count_type_escapes(repo: Path, lang: str) -> int:
+    """Count the analyzer's own type-escape hatches (the Any token + # type: ignore
+    comments), the same way L1.15 does, so the gate can ratchet on the raw number
+    rather than a per-kLOC density."""
+    cfg = indicators.LANG_CFG.get(lang)
+    patterns = cfg.get("type_escape_patterns") if cfg else None
+    if not patterns:
+        return 0
+    tokens = frozenset(patterns)
+    parser = indicators._get_parser(lang)
+    files, _skipped = indicators._read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    return sum(indicators._count_type_escapes_in_tree(parser.parse(src).root_node, tokens) for _path, src in files)
+
+
+def _run_gate(repo: Path, lang: str, max_type_escapes: int | None) -> int:
     """Dogfood gate for a pre-commit hook: run the source indicators against the repo
-    and fail the commit if the tool would flag its own code. Two bright-line, binary
-    invariants (both green today):
+    and fail the commit if the tool would flag its own code. Bright-line invariants:
       - L1.17: no production god-file (a file over 1000 CODE lines).
       - L1.18b: no promiscuous state (the code stays exhaustively testable).
-    Ratio indicators (type-escape density and the like) are surfaced by the full audit,
-    not gated here: a gate must be a bright line, not a moving threshold."""
+      - L1.15 ratchet (opt-in via --max-type-escapes): the Any / # type: ignore count
+        must not exceed the baseline. This is not the density band (a moving
+        threshold); it is a bright line at the current number, so a new escape fails
+        the commit unless the baseline is deliberately raised in the hook config."""
     results = indicators.compute_source_indicators(
         repo, lang=lang, exec_tests=False, timeout_seconds=5.0, classify_state_bounds=True
     )
+    audited_lang = str(results.get("lang", lang))
     problems: list[str] = []
 
     l17 = results.get("L1.17", {})
@@ -41,13 +57,25 @@ def _run_gate(repo: Path, lang: str) -> int:
             "- the code is no longer exhaustively testable"
         )
 
+    escapes: int | None = None
+    if max_type_escapes is not None:
+        escapes = _count_type_escapes(repo, audited_lang)
+        if escapes > max_type_escapes:
+            problems.append(
+                f"type escapes (L1.15): {escapes} Any / # type: ignore hatches, over the ratchet "
+                f"of {max_type_escapes}. Type it (Node / a TypedDict); do not add Any or "
+                "# type: ignore. If a new escape is truly unavoidable, raise the baseline in "
+                ".pre-commit-config.yaml as a deliberate, reviewable change."
+            )
+
     if problems:
         print("Slop audit gate FAILED - the audit flags this repo's own code:")
         for p in problems:
             print(f"  - {p}")
-        print("Split the oversized file (or resolve the state) before committing.")
+        print("Fix the above (split the file, resolve the state, type the escape) before committing.")
         return 1
-    print("Slop audit gate passed: 0 production god-files, finitely testable.")
+    ratchet = "" if escapes is None else f", {escapes}/{max_type_escapes} type escapes"
+    print(f"Slop audit gate passed: 0 production god-files, finitely testable{ratchet}.")
     return 0
 
 
@@ -93,11 +121,19 @@ def main(argv: list[str] | None = None) -> int:
              "exit non-zero if the audit flags the repo's own code (a production god-file, or "
              "promiscuous state that breaks exhaustive testability). Ignores git/config indicators.",
     )
+    parser.add_argument(
+        "--max-type-escapes",
+        type=int,
+        default=None,
+        help="Ratchet the L1.15 type-escape count (Any / # type: ignore): with --gate, fail if the "
+             "count exceeds this baseline. Set it to the current count so a NEW escape fails the "
+             "commit; lower it as escapes are typed away. No effect without --gate.",
+    )
 
     args = parser.parse_args(argv)
 
     if args.gate:
-        return _run_gate(args.repo, args.lang)
+        return _run_gate(args.repo, args.lang, args.max_type_escapes)
 
     results: dict[str, Any] = {}
 

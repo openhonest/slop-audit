@@ -27,8 +27,11 @@ repos:
   - repo: local
     hooks:
       - id: slop-audit-self
-        name: slop audit (dogfood - god-files + finite-testability)
-        entry: uv run --project tools/l1_analyzer l1-analyzer . --gate
+        name: slop audit (dogfood - god-files + finite-testability + type-escape ratchet)
+        # --max-type-escapes is the Any / # type: ignore baseline: a new escape fails
+        # the commit. Lower it as escapes are typed away; raising it is a deliberate,
+        # reviewable change here in the config.
+        entry: uv run --project tools/l1_analyzer l1-analyzer . --gate --max-type-escapes 14
         language: system
         pass_filenames: false
         files: ^tools/l1_analyzer/.*\.py$
