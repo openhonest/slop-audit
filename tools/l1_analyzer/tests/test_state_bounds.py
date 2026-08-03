@@ -83,8 +83,9 @@ def test_on_mode_is_additive_l18_identical_plus_l18b(tmp_path):
     assert set(on) - set(off) == {"L1.18b", "path_cover"}  # the additive enrichments
 
 
-def test_non_python_is_na_not_guessed(tmp_path):
-    # A language the classifier does not implement is n/a, never analyzed as Python.
-    r = state_bounds.classify(tmp_path, "go")
+def test_unsupported_language_is_na_not_guessed(tmp_path):
+    # A language with no LANG_SPEC entry is n/a, never analyzed with another grammar.
+    # (Every LANG_CFG language now has a spec; kotlin has none, so it stands in here.)
+    r = state_bounds.classify(tmp_path, "kotlin")
     assert r["verdict"] == "n/a"
     assert r["value"] == "n/a"

@@ -93,6 +93,13 @@ _RUST_MUTATING = frozenset({
 _JAVA_KEYED_READ = frozenset({"get", "containsKey", "getOrDefault", "contains", "containsValue"})
 _CS_KEYED_READ = frozenset({"ContainsKey", "TryGetValue", "Contains", "ContainsValue", "GetValueOrDefault"})
 _RUST_KEYED_READ = frozenset({"get", "get_mut", "contains_key", "contains", "get_or_insert"})
+_RUBY_MUTATING = frozenset({
+    "push", "store", "delete", "delete_if", "clear", "concat", "unshift", "append",
+    "pop", "shift", "insert", "merge!", "update", "reject!", "map!", "fill", "<<",
+})
+_RUBY_KEYED_READ = frozenset({"key?", "has_key?", "include?", "member?", "fetch", "dig", "value?", "has_value?"})
+# Invoking a value as code: the callee is chosen at runtime, an unbounded target.
+_RUBY_DISPATCH = frozenset({"call", "send", "public_send", "__send__", "instance_eval", "instance_exec", "method"})
 
 _PY_LITERALS = frozenset({"string", "integer", "float", "true", "false", "none", "concatenated_string"})
 _JS_LITERALS = frozenset({"number", "string", "true", "false", "null", "undefined", "template_string"})
@@ -108,6 +115,14 @@ _CS_LITERALS = frozenset({
 _RUST_LITERALS = frozenset({
     "integer_literal", "float_literal", "string_literal", "raw_string_literal",
     "char_literal", "boolean_literal", "true", "false",
+})
+_RUBY_LITERALS = frozenset({
+    "integer", "float", "string", "simple_symbol", "true", "false", "nil", "character",
+})
+_C_LITERALS = frozenset({"number_literal", "char_literal", "string_literal", "true", "false", "null"})
+_GO_LITERALS = frozenset({
+    "int_literal", "float_literal", "imaginary_literal", "rune_literal",
+    "interpreted_string_literal", "raw_string_literal", "true", "false", "nil",
 })
 
 
@@ -140,6 +155,7 @@ LANG_SPEC: dict[str, dict[str, Any]] = {
         "key_prefix": "",
         "mutating": _PY_MUTATING, "keyed_read": frozenset(),
         "literal_types": _PY_LITERALS,
+        "module_enum": "python",
     },
     "typescript": {
         "class_types": ("class_declaration",),
@@ -163,6 +179,31 @@ LANG_SPEC: dict[str, dict[str, Any]] = {
         "key_prefix": "this.",
         "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
+        "module_enum": "js",
+    },
+    "javascript": {
+        "class_types": ("class_declaration",),
+        "func_types": ("function_declaration", "method_definition", "arrow_function", "function_expression", "generator_function_declaration"),
+        "assign_types": ("assignment_expression", "augmented_assignment_expression"),
+        "assign_left": "left", "assign_right": "right",
+        "subscript_types": ("subscript_expression",), "sub_value": "object", "sub_index": "index",
+        "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
+        "call_types": ("call_expression",), "flat_call": False,
+        "call_fn": "function", "call_args": "arguments", "call_name": None,
+        "arglist_types": ("arguments",),
+        "return_types": ("return_statement",),
+        "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
+        "elif_types": (),
+        "passthrough_types": ("parenthesized_expression", "unary_expression"),
+        "comparison_types": ("binary_expression",),
+        "membership": "binary_in",
+        "this_idents": frozenset({"this"}),
+        "instance_ref_style": "member",
+        "field_decl_types": ("field_definition",),
+        "key_prefix": "this.",
+        "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
+        "literal_types": _JS_LITERALS,
+        "module_enum": "js",
     },
     "java": {
         "class_types": ("class_declaration",),
@@ -172,7 +213,7 @@ LANG_SPEC: dict[str, dict[str, Any]] = {
         "subscript_types": ("array_access",), "sub_value": "array", "sub_index": "index",
         "member_types": ("field_access",), "mem_object": "object", "mem_attr": "field",
         "call_types": ("method_invocation",), "flat_call": True,
-        "call_fn": "name", "call_args": "arguments", "call_name": "name",
+        "call_fn": "name", "call_args": "arguments", "call_name": "name", "call_recv": "object",
         "arglist_types": ("argument_list",),
         "return_types": ("return_statement",),
         "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
@@ -236,6 +277,88 @@ LANG_SPEC: dict[str, dict[str, Any]] = {
         "key_prefix": "",
         "mutating": _RUST_MUTATING, "keyed_read": _RUST_KEYED_READ,
         "literal_types": _RUST_LITERALS,
+        "module_enum": "rust",
+    },
+    "ruby": {
+        "class_types": ("class", "module"),
+        "func_types": ("method", "singleton_method"),
+        "assign_types": ("assignment", "operator_assignment"),
+        "assign_left": "left", "assign_right": "right",
+        "subscript_types": ("element_reference",), "sub_value": "object", "sub_index": None,
+        "sub_positional": True,   # element_reference: [object, key] by position
+        "member_types": ("call",),   # unused for ivar state, but keep valid node types
+        "mem_object": "receiver", "mem_attr": "method",
+        "call_types": ("call",), "flat_call": True,
+        "call_fn": "method", "call_args": "arguments", "call_name": "method", "call_recv": "receiver",
+        "arglist_types": ("argument_list",),
+        "return_types": ("return",),
+        "branch_types": ("if", "unless", "while", "until", "if_modifier", "unless_modifier", "while_modifier", "until_modifier", "elsif"),
+        "branch_cond": "condition",
+        "elif_types": (),
+        "passthrough_types": ("parenthesized_statements", "unary", "begin"),
+        "comparison_types": ("binary",),
+        "membership": "none",
+        "this_idents": frozenset(),
+        "instance_ref_style": "member",
+        "instance_enum": "ruby_ivar",
+        "field_decl_types": (),
+        "key_prefix": "",
+        "mutating": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
+        "literal_types": _RUBY_LITERALS,
+    },
+    "c": {
+        # No classes or methods: state is file-scope variables only (module_enum: c).
+        "class_types": (),
+        "func_types": ("function_definition",),
+        "assign_types": ("assignment_expression",),
+        "assign_left": "left", "assign_right": "right",
+        "subscript_types": ("subscript_expression",), "sub_value": "argument", "sub_index": "index",
+        "member_types": ("field_expression",), "mem_object": "argument", "mem_attr": "field",
+        "call_types": ("call_expression",), "flat_call": False,
+        "call_fn": "function", "call_args": "arguments", "call_name": None,
+        "arglist_types": ("argument_list",),
+        "return_types": ("return_statement",),
+        "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
+        "elif_types": (),
+        "passthrough_types": ("parenthesized_expression", "unary_expression", "pointer_expression"),
+        "comparison_types": ("binary_expression",),
+        "membership": "none",
+        "this_idents": frozenset(),
+        "instance_ref_style": "identifier",
+        "field_decl_types": (),
+        "key_prefix": "",
+        "mutating": frozenset(), "keyed_read": frozenset(),
+        "literal_types": _C_LITERALS,
+        "module_enum": "c",
+    },
+    "go": {
+        # No classes: state is struct fields, methods bound by a named receiver. State
+        # is grouped by receiver type (scope_by_receiver) and keyed <Type>.<field>.
+        "class_types": (),
+        "func_types": ("function_declaration", "method_declaration", "func_literal"),
+        "assign_types": ("assignment_statement",),
+        "assign_left": "left", "assign_right": "right",
+        "lvalue_wrapper": "expression_list",   # Go wraps assignment targets in expression_list
+        "subscript_types": ("index_expression",), "sub_value": "operand", "sub_index": "index",
+        "member_types": ("selector_expression",), "mem_object": "operand", "mem_attr": "field",
+        "call_types": ("call_expression",), "flat_call": False,
+        "call_fn": "function", "call_args": "arguments", "call_name": None,
+        "arglist_types": ("argument_list",),
+        "return_types": ("return_statement",),
+        "branch_types": ("if_statement", "for_statement", "expression_switch_statement"), "branch_cond": "condition",
+        "elif_types": (),
+        "passthrough_types": ("parenthesized_expression", "unary_expression", "expression_list"),
+        "comparison_types": ("binary_expression",),
+        "membership": "none",
+        "this_idents": frozenset(),
+        "instance_ref_style": "member",
+        "scope_by_receiver": True,
+        "field_decl_types": (),
+        "key_prefix": "",
+        "mutating": frozenset(), "keyed_read": frozenset(),
+        "extra_bounded": frozenset({"append", "len", "cap", "copy", "make", "new"}),
+        "literal_types": _GO_LITERALS,
+        "module_enum": "go",
     },
 }
 
@@ -385,13 +508,22 @@ def _is_comparison(node: Any, sp: dict[str, Any]) -> bool:
 # Per-reference categorisation.
 # --------------------------------------------------------------------------
 
+def _is_lvalue(node: Any, sp: dict[str, Any]) -> bool:
+    """True if `node` is the assigned lvalue of an assignment, unwrapping an optional
+    lvalue wrapper (Go puts assignment targets inside an expression_list)."""
+    wrapper = sp.get("lvalue_wrapper")
+    p = node.parent
+    if wrapper and p is not None and p.type == wrapper:
+        node, p = p, p.parent
+    return p is not None and p.type in sp["assign_types"] and _same(_field(p, sp["assign_left"]), node)
+
+
 def _is_write_target(ref: Any, parent: Any, sp: dict[str, Any]) -> bool:
-    if parent.type in sp["assign_types"] and _same(_field(parent, sp["assign_left"]), ref):
+    if _is_lvalue(ref, sp):
         return True
     # S[k] = v  -> ref (S) is the collection of a subscript that is the assign target
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
-        gp = parent.parent
-        if gp is not None and gp.type in sp["assign_types"] and _same(_field(gp, sp["assign_left"]), parent):
+        if _is_lvalue(parent, sp):
             return True
     return False
 
@@ -418,10 +550,14 @@ def _categorize(ref: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
         return _keyed_read(_sub_key(parent, sp), sp)
 
     # S.attr : mutating method -> write; keyed map read -> subscript-like; else flows on.
-    if parent.type in sp["member_types"] and _same(_field(parent, sp["mem_object"]), ref):
+    # Nested-call languages only; flat-call languages (Java, Ruby) handle receiver.method
+    # in the branch below, where the member access and the call are one node.
+    if not sp["flat_call"] and parent.type in sp["member_types"] and _same(_field(parent, sp["mem_object"]), ref):
         attr = _text(_field(parent, sp["mem_attr"]))
         gp = parent.parent
         called = gp is not None and gp.type in sp["call_types"] and _same(_field(gp, sp["call_fn"]), parent)
+        if called and attr in sp.get("dispatch_methods", frozenset()):
+            return _UNDECIDABLE                   # invoking a stored callable: unbounded target
         if called and attr in sp["mutating"]:
             return _WRITE
         if called and attr in sp["keyed_read"]:
@@ -430,9 +566,11 @@ def _categorize(ref: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
             return _flow(gp, sp, closed_sets)     # method result flows on (.clone(), .len(), an accessor)
         return _flow(parent, sp, closed_sets)     # plain field access: self.x.y
 
-    # S.method(args) flattened (Java method_invocation with an object receiver).
-    if sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, "object"), ref):
+    # S.method(args) flattened (Java method_invocation / Ruby call with a receiver).
+    if sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_recv"]), ref):
         name = _text(_field(parent, sp["call_name"]))
+        if name in sp.get("dispatch_methods", frozenset()):
+            return _UNDECIDABLE
         if name in sp["mutating"]:
             return _WRITE
         if name in sp["keyed_read"]:
@@ -442,7 +580,7 @@ def _categorize(ref: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
     # f(..., S, ...) : argument to a call.
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
-        if fname in _BOUNDED_BUILTINS:
+        if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
             return _flow(parent.parent, sp, closed_sets)
         if fname in _EFFECT_CALLS:
             return _OUTPUT
@@ -483,7 +621,7 @@ def _flow(node: Any, sp: dict[str, Any], closed_sets: set[str]) -> str:
         return _FINITE
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
-        if fname in _BOUNDED_BUILTINS:
+        if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
             return _flow(parent.parent, sp, closed_sets)
         if fname in _EFFECT_CALLS:
             return _OUTPUT
@@ -545,6 +683,9 @@ def _field_decl_names(fd: Any, sp: dict[str, Any]) -> list[str]:
     if fd.type == "public_field_definition":   # TypeScript
         name = _field(fd, "name")
         return [_text(name)] if name is not None else []
+    if fd.type == "field_definition":          # JavaScript
+        name = _field(fd, "property")
+        return [_text(name)] if name is not None else []
     names: list[str] = []
     for vd in _refs(fd, lambda n: n.type == "variable_declarator"):
         name = _field(vd, "name")
@@ -558,6 +699,11 @@ def _enum_instance_state(cls: Any, sp: dict[str, Any]) -> set[str]:
     (self.x / this.x) and may also declare fields; identifier-style languages (Java,
     C#) reference fields by bare name, so the key is the field name itself."""
     keys: set[str] = set()
+    if sp.get("instance_enum") == "ruby_ivar":
+        # Ruby: state is @instance_variables, a node type of their own (no receiver).
+        for iv in _local_refs(cls, lambda n: n.type == "instance_variable", sp):
+            keys.add(_text(iv))
+        return keys
     if sp.get("instance_enum") == "self_usage":
         # Rust: the field list is on the struct, but state is used as self.<field> in
         # the impl (reads and writes). Enumerate from that usage, not from assignments.
@@ -579,46 +725,124 @@ def _enum_instance_state(cls: Any, sp: dict[str, Any]) -> set[str]:
     return keys
 
 
+def _go_type_name(typ: Any) -> str | None:
+    """The struct type a Go receiver binds to, unwrapping `*T` to `T`."""
+    if typ is None:
+        return None
+    if typ.type == "pointer_type":
+        return _go_type_name(_first_named(typ))
+    if typ.type == "type_identifier":
+        return _text(typ)
+    return None
+
+
+def _go_receiver(method: Any) -> tuple[str | None, str | None]:
+    """(receiver type, receiver variable name) for a Go method_declaration."""
+    recv = _field(method, "receiver")               # parameter_list `(c *Cache)`
+    pd = _first_named(recv) if recv is not None else None
+    if pd is None:
+        return None, None
+    name = _field(pd, "name")
+    return _go_type_name(_field(pd, "type")), (_text(name) if name is not None else None)
+
+
+def _go_receiver_findings(root: Any, rel: str, sp: dict[str, Any], closed_sets: set[str], immutable_ctors: set[str]) -> list[dict[str, Any]]:
+    """Go state, grouped by receiver TYPE across all its methods (spec section 4:
+    analyse state across the whole type, not one method). A field is `<recv>.<field>`
+    inside a method; the key is `<Type>.<field>` so it is stable across methods whose
+    receivers are named differently."""
+    by_type: dict[str, list[tuple[Any, str]]] = {}
+    for m in _refs(root, lambda n: n.type == "method_declaration"):
+        tname, rname = _go_receiver(m)
+        if tname and rname:
+            by_type.setdefault(tname, []).append((m, rname))
+
+    findings: list[dict[str, Any]] = []
+    for tname, methods in by_type.items():
+        field_refs: dict[str, list[Any]] = {}
+        for method, rname in methods:
+            for sel in _refs(method, lambda n: n.type == "selector_expression"):
+                operand = _field(sel, "operand")
+                if operand is not None and operand.type == "identifier" and _text(operand) == rname:
+                    field = _text(_field(sel, "field"))
+                    field_refs.setdefault(field, []).append(sel)
+        for field, refs in field_refs.items():
+            findings.append(_finding(f"{tname}.{field}", refs, rel, sp, closed_sets, immutable_ctors))
+    return findings
+
+
 def _state_refs(scope: Any, key: str, sp: dict[str, Any]) -> list[Any]:
+    if sp.get("instance_enum") == "ruby_ivar":
+        return _local_refs(scope, lambda n: n.type == "instance_variable" and _text(n) == key, sp)
     if sp["instance_ref_style"] == "member":
         return _local_refs(scope, lambda n: n.type in sp["member_types"] and _text(n) == key, sp)
     return _local_refs(scope, lambda n: n.type == "identifier" and _text(n) == key, sp)
 
 
 def _enum_module_state(root: Any, sp: dict[str, Any], cfg: dict[str, Any]) -> set[str]:
-    """Top-level mutable bindings. Python reuses the structural detector; TypeScript
-    reads top-level `let`/`var` declarators (const is not module state). Java and C#
-    keep module (static-field) state out of this prototype and rely on class scope."""
-    if sp is LANG_SPEC["python"]:
+    """Top-level mutable bindings, per language (spec key module_enum). Java/C#/Ruby
+    keep module/static state out of this prototype and rely on class scope; C is the
+    reverse (no classes, so file-scope variables are the only state)."""
+    mode = sp.get("module_enum")
+    names: set[str] = set()
+    if mode == "python":
         return _find_module_mutable_names(root, cfg)
-    if sp is LANG_SPEC["typescript"]:
-        names: set[str] = set()
+    if mode == "js":
+        # top-level `let`/`var` declarators (const is not module-mutable state)
         for decl in root.children:
-            if decl.type == "lexical_declaration" and _text(_first_named(decl)) is not None:
-                kind = decl.children[0].type if decl.children else ""
-                is_const = _text(decl.children[0]) == "const" if decl.children else False
-                if not is_const:
-                    for vd in _refs(decl, lambda n: n.type == "variable_declarator"):
-                        name = _field(vd, "name")
-                        if name is not None and name.type == "identifier":
-                            names.add(_text(name))
-            elif decl.type == "variable_declaration":       # `var x = ...`
-                for vd in _refs(decl, lambda n: n.type == "variable_declarator"):
-                    name = _field(vd, "name")
-                    if name is not None and name.type == "identifier":
-                        names.add(_text(name))
+            if decl.type == "lexical_declaration":
+                if decl.children and _text(decl.children[0]) == "const":
+                    continue
+            elif decl.type != "variable_declaration":
+                continue
+            for vd in _refs(decl, lambda n: n.type == "variable_declarator"):
+                name = _field(vd, "name")
+                if name is not None and name.type == "identifier":
+                    names.add(_text(name))
         return names
-    if sp is LANG_SPEC["rust"]:
-        # `static mut NAME: T = ...` is Rust's module-mutable state. A plain `static`
-        # or `const` is immutable and not counted; the `mut` specifier is the marker.
-        names: set[str] = set()
+    if mode == "rust":
+        # `static mut NAME` only; a plain static or const is immutable, not counted.
         for st in root.children:
             if st.type == "static_item" and any(c.type == "mutable_specifier" for c in st.children):
                 name = _field(st, "name")
                 if name is not None:
                     names.add(_text(name))
         return names
+    if mode == "go":
+        # package-level `var` declarations (const is immutable, not counted)
+        for decl in root.children:
+            if decl.type == "var_declaration":
+                for vs in _refs(decl, lambda n: n.type == "var_spec"):
+                    nm = _field(vs, "name")
+                    if nm is not None and nm.type == "identifier":
+                        names.add(_text(nm))
+        return names
+    if mode == "c":
+        # C has no classes: file-scope variable declarations are the only state. Skip
+        # function declarations and typedefs; take the innermost declared identifier.
+        for decl in root.children:
+            if decl.type != "declaration" or any(c.type == "type_definition" for c in decl.children):
+                continue
+            for dcl in decl.children:
+                nm = _c_declarator_name(dcl)
+                if nm is not None:
+                    names.add(nm)
+        return names
     return set()
+
+
+def _c_declarator_name(node: Any) -> str | None:
+    """The identifier a C declarator binds, unwrapping init/array/pointer declarators.
+    Returns None for a function declarator (not a variable) or a non-declarator node."""
+    if node is None:
+        return None
+    if node.type == "identifier":
+        return _text(node)
+    if node.type == "function_declarator":
+        return None
+    if node.type in ("init_declarator", "array_declarator", "pointer_declarator"):
+        return _c_declarator_name(_field(node, "declarator"))
+    return None
 
 
 # --- immutable-constant recognition (Python only) ---------------------------
@@ -722,6 +946,9 @@ def _analyze_file(root: Any, rel: str, sp: dict[str, Any], cfg: dict[str, Any], 
         refs = _refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm)
         if refs:
             findings.append(_finding(name, refs, rel, sp, closed_sets, immutable_ctors))
+
+    if sp.get("scope_by_receiver"):    # Go: state spans methods, grouped by receiver type
+        findings.extend(_go_receiver_findings(root, rel, sp, closed_sets, immutable_ctors))
 
     for cls in _refs(root, lambda n: n.type in sp["class_types"]):
         for key in _enum_instance_state(cls, sp):
