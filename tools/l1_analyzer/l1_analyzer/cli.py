@@ -16,6 +16,41 @@ from typing import Any
 from l1_analyzer import indicators
 
 
+def _run_gate(repo: Path, lang: str) -> int:
+    """Dogfood gate for a pre-commit hook: run the source indicators against the repo
+    and fail the commit if the tool would flag its own code. Two bright-line, binary
+    invariants (both green today):
+      - L1.17: no production god-file (a file over 1000 CODE lines).
+      - L1.18b: no promiscuous state (the code stays exhaustively testable).
+    Ratio indicators (type-escape density and the like) are surfaced by the full audit,
+    not gated here: a gate must be a bright line, not a moving threshold."""
+    results = indicators.compute_source_indicators(
+        repo, lang=lang, exec_tests=False, timeout_seconds=5.0, classify_state_bounds=True
+    )
+    problems: list[str] = []
+
+    l17 = results.get("L1.17", {})
+    if isinstance(l17.get("value"), (int, float)) and l17["value"] > 0:
+        problems.append(f"god-file (L1.17): {l17.get('details', '')}")
+
+    l18b = results.get("L1.18b", {})
+    counts = l18b.get("counts", {}) if isinstance(l18b, dict) else {}
+    if counts.get("promiscuous", 0) > 0:
+        problems.append(
+            f"finite-testability (L1.18b): {counts['promiscuous']} promiscuous piece(s) of state "
+            "- the code is no longer exhaustively testable"
+        )
+
+    if problems:
+        print("Slop audit gate FAILED - the audit flags this repo's own code:")
+        for p in problems:
+            print(f"  - {p}")
+        print("Split the oversized file (or resolve the state) before committing.")
+        return 1
+    print("Slop audit gate passed: 0 production god-files, finitely testable.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="l1-analyzer")
     parser.add_argument("repo", type=Path, help="Path to git repository root")
@@ -51,8 +86,18 @@ def main(argv: list[str] | None = None) -> int:
              "so the output is exactly the frozen L1.18 set; on by default for everyone else.",
     )
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument(
+        "--gate",
+        action="store_true",
+        help="Dogfood mode for a pre-commit hook: run the source indicators against the repo and "
+             "exit non-zero if the audit flags the repo's own code (a production god-file, or "
+             "promiscuous state that breaks exhaustive testability). Ignores git/config indicators.",
+    )
 
     args = parser.parse_args(argv)
+
+    if args.gate:
+        return _run_gate(args.repo, args.lang)
 
     results: dict[str, Any] = {}
 

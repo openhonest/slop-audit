@@ -19,3 +19,16 @@ repos:
       - id: ruff
         args: [--fix]
         files: ^tools/l1_analyzer/.*\.py$
+
+  # Dogfood: run the Slop Audit against its own analyzer. Fails the commit if the tool
+  # would flag this repo's code on a bright-line invariant (a production god-file, or
+  # promiscuous state that breaks exhaustive testability). Runs only when analyzer
+  # Python changes; audits the whole repo, so pass_filenames is off.
+  - repo: local
+    hooks:
+      - id: slop-audit-self
+        name: slop audit (dogfood - god-files + finite-testability)
+        entry: uv run --project tools/l1_analyzer l1-analyzer . --gate
+        language: system
+        pass_filenames: false
+        files: ^tools/l1_analyzer/.*\.py$
