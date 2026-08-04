@@ -25,3 +25,6 @@ CLAUDE.md
 # confusing duplicate of another repo's file; the test falls back to the sibling
 # honest-framework checkout and skips if neither is present.
 tools/l1_analyzer/tests/reference/honest_framework_app.txt
+
+# Local Paper A v2 run scratch (results, logs, summary) - not part of the tool.
+tools/l1_analyzer/paper_a_v2/
