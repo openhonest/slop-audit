@@ -547,6 +547,11 @@ def compute_source_indicators(
         results["L1.18b"] = state_bounds.classify(repo, lang)
         from l1_analyzer import path_cover
         results["path_cover"] = path_cover.cover_paths(repo, lang)
+        # Additive, gated with the other refinements so frozen/pre-registered runs
+        # (classify_state_bounds=False) keep exactly the L1.18 set. Measures the
+        # concurrency audit surface, never a race verdict.
+        from l1_analyzer import thread_surface
+        results["thread_surface"] = thread_surface.scan(repo, lang)
     return results
 
 _WHITESPACE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"})

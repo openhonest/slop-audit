@@ -80,7 +80,7 @@ def test_on_mode_is_additive_l18_identical_plus_l18b(tmp_path):
     off = indicators.compute_source_indicators(repo, "auto", False, 5, classify_state_bounds=False)
     on = indicators.compute_source_indicators(repo, "auto", False, 5, classify_state_bounds=True)
     assert on["L1.18"] == off["L1.18"]                 # the registered number never moves
-    assert set(on) - set(off) == {"L1.18b", "path_cover"}  # the additive enrichments
+    assert set(on) - set(off) == {"L1.18b", "path_cover", "thread_surface"}  # the additive enrichments
 
 
 def test_unsupported_language_is_na_not_guessed(tmp_path):

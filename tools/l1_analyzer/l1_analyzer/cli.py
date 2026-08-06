@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from l1_analyzer import indicators
+from l1_analyzer import indicators, thread_surface
 
 
 def _count_type_escapes(repo: Path, lang: str) -> int:
@@ -30,7 +30,7 @@ def _count_type_escapes(repo: Path, lang: str) -> int:
     return sum(indicators._count_type_escapes_in_tree(parser.parse(src).root_node, tokens) for _path, src in files)
 
 
-def _run_gate(repo: Path, lang: str, max_type_escapes: int | None) -> int:
+def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_exposed: int | None) -> int:
     """Dogfood gate for a pre-commit hook: run the source indicators against the repo
     and fail the commit if the tool would flag its own code. Bright-line invariants:
       - L1.17: no production god-file (a file over 1000 CODE lines).
@@ -68,6 +68,26 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None) -> int:
                 ".pre-commit-config.yaml as a deliberate, reviewable change."
             )
 
+    # Thread-safety surface ratchet (opt-in via --max-thread-exposed): the count of
+    # hand-overrides of the compiler's thread-safety guarantee (unsafe impl Send/Sync,
+    # static mut) must not exceed the baseline. Like the type-escape ratchet, this is a
+    # bright line at the current number, not a density band: a NEW override fails the
+    # commit unless the baseline is raised deliberately. It is a fact about surface, not
+    # a race claim - the meter never says "safe". n/a for a language with no scanner
+    # (so it is a no-op on a Python repo until the Python scanner lands).
+    exposed: int | None = None
+    if max_thread_exposed is not None:
+        ts = results.get("thread_surface") or thread_surface.scan(repo, audited_lang)
+        exposed = ts["counts"].get(thread_surface.EXPOSED, 0)
+        if exposed > max_thread_exposed:
+            problems.append(
+                f"thread-safety surface: {exposed} hand-overrides of the thread-safety guarantee "
+                f"(unsafe impl Send/Sync, static mut), over the ratchet of {max_thread_exposed}. "
+                "This is not a race verdict - it is new audit surface. Verify the override holds "
+                "under free-threading; if it is sound, raise the baseline in .pre-commit-config.yaml "
+                "as a deliberate, reviewable change."
+            )
+
     if problems:
         print("Slop audit gate FAILED - the audit flags this repo's own code:")
         for p in problems:
@@ -75,6 +95,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None) -> int:
         print("Fix the above (split the file, resolve the state, type the escape) before committing.")
         return 1
     ratchet = "" if escapes is None else f", {escapes}/{max_type_escapes} type escapes"
+    ratchet += "" if exposed is None else f", {exposed}/{max_thread_exposed} thread-safety overrides"
     print(f"Slop audit gate passed: 0 production god-files, finitely testable{ratchet}.")
     return 0
 
@@ -129,11 +150,20 @@ def main(argv: list[str] | None = None) -> int:
              "count exceeds this baseline. Set it to the current count so a NEW escape fails the "
              "commit; lower it as escapes are typed away. No effect without --gate.",
     )
+    parser.add_argument(
+        "--max-thread-exposed",
+        type=int,
+        default=None,
+        help="Ratchet the thread-safety surface: with --gate, fail if the count of hand-overrides "
+             "of the compiler's thread-safety guarantee (unsafe impl Send/Sync, static mut) exceeds "
+             "this baseline. A fact about audit surface, not a race verdict. Set it to the current "
+             "count so a NEW override fails the commit. No effect without --gate.",
+    )
 
     args = parser.parse_args(argv)
 
     if args.gate:
-        return _run_gate(args.repo, args.lang, args.max_type_escapes)
+        return _run_gate(args.repo, args.lang, args.max_type_escapes, args.max_thread_exposed)
 
     results: dict[str, Any] = {}
 
@@ -174,6 +204,9 @@ def main(argv: list[str] | None = None) -> int:
         for k, v in sorted(results.items()):
             if k.startswith("L1."):
                 print(f"  {k}: {v}")
+        ts = results.get("thread_surface")
+        if isinstance(ts, dict):
+            print(f"  thread-safety surface: {ts['verdict']} ({ts.get('details', '')})")
         print("\nSlop signal count (demo thresholds): see individual bands above.")
 
     return 0
