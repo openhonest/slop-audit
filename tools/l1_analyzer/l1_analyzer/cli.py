@@ -159,6 +159,15 @@ def main(argv: list[str] | None = None) -> int:
              "this baseline. A fact about audit surface, not a race verdict. Set it to the current "
              "count so a NEW override fails the commit. No effect without --gate.",
     )
+    parser.add_argument(
+        "--race",
+        action="store_true",
+        help="Runtime thread-safety: build and run the repo's test suite under ThreadSanitizer "
+             "(Rust) and report data races that actually fire. The dynamic counterpart to the "
+             "static surface meter. Runs untrusted code and needs a nightly toolchain, so this is "
+             "CLI/CI only and opt-in. A race observed is proven; no race observed is bounded by the "
+             "suite, never a proof of safety.",
+    )
 
     args = parser.parse_args(argv)
 
@@ -189,6 +198,16 @@ def main(argv: list[str] | None = None) -> int:
         )
         results.update(source_results)
 
+    # Runtime thread-safety (opt-in): the dynamic counterpart to the static surface
+    # meter. Runs untrusted code, so only on explicit --race, never by default.
+    if args.race:
+        from l1_analyzer import race_harness
+        lang = str(results.get("lang", args.lang))
+        race = race_harness.detect_races(args.repo, lang, args.timeout)
+        surface_files = {f["file"] for f in results.get("thread_surface", {}).get("findings", [])}
+        race["confirmed_surface"] = race_harness.confirmed_surface(race["findings"], surface_files)
+        results["race"] = race
+
     if args.format == "json":
         # Provenance: record which mode produced this, so a result is never
         # ambiguous about whether the additive L1.18b classifier was active.
@@ -206,7 +225,13 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {k}: {v}")
         ts = results.get("thread_surface")
         if isinstance(ts, dict):
-            print(f"  thread-safety surface: {ts['verdict']} ({ts.get('details', '')})")
+            print(f"  thread-safety surface (static): {ts['verdict']} ({ts.get('details', '')})")
+        race = results.get("race")
+        if isinstance(race, dict):
+            print(f"  thread-safety race (runtime/{race['tool']}): {race['verdict']} ({race['details']})")
+            for f in race["findings"]:
+                mark = " [confirms flagged surface]" if f in race.get("confirmed_surface", []) else ""
+                print(f"      race at {f['file']}:{f['line']} in {f['symbol']}{mark}")
         print("\nSlop signal count (demo thresholds): see individual bands above.")
 
     return 0
