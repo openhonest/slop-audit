@@ -38,7 +38,7 @@ import tree_sitter_rust
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
-from l1_analyzer import pytest_trace
+from l1_analyzer import pytest_trace, rust_trace
 
 # ---------------------------------------------------------------------------
 # Data shape + pure scoring
@@ -667,14 +667,30 @@ def _god_files(repo: Path) -> L1Result:
         note += "; " + ", ".join(f"{n} >1k LOC scoped out ({r})" for r, n in sorted(scoped_by_reason.items()))
     return {"value": round(god_pct, 2), "band": band_value, "details": _with_skipped(note, skipped)}
 
+def _runtime_coverage(repo: Path, lang: str, timeout_seconds: float) -> L1Result:
+    """Route to the language's runtime coverage harness. Each executes the target
+    repo's own suite; a language with no harness reports n/a with its reason."""
+    if lang == "python":
+        return pytest_trace.decision_space_coverage(repo, lang, timeout_seconds)
+    if lang == "rust":
+        return rust_trace.decision_space_coverage(repo, timeout_seconds)
+    return {"value": "n/a", "band": "n/a", "details": f"runtime decision-coverage harness not implemented for {lang}"}
+
+def _runtime_determinism(repo: Path, lang: str, timeout_seconds: float) -> L1Result:
+    if lang == "python":
+        return pytest_trace.test_determinism(repo, lang, 5, timeout_seconds)
+    if lang == "rust":
+        return rust_trace.test_determinism(repo, 5, timeout_seconds)
+    return {"value": "n/a", "band": "n/a", "details": f"runtime determinism harness not implemented for {lang}"}
+
 def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float) -> L1Result:
-    """Real branch coverage when the suite can run; otherwise the static
-    decision-point enumeration with coverage clearly marked not-measured."""
+    """Real coverage when the suite can run; otherwise the static decision-point
+    enumeration with coverage clearly marked not-measured."""
     static = _compute_decision_space(repo, lang)
     if not exec_tests:
         static["details"] += "; coverage not measured (test execution disabled)"
         return static
-    cov = pytest_trace.decision_space_coverage(repo, lang, timeout_seconds)
+    cov = _runtime_coverage(repo, lang, timeout_seconds)
     if cov.get("band") != "n/a":
         return cov
     static["details"] += f"; coverage not measured: {cov.get('details', 'unavailable')}"
@@ -683,7 +699,7 @@ def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds
 def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float) -> L1Result:
     if not exec_tests:
         return {"value": "not run", "band": "n/a", "details": "test execution disabled"}
-    return pytest_trace.test_determinism(repo, lang, 5, timeout_seconds)
+    return _runtime_determinism(repo, lang, timeout_seconds)
 
 _COMMENT_TYPE_ESCAPES = ("# type: ignore", "// @ts-ignore", "/* @ts-ignore", "@SuppressWarnings")
 
