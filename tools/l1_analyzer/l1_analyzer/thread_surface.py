@@ -335,6 +335,72 @@ def _py_uses_concurrency(root: Node, nodes: list[Node]) -> bool:
     return False
 
 
+# B2 for Python: a check-then-act on a shared module-level container - `if k not in
+# CACHE: CACHE[k] = ...`. Under free-threading two threads both see the key absent and
+# both write. Restricted to module-level containers (the shared ones) in a threaded file.
+_PY_MUTATE_METHODS = frozenset({"add", "append", "update", "setdefault", "pop", "remove", "extend", "insert", "popitem", "clear", "discard"})
+
+
+def _py_module_containers(root: Node) -> set[str]:
+    names: set[str] = set()
+    for stmt in root.children:
+        assign = stmt.children[0] if (stmt.type == "expression_statement" and stmt.children) else stmt
+        if assign.type != "assignment":
+            continue
+        left = assign.child_by_field_name("left")
+        if left is not None and left.type == "identifier" and _py_rhs_is_mutable(assign.child_by_field_name("right")):
+            names.add(_text(left))
+    return names
+
+
+def _py_condition_containers(cond: Node | None, containers: set[str]) -> set[str]:
+    """Shared containers a membership test checks: the container operand of `x in C`."""
+    out: set[str] = set()
+    if cond is None:
+        return out
+    for n in _walk(cond):
+        if n.type == "comparison_operator" and any(c.type in ("in", "not in") for c in n.children):
+            named = [c for c in n.children if c.is_named]
+            if named and named[-1].type == "identifier" and _text(named[-1]) in containers:
+                out.add(_text(named[-1]))
+    return out
+
+
+def _py_body_mutated(body: Node | None, containers: set[str]) -> set[str]:
+    """Shared containers a block mutates: `C[k] = v` or `C.add(...)` / `C.append(...)`."""
+    out: set[str] = set()
+    if body is None:
+        return out
+    for n in _walk(body):
+        if n.type == "assignment":
+            left = n.child_by_field_name("left")
+            if left is not None and left.type == "subscript":
+                val = left.child_by_field_name("value")
+                if val is not None and val.type == "identifier" and _text(val) in containers:
+                    out.add(_text(val))
+        elif n.type == "call":
+            fn = n.child_by_field_name("function")
+            if fn is not None and fn.type == "attribute":
+                recv = fn.child_by_field_name("object")
+                if (recv is not None and recv.type == "identifier" and _text(recv) in containers
+                        and _text(fn.child_by_field_name("attribute")) in _PY_MUTATE_METHODS):
+                    out.add(_text(recv))
+    return out
+
+
+def _py_check_then_act(root: Node, containers: set[str], rel: str) -> list[Finding]:
+    findings: list[Finding] = []
+    for n in _walk(root):
+        if n.type != "if_statement":
+            continue
+        checked = _py_condition_containers(n.child_by_field_name("condition"), containers)
+        mutated = _py_body_mutated(n.child_by_field_name("consequence"), containers)
+        mutated |= _py_body_mutated(n.child_by_field_name("alternative"), containers)
+        for name in sorted(checked & mutated):
+            findings.append(_mk("check_then_act", name, REVIEW, rel, n))
+    return findings
+
+
 def _py_has_lock(nodes: list[Node]) -> bool:
     for n in nodes:
         if n.type == "identifier" and _text(n) in _PY_LOCK_NAMES:
@@ -360,6 +426,8 @@ def _scan_python(root: Node, rel: str) -> list[Finding]:
     # Module-level mutable containers, only when the file actually runs concurrently.
     if not _py_uses_concurrency(root, nodes):
         return findings
+    containers = _py_module_containers(root)
+    findings.extend(_py_check_then_act(root, containers, rel))
     guarded = _py_has_lock(nodes)
     for stmt in root.children:
         assign = stmt.children[0] if (stmt.type == "expression_statement" and stmt.children) else stmt
