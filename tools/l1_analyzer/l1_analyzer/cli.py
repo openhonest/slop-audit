@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from l1_analyzer import indicators, schedule_silence, thread_surface
+from l1_analyzer import indicators, report, schedule_silence, thread_surface
 
 
 def _count_type_escapes(repo: Path, lang: str) -> int:
@@ -220,6 +220,16 @@ def main(argv: list[str] | None = None) -> int:
         default=3,
         help="With --prove, the maximum number of located hazards to attempt (default 3).",
     )
+    parser.add_argument(
+        "--report",
+        nargs="?",
+        const=".",
+        default=None,
+        metavar="DIR",
+        help="Write the full Slop Audit report (the grade, verdict, audit checks, and concurrency "
+             "layer - the way try.slopaudit.org renders it) as <slug>.md and <slug>.html into DIR "
+             "(default the current directory).",
+    )
 
     args = parser.parse_args(argv)
 
@@ -269,6 +279,19 @@ def main(argv: list[str] | None = None) -> int:
         results["proofs"] = _run_prove(args.repo, str(results.get("lang", args.lang)),
                                        results.get("thread_surface"), args.prove_max, args.timeout)
 
+    # The full Slop Audit report (grade + verdict + audit checks + concurrency), the way
+    # try.slopaudit.org renders it. It is the default CLI output and the --report artifact.
+    slug = args.repo.name or str(args.repo)
+    model = report.build_report(slug, str(results.get("lang", args.lang)), results)
+
+    if args.report is not None:
+        out_dir = Path(args.report)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        base = slug.replace("/", "-")
+        (out_dir / f"{base}.md").write_text(report.report_markdown(model))
+        (out_dir / f"{base}.html").write_text(report.report_html(model))
+        print(f"wrote {out_dir / (base + '.md')} and {out_dir / (base + '.html')}")
+
     if args.format == "json":
         # Provenance: record which mode produced this, so a result is never
         # ambiguous about whether the additive L1.18b classifier was active.
@@ -279,33 +302,20 @@ def main(argv: list[str] | None = None) -> int:
         }
         print(json.dumps(envelope, indent=2))
     else:
-        print(f"LAYER 1: Slop Audit indicators for {args.repo}")
-        print(f"Language (for source indicators): {results.get('lang', args.lang)}")
-        for k, v in sorted(results.items()):
-            if k.startswith("L1."):
-                print(f"  {k}: {v}")
-        ts = results.get("thread_surface")
-        if isinstance(ts, dict):
-            print(f"  thread-safety surface (static): {ts['verdict']} ({ts.get('details', '')})")
-        ss = results.get("schedule_silence")
-        if isinstance(ss, dict) and ss["verdict"] != "n/a":
-            print(f"  schedule-silence (static): {ss['verdict']} ({ss['details']})")
-            for f in ss.get("unmodeled", []):
-                print(f"      unmodeled surface: {f}")
+        print(report.report_markdown(model))
+        # Runtime results (race / prove) are not part of the static report; append them.
         race = results.get("race")
         if isinstance(race, dict):
-            print(f"  thread-safety race (runtime/{race['tool']}): {race['verdict']} ({race['details']})")
+            print(f"\n## Thread-safety race (runtime/{race['tool']}) — {race['verdict']}\n\n{race['details']}")
             for f in race["findings"]:
                 mark = " [confirms flagged surface]" if f in race.get("confirmed_surface", []) else ""
-                print(f"      race at {f['file']}:{f['line']} in {f['symbol']}{mark}")
+                print(f"- race at `{f['file']}:{f['line']}` in {f['symbol']}{mark}")
         proofs = results.get("proofs")
         if isinstance(proofs, dict):
-            print(f"  prove (locate -> generate -> run -> retain): {proofs['verdict']} "
+            print(f"\n## Prove (locate → generate → run → retain) — {proofs['verdict']} "
                   f"({proofs.get('demonstrated', 0)}/{proofs.get('attempted', 0)} demonstrated)")
             for o in proofs.get("outcomes", []):
-                flag = "  DEMONSTRATED" if o["verdict"] == "demonstrated" else f"  {o['verdict']}"
-                print(f"      {o['file']}:{o['line']} {o['symbol']}:{flag} - {o['detail']}")
-        print("\nSlop signal count (demo thresholds): see individual bands above.")
+                print(f"- `{o['file']}:{o['line']}` {o['symbol']}: {o['verdict']} — {o['detail']}")
 
     return 0
 

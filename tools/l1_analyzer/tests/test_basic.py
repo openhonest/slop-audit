@@ -583,7 +583,8 @@ def test_cli_source_indicators_no_exec_text(tmp_path, capsys):
     rc = cli.main([str(tmp_path), "--indicators", "16,17,18,19", "--lang", "python", "--no-exec"])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "L1.18" in out and "L1.19" in out
+    # The default CLI output is the full Slop Audit report (grade + verdict + audit checks).
+    assert "Slop Audit" in out and "finitely testable" in out
 
 
 def test_cli_all_indicators_auto_lang(tmp_path, capsys):
@@ -594,7 +595,8 @@ def test_cli_all_indicators_auto_lang(tmp_path, capsys):
     _commit(tmp_path, "init")
     rc = cli.main([str(tmp_path), "--indicators", "all", "--no-exec"])
     assert rc == 0
-    assert "Language (for source indicators): python" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Slop Audit" in out and "(python)" in out  # the report titles with the language
 
 
 # --- per-language L1.18 (runs and discriminates) ----------------------------
