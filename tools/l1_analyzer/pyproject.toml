@@ -23,6 +23,8 @@ l1-analyzer = "l1_analyzer.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-bdd>=7.0", "coverage>=7.0", "pytest-randomly>=3.15"]
+# The --prove stage generates tests with a model; the static core stays zero-LLM.
+prove = ["openai>=1.0"]
 
 [build-system]
 requires = ["hatchling"]

@@ -98,3 +98,95 @@ def prove(request: ProofRequest, model_call: ConcurrencyModelCall, run_generated
 def retained(outcomes: list[ProofOutcome]) -> list[ProofOutcome]:
     """Only demonstrated proofs survive into the report - Umbra's retention rule."""
     return [o for o in outcomes if o["verdict"] == DEMONSTRATED]
+
+
+# --------------------------------------------------------------------------
+# Production loop: the model call and the execution, wired for the CLI.
+#
+# The generator follows Umbra's discipline (structure deterministic; the model only
+# fills an already-located gap; the execution gate, not the model, decides), ported
+# into slop-audit so the whole platform is self-contained. openai is an optional
+# dependency - absent, the loop reports not-generated, never a false claim.
+# --------------------------------------------------------------------------
+
+_CONCURRENCY_INSTRUCTION = (
+    "You are given a located concurrency hazard from real code. Write ONE self-contained Rust file (a "
+    "`#[cfg(test)] mod tests` with a single `#[test]` fn) that REPRODUCES the race the hazard describes and "
+    "makes an assertion FAIL nondeterministically - failing on some runs and passing on others. Model the "
+    "shared state with std types, or these crates if apt: crossbeam-skiplist, crossbeam-utils, crossbeam-queue. "
+    "Spawn threads that drive the racy access concurrently and assert an invariant the race violates (a lost "
+    "update, a torn read, an out-of-order observation). Use SMALL iteration counts and NO barrier so it is "
+    "nondeterministic; the assertion must fail only because of the race. Output ONLY Rust code, no markdown "
+    "fences, no prose."
+)
+# The reproduction crate may reach for these; std otherwise. Pinned, so the build is stable.
+_PROVE_CRATE_DEPS = 'crossbeam-skiplist = "0.1"\ncrossbeam-utils = "0.8"\ncrossbeam-queue = "0.3"\n'
+
+
+def model_available() -> bool:
+    """Whether a generation model can be called (an OpenAI key is present)."""
+    import os
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+
+def _strip_fences(code: str) -> str:
+    import re
+    return re.sub(r"^```(?:rust)?\n|```$", "", code.strip(), flags=re.MULTILINE)
+
+
+def generate(request: ProofRequest) -> str | None:
+    """The prove-stage generator: GPT-5.6 writes a self-contained Rust test that
+    reproduces the located hazard as a failing, nondeterministic race. Returns None when
+    no model / openai is available - the loop then reports not-generated, never a false
+    claim. The execution gate, not this call, decides whether the proof stands."""
+    import os
+    if not model_available():
+        return None
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return None
+    try:
+        response = OpenAI(api_key=os.environ["OPENAI_API_KEY"]).responses.create(
+            model="gpt-5.6",
+            input=[
+                {"role": "developer", "content": _CONCURRENCY_INSTRUCTION},
+                {"role": "user", "content": request["context"]},
+            ],
+        )
+    except Exception:  # noqa: BLE001 - any generation failure yields no proof, never a false claim
+        return None
+    return _strip_fences(response.output_text)
+
+
+def write_crate_and_stress(test_source: str, work_dir: str, runs: int, timeout_seconds: float) -> RunResult:
+    """Execution gate: drop the generated test into a fresh crate and run it under the
+    stress runner. A panic on some runs but not all is a proven race."""
+    from pathlib import Path
+
+    from l1_analyzer import race_harness
+    crate = Path(work_dir)
+    (crate / "src").mkdir(parents=True, exist_ok=True)
+    (crate / "Cargo.toml").write_text(
+        '[package]\nname = "proofcrate"\nversion = "0.0.0"\nedition = "2021"\n[dependencies]\n' + _PROVE_CRATE_DEPS
+    )
+    (crate / "src" / "lib.rs").write_text(test_source)
+    result = race_harness.stress_races(crate, "rust", runs, timeout_seconds)
+    return {"verdict": result["verdict"], "detail": result.get("details", result.get("value", ""))}
+
+
+def prove_hazard(
+    request: ProofRequest,
+    work_dir: str,
+    runs: int = 100,
+    timeout_seconds: float = 300.0,
+    model_call: ConcurrencyModelCall | None = None,
+    run_generated: RunGenerated | None = None,
+) -> ProofOutcome:
+    """The full production loop for one located hazard: generate a test, run it under
+    stress, retain iff it fires. model_call and run_generated default to the real
+    generator and the stress runner; both are injectable so the honesty property stays
+    testable without an API key or a build."""
+    gen = model_call or generate
+    run = run_generated or (lambda test: write_crate_and_stress(test, work_dir, runs, timeout_seconds))
+    return prove(request, gen, run)

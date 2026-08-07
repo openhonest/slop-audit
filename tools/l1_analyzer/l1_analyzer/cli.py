@@ -100,6 +100,43 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
     return 0
 
 
+def _hazard_context(repo: Path, finding: dict[str, object]) -> str:
+    """The code around a located hazard, handed to the generator as the only context."""
+    path = repo / finding["file"]
+    try:
+        lines = path.read_text(errors="ignore").splitlines()
+    except OSError:
+        return f"Located hazard: {finding['kind']} on {finding['symbol']} at {finding['file']}:{finding['line']}."
+    lo, hi = max(0, finding["line"] - 30), min(len(lines), finding["line"] + 30)
+    window = "\n".join(lines[lo:hi])
+    return (f"Located hazard: {finding['kind']} on `{finding['symbol']}` at "
+            f"{finding['file']}:{finding['line']}.\nSurrounding Rust source:\n{window}")
+
+
+def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: int, timeout: float) -> dict[str, object]:
+    """Locate -> generate -> run -> retain over the review-tier findings. Deterministic
+    locate; the model only fills a located gap; the execution gate keeps only what fires."""
+    import tempfile
+
+    from l1_analyzer import prove, thread_surface
+    if lang != "rust":
+        return {"verdict": "n/a", "detail": f"prove is Rust-only for now; {lang} not supported", "demonstrated": 0, "outcomes": []}
+    if not prove.model_available():
+        return {"verdict": "n/a", "detail": "needs OPENAI_API_KEY to generate proofs", "demonstrated": 0, "outcomes": []}
+    ts = thread_surface_result if isinstance(thread_surface_result, dict) else thread_surface.scan(repo, lang)
+    candidates = [f for f in ts.get("findings", []) if f.get("severity") == "review"][:prove_max]
+    work_root = Path(tempfile.mkdtemp(prefix="l1-prove-"))
+    outcomes: list[dict[str, object]] = []
+    for i, f in enumerate(candidates):
+        request = prove.proof_request(f, _hazard_context(repo, f))
+        outcome = prove.prove_hazard(request, str(work_root / f"proof-{i}"), timeout_seconds=timeout)
+        outcomes.append({"file": f["file"], "line": f["line"], "symbol": f["symbol"],
+                         "verdict": outcome["verdict"], "detail": outcome["detail"]})
+    demonstrated = sum(o["verdict"] == prove.DEMONSTRATED for o in outcomes)
+    return {"verdict": "demonstrated" if demonstrated else "none",
+            "demonstrated": demonstrated, "attempted": len(outcomes), "outcomes": outcomes}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="l1-analyzer")
     parser.add_argument("repo", type=Path, help="Path to git repository root")
@@ -168,6 +205,21 @@ def main(argv: list[str] | None = None) -> int:
              "CLI/CI only and opt-in. A race observed is proven; no race observed is bounded by the "
              "suite, never a proof of safety.",
     )
+    parser.add_argument(
+        "--prove",
+        action="store_true",
+        help="Prove located hazards: for each review-tier concurrency finding, ask a model to write a "
+             "Rust test that reproduces the race, run it under the stress runner, and keep it only if it "
+             "genuinely fires. Locate is deterministic; the model only fills a located gap; the execution "
+             "gate decides. Needs OPENAI_API_KEY, cargo, and the openai package (pip install openai). "
+             "Opt-in and CLI-only - it generates and runs code.",
+    )
+    parser.add_argument(
+        "--prove-max",
+        type=int,
+        default=3,
+        help="With --prove, the maximum number of located hazards to attempt (default 3).",
+    )
 
     args = parser.parse_args(argv)
 
@@ -211,6 +263,12 @@ def main(argv: list[str] | None = None) -> int:
         race["confirmed_surface"] = race_harness.confirmed_surface(race["findings"], surface_files)
         results["race"] = race
 
+    # Prove (opt-in): locate -> generate -> run -> retain, in one command. Generates and
+    # runs code, so CLI-only and explicit.
+    if args.prove:
+        results["proofs"] = _run_prove(args.repo, str(results.get("lang", args.lang)),
+                                       results.get("thread_surface"), args.prove_max, args.timeout)
+
     if args.format == "json":
         # Provenance: record which mode produced this, so a result is never
         # ambiguous about whether the additive L1.18b classifier was active.
@@ -240,6 +298,13 @@ def main(argv: list[str] | None = None) -> int:
             for f in race["findings"]:
                 mark = " [confirms flagged surface]" if f in race.get("confirmed_surface", []) else ""
                 print(f"      race at {f['file']}:{f['line']} in {f['symbol']}{mark}")
+        proofs = results.get("proofs")
+        if isinstance(proofs, dict):
+            print(f"  prove (locate -> generate -> run -> retain): {proofs['verdict']} "
+                  f"({proofs.get('demonstrated', 0)}/{proofs.get('attempted', 0)} demonstrated)")
+            for o in proofs.get("outcomes", []):
+                flag = "  DEMONSTRATED" if o["verdict"] == "demonstrated" else f"  {o['verdict']}"
+                print(f"      {o['file']}:{o['line']} {o['symbol']}:{flag} - {o['detail']}")
         print("\nSlop signal count (demo thresholds): see individual bands above.")
 
     return 0

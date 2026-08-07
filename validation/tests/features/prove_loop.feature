@@ -31,3 +31,10 @@ Feature: Concurrency prove loop (locate then demonstrate)
     When I run the prove loop
     Then the hazard is not run
     And the proof is not retained
+
+  Scenario: The production loop delegates through the honesty gate
+    Given a located hazard and a model that writes a test for it
+    And the generated test fires a race when run
+    When I run the production prove loop with those injected
+    Then the hazard is demonstrated
+    And the proof is retained

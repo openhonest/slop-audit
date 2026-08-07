@@ -51,6 +51,15 @@ def when_prove(ctx):
     ctx["outcome"] = prove.prove(ctx["request"], ctx["model_call"], run)
 
 
+@when("I run the production prove loop with those injected")
+def when_prove_hazard(ctx):
+    # prove_hazard is the production wrapper; injecting model_call + run_generated proves
+    # it delegates through the same honesty gate without an API key or a build.
+    ctx["outcome"] = prove.prove_hazard(
+        ctx["request"], work_dir="/unused", model_call=ctx["model_call"], run_generated=ctx["run_generated"],
+    )
+
+
 @then("the hazard is demonstrated")
 def then_demonstrated(ctx):
     assert ctx["outcome"]["verdict"] == prove.DEMONSTRATED
