@@ -490,9 +490,58 @@ def _scan_python(root: Node, rel: str) -> list[Finding]:
     return findings
 
 
+# --------------------------------------------------------------------------
+# JavaScript / TypeScript scanner. One event loop, so the race is not a data race:
+# it is an async TOCTOU. A check on shared instance state, then an `await` (which
+# yields the loop to another task), then a mutation of the same state - the awaited
+# gap is where a concurrent task can invalidate the check. The `await` in the body IS
+# the concurrency, so the shape is self-gating. Restricted to this.-rooted state.
+# --------------------------------------------------------------------------
+
+_JS_CHECK = frozenset({"has", "get", "includes", "find", "indexOf", "hasOwnProperty"})
+_JS_MUTATE = frozenset({"set", "add", "push", "delete", "unshift", "pop", "splice"})
+
+
+def _js_method_receiver(call: Node) -> tuple[str, str] | None:
+    if call.type != "call_expression":
+        return None
+    fn = call.child_by_field_name("function")
+    if fn is None or fn.type != "member_expression":
+        return None
+    return _text(fn.child_by_field_name("property")), _text(fn.child_by_field_name("object"))
+
+
+def _js_receivers_by_method(scope: Node | None, methods: frozenset[str]) -> set[str]:
+    out: set[str] = set()
+    if scope is None:
+        return out
+    for n in _walk(scope):
+        mr = _js_method_receiver(n)
+        if mr is not None and mr[0] in methods and mr[1].startswith("this."):
+            out.add(mr[1])
+    return out
+
+
+def _scan_jsts(root: Node, rel: str) -> list[Finding]:
+    findings: list[Finding] = []
+    for n in _walk(root):
+        if n.type != "if_statement":
+            continue
+        cons = n.child_by_field_name("consequence")
+        if cons is None or not any(x.type == "await_expression" for x in _walk(cons)):
+            continue  # no awaited yield in the body -> not an async TOCTOU
+        checked = _js_receivers_by_method(n.child_by_field_name("condition"), _JS_CHECK)
+        mutated = _js_receivers_by_method(cons, _JS_MUTATE)
+        for recv in sorted(checked & mutated):
+            findings.append(_mk("async_toctou", recv, REVIEW, rel, n))
+    return findings
+
+
 _SCANNERS: dict[str, Callable[[Node, str], list[Finding]]] = {
     "rust": _scan_rust,
     "python": _scan_python,
+    "typescript": _scan_jsts,
+    "javascript": _scan_jsts,
 }
 
 
