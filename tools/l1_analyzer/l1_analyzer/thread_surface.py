@@ -537,11 +537,98 @@ def _scan_jsts(root: Node, rel: str) -> list[Finding]:
     return findings
 
 
+# --------------------------------------------------------------------------
+# Go scanner. The canonical Go race: a `go func(){...}()` writes to a variable captured
+# from the enclosing scope with no synchronization. Go has no borrow checker and its
+# maps are not concurrent-safe, so this is a genuine data race (what `go test -race`
+# catches). A write to a name NOT declared inside the closure is a captured write;
+# downgraded to candidate if the body holds a lock or sends on a channel.
+# --------------------------------------------------------------------------
+
+_GO_SYNC_METHODS = frozenset({"Lock", "Unlock", "RLock", "RUnlock", "Store", "Add", "CompareAndSwap", "Swap"})
+
+
+def _go_assign_base(node: Node | None) -> str | None:
+    """The base variable a write targets: `x` -> x, `m[k]` -> m, `obj.f` -> obj."""
+    if node is None:
+        return None
+    if node.type == "identifier":
+        return _text(node)
+    if node.type in ("index_expression", "selector_expression"):
+        inner = next((c for c in node.children if c.is_named), None)
+        return _go_assign_base(inner)
+    return None
+
+
+def _go_assign_bases(left: Node | None) -> set[str]:
+    if left is None:
+        return set()
+    if left.type == "expression_list":
+        out: set[str] = set()
+        for c in left.children:
+            if c.is_named:
+                out |= _go_assign_bases(c)
+        return out
+    base = _go_assign_base(left)
+    return {base} if base else set()
+
+
+def _go_declared_inside(fl: Node, body: Node) -> set[str]:
+    """Names local to the closure: its parameters and its `:=` declarations."""
+    names: set[str] = set()
+    params = fl.child_by_field_name("parameters")
+    if params is not None:
+        names.update(_text(c) for c in _walk(params) if c.type == "identifier")
+    for n in _walk(body):
+        if n.type == "short_var_declaration":
+            names |= _go_assign_bases(n.child_by_field_name("left"))
+    return names
+
+
+def _go_has_sync(body: Node) -> bool:
+    for n in _walk(body):
+        if n.type == "send_statement":
+            return True
+        if n.type == "call_expression":
+            fn = n.child_by_field_name("function")
+            if fn is not None and fn.type == "selector_expression" and _text(fn.child_by_field_name("field")) in _GO_SYNC_METHODS:
+                return True
+    return False
+
+
+def _scan_go(root: Node, rel: str) -> list[Finding]:
+    findings: list[Finding] = []
+    for go in _walk(root):
+        if go.type != "go_statement":
+            continue
+        fl = next((x for x in _walk(go) if x.type == "func_literal"), None)
+        if fl is None:
+            continue
+        body = fl.child_by_field_name("body")
+        if body is None:
+            continue
+        declared = _go_declared_inside(fl, body)
+        severity = CANDIDATE if _go_has_sync(body) else REVIEW
+        seen: set[str] = set()
+        for n in _walk(body):
+            targets: set[str] = set()
+            if n.type == "assignment_statement":
+                targets = _go_assign_bases(n.child_by_field_name("left"))
+            elif n.type in ("inc_statement", "dec_statement"):
+                targets = {_go_assign_base(next((c for c in n.children if c.is_named), None))} - {None}
+            for t in sorted(targets):
+                if t and t != "_" and t not in declared and t not in seen:  # "_" is the discard
+                    seen.add(t)
+                    findings.append(_mk("goroutine_shared_write", t, severity, rel, n))
+    return findings
+
+
 _SCANNERS: dict[str, Callable[[Node, str], list[Finding]]] = {
     "rust": _scan_rust,
     "python": _scan_python,
     "typescript": _scan_jsts,
     "javascript": _scan_jsts,
+    "go": _scan_go,
 }
 
 
