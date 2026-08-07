@@ -19,3 +19,13 @@ Feature: Structural race-condition shapes in Python (free-threading)
     Given a threaded module that checks then writes a local dict
     When I scan the Python file for race shapes
     Then no check-then-act is reported
+
+  Scenario: A non-atomic compound update on a shared global is flagged
+    Given a threaded module that does COUNTER += 1 on a global
+    When I scan the Python file for race shapes
+    Then a non-atomic read-modify-write is reported on "COUNTER"
+
+  Scenario: A local counter increment is not flagged
+    Given a threaded module that increments a local counter
+    When I scan the Python file for race shapes
+    Then no non-atomic read-modify-write is reported

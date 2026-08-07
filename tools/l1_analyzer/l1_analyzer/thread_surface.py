@@ -416,6 +416,35 @@ def _py_check_then_act(root: Node, containers: set[str], rel: str) -> list[Findi
     return findings
 
 
+def _py_global_names(func: Node) -> set[str]:
+    """Names a function declares `global` - the shared module state it writes."""
+    names: set[str] = set()
+    for n in _walk(func):
+        if n.type == "global_statement":
+            names.update(_text(c) for c in n.children if c.type == "identifier")
+    return names
+
+
+def _py_nonatomic_rmw(root: Node, rel: str, guarded: bool) -> list[Finding]:
+    """B1 for Python: an augmented assignment (`COUNTER += 1`) on a `global`-declared
+    name. The load-add-store is not atomic; under free-threading two threads lose an
+    update. Review unless a lock exists in the file (then candidate - unproven guard)."""
+    severity = CANDIDATE if guarded else REVIEW
+    findings: list[Finding] = []
+    for fn in _walk(root):
+        if fn.type != "function_definition":
+            continue
+        globals_ = _py_global_names(fn)
+        if not globals_:
+            continue
+        for n in _walk(fn):
+            if n.type == "augmented_assignment":
+                left = n.child_by_field_name("left")
+                if left is not None and left.type == "identifier" and _text(left) in globals_:
+                    findings.append(_mk("nonatomic_rmw", _text(left), severity, rel, n))
+    return findings
+
+
 def _py_has_lock(nodes: list[Node]) -> bool:
     for n in nodes:
         if n.type == "identifier" and _text(n) in _PY_LOCK_NAMES:
@@ -441,9 +470,10 @@ def _scan_python(root: Node, rel: str) -> list[Finding]:
     # Module-level mutable containers, only when the file actually runs concurrently.
     if not _py_uses_concurrency(root, nodes):
         return findings
+    guarded = _py_has_lock(nodes)
     containers = _py_module_containers(root)
     findings.extend(_py_check_then_act(root, containers, rel))
-    guarded = _py_has_lock(nodes)
+    findings.extend(_py_nonatomic_rmw(root, rel, guarded))
     for stmt in root.children:
         assign = stmt.children[0] if (stmt.type == "expression_statement" and stmt.children) else stmt
         if assign.type != "assignment":

@@ -58,9 +58,49 @@ def given_threaded_local(ctx, tmp_path):
     ctx["repo"] = tmp_path
 
 
+@given("a threaded module that does COUNTER += 1 on a global")
+def given_global_rmw(ctx, tmp_path):
+    ctx["src"] = (
+        "import threading\n"
+        "COUNTER = 0\n"
+        "def bump():\n"
+        "    global COUNTER\n"
+        "    COUNTER += 1\n"
+        "threading.Thread(target=bump).start()\n"
+    )
+    ctx["repo"] = tmp_path
+
+
+@given("a threaded module that increments a local counter")
+def given_local_rmw(ctx, tmp_path):
+    ctx["src"] = (
+        "import threading\n"
+        "def work():\n"
+        "    c = 0\n"
+        "    c += 1\n"
+        "    return c\n"
+        "threading.Thread(target=work).start()\n"
+    )
+    ctx["repo"] = tmp_path
+
+
 @when("I scan the Python file for race shapes")
 def when_scan(ctx):
     ctx["result"] = _scan(ctx["repo"], ctx["src"])
+
+
+def _rmw(result):
+    return [f for f in result["findings"] if f["kind"] == "nonatomic_rmw"]
+
+
+@then(parsers.parse('a non-atomic read-modify-write is reported on "{name}"'))
+def then_rmw(ctx, name):
+    assert any(f["symbol"] == name for f in _rmw(ctx["result"])), [f["symbol"] for f in _rmw(ctx["result"])]
+
+
+@then("no non-atomic read-modify-write is reported")
+def then_no_rmw(ctx):
+    assert _rmw(ctx["result"]) == []
 
 
 def _cta(result):
