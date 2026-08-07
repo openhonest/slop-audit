@@ -663,6 +663,36 @@ def _scan_java(root: Node, rel: str) -> list[Finding]:
     return findings
 
 
+# --------------------------------------------------------------------------
+# Ruby scanner. CRuby's GVL serialises bytecode, but a compound update is several
+# bytecodes, so `@@count += 1` on a class variable (shared across every instance and
+# thread) still loses updates under Thread, and JRuby/TruffleRuby have true parallelism.
+# Flags a compound assignment to a class variable in a file that uses Thread.
+# --------------------------------------------------------------------------
+
+def _ruby_uses_threads(root: Node) -> bool:
+    for n in _walk(root):
+        if n.type == "constant" and _text(n) == "Thread":
+            return True
+        if n.type == "call":
+            recv = n.child_by_field_name("receiver")
+            if recv is not None and _text(recv) == "Thread":
+                return True
+    return False
+
+
+def _scan_ruby(root: Node, rel: str) -> list[Finding]:
+    if not _ruby_uses_threads(root):
+        return []
+    findings: list[Finding] = []
+    for n in _walk(root):
+        if n.type == "operator_assignment":
+            left = n.child_by_field_name("left")
+            if left is not None and left.type == "class_variable":
+                findings.append(_mk("nonatomic_rmw", _text(left), REVIEW, rel, n))
+    return findings
+
+
 _SCANNERS: dict[str, Callable[[Node, str], list[Finding]]] = {
     "rust": _scan_rust,
     "python": _scan_python,
@@ -670,6 +700,7 @@ _SCANNERS: dict[str, Callable[[Node, str], list[Finding]]] = {
     "javascript": _scan_jsts,
     "go": _scan_go,
     "java": _scan_java,
+    "ruby": _scan_ruby,
 }
 
 
