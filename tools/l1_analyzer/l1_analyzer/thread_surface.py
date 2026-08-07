@@ -112,6 +112,17 @@ def _mk(kind: str, symbol: str, severity: str, rel: str, node: Node) -> Finding:
 # read-modify-write) and B2 (check-then-act) are per-function shapes, restricted to
 # self.-rooted receivers so we flag shared INSTANCE state and skip pure locals. Each
 # B finding is a suspected race SHAPE to verify or prove, never a proven race.
+#
+# The static Rust taxonomy is complete at A / B1 / B2 / C1. The remaining categories
+# are deliberately NOT static detectors, because that is the honest edge of the cone:
+#   C2 (advance-past-a-live-reader, the turso shape) is semantic and cross-file - the
+#      advancing store hides behind an accessor closure and the reader registry lives
+#      in another module, so no per-file pattern reaches it. C2 is a RUNTIME catch
+#      (the race_harness runners and schedule perturbation), not a static one.
+#   D (escaped shared reference) and E (lock-discipline) are enforced by Rust's own
+#      type system - the borrow checker blocks unguarded captures, Mutex<T> forces
+#      locking - so there is little honest static signal left in them for Rust.
+# Other languages without those compiler guarantees reopen D and E; see their scanners.
 # --------------------------------------------------------------------------
 
 # B1: a load and a store on the same atomic in one function is a read-modify-write
