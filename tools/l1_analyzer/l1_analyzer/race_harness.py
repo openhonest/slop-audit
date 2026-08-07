@@ -183,6 +183,99 @@ def _first_error(output: str) -> str:
     return "unknown build error"
 
 
+# --------------------------------------------------------------------------
+# Stress runner. A second concurrency runner, and the one that needs no nightly:
+# it builds and runs the suite under contention repeatedly on the STABLE toolchain.
+# The code's own invariant checks (assert!, turso_assert!, debug_assert!) are the
+# oracle; the runner's job is only to supply a schedule that trips one. A run that
+# panics when other runs passed is a PROVEN nondeterministic failure - a race the
+# suite's own asserts caught. Bounded by the suite's concurrency and the run count.
+# --------------------------------------------------------------------------
+
+NO_RACE_IN_STRESS = "no-race-in-stress"
+
+# Rust panic, both formats: old `panicked at 'msg', file:line`, new `panicked at file:line:`.
+_PANIC = re.compile(
+    r"thread '(?P<thread>[^']*)' panicked at "
+    r"(?:'(?P<msg_old>[^']*)', )?"
+    r"(?P<file>[^\s:,]+\.\w+):(?P<line>\d+)"
+)
+
+
+class PanicFinding(TypedDict):
+    file: str
+    line: int
+    thread: str
+    message: str
+
+
+def parse_panic(output: str) -> list[PanicFinding]:
+    """Extract Rust panics from test output. Deterministic, pure. A panic during a
+    stress run is an invariant check firing - the oracle that caught the race."""
+    findings: list[PanicFinding] = []
+    lines = output.splitlines()
+    for i, line in enumerate(lines):
+        m = _PANIC.search(line)
+        if m is None:
+            continue
+        # New format carries the message on the following line; old format inline.
+        message = m["msg_old"] or (lines[i + 1].strip() if i + 1 < len(lines) else "")
+        findings.append({"file": m["file"], "line": int(m["line"]), "thread": m["thread"], "message": message[:200]})
+    return findings
+
+
+def _cargo_available() -> str | None:
+    """Stress needs only cargo (stable), no rustup/nightly - that is the point."""
+    return None if shutil.which("cargo") is not None else "needs cargo on PATH"
+
+
+def stress_races(repo: Path, lang: str, runs: int, timeout_seconds: float) -> RaceResult:
+    """Run the suite under contention `runs` times and report a panic that fires on
+    some runs but not all - a proven nondeterministic (racy) failure.
+
+    Verdicts: all runs pass -> no-race-in-stress (bounded by the suite + run count);
+    a mix of pass and panic -> race-observed (the code's own assert caught it); every
+    run fails the same way -> n/a (a deterministic failure, not a stress-caught race).
+    """
+    if lang != "rust":
+        return _na(f"stress runner is Rust-only for now; {lang} not supported yet", tool="stress")
+    reason = _cargo_available()
+    if reason is not None:
+        return _na(reason, tool="stress")
+
+    passed = 0
+    panics: list[PanicFinding] = []
+    for _ in range(runs):
+        run = _run_untrusted(
+            ["cargo", "test", "--", "--test-threads=8"], cwd=repo, env={}, timeout_seconds=timeout_seconds,
+        )
+        output = (run.stderr or "") + "\n" + (run.stdout or "")
+        if run.returncode == 124:
+            return _na("a stress run timed out; concurrency not measured", tool="stress")
+        if run.returncode == 0:
+            passed += 1
+        else:
+            hit = parse_panic(output)
+            if not hit and ("error[" in output or "could not compile" in output):
+                return _na(f"could not build the suite: {_first_error(output)}", tool="stress")
+            panics.extend(hit)
+
+    if passed == runs:
+        return {"verdict": NO_RACE_IN_STRESS, "value": f"{runs}/{runs} stress runs passed", "band": "Healthy",
+                "tool": "stress", "findings": [], "details": f"no panic across {runs} contended runs (bounded by the suite)"}
+    if passed == 0:
+        return _na(f"every run failed the same way ({runs}/{runs}) - a deterministic failure, not a stress-caught race", tool="stress")
+    # Mixed: proven nondeterministic. Report the panic(s), attributed to file:line.
+    deduped = {(p["file"], p["line"]): p for p in panics}
+    findings: list[RaceFinding] = [
+        {"file": p["file"], "line": p["line"], "symbol": p["message"] or p["thread"], "accesses": []}
+        for p in deduped.values()
+    ]
+    return {"verdict": RACE_OBSERVED, "value": f"nondeterministic failure ({passed}/{runs} passed)", "band": "Slop",
+            "tool": "stress", "findings": findings,
+            "details": f"a panic fired on {runs - passed} of {runs} contended runs but not the others - a proven race the suite's own asserts caught"}
+
+
 def confirmed_surface(findings: list[RaceFinding], surface_files: set[str]) -> list[RaceFinding]:
     """Cross-reference: the observed races whose site sits in a file the static
     surface meter flagged. These are CONFIRMED exposed - static said 'verify here',
