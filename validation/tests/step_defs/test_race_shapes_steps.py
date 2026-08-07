@@ -73,6 +73,28 @@ def given_local_check_then_act(ctx, tmp_path):
     ctx["repo"] = tmp_path
 
 
+@given("a method that branches on a Relaxed load of self.ready")
+def given_relaxed_guard(ctx, tmp_path):
+    ctx["src"] = (
+        "struct C { ready: AtomicBool }\n"
+        "impl C {\n"
+        "  fn poll(&self) { if self.ready.load(Ordering::Relaxed) { return; } }\n"
+        "}\n"
+    )
+    ctx["repo"] = tmp_path
+
+
+@given("a method that stores to self.count with Relaxed ordering")
+def given_relaxed_store(ctx, tmp_path):
+    ctx["src"] = (
+        "struct C { count: AtomicU64 }\n"
+        "impl C {\n"
+        "  fn tick(&self) { self.count.store(1, Ordering::Relaxed); }\n"
+        "}\n"
+    )
+    ctx["repo"] = tmp_path
+
+
 @when("I scan the Rust file for race shapes")
 def when_scan(ctx):
     ctx["result"] = _scan(ctx["repo"], ctx["src"])
@@ -102,3 +124,15 @@ def then_cta(ctx, recv):
 @then("no check-then-act is reported")
 def then_no_cta(ctx):
     assert _kinds(ctx["result"], "check_then_act") == []
+
+
+@then(parsers.parse('a relaxed guard is reported on "{recv}"'))
+def then_relaxed_guard(ctx, recv):
+    hits = _kinds(ctx["result"], "relaxed_guard")
+    assert any(f["symbol"] == recv for f in hits), [f["symbol"] for f in hits]
+    assert all(f["severity"] == "review" for f in hits)
+
+
+@then("no relaxed guard is reported")
+def then_no_relaxed_guard(ctx):
+    assert _kinds(ctx["result"], "relaxed_guard") == []

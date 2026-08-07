@@ -25,3 +25,13 @@ Feature: Structural race-condition shapes (B1 non-atomic RMW, B2 check-then-act)
     Given a method that checks a local map then inserts into it
     When I scan the Rust file for race shapes
     Then no check-then-act is reported
+
+  Scenario: A Relaxed load that gates a branch is a review-level missing-acquire
+    Given a method that branches on a Relaxed load of self.ready
+    When I scan the Rust file for race shapes
+    Then a relaxed guard is reported on "self.ready"
+
+  Scenario: A Relaxed store to a counter is only a candidate, not a guard
+    Given a method that stores to self.count with Relaxed ordering
+    When I scan the Rust file for race shapes
+    Then no relaxed guard is reported

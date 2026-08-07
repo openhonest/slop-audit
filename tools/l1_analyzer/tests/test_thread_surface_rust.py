@@ -66,16 +66,31 @@ def test_static_mut_is_exposed(tmp_path):
     assert result["verdict"] == "exposed"
 
 
-def test_relaxed_ordering_is_review(tmp_path):
+def test_plain_relaxed_is_candidate(tmp_path):
+    # A Relaxed store to a counter is correct far more often than not, so blanket
+    # Relaxed is the low-precision candidate tier, keyed by the receiver.
     result = _scan(
         tmp_path,
         "use std::sync::atomic::{AtomicU64, Ordering};\n"
         "fn bump(x: &AtomicU64) { x.store(1, Ordering::Relaxed); }\n",
     )
-    f = _find(result, "relaxed_ordering", "Ordering::Relaxed")
-    assert f is not None, "Ordering::Relaxed not surfaced"
-    assert f["severity"] == "review"
-    # A review-only repo is REVIEW, not EXPOSED.
+    f = _find(result, "relaxed_ordering", "x")
+    assert f is not None, "Relaxed store not surfaced"
+    assert f["severity"] == "candidate"
+    assert result["verdict"] == "candidate"
+
+
+def test_relaxed_load_gating_a_branch_is_review(tmp_path):
+    # C1: a Relaxed load whose value gates control flow has no acquire where one is
+    # needed - the meaningful, review-level relaxed_guard.
+    result = _scan(
+        tmp_path,
+        "use std::sync::atomic::{AtomicBool, Ordering};\n"
+        "fn poll(x: &AtomicBool) { if x.load(Ordering::Relaxed) { return; } }\n",
+    )
+    g = _find(result, "relaxed_guard", "x")
+    assert g is not None, "relaxed_guard not surfaced"
+    assert g["severity"] == "review"
     assert result["verdict"] == "review"
 
 
@@ -98,11 +113,11 @@ def test_exposed_dominates_review(tmp_path):
     result = _scan(
         tmp_path,
         "static mut G: i32 = 0;\n"
-        "use std::sync::atomic::{AtomicU64, Ordering};\n"
-        "fn bump(x: &AtomicU64) { x.store(1, Ordering::Relaxed); }\n",
+        "use std::sync::atomic::{AtomicBool, Ordering};\n"
+        "fn poll(x: &AtomicBool) { if x.load(Ordering::Relaxed) { } }\n",
     )
-    assert result["counts"]["exposed"] == 1
-    assert result["counts"]["review"] == 1
+    assert result["counts"]["exposed"] == 1   # static mut G
+    assert result["counts"]["review"] == 1    # relaxed_guard
     assert result["verdict"] == "exposed"
 
 

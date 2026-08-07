@@ -99,7 +99,9 @@ def _walk(node: Node) -> list[Node]:
 
 
 def _mk(kind: str, symbol: str, severity: str, rel: str, node: Node) -> Finding:
-    return {"kind": kind, "symbol": symbol, "severity": severity, "file": rel, "line": node.start_point[0] + 1}
+    # Collapse whitespace: a multi-line field access (self.\n  .field) must read as one
+    # symbol, not carry the source's line breaks into the report.
+    return {"kind": kind, "symbol": " ".join(symbol.split()), "severity": severity, "file": rel, "line": node.start_point[0] + 1}
 
 
 # --------------------------------------------------------------------------
@@ -171,6 +173,41 @@ def _rust_nonatomic_rmw(func: Node, rel: str) -> list[Finding]:
     ]
 
 
+# C1: Relaxed ordering is fine for a counter/stat, but a Relaxed load whose value
+# gates control flow has no acquire where one is needed. Comparison operators that,
+# together with a branch, make a Relaxed load control-bearing.
+_CMP_OPS = frozenset({"==", "!=", "<", ">", "<=", ">="})
+
+
+def _call_uses_relaxed(call: Node) -> bool:
+    args = call.child_by_field_name("arguments")
+    return args is not None and any(
+        n.type == "scoped_identifier" and _text(n).replace(" ", "").endswith("Ordering::Relaxed")
+        for n in _walk(args)
+    )
+
+
+def _result_feeds_branch(call: Node) -> bool:
+    """True if the call's result reaches a branch condition or a comparison, through a
+    few transparent wrappers. The let-bound case (`let v = ..load(); if v`) is out of
+    scope on purpose - only the directly-control-bearing shape, to stay high-precision."""
+    node = call
+    for _ in range(5):
+        p = node.parent
+        if p is None:
+            return False
+        if p.type in ("if_expression", "while_expression"):
+            cond = p.child_by_field_name("condition")
+            return cond is not None and cond.id == node.id
+        if p.type == "binary_expression":
+            return any(c.type in _CMP_OPS for c in p.children)
+        if p.type in ("parenthesized_expression", "unary_expression", "reference_expression", "try_expression"):
+            node = p
+            continue
+        return False
+    return False
+
+
 def _rust_check_then_act(func: Node, rel: str) -> list[Finding]:
     """B2: an `if` whose condition checks a self.-rooted collection and whose body
     mutates the same one - a check-then-act (TOCTOU) window."""
@@ -200,12 +237,22 @@ def _scan_rust(root: Node, rel: str) -> list[Finding]:
         if n.type == "static_item" and any(c.type == "mutable_specifier" for c in n.children):
             findings.append(_mk("static_mut", _text(n.child_by_field_name("name")), EXPOSED, rel, n))
             continue
-        # Ordering::Relaxed : atomic access with no happens-before edge.
-        if n.type == "scoped_identifier" and _text(n).replace(" ", "").endswith("Ordering::Relaxed"):
-            findings.append(_mk("relaxed_ordering", "Ordering::Relaxed", REVIEW, rel, n))
-        # B1 / B2: per-function race shapes on shared instance state. Skipped in test
-        # files (a *tests.rs / tests-dir module is not production concurrency surface).
-        elif n.type == "function_item" and not _is_test_file(rel):
+        # The remaining shapes (Relaxed ordering, B1, B2) are not production concurrency
+        # surface in test files.
+        if _is_test_file(rel):
+            continue
+        # C1: a Relaxed atomic op. A Relaxed LOAD whose value gates control flow is a
+        # review-level missing-acquire (relaxed_guard); every other Relaxed use is the
+        # low-precision candidate tier (Relaxed is correct for counters/stats).
+        if n.type == "call_expression":
+            mr = _rust_method_receiver(n)
+            if mr is not None and _call_uses_relaxed(n):
+                if mr[0] == "load" and _result_feeds_branch(n):
+                    findings.append(_mk("relaxed_guard", mr[1], REVIEW, rel, n))
+                else:
+                    findings.append(_mk("relaxed_ordering", mr[1], CANDIDATE, rel, n))
+        # B1 / B2: per-function race shapes on shared instance state.
+        elif n.type == "function_item":
             findings.extend(_rust_nonatomic_rmw(n, rel))
             findings.extend(_rust_check_then_act(n, rel))
 
