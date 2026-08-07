@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -234,6 +235,15 @@ def main(argv: list[str] | None = None) -> int:
              "repair and take only the first attempt.",
     )
     parser.add_argument(
+        "--prove-coverage-repo",
+        action="store_true",
+        help="Prove coverage gaps across the ENTIRE Rust crate: one coverage build, then every module "
+             "with uncovered branches is swept (batched into one compile per module, with per-gap repair "
+             "fallback). Retained proofs from all modules land in the report's Adoptable proofs section. "
+             "Long-running (one build per module); native slop-audit; needs OPENAI_API_KEY, cargo, "
+             "cargo-llvm-cov. --prove-max caps gaps per module.",
+    )
+    parser.add_argument(
         "--prove-coverage",
         default=None,
         metavar="MODULE",
@@ -303,9 +313,19 @@ def main(argv: list[str] | None = None) -> int:
         results["proofs"] = _run_prove(args.repo, str(results.get("lang", args.lang)),
                                        results.get("thread_surface"), args.prove_max, args.timeout)
 
-    # Coverage-gap proofs (opt-in): locate -> propose -> render -> run in-crate -> retain
-    # over one Rust module. Generates and runs code, so CLI-only and explicit.
-    if args.prove_coverage:
+    # Coverage-gap proofs (opt-in): locate -> propose -> render -> run in-crate -> retain.
+    # Generates and runs code, so CLI-only and explicit. --prove-coverage-repo sweeps the
+    # whole crate; --prove-coverage does one module.
+    if args.prove_coverage_repo:
+        from l1_analyzer import coverage_prove
+
+        def _cov_progress(relpath: str, n_gaps: int, retained: int) -> None:
+            print(f"[prove-coverage] {relpath}: {n_gaps} gap(s), retained so far {retained}",
+                  file=sys.stderr, flush=True)
+        results["coverage_proofs"] = coverage_prove.prove_coverage_repo(
+            args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
+            timeout_seconds=args.timeout, progress=_cov_progress)
+    elif args.prove_coverage:
         from l1_analyzer import coverage_prove
         results["coverage_proofs"] = coverage_prove.prove_coverage(
             args.repo, args.prove_coverage, cap=args.prove_max, timeout_seconds=args.timeout,

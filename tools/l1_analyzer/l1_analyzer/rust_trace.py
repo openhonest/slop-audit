@@ -60,43 +60,72 @@ def _tests_run(output: str) -> tuple[int, int]:
 # L1.19 decision-space coverage (region coverage via cargo-llvm-cov)
 # ---------------------------------------------------------------------------
 
-def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: float) -> dict:
-    """Run cargo-llvm-cov on the real crate and return the set of 1-based line numbers in
-    one module file that a region entry marked never-executed. This is the locate half of
-    the coverage-gap prove loop: it measures against the module IN its crate (so it works
-    for a deeply-integrated module, not only a self-contained one). Returns
-    {measured, uncovered_lines, reason}; measured=False carries an explicit reason."""
+def _llvm_cov_report(repo: Path, timeout_seconds: float) -> tuple[dict | None, str]:
+    """Run cargo-llvm-cov on the real crate once and return (parsed export JSON, reason).
+    The JSON's data[0].files carries every file's coverage in one build, so a whole-repo
+    sweep pays the (expensive) instrumented build a single time."""
     cargo = _cargo()
     if cargo is None:
-        return {"measured": False, "uncovered_lines": frozenset(), "reason": "needs a Rust toolchain (cargo) in PATH"}
+        return None, "needs a Rust toolchain (cargo) in PATH"
     if not _llvm_cov_available():
-        return {"measured": False, "uncovered_lines": frozenset(), "reason": "needs cargo-llvm-cov"}
+        return None, "needs cargo-llvm-cov"
     with tempfile.TemporaryDirectory(prefix="l1-rustcov-") as directory:
         report_file = Path(directory) / "cov.json"
         run = _run_untrusted([cargo, "llvm-cov", "--json", "--quiet", "--output-path", str(report_file)],
                              cwd=repo, env={}, timeout_seconds=timeout_seconds)
         if run.returncode == 124:
-            return {"measured": False, "uncovered_lines": frozenset(), "reason": "coverage run timed out"}
+            return None, "coverage run timed out"
         if not report_file.exists():
-            return {"measured": False, "uncovered_lines": frozenset(),
-                    "reason": f"coverage produced no data (cargo exit {run.returncode}): {_first_line(run.stderr or run.stdout)}"}
+            return None, f"coverage produced no data (cargo exit {run.returncode}): {_first_line(run.stderr or run.stdout)}"
         try:
-            report = json.loads(report_file.read_text())
+            return json.loads(report_file.read_text()), ""
         except (OSError, json.JSONDecodeError):
-            return {"measured": False, "uncovered_lines": frozenset(), "reason": "coverage report was unreadable"}
+            return None, "coverage report was unreadable"
+
+
+def _uncovered_lines(entry: dict) -> frozenset[int]:
+    """1-based lines a region entry marked never-executed. A segment is
+    [line, col, count, has_count, is_region_entry]; a region entry with a real count of
+    zero is a never-executed decision point on that line."""
+    return frozenset(int(seg[0]) for seg in entry.get("segments", ())
+                     if len(seg) >= 5 and seg[3] and seg[4] and int(seg[2]) == 0)
+
+
+def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: float) -> dict:
+    """Uncovered lines for ONE module file, measured against the module in its crate (so it
+    works for a deeply-integrated module). {measured, uncovered_lines, reason}."""
+    report, reason = _llvm_cov_report(repo, timeout_seconds)
+    if report is None:
+        return {"measured": False, "uncovered_lines": frozenset(), "reason": reason}
     target = str((repo / module_relpath).resolve())
     try:
-        files = report["data"][0]["files"]
-        entry = next((f for f in files if str(Path(f["filename"]).resolve()) == target), None)
+        entry = next((f for f in report["data"][0]["files"] if str(Path(f["filename"]).resolve()) == target), None)
     except (KeyError, IndexError, TypeError):
         return {"measured": False, "uncovered_lines": frozenset(), "reason": "coverage report had no file table"}
     if entry is None:
         return {"measured": False, "uncovered_lines": frozenset(), "reason": f"{module_relpath} not found in the coverage report"}
-    # A segment is [line, col, count, has_count, is_region_entry]. A region entry with a
-    # real count of zero is a never-executed decision point on that line.
-    uncovered = frozenset(int(seg[0]) for seg in entry.get("segments", ())
-                          if len(seg) >= 5 and seg[3] and seg[4] and int(seg[2]) == 0)
-    return {"measured": True, "uncovered_lines": uncovered, "reason": ""}
+    return {"measured": True, "uncovered_lines": _uncovered_lines(entry), "reason": ""}
+
+
+def repo_uncovered_lines(repo: Path, timeout_seconds: float) -> dict:
+    """Uncovered lines for EVERY file under the repo, from a single coverage build. Returns
+    {measured, files: {relpath: frozenset(lines)}, reason}. Only files inside `repo` with at
+    least one uncovered line are included, keyed by their path relative to repo."""
+    report, reason = _llvm_cov_report(repo, timeout_seconds)
+    if report is None:
+        return {"measured": False, "files": {}, "reason": reason}
+    root = repo.resolve()
+    files: dict[str, frozenset[int]] = {}
+    try:
+        for entry in report["data"][0]["files"]:
+            path = Path(entry["filename"]).resolve()
+            if root in path.parents:
+                lines = _uncovered_lines(entry)
+                if lines:
+                    files[str(path.relative_to(root))] = lines
+    except (KeyError, IndexError, TypeError, ValueError):
+        return {"measured": False, "files": {}, "reason": "coverage report had no file table"}
+    return {"measured": True, "files": files, "reason": ""}
 
 
 def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:

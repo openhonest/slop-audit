@@ -94,6 +94,56 @@ def test_run_classification_distinguishes_pass_fail_error():
     assert coverage_prove._classify_run("error[E0308]: mismatched types\ncould not compile", 101) == "error"
 
 
+# --- batching + whole-repo sweep ------------------------------------------
+
+def test_render_batch_puts_every_proof_in_one_module():
+    src = coverage_prove.render_batch(["let result = a(); assert!(result);", "let result = b(); assert!(!result);"])
+    assert src.count("#[test]") == 2 and "fn proof_0()" in src and "fn proof_1()" in src
+    assert src.count(f"mod {coverage_prove._PROOF_MOD}") == 1   # ONE module = one compile
+
+
+def test_classify_batch_reads_each_tests_verdict():
+    out = "running 2 tests\ntest l1_coverage_proof::proof_0 ... ok\ntest l1_coverage_proof::proof_1 ... FAILED\n"
+    assert coverage_prove._classify_batch(out) == {0: "pass", 1: "fail"}
+    assert coverage_prove._classify_batch("error[E0308]\ncould not compile") == {}   # no test lines
+
+
+def test_prove_module_batches_when_it_compiles(monkeypatch, tmp_path):
+    monkeypatch.setattr(coverage_prove, "propose", lambda gap: {"body": "b", "explanation": gap["function"]})
+    # one batch run: proof_0 fails (bug), proof_1 passes (correct)
+    monkeypatch.setattr(coverage_prove, "_append_and_run",
+                        lambda *a: (101, "test l1_coverage_proof::proof_0 ... FAILED\ntest l1_coverage_proof::proof_1 ... ok\n"))
+    gaps = [{**_GAP, "function": "a"}, {**_GAP, "function": "b"}]
+    retained, outcomes = coverage_prove._prove_module(tmp_path, "m.rs", gaps, repair_rounds=3, timeout_seconds=1)
+    assert outcomes == {"fail": 1, "pass": 1, "error": 0}
+    assert [r["function"] for r in retained] == ["a"]
+
+
+def test_prove_module_falls_back_to_per_gap_when_batch_wont_compile(monkeypatch, tmp_path):
+    monkeypatch.setattr(coverage_prove, "propose", lambda gap: {"body": "b", "explanation": "e"})
+    monkeypatch.setattr(coverage_prove, "_append_and_run", lambda *a: (101, "error[E0308]\ncould not compile"))
+    calls = []
+    monkeypatch.setattr(coverage_prove, "_prove_one", lambda *a: calls.append(1) or ("pass", {"explanation": "e"}, "src"))
+    _retained, outcomes = coverage_prove._prove_module(tmp_path, "m.rs", [_GAP, _GAP], repair_rounds=3, timeout_seconds=1)
+    assert len(calls) == 2 and outcomes["pass"] == 2   # batch failed to compile -> per-gap fallback ran
+
+
+def test_prove_coverage_repo_aggregates_across_modules(monkeypatch, tmp_path):
+    for name in ("a.rs", "b.rs", "notes.txt"):
+        (tmp_path / name).write_text("fn f() {}")
+    monkeypatch.setattr(coverage_prove.rust_trace, "_cargo", lambda: "/usr/bin/cargo")
+    monkeypatch.setattr(coverage_prove, "model_available", lambda: True)
+    monkeypatch.setattr(coverage_prove.rust_trace, "repo_uncovered_lines",
+                        lambda repo, t: {"measured": True, "files": {"a.rs": frozenset({2}), "b.rs": frozenset({2}), "notes.txt": frozenset({1})}, "reason": ""})
+    monkeypatch.setattr(coverage_prove.rust_facets, "module_functions", lambda src: [{"name": "f"}])
+    monkeypatch.setattr(coverage_prove.rust_facets, "uncovered_gaps", lambda fns, lines: [dict(_GAP)])
+    monkeypatch.setattr(coverage_prove, "_prove_module",
+                        lambda repo, rel, gaps, rr, to: ([{"location": rel}], {"fail": 1, "pass": 0, "error": 0}))
+    res = coverage_prove.prove_coverage_repo(tmp_path, cap_per_module=5)
+    assert res["modules"] == 2                          # a.rs + b.rs, not the non-.rs notes.txt
+    assert res["outcomes"]["fail"] == 2 and len(res["retained"]) == 2
+
+
 # --- graceful not-run ------------------------------------------------------
 
 def test_prove_coverage_needs_a_model(monkeypatch, tmp_path):

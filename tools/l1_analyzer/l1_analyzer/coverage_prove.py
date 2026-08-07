@@ -137,24 +137,53 @@ def _classify_run(output: str, returncode: int) -> str:
     return "error" if returncode != 0 else "pass"
 
 
-def _run_in_crate(repo: Path, module_relpath: str, test_source: str, timeout_seconds: float) -> tuple[str, str]:
-    """Append the proof module to the file, run `cargo test`, and restore the file
-    byte-for-byte. Returns (pass|fail|error, combined output). The file is always restored."""
+def _append_and_run(repo: Path, module_relpath: str, test_source: str, test_filter: str, timeout_seconds: float) -> tuple[int, str]:
+    """Append a proof module to the file, run `cargo test <filter>`, and restore the file
+    byte-for-byte. Returns (returncode, combined output). The file is always restored."""
     cargo = rust_trace._cargo()
     if cargo is None:
-        return "error", "no cargo"
+        return 1, "no cargo"
     module = repo / module_relpath
     original = module.read_bytes()
     try:
         module.write_bytes(original + test_source.encode("utf8"))
         run = rust_trace._run_untrusted(
-            [cargo, "test", "--quiet", f"{_PROOF_MOD}::proof"], cwd=repo, env={}, timeout_seconds=timeout_seconds)
+            [cargo, "test", "--quiet", test_filter], cwd=repo, env={}, timeout_seconds=timeout_seconds)
     finally:
         module.write_bytes(original)
-    output = (run.stdout or "") + (run.stderr or "")
-    if run.returncode == 124:
+    return run.returncode, (run.stdout or "") + (run.stderr or "")
+
+
+def _run_in_crate(repo: Path, module_relpath: str, test_source: str, timeout_seconds: float) -> tuple[str, str]:
+    """One proof, run in-crate. Returns (pass|fail|error, output)."""
+    rc, output = _append_and_run(repo, module_relpath, test_source, f"{_PROOF_MOD}::proof", timeout_seconds)
+    if rc == 124:
         return "error", output + "\n(timed out)"
-    return _classify_run(output, run.returncode), output
+    return _classify_run(output, rc), output
+
+
+def render_batch(bodies: list[str]) -> str:
+    """All of a module's proofs in one #[cfg(test)] module - N tests, ONE compile. This is
+    what makes a whole-codebase sweep cost ~one build per module instead of one per gap."""
+    tests = "\n".join(f"    #[test]\n    fn proof_{i}() {{\n{body}\n    }}" for i, body in enumerate(bodies))
+    return f"\n#[cfg(test)]\nmod {_PROOF_MOD} {{\n    use super::*;\n{tests}\n}}\n"
+
+
+_BATCH_LINE = re.compile(r"proof_(\d+) \.\.\. (ok|FAILED)")
+
+
+def _classify_batch(output: str) -> dict[int, str]:
+    """index -> pass|fail from a batched run. Empty when the batch did not compile (no test
+    lines), which signals the caller to fall back to per-gap repair."""
+    return {int(m.group(1)): ("fail" if m.group(2) == "FAILED" else "pass") for m in _BATCH_LINE.finditer(output)}
+
+
+def _retained_entry(module_relpath: str, gap: dict, proposal: dict, source: str) -> dict:
+    return {
+        "function": gap["function"], "language": "rust",
+        "location": f"{module_relpath}:{gap['line']}",
+        "explanation": proposal["explanation"], "test_source": source.strip(),
+    }
 
 
 def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, timeout_seconds: float) -> tuple[str, dict | None, str]:
@@ -176,6 +205,79 @@ def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, t
         source = render_module(fixed["body"])
         status, output = _run_in_crate(repo, module_relpath, source, timeout_seconds)
     return status, proposal, source
+
+
+def _prove_module(repo: Path, module_relpath: str, gaps: list[dict], repair_rounds: int,
+                  timeout_seconds: float) -> tuple[list[dict], dict]:
+    """Prove all of one module's gaps. Fast path: batch every proposal into one compile and
+    run once. If the batch does not compile (one bad test poisons it), fall back to per-gap
+    with compiler-feedback repair. Returns (retained, outcomes)."""
+    outcomes = {"fail": 0, "pass": 0, "error": 0}
+    ready = [(g, p) for g in gaps for p in (propose(g),) if p is not None]
+    if not ready:
+        return [], outcomes
+    rc, output = _append_and_run(repo, module_relpath, render_batch([p["body"] for _g, p in ready]),
+                                 _PROOF_MOD, timeout_seconds)
+    batch = {} if rc == 124 else _classify_batch(output)
+    if batch:  # the module compiled: read each test's verdict, no repair needed
+        retained = []
+        for i, (gap, proposal) in enumerate(ready):
+            status = batch.get(i, "error")
+            outcomes[status] += 1
+            if status == "fail":
+                retained.append(_retained_entry(module_relpath, gap, proposal, render_module(proposal["body"])))
+        return retained, outcomes
+    # The batch did not compile: isolate and repair each gap individually.
+    retained = []
+    for gap in gaps:
+        status, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
+        if status == "skipped":
+            continue
+        outcomes[status] += 1
+        if status == "fail":
+            retained.append(_retained_entry(module_relpath, gap, proposal, source))
+    return retained, outcomes
+
+
+def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int = 3,
+                        timeout_seconds: float = 600.0, progress=None) -> dict:
+    """Sweep the WHOLE crate: one coverage build, then every module with uncovered branches is
+    proven (batched, with per-gap repair fallback). Retained proofs are aggregated across the
+    codebase. `progress(relpath, n_gaps, running_retained)` is called before each module."""
+    if not rust_trace._cargo():
+        return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
+    if not model_available():
+        return {"retained": [], "attempted": 0, "detail": "needs OPENAI_API_KEY to generate coverage proofs"}
+    cov = rust_trace.repo_uncovered_lines(repo, timeout_seconds)
+    if not cov["measured"]:
+        return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
+
+    retained: list[dict] = []
+    outcomes = {"fail": 0, "pass": 0, "error": 0}
+    modules = 0
+    for relpath, lines in sorted(cov["files"].items()):
+        if not relpath.endswith(".rs"):
+            continue
+        try:
+            functions = rust_facets.module_functions((repo / relpath).read_text(errors="ignore"))
+        except OSError:
+            continue
+        gaps = rust_facets.uncovered_gaps(functions, lines)[:cap_per_module]
+        if not gaps:
+            continue
+        modules += 1
+        if progress:
+            progress(relpath, len(gaps), len(retained))
+        module_retained, module_outcomes = _prove_module(repo, relpath, gaps, repair_rounds, timeout_seconds)
+        retained.extend(module_retained)
+        for k in outcomes:
+            outcomes[k] += module_outcomes[k]
+    attempted = sum(outcomes.values())
+    detail = (f"{len(retained)} coverage proofs retained across {modules} modules with uncovered branches. "
+              f"Of {attempted} generated tests run in-crate: {outcomes['fail']} failed (bug proven), "
+              f"{outcomes['pass']} passed (branch correct), {outcomes['error']} did not compile."
+              ) if attempted else f"no proof-ready uncovered branches located across {modules} modules"
+    return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 
 def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_seconds: float = 600.0,
