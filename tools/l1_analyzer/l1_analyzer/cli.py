@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from l1_analyzer import indicators, thread_surface
+from l1_analyzer import indicators, schedule_silence, thread_surface
 
 
 def _count_type_escapes(repo: Path, lang: str) -> int:
@@ -197,6 +197,9 @@ def main(argv: list[str] | None = None) -> int:
             classify_state_bounds=not args.no_state_bounds,
         )
         results.update(source_results)
+        # Schedule-silence (static, cheap): of the flagged concurrency surface, which
+        # files no loom/shuttle model touches. The concurrency form of Umbra's Silence.
+        results["schedule_silence"] = schedule_silence.analyze(args.repo, str(results.get("lang", args.lang)))
 
     # Runtime thread-safety (opt-in): the dynamic counterpart to the static surface
     # meter. Runs untrusted code, so only on explicit --race, never by default.
@@ -226,6 +229,11 @@ def main(argv: list[str] | None = None) -> int:
         ts = results.get("thread_surface")
         if isinstance(ts, dict):
             print(f"  thread-safety surface (static): {ts['verdict']} ({ts.get('details', '')})")
+        ss = results.get("schedule_silence")
+        if isinstance(ss, dict) and ss["verdict"] != "n/a":
+            print(f"  schedule-silence (static): {ss['verdict']} ({ss['details']})")
+            for f in ss.get("unmodeled", []):
+                print(f"      unmodeled surface: {f}")
         race = results.get("race")
         if isinstance(race, dict):
             print(f"  thread-safety race (runtime/{race['tool']}): {race['verdict']} ({race['details']})")
