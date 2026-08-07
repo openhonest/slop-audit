@@ -145,19 +145,26 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
         return {"retained": [], "attempted": 0, "detail": "no proof-ready uncovered branches located in this module"}
 
     retained: list[dict] = []
-    attempted = 0
+    outcomes = {"fail": 0, "pass": 0, "error": 0}
     for gap in gaps:
         proposal = propose(gap)
         if proposal is None:
             continue
-        attempted += 1
         source = render_test(gap, proposal)
-        if _run_in_crate(repo, module_relpath, source, timeout_seconds) == "fail":
+        result = _run_in_crate(repo, module_relpath, source, timeout_seconds)
+        outcomes[result] += 1
+        if result == "fail":
             retained.append({
                 "function": gap["function"], "language": "rust",
                 "location": f"{module_relpath}:{gap['line']}",
                 "explanation": proposal["explanation"],
                 "test_source": source.strip(),
             })
-    return {"retained": retained, "attempted": attempted,
-            "detail": f"{len(retained)}/{attempted} generated coverage proofs were retained (genuinely failed)"}
+    attempted = sum(outcomes.values())
+    # The breakdown is the honest part: 0 retained means nothing without it. fail = a bug
+    # proven (retained); pass = the uncovered branch is correct; error = the generated test
+    # would not compile (the gap is located but not provable this way), never hidden as "clean".
+    detail = (f"{len(retained)}/{attempted} coverage proofs retained. Of {attempted} generated tests run "
+              f"in-crate: {outcomes['fail']} failed (bug proven), {outcomes['pass']} passed (branch correct), "
+              f"{outcomes['error']} did not compile.") if attempted else "no proof-ready uncovered branches located"
+    return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "detail": detail}
