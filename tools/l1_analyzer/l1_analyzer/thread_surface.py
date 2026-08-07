@@ -623,12 +623,53 @@ def _scan_go(root: Node, rel: str) -> list[Finding]:
     return findings
 
 
+# --------------------------------------------------------------------------
+# Java scanner. The distinctly-Java hazard: a non-final `static` field of a mutable,
+# non-thread-safe collection - shared class-level state reachable from every thread with
+# no synchronization on the field itself. Concurrent (ConcurrentHashMap, CopyOnWrite...)
+# and synchronized (Vector, Hashtable) types are excluded; those are safe by design.
+# --------------------------------------------------------------------------
+
+_JAVA_MUTABLE_TYPES = frozenset({
+    "Map", "HashMap", "LinkedHashMap", "TreeMap", "List", "ArrayList", "LinkedList",
+    "Set", "HashSet", "LinkedHashSet", "TreeSet", "Collection", "Queue", "Deque", "ArrayDeque",
+})
+
+
+def _java_base_type(typ: Node | None) -> str | None:
+    if typ is None:
+        return None
+    if typ.type == "generic_type":
+        base = next((c for c in typ.children if c.type in ("type_identifier", "scoped_type_identifier")), None)
+        return _text(base).split(".")[-1] if base is not None else None
+    if typ.type in ("type_identifier", "scoped_type_identifier"):
+        return _text(typ).split(".")[-1]
+    return None
+
+
+def _scan_java(root: Node, rel: str) -> list[Finding]:
+    findings: list[Finding] = []
+    for fd in _walk(root):
+        if fd.type != "field_declaration":
+            continue
+        mods = next((c for c in fd.children if c.type == "modifiers"), None)
+        words = _text(mods).split() if mods is not None else []
+        if "static" not in words or "final" in words:
+            continue
+        if _java_base_type(fd.child_by_field_name("type")) in _JAVA_MUTABLE_TYPES:
+            decl = fd.child_by_field_name("declarator")
+            name = decl.child_by_field_name("name") if decl is not None else None
+            findings.append(_mk("static_mutable_field", _text(name), REVIEW, rel, fd))
+    return findings
+
+
 _SCANNERS: dict[str, Callable[[Node, str], list[Finding]]] = {
     "rust": _scan_rust,
     "python": _scan_python,
     "typescript": _scan_jsts,
     "javascript": _scan_jsts,
     "go": _scan_go,
+    "java": _scan_java,
 }
 
 
