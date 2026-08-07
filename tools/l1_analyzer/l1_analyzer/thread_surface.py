@@ -156,6 +156,20 @@ def _rust_receivers_by_method(scope: Node | None, methods: frozenset[str]) -> se
     return out
 
 
+def _rust_takes_shared_self(func: Node) -> bool:
+    """True iff the method takes `&self` (a SHARED borrow, so two threads can call it
+    at once). `&mut self` and `self`-by-value are exclusive by the borrow checker - no
+    concurrent aliasing - so a check-then-act or RMW there is not a race. Skipping them
+    is what keeps B1/B2 off exclusive methods (the io_uring release() false positive)."""
+    params = func.child_by_field_name("parameters")
+    if params is None:
+        return False
+    sp = next((c for c in _walk(params) if c.type == "self_parameter"), None)
+    if sp is None:
+        return False
+    return any(c.type == "&" for c in sp.children) and not any(c.type == "mutable_specifier" for c in sp.children)
+
+
 def _rust_nonatomic_rmw(func: Node, rel: str) -> list[Finding]:
     """B1: the same self.-rooted atomic is both loaded and stored/swapped in one
     function - a read-modify-write that is not a single atomic op.
@@ -262,8 +276,9 @@ def _scan_rust(root: Node, rel: str) -> list[Finding]:
                     findings.append(_mk("relaxed_guard", mr[1], REVIEW, rel, n))
                 else:
                     findings.append(_mk("relaxed_ordering", mr[1], CANDIDATE, rel, n))
-        # B1 / B2: per-function race shapes on shared instance state.
-        elif n.type == "function_item":
+        # B1 / B2: per-function race shapes, only on &self methods (a shared borrow, so
+        # concurrent calls are possible). &mut self / self-by-value are exclusive.
+        elif n.type == "function_item" and _rust_takes_shared_self(n):
             findings.extend(_rust_nonatomic_rmw(n, rel))
             findings.extend(_rust_check_then_act(n, rel))
 

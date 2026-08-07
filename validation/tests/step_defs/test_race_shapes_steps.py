@@ -51,10 +51,12 @@ def given_fetch_add(ctx, tmp_path):
 
 @given("a method that checks self.seen then inserts into it")
 def given_check_then_act(ctx, tmp_path):
+    # &self (shared): the field is an interior-mutable / concurrent map, so two threads
+    # can run this at once - the real TOCTOU target. (&mut self would be exclusive.)
     ctx["src"] = (
-        "struct C { seen: HashMap<u64, u64> }\n"
+        "struct C { seen: DashMap<u64, u64> }\n"
         "impl C {\n"
-        "  fn note(&mut self, k: u64, v: u64) {\n"
+        "  fn note(&self, k: u64, v: u64) {\n"
         "    if !self.seen.contains_key(&k) { self.seen.insert(k, v); }\n"
         "  }\n"
         "}\n"
