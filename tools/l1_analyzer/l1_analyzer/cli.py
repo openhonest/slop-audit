@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from l1_analyzer import indicators, report, schedule_silence, thread_surface
+from l1_analyzer import card, indicators, schedule_silence, thread_surface
 
 
 def _count_type_escapes(repo: Path, lang: str) -> int:
@@ -279,17 +279,21 @@ def main(argv: list[str] | None = None) -> int:
         results["proofs"] = _run_prove(args.repo, str(results.get("lang", args.lang)),
                                        results.get("thread_surface"), args.prove_max, args.timeout)
 
-    # The full Slop Audit report (grade + verdict + audit checks + concurrency), the way
-    # try.slopaudit.org renders it. It is the default CLI output and the --report artifact.
+    # The full Slop Audit scorecard - the SAME card try.slopaudit.org renders, from the
+    # same engine module (l1_analyzer.card). The one difference is the runtime layer: the
+    # site never executes the repo's code and says so, while the CLI runs the test suite by
+    # default, so ran_tests carries that fact into the card (measured L1.19 coverage + L1.20
+    # determinism, and a footer that says the tests were run). --no-exec flips it back.
     slug = args.repo.name or str(args.repo)
-    model = report.build_report(slug, str(results.get("lang", args.lang)), results)
+    ran_tests = not args.no_exec
+    model = card.build_card(slug, str(results.get("lang", args.lang)), results, ran_tests=ran_tests)
 
     if args.report is not None:
         out_dir = Path(args.report)
         out_dir.mkdir(parents=True, exist_ok=True)
         base = slug.replace("/", "-")
-        (out_dir / f"{base}.md").write_text(report.report_markdown(model))
-        (out_dir / f"{base}.html").write_text(report.report_html(model))
+        (out_dir / f"{base}.md").write_text(card.card_markdown(model))
+        (out_dir / f"{base}.html").write_text(card.card_html(model))
         print(f"wrote {out_dir / (base + '.md')} and {out_dir / (base + '.html')}")
 
     if args.format == "json":
@@ -302,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         }
         print(json.dumps(envelope, indent=2))
     else:
-        print(report.report_markdown(model))
+        print(card.card_markdown(model))
         # Runtime results (race / prove) are not part of the static report; append them.
         race = results.get("race")
         if isinstance(race, dict):

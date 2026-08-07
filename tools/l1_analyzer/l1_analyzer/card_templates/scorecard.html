@@ -1,0 +1,140 @@
+{% macro metric(m) %}
+<li class="metric metric--{{ m.band | lower | replace(' ', '-') | replace('/', '') }}">
+  <div class="metric__top">
+    <span class="metric__value">{{ m.value }}</span>
+    <div class="metric__naming">
+      <span class="metric__label">{{ m.label }}</span>
+      <span class="metric__tech">{{ m.tech }}</span>
+    </div>
+    <span class="metric__band" title="Slop Audit band">{{ m.band_word }}</span>
+  </div>
+  <p class="metric__meaning">{{ m.meaning | safe }}</p>
+  {% if m.maps_to %}
+  <div class="metric__maps">
+    <span class="metric__maps-lead">Counts toward</span>
+    {% for d in m.maps_to %}
+    <span class="dim">
+      <span class="dim__name">{{ d.dimension }}</span>
+      <span class="dim__frameworks">{{ d.frameworks }}</span>
+    </span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</li>
+{% endmacro %}
+
+<article class="card card--{{ card.status }}">
+  <header class="card__head">
+    <div>
+      <p class="card__eyebrow">Slop Audit result</p>
+      <h2 class="card__slug">{{ card.slug }}</h2>
+      <span class="card__lang">{{ card.lang }}</span>
+    </div>
+    {% if card.grade %}
+    <div class="grade grade--{{ card.status }}">
+      <span class="grade__letter">{{ card.grade }}</span>
+      <span class="grade__pct">{{ card.grade_pct }}% testable</span>
+    </div>
+    {% endif %}
+  </header>
+
+  <p class="card__question">{{ card.question }}</p>
+  {% if card.grade %}<p class="grade__rubric">{{ copy['grade.rubric'] | safe }}</p>{% endif %}
+
+  {% if card.status == 'na' %}
+  <div class="verdict verdict--na">
+    <p class="verdict__detail">{{ card.detail | safe }}</p>
+  </div>
+  {% else %}
+  <div class="verdict verdict--{{ card.status }}">
+    <p class="verdict__headline">{{ card.headline }}</p>
+    {% if card.status == 'can' and card.paths %}
+    <div class="verdict__paths">
+      <span class="verdict__pnum">{{ "{:,}".format(card.paths) }}</span>
+      <span class="verdict__plabel">{{ copy['label.practical'] }}</span>
+    </div>
+    {% endif %}
+    <p class="verdict__detail">{{ card.detail | safe }}</p>
+    {% if card.testable %}<p class="verdict__score"><strong>{{ card.testable }}</strong> of its state is finitely testable</p>{% endif %}
+    <ul class="verdict__dist">
+      <li class="dist dist--can">{{ card.neutral_count }} testable</li>
+      <li class="dist dist--cannot">{{ card.promiscuous_count }} unbounded</li>
+      <li class="dist dist--might">{{ card.unresolved_count }} undetermined</li>
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if card.culprits %}
+  <section class="culprits">
+    <h3 class="culprits__head">{{ card.culprits_heading }}</h3>
+    <p class="culprits__note">{{ card.culprits_note | safe }}</p>
+    <ul class="culprits__list">
+      {% for c in card.culprits %}
+      <li class="culprit culprit--{{ c.verdict }}">
+        <code class="culprit__loc">{{ c.file }}:{{ c.line }}</code>
+        <span class="culprit__fn">{{ c.state }}</span>
+        {% if c.drives_decision %}<span class="culprit__state">drives a decision</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if card.culprits_more %}<p class="culprits__more">and {{ card.culprits_more }} more</p>{% endif %}
+  </section>
+  {% endif %}
+
+  {% if card.core %}
+  <section class="group">
+    <h3 class="group__title">{{ copy['group.core.title'] }}</h3>
+    <p class="group__note">{{ copy['group.core.note'] | safe }}</p>
+    <ul class="metrics">
+      {% for m in card.core %}{{ metric(m) }}{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if card.audit %}
+  <section class="group">
+    <h3 class="group__title">{{ copy['group.audit.title'] }}</h3>
+    <p class="group__note">{{ copy['group.audit.note'] | safe }}</p>
+    <ul class="metrics">
+      {% for m in card.audit %}{{ metric(m) }}{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if card.thread_surface %}
+  <section class="thread thread--{{ card.thread_surface.verdict }}">
+    <h3 class="thread__title">
+      {{ copy['thread.heading'] }}
+      <span class="thread__verdict thread__verdict--{{ card.thread_surface.verdict }}">{{ card.thread_surface.verdict }}</span>
+    </h3>
+    <p class="thread__blurb">{{ card.thread_surface.blurb | safe }}</p>
+    {% if card.thread_surface.sites %}
+    <ul class="thread__list">
+      {% for s in card.thread_surface.sites %}
+      <li class="thread__site thread__site--{{ s.severity }}">
+        <code class="thread__loc">{{ s.file }}:{{ s.line }}</code>
+        <span class="thread__kind">{{ s.kind }}</span>
+        {% if s.symbol %}<span class="thread__sym">{{ s.symbol }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if card.thread_surface.sites_more %}<p class="thread__more">and {{ card.thread_surface.sites_more }} more</p>{% endif %}
+    {% endif %}
+    <p class="thread__note">{{ copy['thread.note'] | safe }}</p>
+  </section>
+  {% endif %}
+
+  {% if card.scoped_out %}
+  <p class="scoped">Scoped out of this audit: {{ card.scoped_out.total }} file{{ 's' if card.scoped_out.total != 1 }} not part of the library ({{ card.scoped_out.reasons }}){% if card.scoped_out.paths %}, including <span class="scoped__paths">{{ card.scoped_out.paths | join(', ') }}{% if card.scoped_out.paths_more %} +{{ card.scoped_out.paths_more }} more{% endif %}</span>{% endif %}. {{ copy['scoped.why'] }}</p>
+  {% endif %}
+
+  <footer class="card__foot">
+    <div class="card__share">
+      <a class="button button--primary" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text={{ card.share_text | urlencode }}">Share this result</a>
+      <a class="button button--ghost" target="_blank" rel="noopener"
+         href="https://github.com/openhonest/slop-audit/blob/main/03-layer1-indicators.md">How each number is measured</a>
+    </div>
+    <p class="card__fine">{% if not card.ran_tests %}{{ copy['footer.fine'] | safe }}{% elif card.tests_measured %}{{ copy['footer.cli'] | safe }}{% else %}{{ copy['footer.cli_na'] | safe }}{% endif %}</p>
+  </footer>
+</article>
