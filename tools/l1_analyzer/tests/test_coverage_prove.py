@@ -48,13 +48,44 @@ def test_uncovered_gaps_skips_functions_with_no_return_type():
 
 # --- rendering + run classification ---------------------------------------
 
-def test_render_test_builds_an_in_crate_proof_module():
-    gap = {"function": "classify", "kind": "if", "line": 2, "function_source": "...",
-           "parameters": [{"name": "n", "type": "i32"}], "return_type": "&'static str"}
-    src = coverage_prove.render_test(gap, {"args": ["0"], "expected": 'result == "zero"', "explanation": "0 is zero"})
+def test_render_module_wraps_a_body_in_an_in_crate_proof_module():
+    body = '        let result = classify(0);\n        assert!(result == "zero", "0 is zero");'
+    src = coverage_prove.render_module(body)
     assert "#[cfg(test)]" in src and "use super::*;" in src
     assert "let result = classify(0);" in src
     assert 'assert!(result == "zero"' in src
+
+
+_GAP = {"function": "f", "kind": "if", "line": 2, "function_source": "fn f(){}",
+        "parameters": [{"name": "n", "type": "i32"}], "return_type": "i32"}
+
+
+def test_repair_loop_recovers_a_compile_error_then_retains_a_failure(monkeypatch, tmp_path):
+    # First attempt does not compile; repair fixes it; the fixed test then fails -> retained.
+    monkeypatch.setattr(coverage_prove, "propose", lambda gap: {"body": "bad", "explanation": "e0"})
+    monkeypatch.setattr(coverage_prove, "repair", lambda gap, src, err: {"body": "good", "explanation": "e1"})
+    runs = iter([("error", "error[E0308]"), ("fail", "test result: FAILED")])
+    monkeypatch.setattr(coverage_prove, "_run_in_crate", lambda *a: next(runs))
+    status, proposal, _src = coverage_prove._prove_one(tmp_path, "m.rs", _GAP, repair_rounds=3, timeout_seconds=1)
+    assert status == "fail" and proposal["explanation"] == "e1"
+
+
+def test_repair_rounds_zero_takes_only_the_first_attempt(monkeypatch, tmp_path):
+    monkeypatch.setattr(coverage_prove, "propose", lambda gap: {"body": "bad", "explanation": "e"})
+    called = []
+    monkeypatch.setattr(coverage_prove, "repair", lambda *a: called.append(1) or {"body": "x", "explanation": "y"})
+    monkeypatch.setattr(coverage_prove, "_run_in_crate", lambda *a: ("error", "error[E0308]"))
+    status, _p, _s = coverage_prove._prove_one(tmp_path, "m.rs", _GAP, repair_rounds=0, timeout_seconds=1)
+    assert status == "error" and called == []          # repair never called when rounds=0
+
+
+def test_repair_stops_after_the_round_cap(monkeypatch, tmp_path):
+    monkeypatch.setattr(coverage_prove, "propose", lambda gap: {"body": "bad", "explanation": "e"})
+    rounds = []
+    monkeypatch.setattr(coverage_prove, "repair", lambda *a: rounds.append(1) or {"body": "still-bad", "explanation": "e"})
+    monkeypatch.setattr(coverage_prove, "_run_in_crate", lambda *a: ("error", "error[E0308]"))
+    status, _p, _s = coverage_prove._prove_one(tmp_path, "m.rs", _GAP, repair_rounds=2, timeout_seconds=1)
+    assert status == "error" and len(rounds) == 2      # exactly the cap, no more
 
 
 def test_run_classification_distinguishes_pass_fail_error():

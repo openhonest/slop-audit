@@ -224,6 +224,16 @@ def main(argv: list[str] | None = None) -> int:
         help="With --prove, the maximum number of located hazards to attempt (default 3).",
     )
     parser.add_argument(
+        "--coverage-repair-rounds",
+        type=int,
+        default=3,
+        help="With --prove-coverage, the max compiler-feedback repair rounds per gap: when a generated "
+             "test does not compile, rustc's error is fed back to the model to rebuild the arrange step "
+             "(construct the real argument values), up to this many times. Generic (the compiler is the "
+             "oracle; no per-type knowledge), but each round is another in-crate compile - set 0 to skip "
+             "repair and take only the first attempt.",
+    )
+    parser.add_argument(
         "--prove-coverage",
         default=None,
         metavar="MODULE",
@@ -298,7 +308,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.prove_coverage:
         from l1_analyzer import coverage_prove
         results["coverage_proofs"] = coverage_prove.prove_coverage(
-            args.repo, args.prove_coverage, cap=args.prove_max, timeout_seconds=args.timeout)
+            args.repo, args.prove_coverage, cap=args.prove_max, timeout_seconds=args.timeout,
+            repair_rounds=args.coverage_repair_rounds)
 
     # The full Slop Audit scorecard - the SAME card try.slopaudit.org renders, from the
     # same engine module (l1_analyzer.card). The one difference is the runtime layer: the

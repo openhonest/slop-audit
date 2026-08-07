@@ -1,22 +1,29 @@
 """Coverage-gap prove loop - slop-audit's own, no Umbra at runtime.
 
-The same discipline as the concurrency prove loop and as Umbra (which was the reference,
-not a dependency): structure is deterministic, the model only fills an already-located
-gap, and the EXECUTION gate decides. Here the gap is an uncovered decision branch:
+The same discipline as the concurrency prove loop and as Umbra (the reference, not a
+dependency): structure is deterministic, the model only fills an already-located gap, and
+the EXECUTION gate decides. The gap is an uncovered decision branch:
 
   locate   rust_facets over the module + rust_trace's per-module uncovered lines
-  propose  a model writes one calling test: concrete args + an expected property
+  propose  a model writes one calling test: build the inputs, call, assert a property
   render   a #[cfg(test)] proof module naming the function
   run      IN-CRATE via `cargo test`, so it reaches private, deeply-integrated
            functions (turso), not only self-contained ones
-  retain   iff the test FAILS - the uncovered branch is also a bug, and the failing
-           test both closes the gap and documents the expectation
+  repair   (optional, on by default) when the test does not compile, feed rustc's own
+           error back to the model and let it rewrite the arrange step - a generic
+           compiler-feedback loop that constructs the real argument values a bare literal
+           cannot, without any per-type or per-codebase knowledge. The compiler is the
+           universal oracle; nothing here knows anything about a particular crate.
+  retain   iff the test FAILS - the uncovered branch is also a bug, and the failing test
+           both closes the gap and documents the expectation
 
-slop-audit proves the gap; it never writes into the user's test file. The module is
-edited only for the duration of one run and restored byte-for-byte afterward. Retained
-proofs land on the card's adoptable-proofs surface (results['coverage_proofs']).
+slop-audit proves the gap; it never writes into the user's test file. The module is edited
+only for the duration of one run and restored byte-for-byte afterward. Retained proofs land
+on the card's adoptable-proofs surface (results['coverage_proofs']).
 
-Opt-in and CLI-only (it runs code): needs OPENAI_API_KEY, cargo, and cargo-llvm-cov.
+Opt-in and CLI-only (it runs code): needs OPENAI_API_KEY, cargo, and cargo-llvm-cov. Repair
+trades wall-clock for reach - each round is another in-crate compile - so it is bounded by a
+round cap per gap and can be switched off (repair_rounds=0).
 """
 
 from __future__ import annotations
@@ -28,16 +35,26 @@ from pathlib import Path
 
 from l1_analyzer import rust_facets, rust_trace
 
-_INSTRUCTION = (
+_PROPOSE_INSTRUCTION = (
     "You are given ONE Rust function and one of its decision branches that no test ever reached. "
     "Infer the caller-facing behavior the branch SHOULD have from the function name, its signature, and "
-    "the branch condition - do not just echo what the code visibly does. Propose one calling test that "
-    "exercises exactly that branch. Return ONLY a JSON object with keys: "
-    '"args" (a JSON array of Rust literal expressions, one per parameter, in order), '
-    '"expected" (a Rust boolean expression over the identifier `result` and literals only - no calls, no `?`), '
-    '"explanation" (one plain sentence stating the behavior you assert). '
-    "The proof is kept only if execution contradicts your expectation, so state the behavior a correct "
-    "implementation must have, not a prediction of the current output."
+    "the branch condition - do not just echo what the code visibly does. Write the BODY of a Rust test "
+    "that exercises exactly that branch: construct the argument values (bindings are fine), call the "
+    "function into a binding named `result`, then `assert!(<property>, <message>)` on `result`. The proof "
+    "is kept only if execution contradicts your assertion, so assert the behavior a correct implementation "
+    "MUST have, not a prediction of the current output. `use super::*;` is already in scope, so the "
+    "function and its module's types are directly nameable. Return ONLY a JSON object with keys: "
+    '"body" (the Rust statements, no fn/mod wrapper) and '
+    '"explanation" (one plain sentence stating the behavior you assert).'
+)
+
+_REPAIR_INSTRUCTION = (
+    "The Rust test below does not compile. Here is the exact rustc error. Rewrite the test BODY so it "
+    "compiles and still asserts the same intended behavior. Fix the arrange step: build the real argument "
+    "values the signature requires (call constructors, `::new`, `Default::default()`, enum variants - "
+    "anything in scope via `use super::*;`), not bare literals of the wrong type. Keep the final "
+    "`let result = ...;` and the `assert!` on `result`. Return ONLY a JSON object with keys "
+    '"body" (the corrected Rust statements, no fn/mod wrapper) and "explanation".'
 )
 
 _PROOF_MOD = "l1_coverage_proof"
@@ -47,18 +64,9 @@ def model_available() -> bool:
     return bool(os.getenv("OPENAI_API_KEY"))
 
 
-def _gap_prompt(gap: dict) -> str:
-    params = ", ".join(f"{p['name']}: {p['type']}" for p in gap["parameters"])
-    return json.dumps({
-        "function_source": gap["function_source"],
-        "signature": f"fn {gap['function']}({params}) -> {gap['return_type']}",
-        "uncovered_branch": f"the `{gap['kind']}` branch at line {gap['line']} is never exercised",
-    })
-
-
-def propose(gap: dict) -> dict | None:
-    """Ask a model for one calling test for the located gap. Returns {args, expected,
-    explanation} or None when no model is available or the reply is unusable."""
+def _call_model(instruction: str, payload: str) -> dict | None:
+    """One structured model call. Returns the parsed JSON object, or None on any failure -
+    an unusable reply never becomes a false proof."""
     if not model_available():
         return None
     try:
@@ -68,35 +76,58 @@ def propose(gap: dict) -> dict | None:
     try:
         response = OpenAI(api_key=os.environ["OPENAI_API_KEY"]).responses.create(
             model="gpt-5.6",
-            input=[{"role": "developer", "content": _INSTRUCTION}, {"role": "user", "content": _gap_prompt(gap)}],
+            input=[{"role": "developer", "content": instruction}, {"role": "user", "content": payload}],
         )
         raw = re.sub(r"^```(?:json)?\n|```$", "", response.output_text.strip(), flags=re.MULTILINE)
         data = json.loads(raw)
     except Exception:  # noqa: BLE001 - any failure yields no proposal, never a false claim
         return None
-    args, expected = data.get("args"), data.get("expected")
-    if not isinstance(args, list) or not isinstance(expected, str) or not expected.strip():
+    return data if isinstance(data, dict) else None
+
+
+def _signature(gap: dict) -> str:
+    params = ", ".join(f"{p['name']}: {p['type']}" for p in gap["parameters"])
+    return f"fn {gap['function']}({params}) -> {gap['return_type']}"
+
+
+def _valid(data: dict | None) -> dict | None:
+    if data is None or not isinstance(data.get("body"), str) or not data["body"].strip():
         return None
-    return {"args": [str(a) for a in args], "expected": expected, "explanation": str(data.get("explanation", ""))}
+    return {"body": data["body"].strip(), "explanation": str(data.get("explanation", ""))}
 
 
-def render_test(gap: dict, proposal: dict) -> str:
-    """A #[cfg(test)] proof module appended to the target file. `use super::*` reaches the
-    function in its own module scope, so private and crate-internal functions are callable."""
-    call = f"{gap['function']}({', '.join(proposal['args'])})"
-    message = json.dumps(proposal["explanation"] or f"uncovered {gap['kind']} branch of {gap['function']}")
+def propose(gap: dict) -> dict | None:
+    """First calling test for the located gap: {body, explanation} or None."""
+    payload = json.dumps({
+        "function_source": gap["function_source"], "signature": _signature(gap),
+        "uncovered_branch": f"the `{gap['kind']}` branch at line {gap['line']} is never exercised",
+    })
+    return _valid(_call_model(_PROPOSE_INSTRUCTION, payload))
+
+
+def repair(gap: dict, test_source: str, compiler_error: str) -> dict | None:
+    """Ask the model to fix a test that did not compile, given rustc's own diagnostic."""
+    payload = json.dumps({
+        "signature": _signature(gap), "function_source": gap["function_source"],
+        "test_that_failed_to_compile": test_source, "rustc_error": compiler_error[-4000:],
+    })
+    return _valid(_call_model(_REPAIR_INSTRUCTION, payload))
+
+
+def render_module(body: str) -> str:
+    """Wrap a test body in a #[cfg(test)] proof module. `use super::*;` reaches the function
+    in its own module scope, so private and crate-internal functions are callable. The body
+    carries its own assert! (with the explanation as the panic message)."""
     return (
         f"\n#[cfg(test)]\nmod {_PROOF_MOD} {{\n    use super::*;\n    #[test]\n    fn proof() {{\n"
-        f"        let result = {call};\n        assert!({proposal['expected']}, {message});\n    }}\n}}\n"
+        f"{body}\n    }}\n}}\n"
     )
 
 
 def _classify_run(output: str, returncode: int) -> str:
-    """pass / fail / error from one in-crate `cargo test` of the proof. A failing test and a
-    passing test both print a `test result:` line, so they are checked BEFORE compile errors:
-    cargo prints its own `error: test failed` for a failed assertion, which is a fail, not a
-    build error. A real build error has no `test result:` line, only rustc's `error[E...]` /
-    `could not compile`."""
+    """pass / fail / error from one in-crate `cargo test`. A failing test and a passing test
+    both print a `test result:` line, so they are checked BEFORE compile errors: cargo prints
+    its own `error: test failed` for a failed assertion, which is a fail, not a build error."""
     if "test result: FAILED" in output or "1 failed" in output or "panicked" in output:
         return "fail"
     if "test result: ok" in output and "1 passed" in output:
@@ -106,12 +137,12 @@ def _classify_run(output: str, returncode: int) -> str:
     return "error" if returncode != 0 else "pass"
 
 
-def _run_in_crate(repo: Path, module_relpath: str, test_source: str, timeout_seconds: float) -> str:
+def _run_in_crate(repo: Path, module_relpath: str, test_source: str, timeout_seconds: float) -> tuple[str, str]:
     """Append the proof module to the file, run `cargo test`, and restore the file
-    byte-for-byte. Returns pass / fail / error. The file is always restored."""
+    byte-for-byte. Returns (pass|fail|error, combined output). The file is always restored."""
     cargo = rust_trace._cargo()
     if cargo is None:
-        return "error"
+        return "error", "no cargo"
     module = repo / module_relpath
     original = module.read_bytes()
     try:
@@ -120,15 +151,38 @@ def _run_in_crate(repo: Path, module_relpath: str, test_source: str, timeout_sec
             [cargo, "test", "--quiet", f"{_PROOF_MOD}::proof"], cwd=repo, env={}, timeout_seconds=timeout_seconds)
     finally:
         module.write_bytes(original)
+    output = (run.stdout or "") + (run.stderr or "")
     if run.returncode == 124:
-        return "error"
-    return _classify_run((run.stdout or "") + (run.stderr or ""), run.returncode)
+        return "error", output + "\n(timed out)"
+    return _classify_run(output, run.returncode), output
 
 
-def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_seconds: float = 600.0) -> dict:
-    """Locate uncovered decision branches in one Rust module, ask a model for a calling
-    test per gap, run each in-crate, and retain the ones that fail. Returns the
-    coverage_proofs shape the card consumes. Every not-run path carries an explicit reason."""
+def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, timeout_seconds: float) -> tuple[str, dict | None, str]:
+    """Propose -> run -> (repair -> run)* for one gap. Returns (status, proposal, test_source)
+    where status is fail (retained), pass (branch correct), error (did not compile even after
+    repair), or skipped (no model reply)."""
+    proposal = propose(gap)
+    if proposal is None:
+        return "skipped", None, ""
+    source = render_module(proposal["body"])
+    status, output = _run_in_crate(repo, module_relpath, source, timeout_seconds)
+    rounds = 0
+    while status == "error" and rounds < repair_rounds:
+        rounds += 1
+        fixed = repair(gap, source, output)
+        if fixed is None:
+            break
+        proposal = fixed
+        source = render_module(fixed["body"])
+        status, output = _run_in_crate(repo, module_relpath, source, timeout_seconds)
+    return status, proposal, source
+
+
+def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_seconds: float = 600.0,
+                   repair_rounds: int = 3) -> dict:
+    """Locate uncovered decision branches in one Rust module, prove each (propose -> run,
+    then compiler-feedback repair up to repair_rounds), and retain the ones that fail.
+    Returns the coverage_proofs shape the card consumes. Every not-run path carries a reason."""
     if not rust_trace._cargo():
         return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
     if not model_available():
@@ -147,13 +201,11 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
     retained: list[dict] = []
     outcomes = {"fail": 0, "pass": 0, "error": 0}
     for gap in gaps:
-        proposal = propose(gap)
-        if proposal is None:
+        status, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
+        if status == "skipped":
             continue
-        source = render_test(gap, proposal)
-        result = _run_in_crate(repo, module_relpath, source, timeout_seconds)
-        outcomes[result] += 1
-        if result == "fail":
+        outcomes[status] += 1
+        if status == "fail":
             retained.append({
                 "function": gap["function"], "language": "rust",
                 "location": f"{module_relpath}:{gap['line']}",
@@ -163,8 +215,11 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
     attempted = sum(outcomes.values())
     # The breakdown is the honest part: 0 retained means nothing without it. fail = a bug
     # proven (retained); pass = the uncovered branch is correct; error = the generated test
-    # would not compile (the gap is located but not provable this way), never hidden as "clean".
+    # would not compile even after repair (located but not provable this way), never hidden.
     detail = (f"{len(retained)}/{attempted} coverage proofs retained. Of {attempted} generated tests run "
               f"in-crate: {outcomes['fail']} failed (bug proven), {outcomes['pass']} passed (branch correct), "
-              f"{outcomes['error']} did not compile.") if attempted else "no proof-ready uncovered branches located"
-    return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "detail": detail}
+              f"{outcomes['error']} did not compile"
+              f"{f' even after {repair_rounds} repair round(s)' if repair_rounds else ''}."
+              ) if attempted else "no proof-ready uncovered branches located"
+    return {"retained": retained, "attempted": attempted, "outcomes": outcomes,
+            "repair_rounds": repair_rounds, "detail": detail}
