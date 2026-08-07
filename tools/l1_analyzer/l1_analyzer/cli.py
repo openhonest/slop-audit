@@ -225,14 +225,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--prove-coverage",
-        nargs=2,
         default=None,
-        metavar=("MODULE", "TESTS"),
-        help="Prove coverage gaps the Umbra way for one Rust (MODULE, TESTS) file pair: locate the "
-             "uncovered decisions, ask a model for a candidate test per gap, run it, and keep it only "
-             "if it genuinely fails - a runnable test that closes the gap. The retained tests appear "
-             "in the report's Adoptable proofs section. Needs the coverage-prove extra (umbra + openai), "
-             "OPENAI_API_KEY, and cargo-llvm-cov. Opt-in and CLI-only.",
+        metavar="MODULE",
+        help="Prove coverage gaps for one Rust MODULE (a path relative to the repo, e.g. "
+             "src/foo.rs): locate the module's uncovered decision branches, ask a model for a calling "
+             "test per gap, run each in-crate under `cargo test`, and keep it only if it genuinely "
+             "fails - a runnable test that closes the gap. Retained tests appear in the report's "
+             "Adoptable proofs section. Native slop-audit; needs OPENAI_API_KEY, cargo, and "
+             "cargo-llvm-cov. Opt-in and CLI-only (it runs code).",
     )
     parser.add_argument(
         "--report",
@@ -293,12 +293,12 @@ def main(argv: list[str] | None = None) -> int:
         results["proofs"] = _run_prove(args.repo, str(results.get("lang", args.lang)),
                                        results.get("thread_surface"), args.prove_max, args.timeout)
 
-    # Coverage-gap proofs (opt-in): Umbra's locate -> propose -> render -> run -> retain over
-    # one (module, tests) pair. Generates and runs code, so CLI-only and explicit.
+    # Coverage-gap proofs (opt-in): locate -> propose -> render -> run in-crate -> retain
+    # over one Rust module. Generates and runs code, so CLI-only and explicit.
     if args.prove_coverage:
         from l1_analyzer import coverage_prove
-        module, tests = (args.repo / p for p in args.prove_coverage)
-        results["coverage_proofs"] = coverage_prove.prove_coverage(module, tests, cap=args.prove_max)
+        results["coverage_proofs"] = coverage_prove.prove_coverage(
+            args.repo, args.prove_coverage, cap=args.prove_max, timeout_seconds=args.timeout)
 
     # The full Slop Audit scorecard - the SAME card try.slopaudit.org renders, from the
     # same engine module (l1_analyzer.card). The one difference is the runtime layer: the
