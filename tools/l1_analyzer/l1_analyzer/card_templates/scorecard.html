@@ -124,6 +124,21 @@
   </section>
   {% endif %}
 
+  {% if card.proofs %}
+  <section class="proofs">
+    <h3 class="proofs__title">{{ copy['proofs.heading'] }}</h3>
+    <p class="proofs__note">{{ copy['proofs.note'] | safe }}</p>
+    {% for p in card.proofs %}
+    <div class="proof proof--{{ p.layer }}">
+      <h4 class="proof__head"><span class="proof__layer">{{ p.layer }}</span> <code>{{ p.target }}</code>{% if p.location %} <span class="proof__loc">{{ p.location }}</span>{% endif %}</h4>
+      <p class="proof__blurb">{{ p.blurb }}</p>
+      {% if p.detail %}<p class="proof__detail">{{ p.detail }}</p>{% endif %}
+      <pre class="proof__code"><code>{{ p.test_source }}</code></pre>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
   {% if card.scoped_out %}
   <p class="scoped">Scoped out of this audit: {{ card.scoped_out.total }} file{{ 's' if card.scoped_out.total != 1 }} not part of the library ({{ card.scoped_out.reasons }}){% if card.scoped_out.paths %}, including <span class="scoped__paths">{{ card.scoped_out.paths | join(', ') }}{% if card.scoped_out.paths_more %} +{{ card.scoped_out.paths_more }} more{% endif %}</span>{% endif %}. {{ copy['scoped.why'] }}</p>
   {% endif %}

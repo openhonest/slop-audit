@@ -81,6 +81,10 @@ CARD_COPY: dict[str, str] = {
     "thread.blurb.clean": "No concurrency escape hatches found. Nothing overrides or bypasses the language's own thread-safety guarantee.",
     "thread.blurb.na": "Not analyzed for {lang} yet.",
     "thread.note": "This measures audit surface, not races. It shows where a language's thread-safety guarantee is overridden or missing, so a human or a runtime tool knows where to look. It does not detect data races: that needs [ThreadSanitizer](https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html#threadsanitizer) or an equivalent at runtime. A site here means \"verify this\", never \"a race exists\".",
+    "proofs.heading": "Adoptable proofs",
+    "proofs.note": "Each proof below is a runnable test slop-audit generated for one located gap and then executed. It is shown only because running it settled the matter: the coverage proof genuinely failed (so it pins a decision your suite never reached), or the concurrency proof fired a data race (so it reproduces the hazard). slop-audit proves the gap; it never writes into your test file. Adopting a surviving proof is your choice. Following Umbra's discipline, an unproven gap is reported but never dressed up as a test.",
+    "proofs.blurb.coverage": "Coverage gap: the suite never exercised this decision. The test drives it and asserts the caller-facing behavior; it fails against the current code, so adopting it both closes the gap and documents the expectation.",
+    "proofs.blurb.concurrency": "Concurrency hazard: the test reproduces a data race at the flagged site under contention. It is retained only because the race actually fired when run.",
 }
 
 _BAND_WORD = {"Healthy": "Clean", "Not Healthy": "Caution", "Slop": "Slop", "n/a": "No data"}
@@ -188,6 +192,44 @@ def _int(v: object) -> int | None:
     return v if isinstance(v, int) else None
 
 
+_PROOF_CAP = 20
+
+
+def _proofs(results: dict) -> list[dict]:
+    """The adoptable proofs: runnable tests slop-audit generated for a located gap and
+    retained only because running them settled it (Umbra's discipline). Two producers feed
+    one surface - the concurrency prove loop (results['proofs']) and the coverage-gap prove
+    loop (results['coverage_proofs']) - and each proof carries the test source to adopt."""
+    out: list[dict] = []
+
+    concurrency = results.get("proofs")
+    if isinstance(concurrency, dict):
+        for o in concurrency.get("outcomes", []):
+            if o.get("verdict") == "demonstrated" and o.get("generated_test"):
+                out.append({
+                    "layer": "concurrency", "language": "rust",
+                    "target": o.get("symbol", "?"),
+                    "location": f"{o.get('file', '?')}:{o.get('line', 0)}",
+                    "blurb": _t("proofs.blurb.concurrency"),
+                    "detail": o.get("detail", ""),
+                    "test_source": o["generated_test"].rstrip(),
+                })
+
+    coverage = results.get("coverage_proofs")
+    if isinstance(coverage, dict):
+        for p in coverage.get("retained", []):
+            if p.get("test_source"):
+                out.append({
+                    "layer": "coverage", "language": p.get("language", "python"),
+                    "target": p.get("function", "?"),
+                    "location": p.get("location", ""),
+                    "blurb": _t("proofs.blurb.coverage"),
+                    "detail": p.get("explanation", ""),
+                    "test_source": p["test_source"].rstrip(),
+                })
+    return out[:_PROOF_CAP]
+
+
 def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> dict:
     """The full scorecard model, identical to the site's. ran_tests=True (the CLI) adds
     the measured runtime metrics (L1.19 coverage, L1.20 determinism); False (the site) omits
@@ -226,6 +268,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "core": _metrics(core_specs, results, "core"),
         "audit": _metrics(_AUDIT, results, "audit"),
         "thread_surface": _thread_surface(lang, results),
+        "proofs": _proofs(results),
         "share_text": _t(f"share.{status}", slug=slug),
     }
 
@@ -286,6 +329,15 @@ def card_markdown(card: dict) -> str:
         for s in ts["sites"]:
             lines.append(f"- `{s['file']}:{s['line']}` — {s['kind']} ({s['severity']}) `{s['symbol']}`")
         lines += ["", "> " + strip.sub("", _t("thread.note"))]
+    proofs = card.get("proofs") or []
+    if proofs:
+        lines += ["", f"## {_t('proofs.heading')}", "", strip.sub("", _t("proofs.note"))]
+        for p in proofs:
+            loc = f" (`{p['location']}`)" if p.get("location") else ""
+            lines += ["", f"### {p['layer']}: `{p['target']}`{loc}", "", p["blurb"]]
+            if p.get("detail"):
+                lines.append(f"\n_{p['detail']}_")
+            lines += ["", f"```{p['language']}", p["test_source"], "```"]
     footer = "footer.fine" if not card["ran_tests"] else ("footer.cli" if card["tests_measured"] else "footer.cli_na")
     lines += ["", "---", "", strip.sub("", _t(footer))]
     return "\n".join(lines)

@@ -130,8 +130,11 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
     for i, f in enumerate(candidates):
         request = prove.proof_request(f, _hazard_context(repo, f))
         outcome = prove.prove_hazard(request, str(work_root / f"proof-{i}"), timeout_seconds=timeout)
+        # Keep the generated test on the outcome so the card can expose a retained (demonstrated)
+        # proof as an adoptable test - the runnable repro, not just a verdict line.
         outcomes.append({"file": f["file"], "line": f["line"], "symbol": f["symbol"],
-                         "verdict": outcome["verdict"], "detail": outcome["detail"]})
+                         "verdict": outcome["verdict"], "detail": outcome["detail"],
+                         "generated_test": outcome.get("generated_test")})
     demonstrated = sum(o["verdict"] == prove.DEMONSTRATED for o in outcomes)
     return {"verdict": "demonstrated" if demonstrated else "none",
             "demonstrated": demonstrated, "attempted": len(outcomes), "outcomes": outcomes}
