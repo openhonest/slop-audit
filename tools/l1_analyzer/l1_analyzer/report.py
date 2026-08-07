@@ -103,7 +103,19 @@ def _int(v: object) -> int | None:
     return v if isinstance(v, int) else None
 
 
-def build_report(slug: str, lang: str, results: dict) -> Report:
+class GradeSummary(TypedDict):
+    status: str                 # can | might | cannot | na
+    counts: dict[str, int]      # neutral / promiscuous / unresolved
+    testable_pct: int | None    # share of state that is finitely testable
+    hygiene: float | None       # weighted health of the audit checks, 0..1
+    grade: str | None           # A/B/C (can), D (might), F (cannot), None (na)
+
+
+def grade_summary(results: dict) -> GradeSummary:
+    """The published grade computation - the SINGLE SOURCE of the A-F grade, used by both
+    the CLI report and the web card. Verifiability first: CANNOT is F, MIGHT is D, and when
+    every piece of state is finitely testable, A/B/C is the weighted health of the audit
+    checks (god-files and type-escapes weigh most)."""
     l18 = results.get("L1.18") or {"band": "n/a"}
     band = str(l18.get("band", "n/a"))
     l18b = results.get("L1.18b") or {}
@@ -111,7 +123,15 @@ def build_report(slug: str, lang: str, results: dict) -> Report:
     status = _status(band, counts, _meter_ran(l18b))
     total = sum(counts.values())
     pct = None if status == "na" else (100 if total == 0 else round(counts.get("neutral", 0) / total * 100))
-    grade = _grade(status, pct, _hygiene(results))
+    hygiene = _hygiene(results)
+    return {"status": status, "counts": counts, "testable_pct": pct, "hygiene": hygiene,
+            "grade": _grade(status, pct, hygiene)}
+
+
+def build_report(slug: str, lang: str, results: dict) -> Report:
+    g = grade_summary(results)
+    status, counts, pct, grade = g["status"], g["counts"], g["testable_pct"], g["grade"]
+    l18b = results.get("L1.18b") or {}
 
     audit = [
         {"tech": label, "value": f"{(results[k].get('value'))}{unit if results[k].get('value') != 'n/a' else ''}",
