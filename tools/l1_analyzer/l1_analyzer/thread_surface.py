@@ -53,6 +53,10 @@ _IGNORE = ("tests", "test", "conformance")
 
 EXPOSED = "exposed"
 REVIEW = "review"
+# candidate: a real hazard SHAPE, but measured low-precision (B1 non-atomic RMW fires
+# on correct lock-free code by design). It never flips a headline verdict on its own and
+# reads as "confirm with the prove stage", not as an accusation. Honest confidence tier.
+CANDIDATE = "candidate"
 CLEAN = "clean"
 
 
@@ -100,7 +104,87 @@ def _mk(kind: str, symbol: str, severity: str, rel: str, node: Node) -> Finding:
 
 # --------------------------------------------------------------------------
 # Rust scanner.
+#
+# Category A (overridden guarantee: unsafe impl Send/Sync, static mut) and the
+# relaxed-ordering footgun are whole-file node matches. Categories B1 (non-atomic
+# read-modify-write) and B2 (check-then-act) are per-function shapes, restricted to
+# self.-rooted receivers so we flag shared INSTANCE state and skip pure locals. Each
+# B finding is a suspected race SHAPE to verify or prove, never a proven race.
 # --------------------------------------------------------------------------
+
+# B1: a load and a store on the same atomic in one function is a read-modify-write
+# done non-atomically (fetch_add / compare_exchange would be the atomic form).
+_ATOMIC_STORE = frozenset({"store", "swap"})
+# B2: a collection read in a condition (check) then a mutation in the body (act).
+_CHECK_METHODS = frozenset({"contains_key", "contains", "is_empty", "is_none", "is_some", "get", "get_mut", "len", "capacity"})
+_MUTATE_METHODS = frozenset({"insert", "push", "push_back", "remove", "pop", "clear", "extend", "append", "set", "store", "swap"})
+
+
+def _rust_method_receiver(call: Node) -> tuple[str, str] | None:
+    """(method, receiver_text) for a `recv.method(..)` call, else None. The receiver
+    text (e.g. `self.count`) is the shared-state key we match B1/B2 on."""
+    if call.type != "call_expression":
+        return None
+    fn = call.child_by_field_name("function")
+    if fn is None or fn.type != "field_expression":
+        return None
+    return _text(fn.child_by_field_name("field")), _text(fn.child_by_field_name("value"))
+
+
+def _rust_receivers_by_method(scope: Node | None, methods: frozenset[str]) -> set[str]:
+    """self.-rooted receivers of any call whose method is in `methods`, within scope."""
+    out: set[str] = set()
+    if scope is None:
+        return out
+    for n in _walk(scope):
+        mr = _rust_method_receiver(n)
+        if mr is not None and mr[0] in methods and mr[1].startswith("self."):
+            out.add(mr[1])
+    return out
+
+
+def _rust_nonatomic_rmw(func: Node, rel: str) -> list[Finding]:
+    """B1: the same self.-rooted atomic is both loaded and stored/swapped in one
+    function - a read-modify-write that is not a single atomic op.
+
+    A receiver that also uses compare_exchange / fetch_* in the same function is doing
+    a real atomic protocol (a CAS loop, a single-writer fetch), not an unguarded RMW,
+    so it is excluded. This is what keeps the shape off correct lock-free code."""
+    loads: dict[str, Node] = {}
+    stores: set[str] = set()
+    atomic_protocol: set[str] = set()
+    for n in _walk(func):
+        mr = _rust_method_receiver(n)
+        if mr is None or not mr[1].startswith("self."):
+            continue
+        method, recv = mr
+        if method == "load":
+            loads.setdefault(recv, n)
+        elif method in _ATOMIC_STORE:
+            stores.add(recv)
+        elif method.startswith("fetch_") or method in ("compare_exchange", "compare_exchange_weak", "compare_and_swap"):
+            atomic_protocol.add(recv)
+    return [
+        _mk("nonatomic_rmw", recv, CANDIDATE, rel, node)
+        for recv, node in loads.items()
+        if recv in stores and recv not in atomic_protocol
+    ]
+
+
+def _rust_check_then_act(func: Node, rel: str) -> list[Finding]:
+    """B2: an `if` whose condition checks a self.-rooted collection and whose body
+    mutates the same one - a check-then-act (TOCTOU) window."""
+    findings: list[Finding] = []
+    for n in _walk(func):
+        if n.type != "if_expression":
+            continue
+        checked = _rust_receivers_by_method(n.child_by_field_name("condition"), _CHECK_METHODS)
+        mutated = _rust_receivers_by_method(n.child_by_field_name("consequence"), _MUTATE_METHODS)
+        mutated |= _rust_receivers_by_method(n.child_by_field_name("alternative"), _MUTATE_METHODS)
+        for recv in sorted(checked & mutated):
+            findings.append(_mk("check_then_act", recv, REVIEW, rel, n))
+    return findings
+
 
 def _scan_rust(root: Node, rel: str) -> list[Finding]:
     findings: list[Finding] = []
@@ -119,8 +203,18 @@ def _scan_rust(root: Node, rel: str) -> list[Finding]:
         # Ordering::Relaxed : atomic access with no happens-before edge.
         if n.type == "scoped_identifier" and _text(n).replace(" ", "").endswith("Ordering::Relaxed"):
             findings.append(_mk("relaxed_ordering", "Ordering::Relaxed", REVIEW, rel, n))
+        # B1 / B2: per-function race shapes on shared instance state. Skipped in test
+        # files (a *tests.rs / tests-dir module is not production concurrency surface).
+        elif n.type == "function_item" and not _is_test_file(rel):
+            findings.extend(_rust_nonatomic_rmw(n, rel))
+            findings.extend(_rust_check_then_act(n, rel))
 
     return findings
+
+
+def _is_test_file(rel: str) -> bool:
+    low = rel.lower()
+    return low.endswith(("tests.rs", "test.rs")) or "/tests/" in low or "/test/" in low
 
 
 # --------------------------------------------------------------------------
@@ -236,7 +330,7 @@ def _na(lang: str) -> SurfaceResult:
         "verdict": "n/a",
         "value": "n/a",
         "band": "n/a",
-        "counts": {EXPOSED: 0, REVIEW: 0},
+        "counts": {EXPOSED: 0, REVIEW: 0, CANDIDATE: 0},
         "findings": [],
         "bucketed": {"counts": {}, "paths": []},
         "details": f"thread-safety surface meter has no scanner for {lang} yet",
@@ -259,7 +353,7 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
         findings.extend(scanner(parser.parse(src).root_node, rel))
 
-    counts = {EXPOSED: 0, REVIEW: 0}
+    counts = {EXPOSED: 0, REVIEW: 0, CANDIDATE: 0}
     for f in findings:
         counts[f["severity"]] += 1
 
@@ -267,21 +361,24 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
         verdict = EXPOSED
     elif counts[REVIEW]:
         verdict = REVIEW
+    elif counts[CANDIDATE]:
+        verdict = CANDIDATE
     else:
         verdict = CLEAN
 
-    _order = {EXPOSED: 0, REVIEW: 1}
+    _order = {EXPOSED: 0, REVIEW: 1, CANDIDATE: 2}
     findings.sort(key=lambda f: (_order[f["severity"]], f["file"], f["line"]))
 
     return {
         "verdict": verdict,
-        "value": f"{counts[EXPOSED]} exposed / {counts[REVIEW]} review",
+        "value": f"{counts[EXPOSED]} exposed / {counts[REVIEW]} review / {counts[CANDIDATE]} candidate",
         "band": "n/a",
         "counts": counts,
         "findings": findings,
         "bucketed": bucketed,
         "details": (
             f"thread-safety surface: {counts[EXPOSED]} hand-overrides of the thread-safety "
-            f"guarantee, {counts[REVIEW]} lower-severity footguns across {len(findings)} sites"
+            f"guarantee, {counts[REVIEW]} lower-severity footguns, {counts[CANDIDATE]} "
+            f"low-precision candidate shape(s) across {len(findings)} sites"
         ),
     }
