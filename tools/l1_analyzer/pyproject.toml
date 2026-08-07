@@ -26,6 +26,12 @@ l1-analyzer = "l1_analyzer.cli:main"
 dev = ["pytest>=8.0", "pytest-bdd>=7.0", "coverage>=7.0", "pytest-randomly>=3.15"]
 # The --prove stage generates tests with a model; the static core stays zero-LLM.
 prove = ["openai>=1.0"]
+# --prove-coverage runs Umbra's coverage-gap proof loop. This extra carries only the model
+# client; the `umbra` package itself is installed SEPARATELY (an editable local checkout, or
+# its private git once the embargo lifts) and is never a declared dependency - a bare `umbra`
+# on PyPI is an unrelated project. coverage_prove.py lazy-imports it and degrades to an
+# explicit not-run reason when it is absent, so the core build stays clean and umbra-free.
+coverage-prove = ["openai>=1.0"]
 
 [build-system]
 requires = ["hatchling"]
