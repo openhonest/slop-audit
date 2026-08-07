@@ -89,3 +89,26 @@ def test_unsupported_language_is_na_not_guessed(tmp_path):
     r = state_bounds.classify(tmp_path, "kotlin")
     assert r["verdict"] == "n/a"
     assert r["value"] == "n/a"
+
+
+def test_grade_summary_is_the_single_source_of_the_published_grade():
+    from l1_analyzer import report
+    base = {
+        "L1.18": {"band": "Healthy"},
+        "L1.18b": {"counts": {"neutral": 8, "promiscuous": 0, "unresolved": 0}, "resolvable_fraction": 1.0, "findings": []},
+    }
+    healthy = {k: {"band": "Healthy"} for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")}
+    # every audit check Healthy -> hygiene 1.0 -> grade A (verdict CAN)
+    assert report.grade_summary({**base, **healthy})["hygiene"] == 1.0
+    assert report.grade_summary({**base, **healthy})["grade"] == "A"
+    # L1.15 (weight 3 of 11) at Slop -> 8/11 hygiene (>= 0.60) -> B
+    assert report.grade_summary({**base, **healthy, "L1.15": {"band": "Slop"}})["grade"] == "B"
+    # L1.15 + L1.17 both Slop -> 5/11 hygiene (< 0.60) -> C
+    assert report.grade_summary({**base, **healthy, "L1.15": {"band": "Slop"}, "L1.17": {"band": "Slop"}})["grade"] == "C"
+    # the verdict gates the tier regardless of hygiene
+    cannot = {**base, "L1.18b": {"counts": {"neutral": 5, "promiscuous": 2, "unresolved": 0}, "resolvable_fraction": 0.7, "findings": []}}
+    assert report.grade_summary(cannot)["grade"] == "F"
+    might = {**base, "L1.18b": {"counts": {"neutral": 5, "promiscuous": 0, "unresolved": 3}, "resolvable_fraction": 0.6, "findings": []}}
+    assert report.grade_summary(might)["grade"] == "D"
+    # an audit check with no band is excluded, not penalized
+    assert report.grade_summary({**base, "L1.17": {"band": "Healthy"}, "L1.15": {"band": "n/a"}})["hygiene"] == 1.0
