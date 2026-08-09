@@ -115,10 +115,17 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float) -> L1
             [sys.executable, "-m", "coverage", "run", "--branch", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
             cwd=repo, env=env, timeout_seconds=timeout_seconds,
         )
-        if run.returncode == 5:
-            return _na("pytest collected no tests")
         if run.returncode == 124:
             return _na("test suite timed out before coverage could be measured")
+        # Coverage is a valid number only when the suite actually ran tests: pytest exit 0
+        # (all passed) or 1 (some failed). Exit 2/3/4/5 mean the suite did not complete a
+        # valid run, so a coverage figure for it is meaningless. Report n/a with the reason,
+        # never a 0.0 that reads as real-but-terrible coverage (a silent failure is a lie).
+        if run.returncode not in (0, 1):
+            reasons = {2: "the run was interrupted", 3: "pytest hit an internal error",
+                       4: "pytest usage or collection error", 5: "pytest collected no tests"}
+            why = reasons.get(run.returncode, f"pytest exit {run.returncode}")
+            return _na(f"the test suite did not complete a valid run ({why}); coverage not measured")
         # `coverage json` is our own trusted, fast step.
         subprocess.run(
             [sys.executable, "-m", "coverage", "json", "-o", str(report_file)],

@@ -267,6 +267,16 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
+    # The analyzer audits a repository (a directory), not a single file: the git, config,
+    # coverage, and test-run steps all operate on a tree. A file argument used to reach the
+    # coverage runner and crash with a stack trace; give a clear message instead.
+    if not args.repo.exists():
+        print(f"error: path does not exist: {args.repo}", file=sys.stderr)
+        return 2
+    if not args.repo.is_dir():
+        print(f"error: point me at a directory (a repo root), not a single file: {args.repo}", file=sys.stderr)
+        return 2
+
     if args.gate:
         return _run_gate(args.repo, args.lang, args.max_type_escapes, args.max_thread_exposed)
 
