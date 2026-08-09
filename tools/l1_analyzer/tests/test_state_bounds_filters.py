@@ -28,6 +28,29 @@ def test_memoization_cache_clears():
     assert _verdict(src, "self._t") == "neutral"
 
 
+def test_memoization_cache_spread_across_methods_with_a_returning_setter_clears():
+    # The real declaro shape: the cache is used across four methods, and a setter returns the
+    # stored value. result-invariance must be scoped to the membership-gated accessor, not
+    # every method that touches the attribute, or this regresses (the setter's `return token`
+    # is not the keyed value). This is the case a self-only, whole-class scan gets wrong.
+    src = ("class Pool:\n    def __init__(self):\n        self._t: dict = {}\n"
+           "    def set(self, k, token):\n        self._t[k] = token\n        return token\n"
+           "    def get(self, k):\n        if k not in self._t:\n            self._t[k] = mint(k)\n"
+           "        return self._t[k]\n    def forget(self, k):\n        self._t.pop(k, None)\n"
+           "    def close(self):\n        self._t.clear()\n")
+    assert _verdict(src, "self._t") == "neutral"
+
+
+def test_write_once_read_by_a_bounded_index_clears_even_when_promiscuous():
+    # A once-assigned list read by an internal position index reads promiscuous (indexed
+    # access), but it is immutable and drives only bounded decisions (position vs len). It
+    # must clear - the value-indexed-cache below, which returns None on a miss, must not.
+    src = ("class Cur:\n    def __init__(self, rows):\n        self._rows = rows\n        self._i = 0\n"
+           "    def next(self):\n        if self._i >= len(self._rows):\n            return None\n"
+           "        row = self._rows[self._i]\n        self._i += 1\n        return row\n")
+    assert _verdict(src, "self._rows") == "neutral"
+
+
 def test_carried_value_that_drives_no_decision_clears():
     # a builder value: assigned, sliced, methods called, but it appears in no test. Neutral.
     src = ("class Q:\n    def __init__(self, m):\n        self._qs = m.objects\n"

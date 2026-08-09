@@ -262,12 +262,13 @@ def _is_keyed_read_of(expr: Node | None, attr: str) -> bool:
 
 
 def _result_invariant(attr: str, refs: list[Node]) -> bool:
-    """Rule A's load-bearing condition. In every method that touches the attribute, each
-    return is the keyed value `self.attr[k]` or a bare return - so the accessor always yields
-    the cached value, whatever the presence. A method that returns a different value by
-    presence (`return None` on miss, `return False` for a dedup) is NOT a cache: the presence
-    IS the answer, and it stays flagged."""
-    for fn in {_enclosing_function(r) for r in refs}:
+    """The presence of a key does not change the answer. Scoped to the ACCESSOR methods -
+    those that contain a membership test on the attribute - every return is the keyed value
+    `self.attr[k]` or a bare return. A method that returns a different value by presence
+    (`return None` on a miss, `return False` for a dedup) is result-VARIANT: the presence IS
+    the answer, a genuine decision, and it stays flagged. A setter in a different method that
+    returns the stored value is irrelevant - only the membership-gated method is checked."""
+    for fn in {_enclosing_function(r) for r in refs if _is_membership_container(r)}:
         if fn is None:
             continue
         for ret in (n for n in _descendants(fn) if n.type == "return_statement"):
@@ -278,12 +279,7 @@ def _result_invariant(attr: str, refs: list[Node]) -> bool:
 
 
 def _is_memoization(cls: Node, attr: str, refs: list[Node]) -> bool:
-    return (
-        _has_presence_gate(refs)
-        and not _value_reaches_condition(refs)
-        and _writes_are_plain_stores(cls, attr, refs)
-        and _result_invariant(attr, refs)
-    )
+    return _has_presence_gate(refs) and _writes_are_plain_stores(cls, attr, refs)
 
 
 # --- entry point -----------------------------------------------------------------
@@ -303,13 +299,15 @@ def is_false_positive(key: str, refs: list[Node], verdict: str) -> bool:
     if cls is None:
         return False
     attr = _attr(key)
-    # write-once clears only an UNRESOLVED finding: an attribute the classifier could not
-    # decide (an unknown-typed constructor argument, say) that is nonetheless assigned once,
-    # never mutated, and never handed out. A PROMISCUOUS finding means an unbounded-key
-    # access drives a decision, which stays real even for a once-assigned container, so
-    # write-once must not touch it.
-    if verdict == "unresolved":
-        return _is_write_once(cls, attr, refs)
+    # The single guard that keeps every genuine finding: if the attribute drives a decision
+    # whose answer depends on an unbounded value or key, it stays flagged, whatever else is
+    # true of it. That is exactly the value-inspected magnitude test (_first_failure_time),
+    # the dedup set, and the value-indexed lookup that returns None on a miss. Only once no
+    # such decision exists is a shape eligible to clear.
+    if _value_reaches_condition(refs) or not _result_invariant(attr, refs):
+        return False
+    if _is_write_once(cls, attr, refs):
+        return True                                   # immutable, read only in bounded ways
     if verdict == "promiscuous":
         return _is_memoization(cls, attr, refs) or _drives_no_decision(refs)
     return False
