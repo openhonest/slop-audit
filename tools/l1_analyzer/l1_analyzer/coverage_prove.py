@@ -33,7 +33,12 @@ import os
 import re
 from pathlib import Path
 
-from l1_analyzer import rust_facets, rust_trace
+from l1_analyzer import coverage_gates, rust_facets, rust_trace
+
+# The retention buckets, in report order. Only `divergence` is a proven bug and retained;
+# the rest name why a failing test is the tool's own noise, surfaced and never hidden.
+_FAIL_BUCKETS = ("divergence", "wrong_channel", "invalid_fixture", "incidental_panic")
+_OUTCOMES = (*_FAIL_BUCKETS, "pass", "error")
 
 _PROPOSE_INSTRUCTION = (
     "You are given ONE Rust function and one of its decision branches that no test ever reached. "
@@ -62,6 +67,23 @@ _PROOF_MOD = "l1_coverage_proof"
 
 def model_available() -> bool:
     return bool(os.getenv("OPENAI_API_KEY"))
+
+
+def host_cfg() -> frozenset[str]:
+    """The host target's cfg set from `rustc --print cfg` - the I/O the cfg gate needs to
+    prove a branch is host-dead. An empty set (no rustc) excludes nothing, never guesses."""
+    cargo = rust_trace._cargo()
+    if cargo is None:
+        return frozenset()
+    rustc = os.path.join(os.path.dirname(cargo), "rustc")
+    probe = rust_trace._run_untrusted([rustc, "--print", "cfg"], cwd=Path.cwd(), env={}, timeout_seconds=30)
+    return coverage_gates.host_cfg_atoms(probe.stdout or "") if probe.returncode == 0 else frozenset()
+
+
+def _live_gaps(gaps: list[dict], host: frozenset[str]) -> list[dict]:
+    """Drop gaps whose branch the host target never compiles: a proof there can only ever
+    assert a premise about a platform the run is not on."""
+    return [g for g in gaps if not coverage_gates.cfg_excluded(g.get("cfg"), host)]
 
 
 def _call_model(instruction: str, payload: str) -> dict | None:
@@ -134,7 +156,20 @@ def _classify_run(output: str, returncode: int) -> str:
         return "pass"
     if "could not compile" in output or re.search(r"error\[E\d+\]", output):
         return "error"
-    return "error" if returncode != 0 else "pass"
+    # A construction that aborts (mem::zeroed UB) prints no `panicked`, but the crate did
+    # compile and run: a non-zero exit after the test harness started is a failure, not a
+    # build error, so it reaches the gates rather than being counted as did-not-compile.
+    ran = "running " in output or "test result:" in output
+    if returncode != 0:
+        return "fail" if ran else "error"
+    return "pass"
+
+
+def _fail_bucket(output: str, proof_label: str, body: str, return_type: str | None) -> str:
+    """A failing run's retention bucket, from the gates: parse this proof's panic, then
+    classify it as a divergence (retained) or one of the noise classes."""
+    panic = coverage_gates.parse_panic(output, proof_label)
+    return coverage_gates.classify_failure(body, return_type, panic)
 
 
 def _append_and_run(repo: Path, module_relpath: str, test_source: str, test_filter: str, timeout_seconds: float) -> tuple[int, str]:
@@ -186,10 +221,24 @@ def _retained_entry(module_relpath: str, gap: dict, proposal: dict, source: str)
     }
 
 
+def _refine_incidental(repo: Path, module_relpath: str, gap: dict, body: str, timeout_seconds: float) -> str:
+    """The permutation check on an incidental panic: rebuild the fixture with a valid,
+    64-aligned scalar and re-run. If the panic clears, the original scalar - not the
+    function - caused it, so this is an invalid fixture. If it persists, it is a real panic
+    on valid construction, kept for review. Deterministic, one extra compile, no model."""
+    permuted = coverage_gates.permute_scalar_construction(body)
+    if permuted is None:
+        return "incidental_panic"
+    status, output = _run_in_crate(repo, module_relpath, render_module(permuted), timeout_seconds)
+    if status != "fail":
+        return "invalid_fixture"   # the panic is gone under a valid scalar
+    return "invalid_fixture" if _fail_bucket(output, "proof", permuted, gap["return_type"]) != "incidental_panic" else "incidental_panic"
+
+
 def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, timeout_seconds: float) -> tuple[str, dict | None, str]:
-    """Propose -> run -> (repair -> run)* for one gap. Returns (status, proposal, test_source)
-    where status is fail (retained), pass (branch correct), error (did not compile even after
-    repair), or skipped (no model reply)."""
+    """Propose -> run -> (repair -> run)* -> gate for one gap. Returns (bucket, proposal,
+    test_source): a fail is resolved to one of _FAIL_BUCKETS (only `divergence` is retained);
+    a clean run is `pass`; `error` is did-not-compile even after repair; `skipped` is no reply."""
     proposal = propose(gap)
     if proposal is None:
         return "skipped", None, ""
@@ -204,37 +253,47 @@ def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, t
         proposal = fixed
         source = render_module(fixed["body"])
         status, output = _run_in_crate(repo, module_relpath, source, timeout_seconds)
-    return status, proposal, source
+    if status != "fail":
+        return status, proposal, source
+    bucket = _fail_bucket(output, "proof", proposal["body"], gap["return_type"])
+    if bucket == "incidental_panic":
+        bucket = _refine_incidental(repo, module_relpath, gap, proposal["body"], timeout_seconds)
+    return bucket, proposal, source
 
 
 def _prove_module(repo: Path, module_relpath: str, gaps: list[dict], repair_rounds: int,
                   timeout_seconds: float) -> tuple[list[dict], dict]:
     """Prove all of one module's gaps. Fast path: batch every proposal into one compile and
-    run once. If the batch does not compile (one bad test poisons it), fall back to per-gap
-    with compiler-feedback repair. Returns (retained, outcomes)."""
-    outcomes = {"fail": 0, "pass": 0, "error": 0}
+    run once, then gate each failing test. If the batch does not compile (one bad test
+    poisons it), fall back to per-gap with compiler-feedback repair. Returns (retained,
+    outcomes). Only a `divergence` is retained; the noise buckets are counted, never hidden."""
+    outcomes = {k: 0 for k in _OUTCOMES}
     ready = [(g, p) for g in gaps for p in (propose(g),) if p is not None]
     if not ready:
         return [], outcomes
     rc, output = _append_and_run(repo, module_relpath, render_batch([p["body"] for _g, p in ready]),
                                  _PROOF_MOD, timeout_seconds)
     batch = {} if rc == 124 else _classify_batch(output)
-    if batch:  # the module compiled: read each test's verdict, no repair needed
+    if batch:  # the module compiled: read each test's verdict, then gate the failures.
         retained = []
         for i, (gap, proposal) in enumerate(ready):
             status = batch.get(i, "error")
-            outcomes[status] += 1
-            if status == "fail":
+            if status != "fail":
+                outcomes[status] += 1
+                continue
+            bucket = _fail_bucket(output, f"proof_{i}", proposal["body"], gap["return_type"])
+            outcomes[bucket] += 1
+            if bucket == "divergence":
                 retained.append(_retained_entry(module_relpath, gap, proposal, render_module(proposal["body"])))
         return retained, outcomes
-    # The batch did not compile: isolate and repair each gap individually.
+    # The batch did not compile: isolate, repair, and gate each gap individually.
     retained = []
     for gap in gaps:
-        status, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
-        if status == "skipped":
+        bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
+        if bucket == "skipped":
             continue
-        outcomes[status] += 1
-        if status == "fail":
+        outcomes[bucket] += 1
+        if bucket == "divergence":
             retained.append(_retained_entry(module_relpath, gap, proposal, source))
     return retained, outcomes
 
@@ -252,8 +311,9 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
+    host = host_cfg()
     retained: list[dict] = []
-    outcomes = {"fail": 0, "pass": 0, "error": 0}
+    outcomes = {k: 0 for k in _OUTCOMES}
     modules = 0
     for relpath, lines in sorted(cov["files"].items()):
         if not relpath.endswith(".rs"):
@@ -262,7 +322,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
             functions = rust_facets.module_functions((repo / relpath).read_text(errors="ignore"))
         except OSError:
             continue
-        gaps = rust_facets.uncovered_gaps(functions, lines)[:cap_per_module]
+        gaps = _live_gaps(rust_facets.uncovered_gaps(functions, lines), host)[:cap_per_module]
         if not gaps:
             continue
         modules += 1
@@ -274,10 +334,19 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
             outcomes[k] += module_outcomes[k]
     attempted = sum(outcomes.values())
     detail = (f"{len(retained)} coverage proofs retained across {modules} modules with uncovered branches. "
-              f"Of {attempted} generated tests run in-crate: {outcomes['fail']} failed (bug proven), "
-              f"{outcomes['pass']} passed (branch correct), {outcomes['error']} did not compile."
-              ) if attempted else f"no proof-ready uncovered branches located across {modules} modules"
+              + _outcome_detail(outcomes)) if attempted else f"no proof-ready uncovered branches located across {modules} modules"
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
+
+
+def _outcome_detail(outcomes: dict) -> str:
+    """The honest breakdown: what each generated test became. Only `divergence` is a proven
+    bug; the noise buckets are named so a zero-retained result still says what happened."""
+    return (f"Of {sum(outcomes.values())} generated tests run in-crate: {outcomes['divergence']} "
+            f"retained as behavioural divergences (bug proven), {outcomes['pass']} passed (branch correct), "
+            f"{outcomes['wrong_channel']} inspected the wrong output channel, "
+            f"{outcomes['invalid_fixture']} were invalid fixtures (construction the code rejects), "
+            f"{outcomes['incidental_panic']} panicked outside the assertion (kept for review), "
+            f"{outcomes['error']} did not compile.")
 
 
 def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_seconds: float = 600.0,
@@ -296,18 +365,18 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
 
     module = repo / module_relpath
     functions = rust_facets.module_functions(module.read_text(errors="ignore"))
-    gaps = rust_facets.uncovered_gaps(functions, cov["uncovered_lines"])[:cap]
+    gaps = _live_gaps(rust_facets.uncovered_gaps(functions, cov["uncovered_lines"]), host_cfg())[:cap]
     if not gaps:
         return {"retained": [], "attempted": 0, "detail": "no proof-ready uncovered branches located in this module"}
 
     retained: list[dict] = []
-    outcomes = {"fail": 0, "pass": 0, "error": 0}
+    outcomes = {k: 0 for k in _OUTCOMES}
     for gap in gaps:
-        status, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
-        if status == "skipped":
+        bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
+        if bucket == "skipped":
             continue
-        outcomes[status] += 1
-        if status == "fail":
+        outcomes[bucket] += 1
+        if bucket == "divergence":
             retained.append({
                 "function": gap["function"], "language": "rust",
                 "location": f"{module_relpath}:{gap['line']}",
@@ -315,13 +384,9 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
                 "test_source": source.strip(),
             })
     attempted = sum(outcomes.values())
-    # The breakdown is the honest part: 0 retained means nothing without it. fail = a bug
-    # proven (retained); pass = the uncovered branch is correct; error = the generated test
-    # would not compile even after repair (located but not provable this way), never hidden.
-    detail = (f"{len(retained)}/{attempted} coverage proofs retained. Of {attempted} generated tests run "
-              f"in-crate: {outcomes['fail']} failed (bug proven), {outcomes['pass']} passed (branch correct), "
-              f"{outcomes['error']} did not compile"
-              f"{f' even after {repair_rounds} repair round(s)' if repair_rounds else ''}."
+    # The breakdown is the honest part: 0 retained means nothing without it. Each generated
+    # test lands in a named bucket; only a behavioural divergence is a proven bug and retained.
+    detail = (f"{len(retained)}/{attempted} coverage proofs retained. " + _outcome_detail(outcomes)
               ) if attempted else "no proof-ready uncovered branches located"
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes,
             "repair_rounds": repair_rounds, "detail": detail}

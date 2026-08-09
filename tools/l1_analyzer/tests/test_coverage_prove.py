@@ -61,13 +61,16 @@ _GAP = {"function": "f", "kind": "if", "line": 2, "function_source": "fn f(){}",
 
 
 def test_repair_loop_recovers_a_compile_error_then_retains_a_failure(monkeypatch, tmp_path):
-    # First attempt does not compile; repair fixes it; the fixed test then fails -> retained.
+    # First attempt does not compile; repair fixes it; the fixed test then fails on its own
+    # assertion -> a behavioural divergence, retained.
     monkeypatch.setattr(coverage_prove, "propose", lambda gap: {"body": "bad", "explanation": "e0"})
-    monkeypatch.setattr(coverage_prove, "repair", lambda gap, src, err: {"body": "good", "explanation": "e1"})
-    runs = iter([("error", "error[E0308]"), ("fail", "test result: FAILED")])
+    monkeypatch.setattr(coverage_prove, "repair",
+                        lambda gap, src, err: {"body": 'let result = f(); assert!(false, "must reject dup");', "explanation": "e1"})
+    runs = iter([("error", "error[E0308]"),
+                 ("fail", "---- l1_coverage_proof::proof stdout ----\nthread 'x' panicked at m.rs:9:1:\nmust reject dup\n")])
     monkeypatch.setattr(coverage_prove, "_run_in_crate", lambda *a: next(runs))
-    status, proposal, _src = coverage_prove._prove_one(tmp_path, "m.rs", _GAP, repair_rounds=3, timeout_seconds=1)
-    assert status == "fail" and proposal["explanation"] == "e1"
+    bucket, proposal, _src = coverage_prove._prove_one(tmp_path, "m.rs", _GAP, repair_rounds=3, timeout_seconds=1)
+    assert bucket == "divergence" and proposal["explanation"] == "e1"
 
 
 def test_repair_rounds_zero_takes_only_the_first_attempt(monkeypatch, tmp_path):
@@ -109,13 +112,16 @@ def test_classify_batch_reads_each_tests_verdict():
 
 
 def test_prove_module_batches_when_it_compiles(monkeypatch, tmp_path):
-    monkeypatch.setattr(coverage_prove, "propose", lambda gap: {"body": "b", "explanation": gap["function"]})
-    # one batch run: proof_0 fails (bug), proof_1 passes (correct)
-    monkeypatch.setattr(coverage_prove, "_append_and_run",
-                        lambda *a: (101, "test l1_coverage_proof::proof_0 ... FAILED\ntest l1_coverage_proof::proof_1 ... ok\n"))
+    monkeypatch.setattr(coverage_prove, "propose",
+                        lambda gap: {"body": 'let result = f(); assert!(false, "boom");', "explanation": gap["function"]})
+    # one batch run: proof_0 fails on its own assertion (a divergence), proof_1 passes.
+    batch_output = (
+        "test l1_coverage_proof::proof_0 ... FAILED\ntest l1_coverage_proof::proof_1 ... ok\n\nfailures:\n\n"
+        "---- l1_coverage_proof::proof_0 stdout ----\nthread 'x' panicked at m.rs:9:1:\nboom\n")
+    monkeypatch.setattr(coverage_prove, "_append_and_run", lambda *a: (101, batch_output))
     gaps = [{**_GAP, "function": "a"}, {**_GAP, "function": "b"}]
     retained, outcomes = coverage_prove._prove_module(tmp_path, "m.rs", gaps, repair_rounds=3, timeout_seconds=1)
-    assert outcomes == {"fail": 1, "pass": 1, "error": 0}
+    assert outcomes["divergence"] == 1 and outcomes["pass"] == 1
     assert [r["function"] for r in retained] == ["a"]
 
 
@@ -137,11 +143,12 @@ def test_prove_coverage_repo_aggregates_across_modules(monkeypatch, tmp_path):
                         lambda repo, t: {"measured": True, "files": {"a.rs": frozenset({2}), "b.rs": frozenset({2}), "notes.txt": frozenset({1})}, "reason": ""})
     monkeypatch.setattr(coverage_prove.rust_facets, "module_functions", lambda src: [{"name": "f"}])
     monkeypatch.setattr(coverage_prove.rust_facets, "uncovered_gaps", lambda fns, lines: [dict(_GAP)])
+    monkeypatch.setattr(coverage_prove, "host_cfg", lambda: frozenset())
     monkeypatch.setattr(coverage_prove, "_prove_module",
-                        lambda repo, rel, gaps, rr, to: ([{"location": rel}], {"fail": 1, "pass": 0, "error": 0}))
+                        lambda repo, rel, gaps, rr, to: ([{"location": rel}], {**{k: 0 for k in coverage_prove._OUTCOMES}, "divergence": 1}))
     res = coverage_prove.prove_coverage_repo(tmp_path, cap_per_module=5)
     assert res["modules"] == 2                          # a.rs + b.rs, not the non-.rs notes.txt
-    assert res["outcomes"]["fail"] == 2 and len(res["retained"]) == 2
+    assert res["outcomes"]["divergence"] == 2 and len(res["retained"]) == 2
 
 
 # --- graceful not-run ------------------------------------------------------

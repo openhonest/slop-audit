@@ -26,6 +26,44 @@ _BRANCH_BODY = {
 }
 
 
+def _cfg_inner(attr_text: str) -> str | None:
+    """The predicate inside a `#[cfg(...)]` attribute, balancing nested parentheses, or
+    None for any other attribute. `#[cfg(not(target_os = "linux"))]` -> `not(target_os = "linux")`."""
+    start = attr_text.find("cfg(")
+    if start < 0:
+        return None
+    depth, i = 0, start + 3
+    for j in range(start + 3, len(attr_text)):
+        if attr_text[j] == "(":
+            depth += 1
+        elif attr_text[j] == ")":
+            depth -= 1
+            if depth == 0:
+                return attr_text[i + 1:j]
+    return None
+
+
+def _enclosing_cfg(src: bytes, node: Node) -> str | None:
+    """Every `#[cfg(...)]` predicate that gates this node - its own preceding attributes and
+    those of each enclosing item - combined with `all(...)`, since all must hold for the host
+    to compile it. None when nothing gates it. This is how a host-dead branch is spotted
+    before a proof is ever spent on it."""
+    preds: list[str] = []
+    cur: Node | None = node
+    while cur is not None:
+        prev = cur.prev_sibling
+        while prev is not None and prev.type in ("attribute_item", "line_comment", "block_comment"):
+            if prev.type == "attribute_item":
+                inner = _cfg_inner(_text(src, prev) or "")
+                if inner is not None:
+                    preds.append(inner.strip())
+            prev = prev.prev_sibling
+        cur = cur.parent
+    if not preds:
+        return None
+    return preds[0] if len(preds) == 1 else "all(" + ", ".join(preds) + ")"
+
+
 class RustParam(TypedDict):
     name: str
     type: str | None
@@ -35,6 +73,7 @@ class RustBranch(TypedDict):
     kind: str
     line: int          # 1-based source line of the branch construct
     body_line: int | None   # 1-based line of the branch body's first executable statement
+    cfg: str | None    # the `#[cfg(...)]` predicate gating this branch, or None
 
 
 class RustFunction(TypedDict):
@@ -75,7 +114,7 @@ def _first_executable_line(body: Node | None) -> int | None:
     return node.start_point[0] + 1
 
 
-def _branches(fn_body: Node) -> list[RustBranch]:
+def _branches(src: bytes, fn_body: Node) -> list[RustBranch]:
     out: list[RustBranch] = []
 
     def walk(n: Node) -> None:
@@ -83,20 +122,24 @@ def _branches(fn_body: Node) -> list[RustBranch]:
             return  # nested fn: its branches belong to it, not to us
         if n.type == "if_expression":
             cons = n.child_by_field_name("consequence")
-            out.append({"kind": "if", "line": n.start_point[0] + 1, "body_line": _first_executable_line(cons)})
+            out.append({"kind": "if", "line": n.start_point[0] + 1,
+                        "body_line": _first_executable_line(cons), "cfg": _enclosing_cfg(src, n)})
             alt = n.child_by_field_name("alternative")
             if alt is not None:
                 # else / else-if: the alternative is a block or another if_expression
                 blk = next((c for c in alt.named_children if c.type == "block"), None)
-                out.append({"kind": "else", "line": alt.start_point[0] + 1, "body_line": _first_executable_line(blk)})
+                out.append({"kind": "else", "line": alt.start_point[0] + 1,
+                            "body_line": _first_executable_line(blk), "cfg": _enclosing_cfg(src, n)})
         elif n.type == "match_expression":
             body = n.child_by_field_name("body")
             for arm in (c for c in body.named_children if c.type == "match_arm") if body else ():
                 out.append({"kind": "match_arm", "line": arm.start_point[0] + 1,
-                            "body_line": _first_executable_line(arm.child_by_field_name("value"))})
+                            "body_line": _first_executable_line(arm.child_by_field_name("value")),
+                            "cfg": _enclosing_cfg(src, arm)})
         elif n.type in _BRANCH_BODY:
             body = n.child_by_field_name(_BRANCH_BODY[n.type][0])
-            out.append({"kind": n.type.split("_")[0], "line": n.start_point[0] + 1, "body_line": _first_executable_line(body)})
+            out.append({"kind": n.type.split("_")[0], "line": n.start_point[0] + 1,
+                        "body_line": _first_executable_line(body), "cfg": _enclosing_cfg(src, n)})
         for c in n.named_children:
             walk(c)
 
@@ -127,7 +170,7 @@ def module_functions(source: str) -> list[RustFunction]:
                     "source": _text(src, n) or "",
                     "parameters": _parameters(src, n.child_by_field_name("parameters")),
                     "return_type": _text(src, n.child_by_field_name("return_type")),
-                    "branches": _branches(body),
+                    "branches": _branches(src, body),
                 })
         for c in n.named_children:
             walk(c)
@@ -140,6 +183,7 @@ class CoverageGap(TypedDict):
     function: str
     kind: str
     line: int
+    cfg: str | None
     function_source: str
     parameters: list[RustParam]
     return_type: str | None
@@ -156,7 +200,7 @@ def uncovered_gaps(functions: list[RustFunction], uncovered_lines: frozenset[int
         for b in fn["branches"]:
             if b["body_line"] is not None and b["body_line"] in uncovered_lines:
                 gaps.append({
-                    "function": fn["name"], "kind": b["kind"], "line": b["line"],
+                    "function": fn["name"], "kind": b["kind"], "line": b["line"], "cfg": b["cfg"],
                     "function_source": fn["source"], "parameters": fn["parameters"], "return_type": fn["return_type"],
                 })
     return gaps
