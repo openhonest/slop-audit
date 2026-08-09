@@ -42,6 +42,7 @@ from typing import Any, TypedDict
 
 from tree_sitter import Node
 
+from l1_analyzer import state_bounds_filters
 from l1_analyzer.indicators import (
     LANG_CFG,
     LangCfg,
@@ -653,6 +654,11 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: se
         verdict, drives = const
     else:
         verdict, drives = _verdict([_categorize(r, sp, closed_sets) for r in refs])
+    # Attribute-level false-positive filter (Python): the per-reference verdict conflates
+    # unbounded data with an unbounded decision. Clear a finding to NEUTRAL only when the
+    # attribute is a provable write-once, memoization cache, or carried-value shape.
+    if verdict != NEUTRAL and sp is LANG_SPEC["python"] and state_bounds_filters.is_false_positive(key, refs, verdict):
+        verdict, drives = NEUTRAL, False
     line = min((r.start_point[0] + 1 for r in refs), default=1)
     return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel, "line": line}
 
