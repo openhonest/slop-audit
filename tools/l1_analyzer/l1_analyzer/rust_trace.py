@@ -38,6 +38,18 @@ def _cargo() -> str | None:
     return shutil.which("cargo")
 
 
+def _toolchain(repo: Path, timeout_seconds: float) -> str:
+    """The rustc toolchain rustup resolves for this repo (its rust-toolchain.toml wins),
+    named so the result says which environment measured it. Directory-insensitive: the
+    rustup shim run with cwd=repo selects the repo's pinned toolchain."""
+    cargo = _cargo()
+    if cargo is None:
+        return "an unknown rust toolchain"
+    probe = _run_untrusted([str(Path(cargo).with_name("rustc")), "--version"],
+                           cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 30))
+    return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown rust toolchain"
+
+
 def _llvm_cov_available() -> bool:
     cargo = _cargo()
     if cargo is None:
@@ -169,7 +181,8 @@ def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:
     return {
         "value": round(pct, 1),
         "band": result_band,
-        "details": f"{covered}/{count} llvm-cov regions exercised by tests, region coverage ({suite})",
+        "details": f"{covered}/{count} llvm-cov regions exercised by tests, region coverage "
+                   f"({suite}; ran under {_toolchain(repo, timeout_seconds)})",
     }
 
 
@@ -200,5 +213,6 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float) -> L1Result:
     return {
         "value": f"{passing}/{runs}",
         "band": result_band,
-        "details": f"{passing} of {runs} cargo-test runs passed cleanly (libtest varies order across runs)",
+        "details": f"{passing} of {runs} cargo-test runs passed cleanly (libtest varies order across runs; "
+                   f"ran under {_toolchain(repo, timeout_seconds)})",
     }

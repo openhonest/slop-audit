@@ -38,7 +38,7 @@ import tree_sitter_rust
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
-from l1_analyzer import pytest_trace, rust_trace
+from l1_analyzer import go_trace, pytest_trace, rust_trace
 
 # ---------------------------------------------------------------------------
 # Data shape + pure scoring
@@ -676,22 +676,38 @@ def _god_files(repo: Path) -> L1Result:
         note += "; " + ", ".join(f"{n} >1k LOC scoped out ({r})" for r, n in sorted(scoped_by_reason.items()))
     return {"value": round(god_pct, 2), "band": band_value, "details": _with_skipped(note, skipped)}
 
+# The runtime-harness seam. Each entry runs the target repo's OWN suite and returns an
+# L1Result; a language with no entry reports n/a with its reason. To add a language, write a
+# module exposing `decision_space_coverage(repo, timeout, runtime_override)` and
+# `test_determinism(repo, runs, timeout, runtime_override)` that detects the target's own
+# runtime (directory-insensitive) and returns n/a with a reason when it cannot measure, then
+# register it below. `runtime_override` is the optional runtime hint (the Python interpreter
+# for pytest; self-detecting harnesses ignore it).
+_COVERAGE_HARNESS = {
+    "python": lambda repo, timeout, override: pytest_trace.decision_space_coverage(repo, "python", timeout, override),
+    "rust": lambda repo, timeout, override: rust_trace.decision_space_coverage(repo, timeout),
+    "go": lambda repo, timeout, override: go_trace.decision_space_coverage(repo, timeout, override),
+}
+_DETERMINISM_HARNESS = {
+    "python": lambda repo, timeout, override: pytest_trace.test_determinism(repo, "python", 5, timeout, override),
+    "rust": lambda repo, timeout, override: rust_trace.test_determinism(repo, 5, timeout),
+    "go": lambda repo, timeout, override: go_trace.test_determinism(repo, 5, timeout, override),
+}
+
+
 def _runtime_coverage(repo: Path, lang: str, timeout_seconds: float, python_executable: str | None) -> L1Result:
-    """Route to the language's runtime coverage harness. Each executes the target
-    repo's own suite; a language with no harness reports n/a with its reason.
-    `python_executable` selects the Python interpreter for the pytest harness."""
-    if lang == "python":
-        return pytest_trace.decision_space_coverage(repo, lang, timeout_seconds, python_executable)
-    if lang == "rust":
-        return rust_trace.decision_space_coverage(repo, timeout_seconds)
-    return {"value": "n/a", "band": "n/a", "details": f"runtime decision-coverage harness not implemented for {lang}"}
+    """Dispatch to the language's runtime coverage harness (the seam above), or n/a."""
+    harness = _COVERAGE_HARNESS.get(lang)
+    if harness is None:
+        return {"value": "n/a", "band": "n/a", "details": f"runtime decision-coverage harness not implemented for {lang}"}
+    return harness(repo, timeout_seconds, python_executable)
 
 def _runtime_determinism(repo: Path, lang: str, timeout_seconds: float, python_executable: str | None) -> L1Result:
-    if lang == "python":
-        return pytest_trace.test_determinism(repo, lang, 5, timeout_seconds, python_executable)
-    if lang == "rust":
-        return rust_trace.test_determinism(repo, 5, timeout_seconds)
-    return {"value": "n/a", "band": "n/a", "details": f"runtime determinism harness not implemented for {lang}"}
+    """Dispatch to the language's runtime determinism harness (the seam above), or n/a."""
+    harness = _DETERMINISM_HARNESS.get(lang)
+    if harness is None:
+        return {"value": "n/a", "band": "n/a", "details": f"runtime determinism harness not implemented for {lang}"}
+    return harness(repo, timeout_seconds, python_executable)
 
 def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float,
                         python_executable: str | None = None) -> L1Result:
