@@ -11,18 +11,21 @@ language-level, not dialect-level.
   (`--sequence.shuffle --sequence.seed`) and jest>=30 (`--seed`) are the runners this
   harness can drive; a project on any other runner reports n/a with the runner it detected.
 
-Directory-insensitive by construction: `node` and `npx` are invoked with `cwd=repo`, so the
-project's own `node_modules`, `package.json` test script, and `.nvmrc` select the toolchain,
-whatever launched the analyzer. The resolved `node --version` is named in every measured
-result. Following the shared discipline, each path returns an explicit *not measured* reason
-rather than a guessed number, and runs the project's (untrusted) suite in a new process group
-with a hard timeout. `runtime_override` is accepted for a uniform harness signature and
-ignored: `node` on PATH is the runtime, and the project selects its own runner.
+Directory-insensitive by construction: commands run with `cwd=repo`, so the project's own
+`node_modules` and `package.json` test script are used. When nvm is installed it is sourced
+and `nvm use` runs in the repo, so `.nvmrc` selects the node version (nvm is shell-resident,
+sourced from `$NVM_DIR/nvm.sh`, and cannot be found on PATH like a shim); without nvm the
+ambient node is used. The resolved `node --version` is named in every measured result.
+Following the shared discipline, each path returns an explicit *not measured* reason rather
+than a guessed number, and runs the project's (untrusted) suite in a new process group with a
+hard timeout. `runtime_override` is accepted for a uniform harness signature and ignored: the
+project's own node (via nvm/.nvmrc when present) is the runtime, and it selects its own runner.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import shutil
 import tempfile
@@ -38,22 +41,47 @@ def _node() -> str | None:
     return shutil.which("node")
 
 
-def _node_version(node: str, repo: Path, timeout_seconds: float) -> str:
-    probe = _run_untrusted([node, "--version"], cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 30))
+def _nvm_dir() -> Path | None:
+    """The nvm install, or None. nvm is a shell function sourced from `$NVM_DIR/nvm.sh`
+    (default `~/.nvm/nvm.sh`) - there is nowhere else for it to be - so it cannot be found on
+    PATH like a shim; it must be sourced."""
+    directory = Path(os.environ.get("NVM_DIR") or (Path.home() / ".nvm"))
+    return directory if (directory / "nvm.sh").exists() else None
+
+
+def _wrap(repo: Path, cmd: list[str]) -> list[str]:
+    """Run `cmd` under the node version the repo pins. When nvm is installed, source it and
+    `nvm use` (with cwd=repo, so its `.nvmrc` selects the version), then exec the command so a
+    bare `node`/`npx` resolves to that version. Without nvm, run the command unchanged under
+    the ambient node. This is what makes JS directory-insensitive under nvm."""
+    nvm = _nvm_dir()
+    if nvm is None:
+        return cmd
+    script = f'. "{nvm / "nvm.sh"}" >/dev/null 2>&1; nvm use --silent >/dev/null 2>&1; exec "$@"'
+    return ["bash", "-c", script, "nvm", *cmd]
+
+
+def _using_nvm() -> str:
+    return " via nvm" if _nvm_dir() is not None else ""
+
+
+def _node_version(repo: Path, timeout_seconds: float) -> str:
+    probe = _run_untrusted(_wrap(repo, ["node", "--version"]), cwd=repo, env={},
+                           timeout_seconds=min(timeout_seconds, 30))
     return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown node runtime"
 
 
-def _runtime_name(node: str, repo: Path, timeout_seconds: float) -> str:
+def _runtime_name(repo: Path, timeout_seconds: float) -> str:
     """The Node runtime that ran, named so the result says which environment measured it.
-    `.nvmrc` is best-effort context: when present, its pin is appended, but the executing
-    `node --version` is the authoritative runtime."""
-    version = _node_version(node, repo, timeout_seconds)
+    Under nvm the version is the one `.nvmrc` selected; the pin is appended for confirmation."""
+    version = _node_version(repo, timeout_seconds)
     nvmrc = repo / ".nvmrc"
     try:
         pin = _first_line(nvmrc.read_text()) if nvmrc.exists() else ""
     except OSError:
         pin = ""
-    return f"{version} (.nvmrc pins {pin})" if pin and pin != "no output" else version
+    pinned = f" (.nvmrc pins {pin})" if pin and pin != "no output" else ""
+    return f"{version}{_using_nvm()}{pinned}"
 
 
 def _node_modules_present(repo: Path) -> bool:
@@ -89,7 +117,7 @@ def _installed_major(repo: Path, package: str) -> int | None:
 # ---------------------------------------------------------------------------
 
 def _c8_available(repo: Path, timeout_seconds: float) -> bool:
-    probe = _run_untrusted(["npx", "--no-install", "c8", "--version"], cwd=repo, env={},
+    probe = _run_untrusted(_wrap(repo, ["npx", "--no-install", "c8", "--version"]), cwd=repo, env={},
                            timeout_seconds=min(timeout_seconds, 60))
     return probe.returncode == 0
 
@@ -116,9 +144,9 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         reports = Path(directory) / "reports"
         summary = reports / "coverage-summary.json"
         run = _run_untrusted(
-            ["npx", "--no-install", "c8", "--reporter=json-summary",
-             f"--reports-dir={reports}", f"--temp-directory={Path(directory) / 'tmp'}",
-             *shlex.split(test_cmd)],
+            _wrap(repo, ["npx", "--no-install", "c8", "--reporter=json-summary",
+                         f"--reports-dir={reports}", f"--temp-directory={Path(directory) / 'tmp'}",
+                         *shlex.split(test_cmd)]),
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
         if run.returncode == 124:
@@ -144,7 +172,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         "value": round(pct, 1),
         "band": result_band,
         "details": f"{pct}% branch coverage from c8 (V8) "
-                   f"({suite}; ran under {_runtime_name(node, repo, timeout_seconds)})",
+                   f"({suite}; ran under {_runtime_name(repo, timeout_seconds)})",
     }
 
 
@@ -226,11 +254,11 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         if major is not None and major < 30:
             return _na(f"jest --seed needs jest>=30; detected jest {major} in node_modules")
 
-    runtime = _runtime_name(node, repo, timeout_seconds)
+    runtime = _runtime_name(repo, timeout_seconds)
     passing = 0
     failing: list[str] = []
     for seed in range(1, runs + 1):
-        run = _run_untrusted(builder(seed), cwd=repo, env={}, timeout_seconds=timeout_seconds)
+        run = _run_untrusted(_wrap(repo, builder(seed)), cwd=repo, env={}, timeout_seconds=timeout_seconds)
         output = (run.stdout or "") + (run.stderr or "")
         if run.returncode == 124:
             return _na(f"a randomized run timed out (seed {seed}); determinism not measured")

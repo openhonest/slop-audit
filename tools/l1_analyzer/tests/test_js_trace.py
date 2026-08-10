@@ -159,3 +159,26 @@ def test_suite_ran_detects_execution():
     assert js_trace._suite_ran("vitest", "Test Files  1 passed (1)")
     assert js_trace._suite_ran("jest", "Tests:       3 passed, 3 total")
     assert not js_trace._suite_ran("vitest", "npm error could not determine executable")
+
+
+# --- nvm sourcing (directory-insensitive node under nvm) ----------------------
+
+def test_nvm_dir_detects_nvm_sh(monkeypatch, tmp_path):
+    monkeypatch.setenv("NVM_DIR", str(tmp_path / "nvm"))
+    assert js_trace._nvm_dir() is None                      # no nvm.sh yet
+    (tmp_path / "nvm").mkdir()
+    (tmp_path / "nvm" / "nvm.sh").write_text("")
+    assert js_trace._nvm_dir() == tmp_path / "nvm"
+
+
+def test_wrap_sources_nvm_and_preserves_the_command(monkeypatch, tmp_path):
+    monkeypatch.setattr(js_trace, "_nvm_dir", lambda: tmp_path / ".nvm")
+    wrapped = js_trace._wrap(tmp_path, ["npx", "c8", "--version"])
+    assert wrapped[0:2] == ["bash", "-c"]
+    assert "nvm.sh" in wrapped[2] and "nvm use" in wrapped[2] and 'exec "$@"' in wrapped[2]
+    assert wrapped[3] == "nvm" and wrapped[4:] == ["npx", "c8", "--version"]   # command preserved
+
+
+def test_wrap_is_a_noop_without_nvm(monkeypatch, tmp_path):
+    monkeypatch.setattr(js_trace, "_nvm_dir", lambda: None)
+    assert js_trace._wrap(tmp_path, ["node", "--version"]) == ["node", "--version"]
