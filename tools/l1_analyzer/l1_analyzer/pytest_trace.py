@@ -69,10 +69,41 @@ def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str], timeout_s
 
 
 def _interpreter(python_executable: str | None) -> str:
-    """Resolve the interpreter that runs the target suite. `None` (the named Nothing) means
-    the analyzer's own interpreter; a path selects a different one, e.g. the target repo's
-    venv python when it needs a Python the analyzer itself cannot run under."""
+    """Resolve a bare interpreter override: the named path, or the analyzer's own. Used by
+    the module-availability probe, which has no repo to auto-detect a venv from."""
     return python_executable or sys.executable
+
+
+# venv layouts, in the order a target repo is most likely to use. The suite must run under
+# the interpreter where the target package and its test deps are installed, not the one that
+# happened to launch the analyzer, or coverage records nothing and every run fails.
+_VENV_PYTHONS = (
+    ".venv/bin/python", ".venv/bin/python3", "venv/bin/python", "venv/bin/python3",
+    ".venv/Scripts/python.exe", "venv/Scripts/python.exe",
+)
+
+
+def detect_target_interpreter(repo: Path) -> str | None:
+    """The target repo's own venv interpreter, or None when it has none. This is what makes
+    the audit directory-insensitive: the runtime result depends on the target's environment,
+    not on where or how the analyzer was launched."""
+    for rel in _VENV_PYTHONS:
+        candidate = repo / rel
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def resolve_interpreter(repo: Path, python_executable: str | None) -> tuple[str, str]:
+    """(interpreter, provenance) for running the target suite. Precedence: an explicit
+    override, then the target repo's own venv, then the analyzer's interpreter. The
+    provenance string is surfaced in the result so which interpreter ran is never hidden."""
+    if python_executable:
+        return python_executable, f"--python {python_executable}"
+    detected = detect_target_interpreter(repo)
+    if detected:
+        return detected, f"target venv {detected}"
+    return sys.executable, f"the analyzer's own interpreter {sys.executable}"
 
 
 def _module_available(module: str, python_executable: str | None = None) -> bool:
@@ -113,9 +144,9 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
     """
     if lang != "python":
         return _na(f"runtime decision-coverage harness is Python-only; {lang} not supported yet")
-    exe = _interpreter(python_executable)
+    exe, provenance = resolve_interpreter(repo, python_executable)
     if not _module_available("pytest", exe) or not _module_available("coverage", exe):
-        return _na("needs pytest and coverage.py in the target environment (e.g. run inside the repo's venv)")
+        return _na(f"needs pytest and coverage.py in the target environment ({provenance})")
 
     with tempfile.TemporaryDirectory(prefix="l1-cov-") as directory:
         data_file = Path(directory) / ".coverage"
@@ -160,7 +191,8 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
     return {
         "value": round(pct, 1),
         "band": result_band,
-        "details": f"{covered_branches}/{num_branches} decision branches exercised by tests ({suite})",
+        "details": f"{covered_branches}/{num_branches} decision branches exercised by tests "
+                   f"({suite}; ran under {provenance})",
     }
 
 
@@ -193,11 +225,11 @@ def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float,
     """
     if lang != "python":
         return _na(f"runtime determinism harness is Python-only; {lang} not supported yet")
-    exe = _interpreter(python_executable)
+    exe, provenance = resolve_interpreter(repo, python_executable)
     if not _module_available("pytest", exe):
-        return _na("needs pytest in the target environment")
+        return _na(f"needs pytest in the target environment ({provenance})")
     if not _module_available("pytest_randomly", exe):
-        return _na("needs pytest-randomly to randomize execution order (install it in the target environment)")
+        return _na(f"needs pytest-randomly to randomize execution order (install it in {provenance})")
 
     _INCOMPLETE = {2: "the run was interrupted", 3: "pytest hit an internal error",
                    4: "pytest usage or collection error (the suite did not run)"}
@@ -222,7 +254,7 @@ def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float,
             failing.append(f"seed {seed}: {_pytest_summary((run.stdout or '') + (run.stderr or ''))}")
 
     result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
-    details = f"{passing} of {runs} randomized-order runs passed cleanly"
+    details = f"{passing} of {runs} randomized-order runs passed cleanly (under {provenance})"
     if failing:
-        details += f" (runs with failures: {'; '.join(failing[:3])})"
+        details += f"; runs with failures: {'; '.join(failing[:3])}"
     return {"value": f"{passing}/{runs}", "band": result_band, "details": details}

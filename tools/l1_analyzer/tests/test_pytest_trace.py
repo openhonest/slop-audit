@@ -92,3 +92,29 @@ def test_module_available_probes_the_named_interpreter(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake)
     pytest_trace._module_available("pytest", "/tgt/venv/bin/python")
     assert seen["exe"] == "/tgt/venv/bin/python"
+
+
+# --- directory-insensitive interpreter detection ------------------------------
+
+def test_detect_target_interpreter_finds_a_repo_venv(tmp_path):
+    assert pytest_trace.detect_target_interpreter(tmp_path) is None
+    venv = tmp_path / ".venv" / "bin"
+    venv.mkdir(parents=True)
+    (venv / "python").write_text("")   # existence is all detection needs
+    assert pytest_trace.detect_target_interpreter(tmp_path) == str(venv / "python")
+
+
+def test_resolve_interpreter_precedence(tmp_path):
+    import sys
+    # 1. an explicit override wins over everything.
+    exe, prov = pytest_trace.resolve_interpreter(tmp_path, "/x/py")
+    assert exe == "/x/py" and "--python" in prov
+    # 2. else the target repo's own venv (this is what makes the audit dir-insensitive).
+    venv = tmp_path / ".venv" / "bin"
+    venv.mkdir(parents=True)
+    (venv / "python").write_text("")
+    exe, prov = pytest_trace.resolve_interpreter(tmp_path, None)
+    assert exe == str(venv / "python") and "target venv" in prov
+    # 3. else the analyzer's own interpreter (a repo with no venv).
+    exe, prov = pytest_trace.resolve_interpreter(tmp_path / "no-venv-here", None)
+    assert exe == sys.executable and "analyzer" in prov
