@@ -170,6 +170,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Seconds allowed for each test-suite execution in L1.19/L1.20 (default 300).",
     )
     parser.add_argument(
+        "--python",
+        default=None,
+        metavar="PATH",
+        help="Interpreter that runs the target suite for L1.19/L1.20. Defaults to the analyzer's "
+             "own interpreter; point it at the target repo's venv python when the target needs a "
+             "different Python (e.g. a 3.11 target audited from a 3.12+ analyzer). The target "
+             "package must be importable there, or coverage/determinism report n/a with the reason.",
+    )
+    parser.add_argument(
         "--no-state-bounds",
         action="store_true",
         help="Turn off the additive L1.18b state-bounds classifier. Pre-registered runs use this "
@@ -300,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     if inds is None or any(i in ("12","13","14","15","16","17","18","19","20","all") for i in (inds or [])):
         source_results = indicators.compute_source_indicators(
             args.repo, lang=args.lang, exec_tests=not args.no_exec, timeout_seconds=args.timeout,
-            classify_state_bounds=not args.no_state_bounds,
+            classify_state_bounds=not args.no_state_bounds, python_executable=args.python,
         )
         results.update(source_results)
         # Schedule-silence (static, cheap): of the flagged concurrency surface, which

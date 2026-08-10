@@ -522,10 +522,17 @@ def compute_source_indicators(
     exec_tests: bool,
     timeout_seconds: float,
     classify_state_bounds: bool = True,
+    python_executable: str | None = None,
 ) -> dict[str, L1Result]:
     """L1.12-L1.20. `lang` may be "auto" (resolved here) or a concrete key.
     `exec_tests` gates the two runtime indicators (L1.19 coverage, L1.20);
     `timeout_seconds` bounds each test-suite execution.
+
+    `python_executable` is the interpreter the L1.19/L1.20 harness runs the target suite
+    under. `None` (the named Nothing) means the analyzer's own interpreter; pass the target
+    repo's venv python when it needs a Python the analyzer cannot run under (e.g. a 3.11
+    target audited from a 3.12+ analyzer). If the target package is not importable there, the
+    harness reports n/a with the reason rather than a misleading 0/5 or empty coverage.
 
     `classify_state_bounds` gates the additive L1.18b state-bounds refinement. It
     is ON by default for real users (CLI, web). The pre-registered experiments
@@ -539,9 +546,9 @@ def compute_source_indicators(
     results["L1.17"] = _god_files(repo)
     results["L1.18"] = analyze_mutable_state(repo, lang)
     results["L1.15"] = _compute_type_escapes(repo, lang)
-    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds)
+    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds, python_executable)
     results.update(_compute_external_indicators(repo, lang))
-    results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds)
+    results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds, python_executable)
     if classify_state_bounds:
         from l1_analyzer import state_bounds
         results["L1.18b"] = state_bounds.classify(repo, lang)
@@ -669,39 +676,42 @@ def _god_files(repo: Path) -> L1Result:
         note += "; " + ", ".join(f"{n} >1k LOC scoped out ({r})" for r, n in sorted(scoped_by_reason.items()))
     return {"value": round(god_pct, 2), "band": band_value, "details": _with_skipped(note, skipped)}
 
-def _runtime_coverage(repo: Path, lang: str, timeout_seconds: float) -> L1Result:
+def _runtime_coverage(repo: Path, lang: str, timeout_seconds: float, python_executable: str | None) -> L1Result:
     """Route to the language's runtime coverage harness. Each executes the target
-    repo's own suite; a language with no harness reports n/a with its reason."""
+    repo's own suite; a language with no harness reports n/a with its reason.
+    `python_executable` selects the Python interpreter for the pytest harness."""
     if lang == "python":
-        return pytest_trace.decision_space_coverage(repo, lang, timeout_seconds)
+        return pytest_trace.decision_space_coverage(repo, lang, timeout_seconds, python_executable)
     if lang == "rust":
         return rust_trace.decision_space_coverage(repo, timeout_seconds)
     return {"value": "n/a", "band": "n/a", "details": f"runtime decision-coverage harness not implemented for {lang}"}
 
-def _runtime_determinism(repo: Path, lang: str, timeout_seconds: float) -> L1Result:
+def _runtime_determinism(repo: Path, lang: str, timeout_seconds: float, python_executable: str | None) -> L1Result:
     if lang == "python":
-        return pytest_trace.test_determinism(repo, lang, 5, timeout_seconds)
+        return pytest_trace.test_determinism(repo, lang, 5, timeout_seconds, python_executable)
     if lang == "rust":
         return rust_trace.test_determinism(repo, 5, timeout_seconds)
     return {"value": "n/a", "band": "n/a", "details": f"runtime determinism harness not implemented for {lang}"}
 
-def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float) -> L1Result:
+def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float,
+                        python_executable: str | None = None) -> L1Result:
     """Real coverage when the suite can run; otherwise the static decision-point
     enumeration with coverage clearly marked not-measured."""
     static = _compute_decision_space(repo, lang)
     if not exec_tests:
         static["details"] += "; coverage not measured (test execution disabled)"
         return static
-    cov = _runtime_coverage(repo, lang, timeout_seconds)
+    cov = _runtime_coverage(repo, lang, timeout_seconds, python_executable)
     if cov.get("band") != "n/a":
         return cov
     static["details"] += f"; coverage not measured: {cov.get('details', 'unavailable')}"
     return static
 
-def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float) -> L1Result:
+def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float,
+                          python_executable: str | None = None) -> L1Result:
     if not exec_tests:
         return {"value": "not run", "band": "n/a", "details": "test execution disabled"}
-    return _runtime_determinism(repo, lang, timeout_seconds)
+    return _runtime_determinism(repo, lang, timeout_seconds, python_executable)
 
 _COMMENT_TYPE_ESCAPES = ("# type: ignore", "// @ts-ignore", "/* @ts-ignore", "@SuppressWarnings")
 

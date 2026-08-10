@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -67,13 +68,19 @@ def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str], timeout_s
         return subprocess.CompletedProcess(command, 124, stdout or "", (stderr or "") + "\ntimed out")
 
 
-def _module_available(module: str) -> bool:
-    """True if `import module` succeeds in this interpreter. The suite runs under
-    sys.executable, so this reflects the environment the analyzer was launched in
-    (e.g. the target repo's venv)."""
+def _interpreter(python_executable: str | None) -> str:
+    """Resolve the interpreter that runs the target suite. `None` (the named Nothing) means
+    the analyzer's own interpreter; a path selects a different one, e.g. the target repo's
+    venv python when it needs a Python the analyzer itself cannot run under."""
+    return python_executable or sys.executable
+
+
+def _module_available(module: str, python_executable: str | None = None) -> bool:
+    """True if `import module` succeeds in the interpreter that will run the suite. That is
+    the analyzer's own interpreter by default, or the one `python_executable` names."""
     try:
         result = subprocess.run(
-            [sys.executable, "-c", f"import {module}"],
+            [_interpreter(python_executable), "-c", f"import {module}"],
             capture_output=True, text=True, timeout=30, check=False,
         )
         return result.returncode == 0
@@ -96,15 +103,18 @@ def _first_line(text: str) -> str:
 # L1.19 decision-space coverage
 # ---------------------------------------------------------------------------
 
-def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float) -> L1Result:
+def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
+                            python_executable: str | None = None) -> L1Result:
     """L1.19: branch-level decision coverage from coverage.py.
 
     Bands (spec 03-layer1-indicators.md): >90% Healthy, 60-90% Not Healthy,
-    <60% Slop.
+    <60% Slop. `python_executable` selects the interpreter that runs the suite; the target
+    package must be importable there, or coverage records nothing.
     """
     if lang != "python":
         return _na(f"runtime decision-coverage harness is Python-only; {lang} not supported yet")
-    if not _module_available("pytest") or not _module_available("coverage"):
+    exe = _interpreter(python_executable)
+    if not _module_available("pytest", exe) or not _module_available("coverage", exe):
         return _na("needs pytest and coverage.py in the target environment (e.g. run inside the repo's venv)")
 
     with tempfile.TemporaryDirectory(prefix="l1-cov-") as directory:
@@ -112,7 +122,7 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float) -> L1
         report_file = Path(directory) / "coverage.json"
         env = {"COVERAGE_FILE": str(data_file)}
         run = _run_untrusted(
-            [sys.executable, "-m", "coverage", "run", "--branch", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
+            [exe, "-m", "coverage", "run", "--branch", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
             cwd=repo, env=env, timeout_seconds=timeout_seconds,
         )
         if run.returncode == 124:
@@ -128,7 +138,7 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float) -> L1
             return _na(f"the test suite did not complete a valid run ({why}); coverage not measured")
         # `coverage json` is our own trusted, fast step.
         subprocess.run(
-            [sys.executable, "-m", "coverage", "json", "-o", str(report_file)],
+            [exe, "-m", "coverage", "json", "-o", str(report_file)],
             cwd=str(repo), env={**os.environ, **env}, capture_output=True, text=True, check=False,
         )
         if not report_file.exists():
@@ -158,36 +168,61 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float) -> L1
 # L1.20 test determinism
 # ---------------------------------------------------------------------------
 
-def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float) -> L1Result:
+_SUMMARY_LINE = re.compile(r"(\d+ (?:failed|passed|error)[^\n]*)")
+
+
+def _pytest_summary(output: str) -> str:
+    """The last pytest summary counts line (e.g. `3 failed, 1219 passed in 10.0s`), or a
+    generic note. This is what turns a bare 0/5 into a reason a reader can act on."""
+    matches = _SUMMARY_LINE.findall(output)
+    return matches[-1].strip() if matches else "no summary line"
+
+
+def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float,
+                     python_executable: str | None = None) -> L1Result:
     """L1.20: run the suite `runs` times in randomized order and count the runs
     where every test passes. Value is "passing/runs".
 
     Bands (spec): 5/5 Healthy, 4/5 Not Healthy, <4/5 Slop.
+
+    A run that does not complete (collection or usage error, exit 2/3/4) means the suite did
+    not execute, not that it is non-deterministic, so return n/a with the reason rather than a
+    misleading 0/5. When the suite runs but some tests fail (exit 1), the failing seeds' counts
+    are surfaced in `details`, because a silent 0/5 reads as flakiness when it is a broken run.
+    `python_executable` selects the interpreter; the target package must import there.
     """
     if lang != "python":
         return _na(f"runtime determinism harness is Python-only; {lang} not supported yet")
-    if not _module_available("pytest"):
+    exe = _interpreter(python_executable)
+    if not _module_available("pytest", exe):
         return _na("needs pytest in the target environment")
-    if not _module_available("pytest_randomly"):
+    if not _module_available("pytest_randomly", exe):
         return _na("needs pytest-randomly to randomize execution order (install it in the target environment)")
 
+    _INCOMPLETE = {2: "the run was interrupted", 3: "pytest hit an internal error",
+                   4: "pytest usage or collection error (the suite did not run)"}
     passing = 0
+    failing: list[str] = []
     # Fixed seeds make the audit itself reproducible; each seed is a different order.
     for seed in range(1, runs + 1):
         run = _run_untrusted(
-            [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", f"--randomly-seed={seed}"],
+            [exe, "-m", "pytest", "-q", "-p", "no:cacheprovider", f"--randomly-seed={seed}"],
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
         if run.returncode == 5:
             return _na("pytest collected no tests")
         if run.returncode == 124:
             return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
+        if run.returncode in _INCOMPLETE:
+            return _na(f"the suite did not complete a valid run (seed {seed}: {_INCOMPLETE[run.returncode]}); "
+                       "determinism not measured")
         if run.returncode == 0:
             passing += 1
+        else:  # exit 1: the suite ran, but not every test passed
+            failing.append(f"seed {seed}: {_pytest_summary((run.stdout or '') + (run.stderr or ''))}")
 
     result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
-    return {
-        "value": f"{passing}/{runs}",
-        "band": result_band,
-        "details": f"{passing} of {runs} randomized-order runs passed cleanly",
-    }
+    details = f"{passing} of {runs} randomized-order runs passed cleanly"
+    if failing:
+        details += f" (runs with failures: {'; '.join(failing[:3])})"
+    return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
