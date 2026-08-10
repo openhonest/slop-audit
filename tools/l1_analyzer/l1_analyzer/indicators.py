@@ -38,7 +38,16 @@ import tree_sitter_rust
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
-from l1_analyzer import go_trace, pytest_trace, rust_trace
+from l1_analyzer import (
+    c_trace,
+    csharp_trace,
+    go_trace,
+    java_trace,
+    js_trace,
+    pytest_trace,
+    ruby_trace,
+    rust_trace,
+)
 
 # ---------------------------------------------------------------------------
 # Data shape + pure scoring
@@ -687,11 +696,23 @@ _COVERAGE_HARNESS = {
     "python": lambda repo, timeout, override: pytest_trace.decision_space_coverage(repo, "python", timeout, override),
     "rust": lambda repo, timeout, override: rust_trace.decision_space_coverage(repo, timeout),
     "go": lambda repo, timeout, override: go_trace.decision_space_coverage(repo, timeout, override),
+    "ruby": lambda repo, timeout, override: ruby_trace.decision_space_coverage(repo, timeout, override),
+    "javascript": lambda repo, timeout, override: js_trace.decision_space_coverage(repo, timeout, override),
+    "typescript": lambda repo, timeout, override: js_trace.decision_space_coverage(repo, timeout, override),
+    "java": lambda repo, timeout, override: java_trace.decision_space_coverage(repo, timeout, override),
+    "csharp": lambda repo, timeout, override: csharp_trace.decision_space_coverage(repo, timeout, override),
+    "c": lambda repo, timeout, override: c_trace.decision_space_coverage(repo, timeout, override),
 }
 _DETERMINISM_HARNESS = {
     "python": lambda repo, timeout, override: pytest_trace.test_determinism(repo, "python", 5, timeout, override),
     "rust": lambda repo, timeout, override: rust_trace.test_determinism(repo, 5, timeout),
     "go": lambda repo, timeout, override: go_trace.test_determinism(repo, 5, timeout, override),
+    "ruby": lambda repo, timeout, override: ruby_trace.test_determinism(repo, 5, timeout, override),
+    "javascript": lambda repo, timeout, override: js_trace.test_determinism(repo, 5, timeout, override),
+    "typescript": lambda repo, timeout, override: js_trace.test_determinism(repo, 5, timeout, override),
+    "java": lambda repo, timeout, override: java_trace.test_determinism(repo, 5, timeout, override),
+    "csharp": lambda repo, timeout, override: csharp_trace.test_determinism(repo, 5, timeout, override),
+    "c": lambda repo, timeout, override: c_trace.test_determinism(repo, 5, timeout, override),
 }
 
 
