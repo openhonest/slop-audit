@@ -60,6 +60,7 @@ class Report(TypedDict, total=False):
     culprits_more: int
     thread_surface: dict[str, object] | None
     schedule_silence: dict[str, object] | None
+    absolute_paths: dict[str, object] | None
 
 
 def _meter_ran(l18b: dict) -> bool:
@@ -157,6 +158,7 @@ def build_report(slug: str, lang: str, results: dict) -> Report:
         "audit": audit, "culprits": culprits, "culprits_more": culprits_more,
         "thread_surface": results.get("thread_surface"),
         "schedule_silence": results.get("schedule_silence"),
+        "absolute_paths": results.get("absolute_paths"),
     }
 
 
@@ -192,6 +194,12 @@ def report_markdown(r: Report) -> str:
         lines += ["", f"## Schedule-silence (concurrency anti-coverage) — {ss['verdict']}", ""]
         for f in (ss.get("unmodeled") or []):
             lines.append(f"- `{f}` — flagged surface no loom/shuttle model touches")
+    ap = r.get("absolute_paths")
+    if isinstance(ap, dict) and ap.get("verdict") == "flagged":
+        lines += ["", f"## Hardcoded absolute paths — {ap['band']}", "", str(ap.get("details", ""))]
+        for f in (ap.get("findings") or [])[:12]:
+            lines.append(f"- `{f['file']}:{f['line']}` — `{f['path']}`")
+        lines += ["", "> A machine-specific path in source couples the code to one filesystem and leaks the author's layout."]
     lines += ["", "## How the grade is computed", "", _RUBRIC, "", "Full methodology: https://slopaudit.org"]
     return "\n".join(lines)
 
@@ -240,6 +248,12 @@ def report_html(r: Report) -> str:
     if isinstance(ss, dict) and ss.get("verdict") not in (None, "n/a"):
         um = "".join(f"<li><code>{e(f)}</code></li>" for f in (ss.get("unmodeled") or []))
         ss_html = f"<h2>Schedule-silence — {e(str(ss['verdict']))}</h2><p class=note>Flagged concurrency surface that no loom/shuttle model touches.</p><ul>{um}</ul>"
+    ap = r.get("absolute_paths")
+    ap_html = ""
+    if isinstance(ap, dict) and ap.get("verdict") == "flagged":
+        hits = "".join(f"<li><code>{e(f['file'])}:{f['line']}</code> — <code>{e(f['path'])}</code></li>" for f in (ap.get("findings") or [])[:12])
+        ap_html = (f"<h2>Hardcoded absolute paths — {e(str(ap['band']))}</h2><p>{e(str(ap.get('details','')))}</p><ul>{hits}</ul>"
+                   f"<p class=note>A machine-specific path in source couples the code to one filesystem and leaks the author's layout.</p>")
     return (
         f"<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
         f"<title>Slop Audit — {e(r['slug'])}</title><style>{_CSS}</style></head><body>"
@@ -249,7 +263,7 @@ def report_html(r: Report) -> str:
         f"<div class=dist><span><b>{r['neutral']}</b> finitely testable</span><span><b>{r['promiscuous']}</b> provably unbounded</span><span><b>{r['unresolved']}</b> undetermined</span></div>"
         f"{culprits}"
         f"<h2>Audit checks</h2><table><thead><tr><th>Check</th><th>Value</th><th>Band</th></tr></thead><tbody>{audit_rows}</tbody></table>"
-        f"{ts_html}{ss_html}"
+        f"{ts_html}{ss_html}{ap_html}"
         f"<h2>How the grade is computed</h2><p class=rubric>{e(_RUBRIC)}</p>"
         f"<p class=rubric>Full methodology: <a href='https://slopaudit.org'>slopaudit.org</a></p>"
         f"</body></html>"

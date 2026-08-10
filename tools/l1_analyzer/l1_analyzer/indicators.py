@@ -552,6 +552,8 @@ def compute_source_indicators(
         # concurrency audit surface, never a race verdict.
         from l1_analyzer import thread_surface
         results["thread_surface"] = thread_surface.scan(repo, lang)
+        from l1_analyzer import absolute_paths
+        results["absolute_paths"] = absolute_paths.scan(repo, lang)
     return results
 
 _WHITESPACE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"})
