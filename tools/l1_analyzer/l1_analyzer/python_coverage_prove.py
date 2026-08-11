@@ -14,7 +14,7 @@ and EXECUTION decides. The gap is an uncovered decision branch:
            the tool's own noise, reported separately, never dressed up as a proven bug.
 
 slop-audit proves the gap; it never writes into the user's test file. Opt-in and CLI-only (it
-runs code): needs OPENAI_API_KEY and the target's pytest environment.
+runs code): needs ANTHROPIC_API_KEY and the target's pytest environment.
 """
 
 from __future__ import annotations
@@ -176,7 +176,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     with uncovered branches is proven. Retained proofs (assertion-divergences) aggregate across
     the package. Directory-insensitive: the suite runs under the target's own interpreter."""
     if not model_available():
-        return {"retained": [], "attempted": 0, "detail": "needs OPENAI_API_KEY to generate coverage proofs"}
+        return {"retained": [], "attempted": 0, "detail": "needs ANTHROPIC_API_KEY to generate coverage proofs"}
     interpreter, provenance = pytest_trace.resolve_interpreter(repo, python_executable)
     if not pytest_trace._module_available("pytest", interpreter) or not pytest_trace._module_available("coverage", interpreter):
         return {"retained": [], "attempted": 0, "detail": f"needs pytest and coverage.py in the target environment ({provenance})"}

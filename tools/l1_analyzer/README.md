@@ -47,7 +47,7 @@ Pass `--python PATH` to force the interpreter (for example a 3.11 target audited
 
 ## Prove loops (opt-in, CLI-only)
 
-These generate and run code, so they are explicit and need `OPENAI_API_KEY`:
+These generate and run code, so they are explicit and need `ANTHROPIC_API_KEY`:
 
 - `--prove` locates concurrency hazards and generates a test that reproduces the race (concurrency proofs → `schedule_silence`).
 - `--prove-coverage-repo` locates uncovered decision branches (L1.19's own gaps) and generates one test per gap, runs it under the target's runtime, and keeps it only if it fails on its own assertion (a proven divergence). Missing-test generation exists for **Rust and Python**; the flag dispatches by language. `--coverage-repair-rounds N` caps the compiler/setup-error repair loop; `--prove-max` caps gaps per module.
@@ -65,5 +65,5 @@ slop-audit proves the gap; it never writes into your test file. Adopting a survi
 | `--report [DIR]` | Write the Markdown and HTML cards. |
 | `--gate` | Pass/fail mode for a pre-commit hook (god-files + finite-testability). |
 | `--no-state-bounds` | Emit exactly the frozen L1.18 set (used by pre-registered runs). |
-| `--prove` / `--prove-coverage-repo` / `--prove-coverage MODULE` | The prove loops (need `OPENAI_API_KEY`). |
+| `--prove` / `--prove-coverage-repo` / `--prove-coverage MODULE` | The prove loops (need `ANTHROPIC_API_KEY`). |
 | `--timeout N` | Seconds per test-suite execution. |

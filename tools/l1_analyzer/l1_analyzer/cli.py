@@ -123,7 +123,7 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
     if lang != "rust":
         return {"verdict": "n/a", "detail": f"prove is Rust-only for now; {lang} not supported", "demonstrated": 0, "outcomes": []}
     if not prove.model_available():
-        return {"verdict": "n/a", "detail": "needs OPENAI_API_KEY to generate proofs", "demonstrated": 0, "outcomes": []}
+        return {"verdict": "n/a", "detail": "needs ANTHROPIC_API_KEY to generate proofs", "demonstrated": 0, "outcomes": []}
     ts = thread_surface_result if isinstance(thread_surface_result, dict) else thread_surface.scan(repo, lang)
     candidates = [f for f in ts.get("findings", []) if f.get("severity") == "review"][:prove_max]
     work_root = Path(tempfile.mkdtemp(prefix="l1-prove-"))
@@ -224,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Prove located hazards: for each review-tier concurrency finding, ask a model to write a "
              "Rust test that reproduces the race, run it under the stress runner, and keep it only if it "
              "genuinely fires. Locate is deterministic; the model only fills a located gap; the execution "
-             "gate decides. Needs OPENAI_API_KEY, cargo, and the openai package (pip install openai). "
+             "gate decides. Needs ANTHROPIC_API_KEY, cargo, and the anthropic package (pip install anthropic). "
              "Opt-in and CLI-only - it generates and runs code.",
     )
     parser.add_argument(
@@ -249,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Prove coverage gaps across the ENTIRE Rust crate: one coverage build, then every module "
              "with uncovered branches is swept (batched into one compile per module, with per-gap repair "
              "fallback). Retained proofs from all modules land in the report's Adoptable proofs section. "
-             "Long-running (one build per module); native slop-audit; needs OPENAI_API_KEY, cargo, "
+             "Long-running (one build per module); native slop-audit; needs ANTHROPIC_API_KEY, cargo, "
              "cargo-llvm-cov. --prove-max caps gaps per module.",
     )
     parser.add_argument(
@@ -260,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
              "src/foo.rs): locate the module's uncovered decision branches, ask a model for a calling "
              "test per gap, run each in-crate under `cargo test`, and keep it only if it genuinely "
              "fails - a runnable test that closes the gap. Retained tests appear in the report's "
-             "Adoptable proofs section. Native slop-audit; needs OPENAI_API_KEY, cargo, and "
+             "Adoptable proofs section. Native slop-audit; needs ANTHROPIC_API_KEY, cargo, and "
              "cargo-llvm-cov. Opt-in and CLI-only (it runs code).",
     )
     parser.add_argument(

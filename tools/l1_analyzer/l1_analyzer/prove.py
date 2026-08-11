@@ -12,7 +12,7 @@ on the concurrency axis:
 
 Both the model call and the execution are injected, so the loop's honesty property
 (retain iff demonstrated) is testable without an API key or a build. Production wires in
-GPT-5.6 for generation and the stress runner for execution.
+Claude Sonnet 5 for generation and the stress runner for execution.
 """
 
 from __future__ import annotations
@@ -105,7 +105,7 @@ def retained(outcomes: list[ProofOutcome]) -> list[ProofOutcome]:
 #
 # The generator follows Umbra's discipline (structure deterministic; the model only
 # fills an already-located gap; the execution gate, not the model, decides), ported
-# into slop-audit so the whole platform is self-contained. openai is an optional
+# into slop-audit so the whole platform is self-contained. anthropic is an optional
 # dependency - absent, the loop reports not-generated, never a false claim.
 # --------------------------------------------------------------------------
 
@@ -124,9 +124,9 @@ _PROVE_CRATE_DEPS = 'crossbeam-skiplist = "0.1"\ncrossbeam-utils = "0.8"\ncrossb
 
 
 def model_available() -> bool:
-    """Whether a generation model can be called (an OpenAI key is present)."""
+    """Whether a generation model can be called (an Anthropic key is present)."""
     import os
-    return bool(os.getenv("OPENAI_API_KEY"))
+    return bool(os.getenv("ANTHROPIC_API_KEY"))
 
 
 def _strip_fences(code: str) -> str:
@@ -135,28 +135,27 @@ def _strip_fences(code: str) -> str:
 
 
 def generate(request: ProofRequest) -> str | None:
-    """The prove-stage generator: GPT-5.6 writes a self-contained Rust test that
+    """The prove-stage generator: Claude Sonnet 5 writes a self-contained Rust test that
     reproduces the located hazard as a failing, nondeterministic race. Returns None when
-    no model / openai is available - the loop then reports not-generated, never a false
+    no model / anthropic is available - the loop then reports not-generated, never a false
     claim. The execution gate, not this call, decides whether the proof stands."""
     import os
     if not model_available():
         return None
     try:
-        from openai import OpenAI
+        from anthropic import Anthropic
     except ImportError:
         return None
     try:
-        response = OpenAI(api_key=os.environ["OPENAI_API_KEY"]).responses.create(
-            model="gpt-5.6",
-            input=[
-                {"role": "developer", "content": _CONCURRENCY_INSTRUCTION},
-                {"role": "user", "content": request["context"]},
-            ],
+        response = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]).messages.create(
+            model="claude-sonnet-5",
+            max_tokens=4096,
+            system=_CONCURRENCY_INSTRUCTION,
+            messages=[{"role": "user", "content": request["context"]}],
         )
     except Exception:  # noqa: BLE001 - any generation failure yields no proof, never a false claim
         return None
-    return _strip_fences(response.output_text)
+    return _strip_fences(response.content[0].text)
 
 
 def write_crate_and_stress(test_source: str, work_dir: str, runs: int, timeout_seconds: float) -> RunResult:

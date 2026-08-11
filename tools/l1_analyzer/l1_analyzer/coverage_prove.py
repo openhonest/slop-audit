@@ -21,7 +21,7 @@ slop-audit proves the gap; it never writes into the user's test file. The module
 only for the duration of one run and restored byte-for-byte afterward. Retained proofs land
 on the card's adoptable-proofs surface (results['coverage_proofs']).
 
-Opt-in and CLI-only (it runs code): needs OPENAI_API_KEY, cargo, and cargo-llvm-cov. Repair
+Opt-in and CLI-only (it runs code): needs ANTHROPIC_API_KEY, cargo, and cargo-llvm-cov. Repair
 trades wall-clock for reach - each round is another in-crate compile - so it is bounded by a
 round cap per gap and can be switched off (repair_rounds=0).
 """
@@ -66,7 +66,7 @@ _PROOF_MOD = "l1_coverage_proof"
 
 
 def model_available() -> bool:
-    return bool(os.getenv("OPENAI_API_KEY"))
+    return bool(os.getenv("ANTHROPIC_API_KEY"))
 
 
 def host_cfg() -> frozenset[str]:
@@ -92,15 +92,16 @@ def _call_model(instruction: str, payload: str) -> dict | None:
     if not model_available():
         return None
     try:
-        from openai import OpenAI
+        from anthropic import Anthropic
     except ImportError:
         return None
     try:
-        response = OpenAI(api_key=os.environ["OPENAI_API_KEY"]).responses.create(
-            model="gpt-5.6",
-            input=[{"role": "developer", "content": instruction}, {"role": "user", "content": payload}],
+        response = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]).messages.create(
+            model="claude-sonnet-5", max_tokens=2048,
+            system=instruction,
+            messages=[{"role": "user", "content": payload}],
         )
-        raw = re.sub(r"^```(?:json)?\n|```$", "", response.output_text.strip(), flags=re.MULTILINE)
+        raw = re.sub(r"^```(?:json)?\n|```$", "", response.content[0].text.strip(), flags=re.MULTILINE)
         data = json.loads(raw)
     except Exception:  # noqa: BLE001 - any failure yields no proposal, never a false claim
         return None
@@ -306,7 +307,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     if not rust_trace._cargo():
         return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
     if not model_available():
-        return {"retained": [], "attempted": 0, "detail": "needs OPENAI_API_KEY to generate coverage proofs"}
+        return {"retained": [], "attempted": 0, "detail": "needs ANTHROPIC_API_KEY to generate coverage proofs"}
     cov = rust_trace.repo_uncovered_lines(repo, timeout_seconds)
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
@@ -357,7 +358,7 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
     if not rust_trace._cargo():
         return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
     if not model_available():
-        return {"retained": [], "attempted": 0, "detail": "needs OPENAI_API_KEY to generate coverage proofs"}
+        return {"retained": [], "attempted": 0, "detail": "needs ANTHROPIC_API_KEY to generate coverage proofs"}
 
     cov = rust_trace.module_uncovered_lines(repo, module_relpath, timeout_seconds)
     if not cov["measured"]:

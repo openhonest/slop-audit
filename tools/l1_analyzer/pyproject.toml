@@ -25,11 +25,11 @@ l1-analyzer = "l1_analyzer.cli:main"
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-bdd>=7.0", "coverage>=7.0", "pytest-randomly>=3.15"]
 # The --prove stage generates tests with a model; the static core stays zero-LLM.
-prove = ["openai>=1.0"]
+prove = ["anthropic>=0.40"]
 # --prove-coverage runs slop-audit's own coverage-gap proof loop (native locate via
 # rust_facets + rust_trace, model proposal, in-crate cargo-test execution). It needs only
 # the model client here; cargo + cargo-llvm-cov are external tools. No Umbra dependency.
-coverage-prove = ["openai>=1.0"]
+coverage-prove = ["anthropic>=0.40"]
 
 [build-system]
 requires = ["hatchling"]

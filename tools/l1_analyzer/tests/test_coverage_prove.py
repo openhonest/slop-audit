@@ -158,4 +158,4 @@ def test_prove_coverage_needs_a_model(monkeypatch, tmp_path):
     monkeypatch.setattr(coverage_prove.rust_trace, "_cargo", lambda: "/usr/bin/cargo")
     result = coverage_prove.prove_coverage(tmp_path, "src/lib.rs")
     assert result["retained"] == [] and result["attempted"] == 0
-    assert "OPENAI_API_KEY" in result["detail"]
+    assert "ANTHROPIC_API_KEY" in result["detail"]
