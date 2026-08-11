@@ -7,7 +7,8 @@ Reference implementations of audit instruments. **Not canonical.** The Slop Audi
 | Tool | Maps to dimension | Audits |
 |---|---|---|
 | `ui-audit/` | 4.18 (UX from code) | One aspect: stacks using the playground / enhance-function component pattern. Compares declared playground controls against actual `enhance()` implementations to surface dead controls, hidden features, and wiring mismatches. |
-| `l1_analyzer/` | All L1.1-L1.20 (git history + source) | Reference Python implementation of the 20 Layer 1 quantitative indicators. Git-based indicators (L1.1-8) are completely language-agnostic. Source-based indicators (L1.12+) use tree-sitter + LANG_CFG so the *same* semantic analysis works for Python, Rust, C, and is easily extended to Java/TS/C#/etc (exactly as the research L1.18 implementation does). |
+| `l1_analyzer/` | All L1.1-L1.20 (git history + source + runtime) | The canonical Python implementation of the 20 Layer 1 indicators, the additive checks, and the prove loops. Git indicators (L1.1-8) are language-agnostic; source indicators (L1.12-L1.18) use tree-sitter across ten languages; the runtime indicators (L1.19 coverage, L1.20 determinism) execute the target's own suite under the target's own runtime, which the tool auto-detects (`.venv`, rustup, `go.mod`, `global.json`, nvm, rbenv/asdf/jenv), so the result depends only on the repo. Opt-in prove loops generate a runnable test for an uncovered branch (Rust and Python) or a concurrency hazard. See `l1_analyzer/README.md`. |
+| `slop-audit-rs/` | Portable redistribution of the L1 panel | A compiled Rust build of the analyzer for USB/offline use: one static binary per platform with the tree-sitter grammars linked in, no interpreter and no shipped `.so`. Cross-compiles to macOS/Linux/Windows. Ported indicator-by-indicator and validated equal to the Python instrument (the Python stays canonical). See `slop-audit-rs/`. |
 
 ## What "one example implementation" means
 

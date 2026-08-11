@@ -1,36 +1,69 @@
-# slop-audit-l1
+# l1_analyzer
 
-Reference Python implementation of all 20 Slop Audit Layer 1 indicators.
+The reference implementation of the twenty Layer 1 quantitative indicators (L1.1 through L1.20), plus the additive refinements and the prove loops. It reads a repository and prints a panel: a grade, the finitely-testable share, each indicator's value and band, and (opt-in) generated proofs for the gaps it finds.
 
-**Key property:** can be run against codebases in *any* language.
+This is the canonical instrument. The pre-registered study designs are validated against its output. A separate, validated-equivalent Rust redistribution for portability lives at `../slop-audit-rs/`.
 
-- Git-history indicators (L1.1–L1.8): completely language-agnostic.
-- Config indicators (L1.9–L1.11): file presence.
-- Source-analysis indicators (L1.12+): use tree-sitter + `LANG_CFG` dispatch tables (same architecture as the research L1.18 / bound-literal analyzers). Wired up for Python, Java, JavaScript, TypeScript, C#, Ruby, Go, Rust, and C. Each language has verified tree-sitter node types and a regression test in `tests/test_basic.py`. Ruby mutable state is detected via `@instance`/`$global` variables and Go via method-receiver field access, not just `self.`/`this.`.
-- Runtime indicators L1.19 (decision-space coverage) and L1.20 (test determinism): implemented in `pytest_trace.py` for Python. L1.19 runs the suite under `coverage run --branch` and reports `covered_branches / num_branches`; L1.20 runs the suite five times in randomized order (pytest-randomly) and counts clean passes. The pytest-under-coverage recipe and the process-group timeout kill mirror the sibling Slop Audit instrument [Umbra](https://slopaudit.org/umbra.html). These two indicators execute the target repo's test suite (untrusted code, run in an isolated process group with a hard timeout set by `--timeout`, default 300s); pass `--no-exec` to skip execution, in which case L1.19 falls back to a static decision-point count with coverage explicitly marked not-measured. Non-Python targets report `n/a` for now. Never a guessed number.
+## Run it
 
-## Usage
-
-```bash
-cd slop-audit/tools/l1_analyzer
-uv sync
-
-# Against any repo (auto language detection for source indicators)
-uv run l1-analyzer /path/to/some/repo --indicators all
-
-# Force language
-uv run l1-analyzer /path/to/some/rust/codebase --lang rust --indicators 18
-
-# Specific date range + json output
-uv run l1-analyzer /path/to/repo --since 2025-01-01 --format json
+```
+uv run l1-analyzer <repo>                      # the full panel, text
+uv run l1-analyzer <repo> --format json        # machine-readable
+uv run l1-analyzer <repo> --no-exec            # static only, skip the runtime indicators
+uv run l1-analyzer <repo> --report ./out       # write <slug>.md and <slug>.html cards
 ```
 
-## Integration with the Honest Audit Test Suite
+Tests run with the dev extra: `uv run --extra dev pytest`.
 
-The Gherkin behavioural specs in `../../validation/tests/` can use this package (when on PYTHONPATH) to get real numbers instead of pure simulation.
+## What it measures
 
-## Extending to more languages
+- **L1.1 through L1.8** are `git log` ratios (doc-only, code-only, mixed commits, doc-line ratio, delete/add, net-negative, high-delete, test-to-production). Language-agnostic.
+- **L1.9 through L1.11** are config-presence checks (pre-commit hooks, CI/CD, containerization).
+- **L1.12 through L1.17** are source metrics via tree-sitter (dead code, duplication, secrets, type-escape density, trailing whitespace, god-file concentration), across `--lang {c, csharp, go, java, javascript, python, ruby, rust, typescript}` or `auto`.
+- **L1.18** mutable-state ratio and **L1.18b** the state-bounds classifier: the finite-testability meter. This sets the grade (see below).
+- **L1.19** decision-space coverage and **L1.20** test determinism: the two runtime indicators. They execute the target's own suite.
+- **Additive checks** reported alongside: `path_cover`, `thread_surface`, `absolute_paths` (hardcoded machine-specific paths), and, when the prove loops run, `coverage_proofs` and `schedule_silence`.
 
-Add the tree-sitter parser and an entry in `LANG_CFG` in `l1_analyzer/indicators.py`. The `_count_mutable_refs` (and future walks for L1.15, L1.19, etc.) already dispatch on the cfg.
+## The grade
 
-See the full production analyzers and 300+ Gherkin scenarios in the Paper A replication package for the complete, battle-tested versions.
+Verifiability first, by a published rule (`report.py`): any promiscuous state that drives a decision makes the code provably-not-exhaustively-testable, so the verdict is CANNOT and the grade is **F**. State that is merely undetermined is MIGHT, grade **D**. When every piece of state is finitely testable the verdict is CAN, and the grade is A/B/C by hygiene (god-files and type-escapes weigh most). The finitely-testable percentage is a detail, not the tier: a 94%-clean codebase with one promiscuous decision-driver still grades F, because one such driver breaks exhaustive verification.
+
+## Directory-insensitive by design
+
+The two runtime indicators (L1.19, L1.20) run the target's suite under the **target's own runtime**, not whatever launched the analyzer, so the result depends only on the repository:
+
+| Language | Coverage (L1.19) | Determinism (L1.20) | Runtime it resolves |
+|---|---|---|---|
+| Python | coverage.py branch | pytest-randomly | the repo's `.venv` (auto-detected) |
+| Rust | cargo-llvm-cov region | libtest thread order | rustup + `rust-toolchain.toml` |
+| Go | `go test -cover` (statement) | `go test -shuffle` | `go.mod` toolchain |
+| Ruby | SimpleCov branch (when wired) | rspec / minitest `--seed` | rbenv / asdf / jenv shim |
+| JS / TS | c8 (V8 branch) | vitest / jest seed | nvm `.nvmrc` (sourced) |
+| Java | JaCoCo branch (when configured) | surefire random order | `./mvnw` + JDK |
+| C# | coverlet cobertura branch | `dotnet test` x5 | `global.json` SDK |
+| C | (no standard runner) | (no standard randomizer) | honest n/a |
+
+Pass `--python PATH` to force the interpreter (for example a 3.11 target audited from a 3.12+ analyzer). Every measured result **names the runtime that ran it**, and when a toolchain, plugin, or dependency is missing the tool returns n/a with the exact remedy ("needs c8 for coverage", "needs pytest-randomly", "no branches instrumented") rather than a fabricated number.
+
+## Prove loops (opt-in, CLI-only)
+
+These generate and run code, so they are explicit and need `OPENAI_API_KEY`:
+
+- `--prove` locates concurrency hazards and generates a test that reproduces the race (concurrency proofs → `schedule_silence`).
+- `--prove-coverage-repo` locates uncovered decision branches (L1.19's own gaps) and generates one test per gap, runs it under the target's runtime, and keeps it only if it fails on its own assertion (a proven divergence). Missing-test generation exists for **Rust and Python**; the flag dispatches by language. `--coverage-repair-rounds N` caps the compiler/setup-error repair loop; `--prove-max` caps gaps per module.
+
+slop-audit proves the gap; it never writes into your test file. Adopting a surviving proof is your choice.
+
+## Key flags
+
+| Flag | Effect |
+|---|---|
+| `--lang` | Primary language (default `auto`). |
+| `--python PATH` | Interpreter for the L1.19/L1.20 harness; defaults to auto-detecting the target's venv. |
+| `--no-exec` | Skip the runtime indicators (static panel only). |
+| `--format {text,json}` | Output format. |
+| `--report [DIR]` | Write the Markdown and HTML cards. |
+| `--gate` | Pass/fail mode for a pre-commit hook (god-files + finite-testability). |
+| `--no-state-bounds` | Emit exactly the frozen L1.18 set (used by pre-registered runs). |
+| `--prove` / `--prove-coverage-repo` / `--prove-coverage MODULE` | The prove loops (need `OPENAI_API_KEY`). |
+| `--timeout N` | Seconds per test-suite execution. |
