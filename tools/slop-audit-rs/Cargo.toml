@@ -1,0 +1,15 @@
+[package]
+name = "slop-audit-rs"
+version = "0.0.1"
+edition = "2021"
+description = "Portable slop-audit proof: static panel + tree-sitter, validated against the Python reference."
+
+[dependencies]
+tree-sitter = "0.24"
+tree-sitter-python = "0.23"
+walkdir = "2.5"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "z"
