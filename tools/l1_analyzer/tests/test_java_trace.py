@@ -106,3 +106,20 @@ def test_l20_surfaces_failing_seed_not_a_bare_score(monkeypatch, tmp_path):
 def test_ran_tests_detects_execution():
     assert java_trace._ran_tests("Tests run: 5, Failures: 0, Errors: 0")
     assert not java_trace._ran_tests("[ERROR] COMPILATION ERROR : cannot find symbol")
+
+
+# --- explicit-shim JDK pinning ------------------------------------------------
+
+def test_pin_jdk_sets_java_home_from_the_resolved_jdk(monkeypatch, tmp_path):
+    jbin = tmp_path / "jdk" / "bin"
+    jbin.mkdir(parents=True)
+    (jbin / "java").write_text("")
+    monkeypatch.setattr(java_trace, "resolve_via_shim", lambda repo, tool, t: (str(jbin / "java"), "jenv which java"))
+    env, prov = java_trace._pin_jdk(tmp_path, 5)
+    assert env["JAVA_HOME"] == str(tmp_path / "jdk") and env["PATH"].startswith(str(jbin))
+    assert "jenv which java" in prov
+
+
+def test_pin_jdk_ambient_without_a_manager(monkeypatch, tmp_path):
+    monkeypatch.setattr(java_trace, "resolve_via_shim", lambda *a: (None, ""))
+    assert java_trace._pin_jdk(tmp_path, 5) == ({}, "")

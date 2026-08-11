@@ -27,12 +27,19 @@ runtime.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
+from l1_analyzer.pytest_trace import (
+    L1Result,
+    _first_line,
+    _na,
+    _run_untrusted,
+    resolve_via_shim,
+)
 
 # Surefire's per-run summary, e.g. "Tests run: 12, Failures: 0, Errors: 0, Skipped: 0".
 _SUREFIRE = re.compile(r"(Tests run: \d+[^\n]*)")
@@ -62,10 +69,23 @@ def _unsupported_reason(repo: Path) -> str | None:
     return None
 
 
-def _jdk(repo: Path, timeout_seconds: float) -> str:
+def _pin_jdk(repo: Path, timeout_seconds: float) -> tuple[dict, str]:
+    """(env, provenance): pin the JDK via a version manager (jenv/asdf/mise which java) when
+    one resolves it for this repo, setting JAVA_HOME so Maven uses it rather than letting a
+    homebrew java ahead of the shim on PATH silently win. Empty env and no provenance suffix
+    when none resolves (the ambient java is used)."""
+    java_path, note = resolve_via_shim(repo, "java", timeout_seconds)
+    if java_path is None:
+        return {}, ""
+    bindir = Path(java_path).parent
+    return {"JAVA_HOME": str(bindir.parent),
+            "PATH": str(bindir) + os.pathsep + os.environ.get("PATH", "")}, f", {note}"
+
+
+def _jdk(repo: Path, timeout_seconds: float, env: dict) -> str:
     """The JDK that runs the build, named so every measured result says which runtime measured
     it. `java -version` prints to stderr, so read it from there."""
-    probe = _run_untrusted(["java", "-version"], cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 30))
+    probe = _run_untrusted(["java", "-version"], cwd=repo, env=env, timeout_seconds=min(timeout_seconds, 30))
     return _first_line(probe.stderr or probe.stdout) if probe.returncode == 0 else "an unknown JDK"
 
 
@@ -88,8 +108,9 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     if reason is not None:
         return _na(reason)
     maven = _maven(repo)
-    jdk = _jdk(repo, timeout_seconds)
-    run = _run_untrusted([maven, "-q", "test", "jacoco:report"], cwd=repo, env={}, timeout_seconds=timeout_seconds)
+    env, prov = _pin_jdk(repo, timeout_seconds)
+    jdk = _jdk(repo, timeout_seconds, env) + prov
+    run = _run_untrusted([maven, "-q", "test", "jacoco:report"], cwd=repo, env=env, timeout_seconds=timeout_seconds)
     if run.returncode == 124:
         return _na("test suite timed out before coverage could be measured")
     # JaCoCo writes jacoco.xml only when the plugin is wired into the build and the suite
@@ -142,14 +163,15 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     if reason is not None:
         return _na(reason)
     maven = _maven(repo)
-    jdk = _jdk(repo, timeout_seconds)
+    env, prov = _pin_jdk(repo, timeout_seconds)
+    jdk = _jdk(repo, timeout_seconds, env) + prov
 
     passing = 0
     failing: list[str] = []
     for seed in range(1, runs + 1):
         run = _run_untrusted(
             [maven, "-q", "-Dsurefire.runOrder=random", "test"],
-            cwd=repo, env={}, timeout_seconds=timeout_seconds,
+            cwd=repo, env=env, timeout_seconds=timeout_seconds,
         )
         output = (run.stdout or "") + (run.stderr or "")
         if run.returncode == 124:

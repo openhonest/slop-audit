@@ -154,3 +154,23 @@ def test_branch_totals_counts_covered_leaves():
 def test_branch_totals_ignores_old_line_only_format():
     old = {"RSpec": {"coverage": {"/app/x.rb": [1, 0, None]}}}
     assert ruby_trace._branch_totals(old) == (0, 0)
+
+
+# --- explicit-shim pinning ----------------------------------------------------
+
+def test_pin_prepends_the_resolved_ruby_bin(monkeypatch, tmp_path):
+    rbin = tmp_path / "rbenv" / "bin"
+    rbin.mkdir(parents=True)
+    (rbin / "ruby").write_text("")
+    (rbin / "bundle").write_text("")
+    monkeypatch.setattr(ruby_trace, "resolve_via_shim", lambda repo, tool, t: (str(rbin / "ruby"), "rbenv which ruby"))
+    ruby, bundle, env, prov = ruby_trace._pin(tmp_path, 5)
+    assert ruby == str(rbin / "ruby") and bundle == str(rbin / "bundle")
+    assert env["PATH"].startswith(str(rbin)) and "rbenv which ruby" in prov
+
+
+def test_pin_falls_back_to_ambient_without_a_manager(monkeypatch, tmp_path):
+    monkeypatch.setattr(ruby_trace, "resolve_via_shim", lambda *a: (None, ""))
+    monkeypatch.setattr(ruby_trace, "_ruby", lambda: "/usr/bin/ruby")
+    monkeypatch.setattr(ruby_trace, "_bundle", lambda: "/usr/bin/bundle")
+    assert ruby_trace._pin(tmp_path, 5) == ("/usr/bin/ruby", "/usr/bin/bundle", {}, "")

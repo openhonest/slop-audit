@@ -3,9 +3,10 @@ pytest_trace, go_trace, and rust_trace.
 
 - **L1.19 decision-space coverage**: branch coverage from `dotnet test --collect:"XPlat Code
   Coverage"`, which drives the coverlet.collector data collector to emit a Cobertura report
-  (`coverage.cobertura.xml`). The report's root `<coverage ... branch-rate="0.xx">` attribute
-  is branch coverage directly, so `pct = branch-rate * 100` is the honest decision-space
-  figure on the standard toolchain, and the details string says so.
+  (`coverage.cobertura.xml`). The report's root `branches-covered` / `branches-valid` counts
+  give branch coverage as `covered / valid * 100`; `branches-valid == 0` means nothing had a
+  branch to cover (usually the code under test sits in the test assembly, which coverlet
+  excludes) and is reported n/a with the remedy, never a misleading 0.0.
 - **L1.20 test determinism**: `dotnet test` run five times, counting the runs where the whole
   suite passes. `dotnet test` has no seed CLI and does not force order randomization, so this
   detects flakiness under scheduler-varied order rather than a seed-controlled shuffle; the
@@ -27,7 +28,8 @@ from pathlib import Path
 
 from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
 
-_BRANCH_RATE = re.compile(r"<coverage[^>]*\bbranch-rate=\"([\d.]+)\"")
+_BRANCHES_VALID = re.compile(r"<coverage[^>]*\bbranches-valid=\"(\d+)\"")
+_BRANCHES_COVERED = re.compile(r"<coverage[^>]*\bbranches-covered=\"(\d+)\"")
 # `dotnet test` prints one of these banners only when the test runner actually executed a
 # suite. Their absence means the build failed or no tests were discovered, not 0/5.
 _RAN = ("Passed!", "Failed!", "Passed: ", "Failed: ", "Total tests:", "Passed :", "Failed :")
@@ -66,18 +68,27 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         if not reports:
             return _na("C# branch coverage needs coverlet.collector in the test project "
                        "(coverage.cobertura.xml not produced)")
-        match = _BRANCH_RATE.search(reports[0].read_text(errors="ignore"))
-        if match is None:
-            return _na("cobertura report had no branch-rate")
+        text = reports[0].read_text(errors="ignore")
+        valid_match = _BRANCHES_VALID.search(text)
+        covered_match = _BRANCHES_COVERED.search(text)
+        if valid_match is None or covered_match is None:
+            return _na("cobertura report had no branch counts")
+        valid, covered = int(valid_match.group(1)), int(covered_match.group(1))
 
-    pct = float(match.group(1)) * 100
+    # branches-valid == 0 means nothing had a branch to cover, NOT that coverage is 0. It
+    # usually means the code under test sits in the test assembly, which coverlet excludes by
+    # default. n/a with the remedy, never a 0.0 that reads as real-but-terrible coverage.
+    if valid == 0:
+        return _na("no branches instrumented; the code under test may be in the test assembly "
+                   "(coverlet excludes it) - put it in a separate project the tests reference")
+    pct = covered / valid * 100
     result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
     suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
     return {
         "value": round(pct, 1),
         "band": result_band,
-        "details": f"{round(pct, 1)}% branch coverage from `dotnet test --collect \"XPlat Code Coverage\"` "
-                   f"({suite}; ran under {sdk})",
+        "details": f"{covered}/{valid} branches exercised by tests from `dotnet test --collect "
+                   f"\"XPlat Code Coverage\"` ({suite}; ran under {sdk})",
     }
 
 

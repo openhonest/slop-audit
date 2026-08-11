@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -104,6 +105,30 @@ def resolve_interpreter(repo: Path, python_executable: str | None) -> tuple[str,
     if detected:
         return detected, f"target venv {detected}"
     return sys.executable, f"the analyzer's own interpreter {sys.executable}"
+
+
+# Version managers that expose a per-directory `<manager> which <tool>`, honoring the repo's
+# version file (.ruby-version / .tool-versions / .java-version). Unlike nvm (shell-resident),
+# these are real binaries, so we ask them directly instead of trusting PATH order - which a
+# homebrew ruby/java ahead of the shim would otherwise silently win.
+_SHIM_MANAGERS = ("mise", "rbenv", "asdf", "jenv")
+
+
+def resolve_via_shim(repo: Path, tool: str, timeout_seconds: float) -> tuple[str | None, str]:
+    """(resolved path, provenance) for `tool` as a version manager pins it for this repo dir,
+    or (None, "") when no manager resolves it (caller falls back to the ambient runtime). This
+    defeats PATH-shadowing: it uses the manager's own resolution, not whatever is first on PATH.
+    A manager that does not manage `tool` (jenv for ruby, rbenv for java) simply fails and is
+    skipped."""
+    for manager in _SHIM_MANAGERS:
+        if shutil.which(manager) is None:
+            continue
+        probe = _run_untrusted([manager, "which", tool], cwd=repo, env={},
+                               timeout_seconds=min(timeout_seconds, 30))
+        path = _first_line(probe.stdout).strip()
+        if probe.returncode == 0 and path.startswith("/") and Path(path).exists():
+            return path, f"{manager} which {tool}"
+    return None, ""
 
 
 def _module_available(module: str, python_executable: str | None = None) -> bool:

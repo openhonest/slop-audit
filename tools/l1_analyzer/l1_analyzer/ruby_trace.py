@@ -24,11 +24,18 @@ guessed number, and RSpec is preferred over Minitest when both are present.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 from pathlib import Path
 
-from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
+from l1_analyzer.pytest_trace import (
+    L1Result,
+    _first_line,
+    _na,
+    _run_untrusted,
+    resolve_via_shim,
+)
 
 # One summary line per runner: group(1) is the number of tests that ran, group(0)
 # is the whole line (surfaced verbatim when a seed fails). No summary line at all
@@ -77,10 +84,24 @@ def _detect_runner(repo: Path) -> str | None:
     return None
 
 
-def _ruby_version(ruby: str, repo: Path, timeout_seconds: float) -> str:
-    """The ruby the target's shims resolve, run with cwd=repo so .ruby-version wins, named
-    so every measured result says which interpreter measured it."""
-    probe = _run_untrusted([ruby, "--version"], cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 30))
+def _pin(repo: Path, timeout_seconds: float) -> tuple[str | None, str | None, dict, str]:
+    """(ruby, bundle, env, provenance): pin ruby via a shim manager (rbenv/asdf/mise which
+    ruby) when one resolves it for this repo, so a homebrew ruby ahead of the shim on PATH
+    cannot silently win. env prepends the pinned ruby's bin so bundle and the suite run under
+    it. Falls back to the ambient ruby/bundle (env {}, no provenance suffix)."""
+    ruby_path, note = resolve_via_shim(repo, "ruby", timeout_seconds)
+    if ruby_path is None:
+        return _ruby(), _bundle(), {}, ""
+    bindir = Path(ruby_path).parent
+    pinned_bundle = bindir / "bundle"
+    bundle = str(pinned_bundle) if pinned_bundle.exists() else _bundle()
+    return ruby_path, bundle, {"PATH": str(bindir) + os.pathsep + os.environ.get("PATH", "")}, f", {note}"
+
+
+def _ruby_version(ruby: str, repo: Path, timeout_seconds: float, env: dict) -> str:
+    """The pinned ruby's version, run with cwd=repo (and the pin's PATH) so .ruby-version
+    wins, named so every measured result says which interpreter measured it."""
+    probe = _run_untrusted([ruby, "--version"], cwd=repo, env=env, timeout_seconds=min(timeout_seconds, 30))
     return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown ruby"
 
 
@@ -121,17 +142,16 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     """L1.19 for Ruby: SimpleCov branch coverage from the suite's own coverage/.resultset.json.
     Bands match the spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is
     accepted for a uniform harness signature and ignored: the target's shims select ruby."""
-    ruby = _ruby()
-    bundle = _bundle()
+    ruby, bundle, env, prov = _pin(repo, timeout_seconds)
     if ruby is None or bundle is None:
         return _na("needs Ruby and Bundler (ruby, bundle) in PATH")
     runner = _detect_runner(repo)
     if runner is None:
         return _na("no RSpec (spec/, .rspec, or rspec in Gemfile.lock) or Minitest (test/ + Rakefile) suite detected")
-    version = _ruby_version(ruby, repo, timeout_seconds)
+    version = _ruby_version(ruby, repo, timeout_seconds, env) + prov
 
     resultset_file = repo / "coverage" / ".resultset.json"
-    run = _run_untrusted(_COVERAGE_COMMAND[runner](bundle), cwd=repo, env={}, timeout_seconds=timeout_seconds)
+    run = _run_untrusted(_COVERAGE_COMMAND[runner](bundle), cwd=repo, env=env, timeout_seconds=timeout_seconds)
     if run.returncode == 124:
         return _na("test suite timed out before coverage could be measured")
     # SimpleCov must be started in the suite's spec_helper; it cannot be injected
@@ -171,19 +191,18 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     <4/5 Slop. A run that builds nothing or runs no tests is not a determinism result, so
     return n/a with the reason rather than a misleading 0/5. When the suite runs but some
     tests fail, the failing seeds' summary lines are surfaced in details."""
-    ruby = _ruby()
-    bundle = _bundle()
+    ruby, bundle, env, prov = _pin(repo, timeout_seconds)
     if ruby is None or bundle is None:
         return _na("needs Ruby and Bundler (ruby, bundle) in PATH")
     runner = _detect_runner(repo)
     if runner is None:
         return _na("no RSpec (spec/, .rspec, or rspec in Gemfile.lock) or Minitest (test/ + Rakefile) suite detected")
-    version = _ruby_version(ruby, repo, timeout_seconds)
+    version = _ruby_version(ruby, repo, timeout_seconds, env) + prov
 
     passing = 0
     failing: list[str] = []
     for seed in range(1, runs + 1):
-        run = _run_untrusted(_DETERMINISM_COMMAND[runner](bundle, seed), cwd=repo, env={}, timeout_seconds=timeout_seconds)
+        run = _run_untrusted(_DETERMINISM_COMMAND[runner](bundle, seed), cwd=repo, env=env, timeout_seconds=timeout_seconds)
         output = (run.stdout or "") + (run.stderr or "")
         if run.returncode == 124:
             return _na(f"a randomized run timed out (seed {seed}); determinism not measured")

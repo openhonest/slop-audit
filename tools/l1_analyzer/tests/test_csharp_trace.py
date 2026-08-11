@@ -1,6 +1,6 @@
 """The C# runtime harness (L1.19 Cobertura branch coverage, L1.20 repeat-run determinism).
 The live harness needs the dotnet SDK, so here the run boundary is stubbed and the
-deterministic pieces are asserted: branch-rate parsing, the not-run guard, the coverage-missing
+deterministic pieces are asserted: branch-count parsing, the not-run guard, the coverage-missing
 n/a, and per-run failure surfacing rather than a guessed number. Pure assertions, no mocks of
 business logic."""
 
@@ -15,9 +15,11 @@ def _cp(rc, stdout=""):
     return subprocess.CompletedProcess([], rc, stdout, "")
 
 
-def _cover_run(monkeypatch, *, branch_rate="0.632", test_rc=0, write_report=True):
+def _cover_run(monkeypatch, *, branch_rate="0.632", branches_valid=1000, test_rc=0, write_report=True):
     """Stub dotnet test (writes a Cobertura report into the results directory if asked) plus
-    dotnet --version."""
+    dotnet --version. branches_valid=0 models a report with no branch to cover."""
+    covered = round(float(branch_rate) * branches_valid)
+
     def fake(cmd, cwd, env, timeout_seconds):
         if "--version" in cmd:
             return _cp(0, "8.0.404")
@@ -27,7 +29,8 @@ def _cover_run(monkeypatch, *, branch_rate="0.632", test_rc=0, write_report=True
                 out = Path(cmd[cmd.index("--results-directory") + 1]) / "guid"
                 out.mkdir(parents=True, exist_ok=True)
                 (out / "coverage.cobertura.xml").write_text(
-                    f'<coverage line-rate="0.9" branch-rate="{branch_rate}" version="1.9"></coverage>')
+                    f'<coverage line-rate="0.9" branch-rate="{branch_rate}" '
+                    f'branches-covered="{covered}" branches-valid="{branches_valid}" version="1.9"></coverage>')
             return _cp(test_rc, "Passed!  - Failed:     0, Passed:     5, Skipped:     0, Total:     5")
         return _cp(0, "")
     monkeypatch.setattr(csharp_trace, "_dotnet", lambda: "/usr/bin/dotnet")
@@ -46,7 +49,7 @@ def test_l19_reports_branch_coverage_and_names_the_sdk(monkeypatch, tmp_path):
     _cover_run(monkeypatch, branch_rate="0.632")
     r = csharp_trace.decision_space_coverage(tmp_path, 30)
     assert r["value"] == 63.2 and r["band"] == "Not Healthy"
-    assert "branch coverage" in r["details"] and "dotnet 8.0.404" in r["details"]
+    assert "branches exercised" in r["details"] and "dotnet 8.0.404" in r["details"]
 
 
 def test_l19_na_when_no_cobertura_is_produced(monkeypatch, tmp_path):
@@ -54,6 +57,14 @@ def test_l19_na_when_no_cobertura_is_produced(monkeypatch, tmp_path):
     _cover_run(monkeypatch, write_report=False, test_rc=1)
     r = csharp_trace.decision_space_coverage(tmp_path, 30)
     assert r["band"] == "n/a" and "coverlet.collector" in r["details"]
+
+
+def test_l19_na_when_no_branches_instrumented(monkeypatch, tmp_path):
+    # branches-valid=0 means nothing had a branch to cover (code under test in the test
+    # assembly). It must be n/a with the remedy, NOT 0.0 Slop, which reads as real coverage.
+    _cover_run(monkeypatch, branches_valid=0)
+    r = csharp_trace.decision_space_coverage(tmp_path, 30)
+    assert r["band"] == "n/a" and "no branches instrumented" in r["details"]
 
 
 def test_l19_bands_follow_the_spec(monkeypatch, tmp_path):

@@ -118,3 +118,20 @@ def test_resolve_interpreter_precedence(tmp_path):
     # 3. else the analyzer's own interpreter (a repo with no venv).
     exe, prov = pytest_trace.resolve_interpreter(tmp_path / "no-venv-here", None)
     assert exe == sys.executable and "analyzer" in prov
+
+
+# --- explicit shim resolution (defeats PATH-shadowing for ruby/java) ----------
+
+def test_resolve_via_shim_uses_the_manager_that_resolves(monkeypatch, tmp_path):
+    real = tmp_path / "ruby"
+    real.write_text("")
+    monkeypatch.setattr(pytest_trace.shutil, "which", lambda m: "/opt/rbenv" if m == "rbenv" else None)
+    monkeypatch.setattr(pytest_trace, "_run_untrusted",
+                        lambda cmd, **k: subprocess.CompletedProcess(cmd, 0, str(real), ""))
+    path, note = pytest_trace.resolve_via_shim(tmp_path, "ruby", 5)
+    assert path == str(real) and note == "rbenv which ruby"
+
+
+def test_resolve_via_shim_none_when_no_manager(monkeypatch, tmp_path):
+    monkeypatch.setattr(pytest_trace.shutil, "which", lambda m: None)
+    assert pytest_trace.resolve_via_shim(tmp_path, "ruby", 5) == (None, "")
