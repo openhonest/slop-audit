@@ -336,14 +336,19 @@ def main(argv: list[str] | None = None) -> int:
     # Generates and runs code, so CLI-only and explicit. --prove-coverage-repo sweeps the
     # whole crate; --prove-coverage does one module.
     if args.prove_coverage_repo:
-        from l1_analyzer import coverage_prove
-
         def _cov_progress(relpath: str, n_gaps: int, retained: int) -> None:
             print(f"[prove-coverage] {relpath}: {n_gaps} gap(s), retained so far {retained}",
                   file=sys.stderr, flush=True)
-        results["coverage_proofs"] = coverage_prove.prove_coverage_repo(
-            args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
-            timeout_seconds=args.timeout, progress=_cov_progress)
+        if str(results.get("lang", args.lang)) == "python":
+            from l1_analyzer import python_coverage_prove
+            results["coverage_proofs"] = python_coverage_prove.prove_coverage_repo(
+                args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
+                timeout_seconds=args.timeout, python_executable=args.python, progress=_cov_progress)
+        else:
+            from l1_analyzer import coverage_prove
+            results["coverage_proofs"] = coverage_prove.prove_coverage_repo(
+                args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
+                timeout_seconds=args.timeout, progress=_cov_progress)
     elif args.prove_coverage:
         from l1_analyzer import coverage_prove
         results["coverage_proofs"] = coverage_prove.prove_coverage(
