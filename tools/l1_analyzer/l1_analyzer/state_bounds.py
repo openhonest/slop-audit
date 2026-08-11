@@ -426,6 +426,53 @@ def _refs(scope: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     return out
 
 
+def _fn_binds_name_locally(fn: Node, name: str) -> bool:
+    """True if ``name`` is a LOCAL of this function under Python scoping: bound in its body
+    (an assignment target or a parameter) and not declared ``global``. A nested function or
+    class is its own scope, so a binding inside one does not make ``name`` local to ``fn``.
+    Conservative — only unambiguous assignment/parameter bindings count, so an unrecognised
+    binding form leaves the reference attached to the module binding (never a false green)."""
+    declared_global = False
+    binds_local = False
+
+    params = _field(fn, "parameters")
+    if params is not None:
+        for p in params.named_children:
+            ident = p if p.type == "identifier" else _field(p, "name")
+            if ident is not None and ident.type == "identifier" and _text(ident) == name:
+                binds_local = True
+
+    def walk(n: Node) -> None:
+        nonlocal declared_global, binds_local
+        if n.type == "global_statement" and any(_text(c) == name for c in n.children):
+            declared_global = True
+        elif n.type == "assignment":
+            left = _field(n, "left")
+            if left is not None and left.type == "identifier" and _text(left) == name:
+                binds_local = True
+        for c in n.children:
+            if c.type in ("function_definition", "class_definition"):
+                continue  # a nested scope owns its own bindings
+            walk(c)
+
+    body = _field(fn, "body")
+    if body is not None:
+        walk(body)
+    return binds_local and not declared_global
+
+
+def _refers_to_module_binding(ref: Node, name: str) -> bool:
+    """A reference to the bare module-level ``name``, not a same-named function-local. False
+    when the ref sits inside a function that binds ``name`` as its own local (Python scoping):
+    that local is a different binding and must not attach to the module binding's finding."""
+    cur = ref.parent
+    while cur is not None:
+        if cur.type == "function_definition" and _fn_binds_name_locally(cur, name):
+            return False
+        cur = cur.parent
+    return True
+
+
 def _local_refs(scope: Node, predicate: Callable[[Node], bool], sp: LangSpec) -> list[Node]:
     """Like _refs, but does not descend into a nested class: an inner class owns its
     own fields and is analysed as its own scope, so the enclosing class must not
@@ -719,6 +766,10 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
 
     for name in _enum_module_state(root, sp, cfg):
         refs = _refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm)
+        if sp is LANG_SPEC["python"]:
+            # A same-named function-local is a different binding (Python scoping); drop its
+            # references so they do not poison the module binding's verdict.
+            refs = [r for r in refs if _refers_to_module_binding(r, name)]
         if refs:
             findings.append(_finding(name, refs, rel, sp, closed_sets, immutable_ctors, instance=False))
 
