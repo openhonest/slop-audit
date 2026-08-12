@@ -11,7 +11,6 @@ Red first: classify(repo, "rust") returns n/a until the rust spec lands.
 """
 
 import pytest
-
 from l1_analyzer import state_bounds
 
 VECTORS = [
@@ -73,14 +72,14 @@ VECTORS = [
         ),
     },
     {
-        "id": "single-writer-dynamic-dispatch",
+        "id": "invoked-only-collaborator",
         "state": "self.handler",
-        "verdict": "unresolved",
-        "drives_decision": True,
+        "verdict": "neutral",
+        "drives_decision": False,
         "src": (
             "struct Router { handler: Box<dyn Fn(&str) -> String> }\n"
             "impl Router {\n"
-            "  fn route(&self, r: &str) -> String { (self.handler)(r) }\n"                # state invoked: unbounded callee
+            "  fn route(&self, r: &str) -> String { (self.handler)(r) }\n"                # invoked through a wrapper, result returned
             "}\n"
         ),
     },

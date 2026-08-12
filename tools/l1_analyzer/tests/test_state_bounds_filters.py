@@ -109,11 +109,31 @@ def test_counted_value_read_into_a_branch_keeps():
     assert _verdict(src, "self._h") == "promiscuous"
 
 
-def test_dynamic_dispatch_keeps_write_once_but_invoked():
-    # single writer, but the attribute is invoked as a callable: undecidable, stays unresolved.
+def test_invoked_only_collaborator_clears():
+    # Single writer, invoked as a callable, result returned. Invoking state is not a decision
+    # ON that state: nothing reads its value to select an arm, so its reaching-set is empty.
+    # This was the shape that capped every repo with an injected collaborator at unresolved.
     src = ("class R:\n    def __init__(self, handler):\n        self._h = handler\n"
            "    def route(self, req):\n        return self._h(req)\n")
+    assert _verdict(src, "self._h") == "neutral"
+
+
+def test_rebound_call_target_keeps():
+    # The same shape with a second binding site: which callee is live at the call depends on
+    # invisible history (runtime rebinding of dispatch), so the premise fails and it stays.
+    src = ("class R:\n    def __init__(self, handler):\n        self._h = handler\n"
+           "    def swap(self, handler):\n        self._h = handler\n"
+           "    def route(self, req):\n        return self._h(req)\n")
     assert _verdict(src, "self._h") == "unresolved"
+
+
+def test_collaborator_mutated_through_the_slot_keeps():
+    # Bound once and invoked, but the host writes through the slot, so the collaborator at
+    # the call site is not provably the value that was injected. The premise fails.
+    src = ("class R:\n    def __init__(self, sink):\n        self._s = sink\n"
+           "    def configure(self):\n        self._s.limit = 10\n"
+           "    def run(self, req):\n        return self._s(req)\n")
+    assert _verdict(src, "self._s") == "unresolved"
 
 
 def test_passed_to_unknown_callee_keeps_write_once_but_escapes():

@@ -113,16 +113,96 @@ VECTORS = [
         ),
     },
     {
+        # The callee is selected by getattr from an OPEN name argument: the target set is
+        # unbounded and single-writer + local do not rescue it (the HC-P018 construct).
+        # It is the NAME that is open, not the fact that something is invoked - see
+        # invoked-only-collaborator for the case this must not be confused with.
         "id": "single-writer-local-but-dynamic-dispatch",
-        "state": "self.handler",
+        "state": "self._name",
+        "verdict": "unresolved",
+        "drives_decision": True,
+        "src": (
+            "class Router:\n"
+            "    def __init__(self, name):\n"
+            "        self._name = name\n"            # single writer, local
+            "    def route(self, arg):\n"
+            "        return getattr(self, self._name)(arg)\n"   # open name -> unbounded target set
+        ),
+    },
+    {
+        # Call-target position is compositional, exactly as return position is. self.app is
+        # bound once and its only non-assignment use is as the target of a call whose result
+        # is returned. No decision reads its VALUE to select an arm, so its reaching-set is
+        # empty. What the collaborator does when it runs is the collaborator's own
+        # finite-testability. The arguments passed THROUGH the call still reach an unbounded
+        # target and stay unresolved in their own right - that is untouched.
+        "id": "invoked-only-collaborator",
+        "state": "self.app",
+        "verdict": "neutral",
+        "drives_decision": False,
+        "src": (
+            "class Middleware:\n"
+            "    def __init__(self, app):\n"
+            "        self.app = app\n"
+            "    async def handle(self, scope, receive, send):\n"
+            "        return await self.app(scope, receive, send)\n"
+        ),
+    },
+    {
+        # Closing the question rather than assuming it: a path from the state to a decision
+        # DOES exist here, because the host branches on what the collaborator returned. The
+        # meter follows the call result instead of fail-closing. The partition is the host's
+        # own arm count - a collaborator whose answer takes one arm against one whose answer
+        # takes the other - so two classes: neutral, but drives a decision.
+        "id": "invoked-result-reaches-a-condition",
+        "state": "self._check",
+        "verdict": "neutral",
+        "drives_decision": True,
+        "src": (
+            "class Guard:\n"
+            "    def __init__(self, check):\n"
+            "        self._check = check\n"
+            "    def allow(self, req):\n"
+            "        if self._check(req):\n"
+            "            return 'ok'\n"
+            "        return 'deny'\n"
+        ),
+    },
+    {
+        # Premise check 1. The invoked slot is assigned in more than one place, so which
+        # callee is live at the call site depends on invisible history: runtime rebinding of
+        # dispatch. Bound-once is what separates an injected collaborator from a rebindable
+        # dispatch slot, so this stays fail-closed.
+        "id": "rebound-call-target",
+        "state": "self._h",
         "verdict": "unresolved",
         "drives_decision": True,
         "src": (
             "class Router:\n"
             "    def __init__(self, handler):\n"
-            "        self.handler = handler\n"       # single writer, local
+            "        self._h = handler\n"
+            "    def swap(self, handler):\n"
+            "        self._h = handler\n"            # a second binding site
             "    def route(self, req):\n"
-            "        return self.handler(req)\n"     # callee set unbounded -> undecidable
+            "        return self._h(req)\n"
+        ),
+    },
+    {
+        # Premise check 2. The host writes THROUGH the slot, so the collaborator at the call
+        # site is not provably the value that was injected, and the host now depends on the
+        # collaborator's internal shape, which it cannot enumerate. Stays fail-closed.
+        "id": "collaborator-mutated-through-the-slot",
+        "state": "self._sink",
+        "verdict": "unresolved",
+        "drives_decision": True,
+        "src": (
+            "class Host:\n"
+            "    def __init__(self, sink):\n"
+            "        self._sink = sink\n"
+            "    def configure(self):\n"
+            "        self._sink.limit = 10\n"        # reaching in through the slot
+            "    def run(self, req):\n"
+            "        return self._sink(req)\n"
         ),
     },
     {

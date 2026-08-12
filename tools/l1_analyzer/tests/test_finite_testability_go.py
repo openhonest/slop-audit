@@ -8,7 +8,6 @@ assignment target is wrapped in an expression_list; membership is the comma-ok i
 """
 
 import pytest
-
 from l1_analyzer import state_bounds
 
 VECTORS = [
@@ -39,7 +38,7 @@ VECTORS = [
         "type Store struct { data map[string]int }\n"
         "func (s *Store) Load(d map[string]int) { s.data = d }\n"
         "func (s *Store) Snapshot() map[string]int { return s.data }\n")},
-    {"id": "single-writer-dynamic-dispatch", "state": "Router.handler", "verdict": "unresolved", "drives_decision": True,
+    {"id": "invoked-only-collaborator", "state": "Router.handler", "verdict": "neutral", "drives_decision": False,
      "src": (
         "package main\n"
         "type Router struct { handler func(string) string }\n"

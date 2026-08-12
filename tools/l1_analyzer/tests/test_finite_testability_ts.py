@@ -10,7 +10,6 @@ lands, so every case here fails until the classifier is language-parameterized.
 """
 
 import pytest
-
 from l1_analyzer import state_bounds
 
 VECTORS = [
@@ -71,15 +70,15 @@ VECTORS = [
         ),
     },
     {
-        "id": "single-writer-dynamic-dispatch",
+        "id": "invoked-only-collaborator",
         "state": "this.handler",
-        "verdict": "unresolved",
-        "drives_decision": True,
+        "verdict": "neutral",
+        "drives_decision": False,
         "src": (
             "class Router {\n"
             "  handler: (r: string) => string;\n"
             "  constructor(h: (r: string) => string) { this.handler = h; }\n"
-            "  route(r: string) { return this.handler(r); }\n"        # callee set unbounded
+            "  route(r: string) { return this.handler(r); }\n"        # invoked, result returned
             "}\n"
         ),
     },

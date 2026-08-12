@@ -142,7 +142,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "return_types": ("return_statement",),
         "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
         "elif_types": ("elif_clause",),
-        "passthrough_types": ("parenthesized_expression", "not_operator", "boolean_operator", "unary_operator"),
+        # `await X` is a transparent wrapper around X's value: an awaited call result reaches
+        # the same decision the bare call result would, so it must not stop the flow walk.
+        "passthrough_types": ("parenthesized_expression", "not_operator", "boolean_operator", "unary_operator", "await"),
         "comparison_types": ("comparison_operator",),
         "membership": "comparison_in",
         "this_idents": frozenset({"self"}),

@@ -7,7 +7,6 @@ dispatch. Instance state does not apply, so every vector here is module state.
 """
 
 import pytest
-
 from l1_analyzer import state_bounds
 
 VECTORS = [
@@ -25,7 +24,13 @@ VECTORS = [
      "src": (
         "static int total = 0;\n"
         "void record(int amount) { total += amount; }\n")},
-    {"id": "function-pointer-dynamic-dispatch", "state": "handler", "verdict": "unresolved", "drives_decision": True,
+    # Invoked, but MODULE-level, so the compositional call-target rule does not reach it: the
+    # slot has no binding site here and any translation unit can assign it, so its writer set
+    # is not enumerable at all. Instance state is what the spec's class-scope rule can bound
+    # (its writers are the methods of its own class); a mutable global holding a callable is
+    # the case that rule does not cover. Contrast invoked-only-collaborator in the other
+    # languages, where the slot is a field bound at construction.
+    {"id": "module-level-invoked-slot", "state": "handler", "verdict": "unresolved", "drives_decision": True,
      "src": (
         "typedef int (*Handler)(int);\n"
         "static Handler handler;\n"

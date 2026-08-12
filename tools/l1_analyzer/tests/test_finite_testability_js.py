@@ -6,7 +6,6 @@ access, `in`, subscript, augmented assignment, top-level `let` module state — 
 """
 
 import pytest
-
 from l1_analyzer import state_bounds
 
 VECTORS = [
@@ -39,7 +38,7 @@ VECTORS = [
         "  load(d) { this.data = d; }\n"
         "  snapshot() { return this.data; }\n"
         "}\n")},
-    {"id": "single-writer-dynamic-dispatch", "state": "this.handler", "verdict": "unresolved", "drives_decision": True,
+    {"id": "invoked-only-collaborator", "state": "this.handler", "verdict": "neutral", "drives_decision": False,
      "src": (
         "class Router {\n"
         "  handler = null;\n"

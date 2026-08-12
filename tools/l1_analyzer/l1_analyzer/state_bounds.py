@@ -257,9 +257,14 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: set[str]) -> str:
     if _is_write_target(ref, parent, sp):
         return _WRITE
 
-    # S(...) : the state is the call target -> dynamic dispatch, unbounded callee.
+    # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target
+    # position is compositional exactly as return position is, and the meter neither
+    # fail-closes nor assumes: it follows the call RESULT like any other call result (spec
+    # section 4). `return S(x)` is output; `if S(x):` is the host's own two arms. The premise
+    # checks that make this a proof rather than an assumption are per-attribute, and live in
+    # _injected_slot_premise_fails.
     if not sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), ref):
-        return _UNDECIDABLE
+        return _flow(parent, sp, closed_sets)
 
     # S[x] read : indexed by x. Unbounded key -> unbounded partition.
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
@@ -313,14 +318,14 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: set[str]) -> str:
     if parent.type in sp["return_types"]:
         return _OUTPUT
     # The state value itself is invoked as a callable, possibly through a wrapper:
-    # `(self.f)(x)` in Rust reaches the call via a parenthesized_expression. Dynamic
-    # dispatch, unbounded callee. (Direct `S(x)` is caught earlier in _categorize.)
+    # `(self.f)(x)` in Rust reaches the call via a parenthesized_expression. Same rule as
+    # direct `S(x)` in _categorize: follow the call result, do not fail-close.
     # A call RESULT being invoked is method-chaining, not state dispatch: `app.get(p)
-    # (handler)` (FastAPI's decorator idiom in call form) calls what app.get returns,
+    # (handler)` (the decorator idiom in call form) calls what app.get returns,
     # not app - so exclude nodes that are themselves a call.
     if (not sp["flat_call"] and node.type not in sp["call_types"]
             and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node)):
-        return _UNDECIDABLE
+        return _flow(parent, sp, closed_sets)
     if parent.type in sp["passthrough_types"]:
         return _flow(parent, sp, closed_sets)
     if parent.type in sp["comparison_types"]:
@@ -349,6 +354,48 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: set[str]) -> str:
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), node):
         return _keyed_read(_sub_key(parent, sp), sp)
     return _OUTPUT
+
+
+def _is_call_target(ref: Node, sp: LangSpec) -> bool:
+    """This reference supplies what runs at a call site: `S(...)`, `await S(...)`."""
+    parent = ref.parent
+    if parent is None or sp["flat_call"]:
+        return False
+    return parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), ref)
+
+
+def _written_through(ref: Node, sp: LangSpec) -> bool:
+    """The host reaches INTO the value: `S.attr = v`, or a mutating method on S. Either way
+    the host depends on the collaborator's internal shape, which it cannot enumerate."""
+    parent = ref.parent
+    if parent is None or parent.type not in sp["member_types"] or not _same(_field(parent, sp["mem_object"]), ref):
+        return False
+    if _is_lvalue(parent, sp):
+        return True                                   # S.attr = v
+    gp = parent.parent
+    called = gp is not None and gp.type in sp["call_types"] and _same(_field(gp, sp["call_fn"]), parent)
+    return called and _text(_field(parent, sp["mem_attr"])) in sp["mutating"]
+
+
+def _injected_slot_premise_fails(refs: list[Node], sp: LangSpec, instance: bool) -> bool:
+    """Call-target position is compositional only while the value at the call site is
+    provably the value that was injected (spec section 4). Three constructs defeat that
+    proof, and all three are per-attribute, so none can be seen one reference at a time.
+
+    Not instance state: a module-level invoked slot (a C function pointer, a module global
+    holding a callable) has a writer set that is not enumerable at all - any translation
+    unit can assign it. Only instance state has the property the spec's scope rule relies
+    on, that its writers are the methods of its own class. Rebinding: more than one binding
+    site means which callee is live at the call depends on invisible history, the runtime
+    rebinding of dispatch that honest-test section 4.8 rejects. Reaching in: writing through
+    the slot means the collaborator is no longer a black box behind its contract."""
+    if not any(_is_call_target(r, sp) for r in refs):
+        return False
+    if not instance:
+        return True
+    if sum(1 for r in refs if _is_lvalue(r, sp)) > 1:
+        return True
+    return any(_written_through(r, sp) for r in refs)
 
 
 def _verdict(categories: list[str]) -> tuple[str, bool]:
@@ -487,7 +534,7 @@ def _go_receiver_findings(root: Node, rel: str, sp: LangSpec, closed_sets: set[s
                     field = _text(_field(sel, "field"))
                     field_refs.setdefault(field, []).append(sel)
         for field, refs in field_refs.items():
-            findings.append(_finding(f"{tname}.{field}", refs, rel, sp, closed_sets, immutable_ctors))
+            findings.append(_finding(f"{tname}.{field}", refs, rel, sp, closed_sets, immutable_ctors, instance=True))
     return findings
 
 
@@ -648,12 +695,15 @@ def _immutable_const_verdict(refs: list[Node], immutable_ctors: set[str], sp: La
     return NEUTRAL, _reaches_decision(refs, sp)
 
 
-def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: set[str], immutable_ctors: set[str]) -> Finding:
+def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: set[str], immutable_ctors: set[str], instance: bool) -> Finding:
     const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp is LANG_SPEC["python"] else None
     if const is not None:
         verdict, drives = const
     else:
         verdict, drives = _verdict([_categorize(r, sp, closed_sets) for r in refs])
+        # An invoked slot earns NEUTRAL from the compositional rule; that rule has premises.
+        if verdict == NEUTRAL and _injected_slot_premise_fails(refs, sp, instance):
+            verdict, drives = UNRESOLVED, True
     # Attribute-level false-positive filter (Python): the per-reference verdict conflates
     # unbounded data with an unbounded decision. Clear a finding to NEUTRAL only when the
     # attribute is a provable write-once, memoization cache, or carried-value shape.
@@ -670,7 +720,7 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
     for name in _enum_module_state(root, sp, cfg):
         refs = _refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm)
         if refs:
-            findings.append(_finding(name, refs, rel, sp, closed_sets, immutable_ctors))
+            findings.append(_finding(name, refs, rel, sp, closed_sets, immutable_ctors, instance=False))
 
     if sp.get("scope_by_receiver"):    # Go: state spans methods, grouped by receiver type
         findings.extend(_go_receiver_findings(root, rel, sp, closed_sets, immutable_ctors))
@@ -679,7 +729,7 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
         for key in _enum_instance_state(cls, sp):
             refs = _state_refs(cls, key, sp)
             if refs:
-                findings.append(_finding(key, refs, rel, sp, closed_sets, immutable_ctors))
+                findings.append(_finding(key, refs, rel, sp, closed_sets, immutable_ctors, instance=True))
 
     return findings
 
