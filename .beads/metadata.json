@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "slop_audit",
+  "project_id": "e490e61f-d282-4772-a2a3-9ebb567cfbe8"
+}

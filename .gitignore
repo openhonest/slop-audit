@@ -28,3 +28,9 @@ tools/l1_analyzer/tests/reference/honest_framework_app.txt
 
 # Local Paper A v2 run scratch (results, logs, summary) - not part of the tool.
 tools/l1_analyzer/paper_a_v2/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
