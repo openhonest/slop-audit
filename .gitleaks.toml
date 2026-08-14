@@ -1,0 +1,27 @@
+# gitleaks configuration for the Slop Audit repository.
+#
+# The methodology documents the credential-leak antipattern by showing it. The example in
+# dimensions/07-configuration-secrets.md is a Flask config.py holding a Stripe key, a
+# database URL and a JWT secret, and the whole point of the passage is that a reader
+# recognises the shape. gitleaks recognises it too, and reports the documentation as a leak.
+#
+# Prose that documents a pattern is not an instance of the pattern. The allowlist below is
+# written narrowly for that reason: it names the placeholder strings themselves, not the
+# file and not the directory. A real key pasted into the same paragraph still fails the
+# scan, which is the property a path-wide exemption would throw away.
+#
+# Adding to this list is a deliberate, reviewable act. Every entry must be a string that
+# was invented for a document, never one that was ever valid anywhere.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Invented credentials that appear in the methodology's own antipattern examples"
+regexes = [
+  # dimensions/07-configuration-secrets.md, the "Example absence (Python / Flask)" block.
+  '''sk_live_51ABC\.\.\.''',
+  '''postgres://app:hunter2@db\.prod\.internal:5432/myapp''',
+  '''the-quick-brown-fox-jumps-over-the-lazy-dog''',
+  '''SG\.xyz\.\.\.''',
+]

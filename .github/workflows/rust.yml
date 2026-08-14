@@ -1,0 +1,37 @@
+name: Portable bundle
+
+# The Rust bundle is the redistributable form of the analyzer: one self-contained binary
+# per platform, grammars linked in. It builds on the two platforms an auditor arrives with.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/slop-audit-rs/**'
+      - '.github/workflows/rust.yml'
+  pull_request:
+    paths:
+      - 'tools/slop-audit-rs/**'
+      - '.github/workflows/rust.yml'
+
+jobs:
+  build:
+    name: cargo test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    defaults:
+      run:
+        working-directory: tools/slop-audit-rs
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --release --locked
+      # The grammar-load test is the one that matters here: a grammar crate compiled
+      # against a newer tree-sitter ABI than the core crate builds clean and then panics
+      # at set_language, in the field, on whichever language the auditor points it at.
+      - name: Test
+        run: cargo test --release --locked
+      - name: Smoke-run the panel on this repo
+        run: ./target/release/slop-audit-rs "$GITHUB_WORKSPACE"

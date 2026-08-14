@@ -1,0 +1,92 @@
+name: Release binaries
+
+# One self-contained binary per platform, which is the whole point of the Rust bundle: an
+# auditor runs the panel from a USB key, with no Python, no install, and no network.
+#
+# Linux and Windows cross-build from the Linux runner, which carries a rustup toolchain
+# that can add targets. Debian needs musl-tools for musl-gcc and mingw-w64 for the Windows
+# cross-compiler, because the tree-sitter grammars are C.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  linux-and-windows:
+    name: Linux (static) and Windows
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/slop-audit-rs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install cross-compilers
+        run: sudo apt-get update && sudo apt-get install -y musl-tools mingw-w64
+      - name: Add targets
+        run: rustup target add x86_64-unknown-linux-musl x86_64-pc-windows-gnu
+      - name: Build Linux (static-pie, no libc dependency)
+        run: cargo build --release --locked --target x86_64-unknown-linux-musl
+        env:
+          CC_x86_64_unknown_linux_musl: musl-gcc
+      - name: Build Windows
+        run: cargo build --release --locked --target x86_64-pc-windows-gnu
+      - name: Check the Linux binary is genuinely static
+        run: file target/x86_64-unknown-linux-musl/release/slop-audit-rs | grep -q "static-pie"
+      - name: Record the Linux panel for the cross-platform diff
+        run: ./target/x86_64-unknown-linux-musl/release/slop-audit-rs "$GITHUB_WORKSPACE" --tsv > panel-linux.tsv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slop-audit-rs-x86_64-linux-musl
+          path: tools/slop-audit-rs/target/x86_64-unknown-linux-musl/release/slop-audit-rs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slop-audit-rs-x86_64-windows
+          path: tools/slop-audit-rs/target/x86_64-pc-windows-gnu/release/slop-audit-rs.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panel-linux
+          path: tools/slop-audit-rs/panel-linux.tsv
+
+  macos:
+    name: macOS (arm64)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: tools/slop-audit-rs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build
+        run: cargo build --release --locked
+      - name: Record the macOS panel for the cross-platform diff
+        run: ./target/release/slop-audit-rs "$GITHUB_WORKSPACE" --tsv > panel-macos.tsv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slop-audit-rs-aarch64-macos
+          path: tools/slop-audit-rs/target/release/slop-audit-rs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panel-macos
+          path: tools/slop-audit-rs/panel-macos.tsv
+
+  cross-platform-agreement:
+    # A binary that reports different numbers on a different architecture is not one
+    # instrument. Both jobs audit the same commit of this repo and record the panel; this
+    # diffs them byte for byte and fails the release if they disagree.
+    name: Linux and macOS agree on the same repo
+    needs: [linux-and-windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: panel-linux
+          path: linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: panel-macos
+          path: macos
+      - name: Diff the two panels
+        run: diff linux/panel-linux.tsv macos/panel-macos.tsv
