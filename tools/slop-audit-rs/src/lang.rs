@@ -18,6 +18,13 @@ pub struct LangCfg {
     /// LANG_CFG["type_escape_patterns"]. Empty means L1.15 is n/a for the language
     /// (untyped, or no configured escape hatch): Ruby, JavaScript, Rust, C.
     pub type_escape_patterns: &'static [&'static str],
+    /// LANG_CFG["annotation_escape_nodes"]: the grammar's annotation node types, where
+    /// a language writes its suppressions as an annotation rather than a comment.
+    pub annotation_escape_nodes: &'static [&'static str],
+    /// LANG_CFG["annotation_escape_names"]: the annotation names that suppress a type
+    /// diagnostic. Java only for now; see
+    /// l1_analyzer/docs/amendment-2026-08-14-java-suppression-marker.md.
+    pub annotation_escape_names: &'static [&'static str],
     /// _LITERAL_NODES[lang]: container-literal node types that read as a data table,
     /// discounted from the L1.17 code-line count.
     pub literal_nodes: &'static [&'static str],
@@ -31,54 +38,72 @@ pub const LANGS: &[LangCfg] = &[
         key: "python",
         extensions: &[".py"],
         type_escape_patterns: &["Any"],
+        annotation_escape_nodes: &[],
+        annotation_escape_names: &[],
         literal_nodes: &["dictionary", "list", "set", "tuple"],
     },
     LangCfg {
         key: "rust",
         extensions: &[".rs"],
         type_escape_patterns: &[],
+        annotation_escape_nodes: &[],
+        annotation_escape_names: &[],
         literal_nodes: &["array_expression"],
     },
     LangCfg {
         key: "c",
         extensions: &[".c", ".h"],
         type_escape_patterns: &[],
+        annotation_escape_nodes: &[],
+        annotation_escape_names: &[],
         literal_nodes: &["initializer_list"],
     },
     LangCfg {
         key: "java",
         extensions: &[".java"],
         type_escape_patterns: &["Object"],
+        annotation_escape_nodes: &["annotation", "marker_annotation"],
+        annotation_escape_names: &["SuppressWarnings"],
         literal_nodes: &["array_initializer"],
     },
     LangCfg {
         key: "typescript",
         extensions: &[".ts", ".tsx"],
         type_escape_patterns: &["any", "unknown"],
+        annotation_escape_nodes: &[],
+        annotation_escape_names: &[],
         literal_nodes: &["object", "array"],
     },
     LangCfg {
         key: "csharp",
         extensions: &[".cs"],
         type_escape_patterns: &["object", "dynamic"],
+        annotation_escape_nodes: &[],
+        annotation_escape_names: &[],
         literal_nodes: &["initializer_expression", "collection_expression"],
     },
     LangCfg {
         key: "javascript",
         extensions: &[".js", ".jsx", ".mjs", ".cjs"],
         type_escape_patterns: &[],
+        annotation_escape_nodes: &[],
+        annotation_escape_names: &[],
         literal_nodes: &["object", "array"],
     },
     LangCfg {
         key: "ruby",
         extensions: &[".rb"],
         type_escape_patterns: &[],
+        annotation_escape_nodes: &[],
+        annotation_escape_names: &[],
         literal_nodes: &["hash", "array"],
     },
     LangCfg {
         key: "go",
         extensions: &[".go"],
         type_escape_patterns: &["any"],
+        annotation_escape_nodes: &[],
+        annotation_escape_names: &[],
         literal_nodes: &["literal_value", "composite_literal"],
     },
 ];

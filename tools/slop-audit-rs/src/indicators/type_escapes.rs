@@ -1,7 +1,7 @@
 //! L1.15 type-escape density: count tree-sitter leaf nodes whose exact text is one of
-//! the language's escape tokens, plus comment nodes carrying an ignore-marker, over
-//! kLOC. Ported from l1_analyzer.indicators._compute_type_escapes and
-//! _count_type_escapes_in_tree.
+//! the language's escape tokens, plus comment nodes carrying an ignore-marker and
+//! annotation nodes naming a suppression, over kLOC. Ported from
+//! l1_analyzer.indicators._compute_type_escapes and _count_type_escapes_in_tree.
 //!
 //! Language-driven: the escape tokens come from lang::LangCfg, so the four untyped or
 //! no-escape-hatch languages (Ruby, JavaScript, Rust, C) report n/a exactly as the
@@ -16,12 +16,7 @@ use std::path::Path;
 use tree_sitter::Node;
 
 // _COMMENT_TYPE_ESCAPES (language agnostic; substring match on a comment node).
-const COMMENT_ESCAPES: &[&str] = &[
-    "# type: ignore",
-    "// @ts-ignore",
-    "/* @ts-ignore",
-    "@SuppressWarnings",
-];
+const COMMENT_ESCAPES: &[&str] = &["# type: ignore", "// @ts-ignore", "/* @ts-ignore"];
 // _read_source_bytes(..., extra_ignore=("tests", "test")).
 const EXTRA_IGNORE: &[&str] = &["tests", "test"];
 
@@ -39,14 +34,32 @@ fn in_string(node: Node) -> bool {
     false
 }
 
+/// _annotation_name: the name an annotation declares, read from the grammar's `name`
+/// field and followed down as far as the field goes, so a scoped annotation
+/// (`@java.lang.SuppressWarnings`) reads as `SuppressWarnings`.
+fn annotation_name<'a>(node: Node<'a>, src: &[u8]) -> String {
+    let mut node = node;
+    while let Some(name) = node.child_by_field_name("name") {
+        node = name;
+    }
+    String::from_utf8_lossy(&src[node.byte_range()]).into_owned()
+}
+
 /// _count_type_escapes_in_tree: a leaf whose exact text is an escape token and is not
-/// inside a string, plus a comment node that BEGINS with an ignore-marker. A comment
-/// that merely mentions the marker while explaining the rule is documentation.
-fn count_escapes_in_tree(node: Node, src: &[u8], escape_tokens: &[&str]) -> usize {
+/// inside a string, a comment node that BEGINS with an ignore-marker, and an annotation
+/// node naming a suppression. A comment that merely mentions the marker while explaining
+/// the rule is documentation.
+///
+/// The annotation arm is what Java's `@SuppressWarnings` needs: it parses as an
+/// `annotation` node, so the comment arm never saw it. One annotation is one escape
+/// however many warnings it names.
+/// The whole vocabulary travels in `cfg`, as it does in the reference: unpacking it at
+/// each call site is how a new vocabulary silently splits the measure in two.
+fn count_escapes_in_tree(node: Node, src: &[u8], cfg: &lang::LangCfg) -> usize {
     let mut count = 0usize;
     if node.child_count() == 0 {
         let text = String::from_utf8_lossy(&src[node.byte_range()]);
-        if escape_tokens.contains(&text.as_ref()) && !in_string(node) {
+        if cfg.type_escape_patterns.contains(&text.as_ref()) && !in_string(node) {
             count += 1;
         }
     }
@@ -56,9 +69,14 @@ fn count_escapes_in_tree(node: Node, src: &[u8], escape_tokens: &[&str]) -> usiz
             count += 1;
         }
     }
+    if cfg.annotation_escape_nodes.contains(&node.kind())
+        && cfg.annotation_escape_names.contains(&annotation_name(node, src).as_str())
+    {
+        count += 1;
+    }
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        count += count_escapes_in_tree(child, src, escape_tokens);
+        count += count_escapes_in_tree(child, src, cfg);
     }
     count
 }
@@ -115,7 +133,7 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
         };
         total_loc += splitlines_count_str(&String::from_utf8_lossy(&src));
         if let Some(tree) = parser.parse(&src, None) {
-            escape_count += count_escapes_in_tree(tree.root_node(), &src, cfg.type_escape_patterns);
+            escape_count += count_escapes_in_tree(tree.root_node(), &src, cfg);
         }
     }
 
@@ -134,5 +152,55 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
         value: py_round2(density),
         band: band(density, 1.0, 5.0, false).into(),
         details,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The count one file yields, through the same walker `analyze` uses.
+    fn count(language: &str, source: &str) -> usize {
+        let cfg = lang::cfg(language).expect("language row");
+        let mut parser = parser_for(language);
+        let src = source.as_bytes();
+        let tree = parser.parse(src, None).expect("parse");
+        count_escapes_in_tree(tree.root_node(), src, cfg)
+    }
+
+    /// Java's suppression marker parses as an `annotation` node, so the comment arm never
+    /// saw it and Java's real escape hatch went uncounted. `@Override` is an annotation
+    /// too and is not a type escape.
+    #[test]
+    fn java_suppresswarnings_on_a_method_is_counted() {
+        let src = "class A {\n    @SuppressWarnings(\"unchecked\")\n    @Override\n    public void m() {}\n}\n";
+        assert_eq!(count("java", src), 1);
+    }
+
+    /// One annotation is one decision to opt out, however many warnings it names, and a
+    /// scoped annotation names the same marker.
+    #[test]
+    fn java_suppression_counts_once_however_many_warnings() {
+        let src = "class A {\n    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n    void m() {}\n    @java.lang.SuppressWarnings(\"unchecked\")\n    void n() {}\n}\n";
+        assert_eq!(count("java", src), 2);
+    }
+
+    /// Prose about the marker, and a string holding it, are not suppressions. Moving the
+    /// marker to the annotation table must not reopen the self-reference hole.
+    #[test]
+    fn java_comment_mentioning_the_marker_is_documentation() {
+        let src = "class A {\n    // use @SuppressWarnings(\"unchecked\") only where the cast is proven\n    void m() {\n        String s = \"@SuppressWarnings\";\n    }\n}\n";
+        assert_eq!(count("java", src), 0);
+    }
+
+    /// The reference's own L1.15 cases, so the two walkers cannot drift on the rules the
+    /// annotation arm sits beside.
+    #[test]
+    fn the_comment_and_string_rules_are_unchanged() {
+        assert_eq!(count("python", "x = 1  # type: ignore\n"), 1);
+        assert_eq!(count("python", "x = 1  # type: ignore[attr-defined]\n"), 1);
+        assert_eq!(count("python", "# the marker is # type: ignore, mid-sentence\nx = 1\n"), 0);
+        assert_eq!(count("python", "PATTERNS = (\"Any\",)\nx = 1\n"), 0);
+        assert_eq!(count("java", "class A {\n    Object o;\n}\n"), 1);
     }
 }

@@ -17,17 +17,18 @@ from l1_analyzer import card, indicators, schedule_silence, thread_surface
 
 
 def _count_type_escapes(repo: Path, lang: str) -> int:
-    """Count the analyzer's own type-escape hatches (the Any token + # type: ignore
-    comments), the same way L1.15 does, so the gate can ratchet on the raw number
-    rather than a per-kLOC density."""
+    """Count the analyzer's own type-escape hatches (the Any token, # type: ignore
+    comments, suppression annotations), the same way L1.15 does, so the gate can ratchet
+    on the raw number rather than a per-kLOC density.
+
+    The whole vocabulary travels in `cfg`, so the gate cannot count by an older rule than
+    the indicator it is meant to enforce."""
     cfg = indicators.LANG_CFG.get(lang)
-    patterns = cfg.get("type_escape_patterns") if cfg else None
-    if not patterns:
+    if cfg is None or not cfg["type_escape_patterns"]:
         return 0
-    tokens = frozenset(patterns)
     parser = indicators._get_parser(lang)
     files, _skipped = indicators._read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
-    return sum(indicators._count_type_escapes_in_tree(parser.parse(src).root_node, tokens) for _path, src in files)
+    return sum(indicators._count_type_escapes_in_tree(parser.parse(src).root_node, cfg) for _path, src in files)
 
 
 def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_exposed: int | None) -> int:

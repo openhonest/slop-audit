@@ -239,6 +239,54 @@ def test_l1_15_still_counts_a_real_suppression_with_a_code(tmp_path):
     assert res["details"].startswith("1 escapes")
 
 
+def test_l1_15_counts_java_suppresswarnings_annotation(tmp_path):
+    """Java's suppression marker is an annotation node, not a comment, so the comment
+    path never saw it. @Override is an annotation too and is not a type escape."""
+    res = _escapes(tmp_path, "java", "A.java",
+                   "class A {\n"
+                   "    @SuppressWarnings(\"unchecked\")\n"
+                   "    @Override\n"
+                   "    public void m() {}\n"
+                   "}\n")
+    assert res["details"].startswith("1 escapes")
+
+
+def test_l1_15_java_suppression_counts_once_however_many_warnings(tmp_path):
+    """One annotation is one decision to opt out, the rule `# type: ignore[a, b]`
+    already gets. A scoped annotation names the same marker."""
+    res = _escapes(tmp_path, "java", "A.java",
+                   "class A {\n"
+                   "    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n"
+                   "    void m() {}\n"
+                   "    @java.lang.SuppressWarnings(\"unchecked\")\n"
+                   "    void n() {}\n"
+                   "}\n")
+    assert res["details"].startswith("2 escapes")
+
+
+def test_l1_15_java_comment_mentioning_suppresswarnings_is_documentation(tmp_path):
+    """Prose about the marker, and a string holding it, are not suppressions. Moving
+    the marker to the annotation table must not reopen the self-reference hole."""
+    res = _escapes(tmp_path, "java", "A.java",
+                   "class A {\n"
+                   "    // use @SuppressWarnings(\"unchecked\") only where the cast is proven\n"
+                   "    void m() {\n"
+                   "        String s = \"@SuppressWarnings\";\n"
+                   "    }\n"
+                   "}\n")
+    assert res["details"].startswith("0 escapes")
+
+
+def test_l1_15_the_ratchet_counts_what_the_indicator_counts(tmp_path):
+    """The pre-commit gate and L1.15 must count by one rule. They unpacked the
+    vocabulary separately, so a vocabulary added to one was invisible to the other."""
+    from l1_analyzer import cli
+
+    (tmp_path / "A.java").write_text("class A {\n    @SuppressWarnings(\"unchecked\")\n    void m() {}\n}\n")
+    assert cli._count_type_escapes(tmp_path, "java") == 1
+    assert indicators._compute_type_escapes(tmp_path, "java")["details"].startswith("1 escapes")
+
+
 def test_l1_15_typescript_any_and_unknown(tmp_path):
     res = _escapes(tmp_path, "typescript", "a.ts", "let x: any = 1;\nlet y: unknown = 2;\n")
     assert res["details"].startswith("2 escapes")

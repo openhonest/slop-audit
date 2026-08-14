@@ -60,3 +60,5 @@ Every change landed in `tools/slop-audit-rs` in the same commit and the panels w
 ## Not fixed here
 
 `@SuppressWarnings` sits in the comment-marker list, but in Java it is an annotation node, not a comment, so it has never been counted where it actually appears. Java's real suppression marker is therefore invisible to L1.15. Recorded as a defect rather than fixed, because it widens the measure rather than narrowing a false positive.
+
+Fixed in `amendment-2026-08-14-java-suppression-marker.md`.

@@ -398,6 +398,8 @@ class LangCfg(TypedDict, total=False):
     this_ident: frozenset[str]
     module_level_assign: tuple[str, ...]
     type_escape_patterns: tuple[str, ...]
+    annotation_escape_nodes: tuple[str, ...]
+    annotation_escape_names: tuple[str, ...]
     field_based_globals: bool
     mutable_specifier_globals: bool
     const_keywords: tuple[str, ...]
@@ -460,6 +462,10 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_variable_declaration"),
         "type_escape_patterns": ("Object",),  # raw types, etc.
+        # Java's suppression marker is an annotation node, not a comment. See
+        # docs/amendment-2026-08-14-java-suppression-marker.md.
+        "annotation_escape_nodes": ("annotation", "marker_annotation"),
+        "annotation_escape_names": ("SuppressWarnings",),
     },
     "typescript": {
         "language": Language(tree_sitter_typescript.language_typescript()),
@@ -779,10 +785,30 @@ def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool, timeout_secon
         return {"value": "not run", "band": "n/a", "details": "test execution disabled"}
     return _runtime_determinism(repo, lang, timeout_seconds, python_executable)
 
-_COMMENT_TYPE_ESCAPES = ("# type: ignore", "// @ts-ignore", "/* @ts-ignore", "@SuppressWarnings")
+_COMMENT_TYPE_ESCAPES = ("# type: ignore", "// @ts-ignore", "/* @ts-ignore")
 
-def _count_type_escapes_in_tree(root: Node, escape_tokens: frozenset[str]) -> int:
+def _annotation_name(node: Node) -> str:
+    """The name an annotation declares, read from the grammar's `name` field.
+
+    The field is followed down as far as it goes, so a scoped annotation
+    (`@java.lang.SuppressWarnings`) reads as `SuppressWarnings`: a scoped_identifier
+    carries its own `name` field holding the final segment. Reading the field beats
+    splitting the node's text, which is the mistake docs/amendment-2026-08-02-rust-
+    receiver-and-static.md records.
+    """
+    name = node.child_by_field_name("name")
+    while name is not None:
+        node = name
+        name = node.child_by_field_name("name")
+    return node.text.decode("utf8", errors="ignore") if node.text else ""
+
+def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
     """Count type-escape hatches in one parsed tree.
+
+    The whole vocabulary is read from `cfg` here rather than unpacked by each caller.
+    Two callers unpacked it (L1.15 and the pre-commit ratchet in cli.py), so adding a
+    vocabulary was a silent measurement split waiting to happen: the gate would keep
+    counting the old way while the indicator counted the new way.
 
     A type token (Any, object, dynamic, ...) is matched only on a leaf node whose
     exact text is one of `escape_tokens`, so it catches real annotations without
@@ -802,7 +828,15 @@ def _count_type_escapes_in_tree(root: Node, escape_tokens: frozenset[str]) -> in
     looks like. A comment that mentions `# type: ignore` while explaining the rule is
     documentation. This module's own pattern list is the proof: it described the marker
     three times and was charged three escapes for saying so.
+
+    A suppression written as an annotation is counted where the grammar puts it. Java's
+    `@SuppressWarnings` is an `annotation` node, so the comment path never saw it and
+    Java's real suppression marker went uncounted. One annotation is one escape however
+    many warnings it names, the same rule `# type: ignore[a, b]` already gets.
     """
+    escape_tokens = frozenset(cfg["type_escape_patterns"])
+    annotation_nodes = frozenset(cfg.get("annotation_escape_nodes", ()))
+    annotation_names = frozenset(cfg.get("annotation_escape_names", ()))
     count = 0
 
     def in_string(n: Node) -> bool:
@@ -823,6 +857,8 @@ def _count_type_escapes_in_tree(root: Node, escape_tokens: frozenset[str]) -> in
             text = n.text.decode("utf8", errors="ignore") if n.text else ""
             if any(text.lstrip().startswith(pat) for pat in _COMMENT_TYPE_ESCAPES):
                 count += 1
+        if n.type in annotation_nodes and _annotation_name(n) in annotation_names:
+            count += 1
         for c in n.children:
             walk(c)
 
@@ -838,14 +874,13 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
         # Untyped or no configured escape hatch (Ruby, JavaScript, Rust, C).
         return {"value": "n/a", "band": "n/a", "details": f"type-escape density not applicable for {lang}"}
     parser = _get_parser(lang)
-    escape_tokens = frozenset(cfg["type_escape_patterns"])
     files, skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
 
     escape_count = 0
     total_loc = 0
     for _path, src in files:
         total_loc += len(src.decode("utf8", errors="ignore").splitlines())
-        escape_count += _count_type_escapes_in_tree(parser.parse(src).root_node, escape_tokens)
+        escape_count += _count_type_escapes_in_tree(parser.parse(src).root_node, cfg)
 
     density = (escape_count / (total_loc / 1000)) if total_loc > 1000 else 0.0
     return {"value": round(density, 2), "band": band(density, 1, 5, higher_is_better=False), "details": _with_skipped(f"{escape_count} escapes in ~{total_loc // 1000}kLOC", skipped)}
