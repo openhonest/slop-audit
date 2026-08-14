@@ -551,12 +551,65 @@ def _go_receiver_findings(root: Node, rel: str, sp: LangSpec, closed_sets: set[s
     return findings
 
 
+# Node types whose subtree is a module path rather than a value: `from app.auth import X`
+# names a package, not the variable `app` defined below it. Matching on identifier text
+# alone made the two the same state.
+_IMPORT_PATH_TYPES = ("import", "using_directive", "package_declaration", "package_clause")
+
+
+def _under_import_path(node: Node) -> bool:
+    """True when the identifier is part of an import or package path, so it binds nothing
+    here and is not a reference to same-named state."""
+    parent = node.parent
+    while parent is not None:
+        if any(marker in parent.type for marker in _IMPORT_PATH_TYPES):
+            return True
+        parent = parent.parent
+    return False
+
+
+def _shadowing_scope(node: Node, key: str, sp: LangSpec) -> Node | None:
+    """The nearest enclosing function that BINDS `key` itself, or None.
+
+    A parameter named `app` and a module variable named `app` are different objects, and
+    the classifier treated them as one because their text matched. A reference inside a
+    function whose own parameter list declares that name belongs to the parameter, so it
+    is not evidence about the module variable. Ablation that isolated this: renaming the
+    parameter, and changing nothing else, flipped the file's verdict.
+
+    Only the parameter list is consulted. A local assignment shadows too, in Python and
+    in most of the nine, but the rules diverge per language (Python's `global`, Ruby's
+    block scoping), and a parameter is unambiguous everywhere. Narrow on purpose."""
+    parent = node.parent
+    while parent is not None:
+        if parent.type in sp["func_types"]:
+            for params in parent.children:
+                if params.type not in sp.get("arglist_types", ()) and "param" not in params.type:
+                    continue
+                for declared in _refs(params, lambda n: n.type == "identifier"):
+                    if _text(declared) == key:
+                        return parent
+        parent = parent.parent
+    return None
+
+
+def _bound_to(refs: list[Node], key: str, sp: LangSpec) -> list[Node]:
+    """The references that actually denote `key`, dropping the two ways a matching name
+    does not: it names a package, or a nearer parameter binds it.
+
+    Both collection sites go through this. Module state and class state used to collect
+    references separately, so a filter applied to one silently missed the other."""
+    return [n for n in refs
+            if not _under_import_path(n) and _shadowing_scope(n, key, sp) is None]
+
+
 def _state_refs(scope: Node, key: str, sp: LangSpec) -> list[Node]:
     if sp.get("instance_enum") == "ruby_ivar":
         return _local_refs(scope, lambda n: n.type == "instance_variable" and _text(n) == key, sp)
     if sp["instance_ref_style"] == "member":
         return _local_refs(scope, lambda n: n.type in sp["member_types"] and _text(n) == key, sp)
-    return _local_refs(scope, lambda n: n.type == "identifier" and _text(n) == key, sp)
+    hits = _local_refs(scope, lambda n: n.type == "identifier" and _text(n) == key, sp)
+    return _bound_to(hits, key, sp)
 
 
 def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> set[str]:
@@ -753,7 +806,7 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
     findings: list[Finding] = []
 
     for name in _enum_module_state(root, sp, cfg):
-        refs = _refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm)
+        refs = _bound_to(_refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm), name, sp)
         if refs:
             findings.append(_finding(name, refs, rel, sp, closed_sets, immutable_ctors, instance=False))
 
