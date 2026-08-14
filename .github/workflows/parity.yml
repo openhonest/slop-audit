@@ -1,0 +1,41 @@
+name: Parity
+
+# The portable bundle is a certified-equivalent redistribution of the Python reference,
+# and that claim is only worth what it is checked against. validate.py runs both tools on
+# the same repo and fails on any indicator where they disagree.
+#
+# The reference is canonical. A parity failure means the port drifted, unless the commit
+# deliberately changed the measurement in both, in which case both change together.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  parity:
+    name: Rust port equals the Python reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The git indicators read the log, so a shallow clone would compare two tools
+          # on one commit rather than on a history.
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Sync the reference
+        run: uv sync --extra dev
+        working-directory: tools/l1_analyzer
+      - name: Build the bundle
+        run: cargo build --release --locked
+        working-directory: tools/slop-audit-rs
+      # Three targets, three languages: the repo itself and the Python package resolve as
+      # python, the crate as rust. Wider language coverage needs a fixture corpus, which
+      # is tracked separately.
+      - name: Diff the panels
+        working-directory: tools/slop-audit-rs
+        run: |
+          set -e
+          uv run validate.py "$GITHUB_WORKSPACE"
+          uv run validate.py "$GITHUB_WORKSPACE/tools/l1_analyzer"
+          uv run validate.py "$GITHUB_WORKSPACE/tools/slop-audit-rs"
