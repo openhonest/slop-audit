@@ -1,0 +1,56 @@
+# The parity corpus: real repositories the port is validated equal against.
+#
+# Every entry is pinned to a commit, so a parity run is reproducible and a failure is
+# about the tools rather than about upstream moving. Nothing here is vendored into this
+# repository; validate_corpus.py clones each one at the pinned commit into a cache
+# directory outside the tree.
+#
+# `lang` is the language the entry exists to exercise. It is checked, not assumed: the
+# run passes --lang auto and fails if the tools detect something else, so a repo whose
+# file mix drifts is caught rather than silently measuring a different grammar.
+#
+# Adding an entry: pick a repository that is public, permissively licensed and under
+# about 50 MB, resolve its current commit, and add a row. Then run validate_corpus.py
+# and commit the result only if every indicator is equal.
+
+[[repo]]
+slug = "google/gson"
+lang = "java"
+commit = "119818bc666d3b9f897d6c0ca7546ce28e9bbcac"
+license = "Apache-2.0"
+note = "A Java library with a long history and a real test tree."
+
+[[repo]]
+slug = "junit-team/junit4"
+lang = "java"
+commit = "890f3c972647de378f25e7271d8fbbd9d3456b79"
+license = "EPL-1.0"
+note = "Java, and a test framework, so the test/production split is unusually large."
+
+[[repo]]
+slug = "JamesNK/Newtonsoft.Json"
+lang = "csharp"
+commit = "09bb545d72969ad7fb4ea07db0d5c34f4fc07877"
+license = "MIT"
+note = "C#, heavy use of `object` and `dynamic`, which is what L1.15 counts there."
+
+[[repo]]
+slug = "restsharp/RestSharp"
+lang = "csharp"
+commit = "6a5082169257438cd085f822f050d93256a8e499"
+license = "Apache-2.0"
+note = "C# with async throughout and a modern project layout."
+
+[[repo]]
+slug = "json-c/json-c"
+lang = "c"
+commit = "c0d4626175806817e82b8000114799c7f55f1d00"
+license = "NOASSERTION (MIT-style, see the repository's COPYING)"
+note = "C, small, with headers beside sources so the .c/.h split is exercised."
+
+[[repo]]
+slug = "libuv/libuv"
+lang = "c"
+commit = "a6d06ba716b6facdf00e29306aa5013d51e070d4"
+license = "MIT"
+note = "C, larger, with platform subtrees and a big test directory."

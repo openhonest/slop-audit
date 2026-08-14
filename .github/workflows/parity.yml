@@ -29,9 +29,8 @@ jobs:
       - name: Build the bundle
         run: cargo build --release --locked
         working-directory: tools/slop-audit-rs
-      # Three targets, three languages: the repo itself and the Python package resolve as
-      # python, the crate as rust. Wider language coverage needs a fixture corpus, which
-      # is tracked separately.
+      # Three in-tree targets: the repo itself and the Python package resolve as python,
+      # the crate as rust. The other six languages are covered by the corpus job below.
       - name: Diff the panels
         working-directory: tools/slop-audit-rs
         run: |
@@ -39,3 +38,33 @@ jobs:
           uv run validate.py "$GITHUB_WORKSPACE"
           uv run validate.py "$GITHUB_WORKSPACE/tools/l1_analyzer"
           uv run validate.py "$GITHUB_WORKSPACE/tools/slop-audit-rs"
+
+  corpus:
+    # Six real repositories, pinned in corpus.toml, covering Java, C# and C. They are
+    # cloned in full, because L1.1 through L1.8 read the commit history, so this job is
+    # heavier than the one above and does not run on every push.
+    name: Parity across the pinned corpus
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Sync the reference
+        run: uv sync --extra dev
+        working-directory: tools/l1_analyzer
+      - name: Build the bundle
+        run: cargo build --release --locked
+        working-directory: tools/slop-audit-rs
+      - name: Cache the corpus clones
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/slop-audit-corpus
+          # The manifest pins every commit, so its hash is the cache identity: change a
+          # pin and the clones are refetched rather than silently reused.
+          key: corpus-${{ hashFiles('tools/slop-audit-rs/corpus.toml') }}
+      - name: Diff every panel in the corpus
+        run: uv run validate_corpus.py
+        working-directory: tools/slop-audit-rs
