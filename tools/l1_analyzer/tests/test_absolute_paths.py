@@ -86,7 +86,9 @@ def test_scopes_out_the_test_tree():
     path detector fires has to contain the path it detects."""
     r = _scan({"src/a.py": 'p = "/home/adam/x"\n',
                "tests/test_a.py": 'FIXTURE = "/home/adam/y"\n',
-               "test/legacy.py": 'FIXTURE = "/home/adam/z"\n'})
+               # A test directory is believed only when its contents corroborate it, so
+               # legacy.py carries the import a real one would.
+               "test/legacy.py": 'import unittest\nFIXTURE = "/home/adam/z"\n'})
     assert r["value"] == 1
     assert r["findings"][0]["file"] == "src/a.py"
 
@@ -97,7 +99,7 @@ def test_scopes_out_a_dotted_csharp_test_project():
     fixture data under Src/Newtonsoft.Json.Tests/."""
     r = _scan({"Src/Newtonsoft.Json/Serializer.cs": 'var p = "/home/adam/x";\n',
                "Src/Newtonsoft.Json.Tests/Schema/PersonTests.cs": 'var f = @"c:\\schema\\Person.json";\n',
-               "Src/Newtonsoft.Json.Test/Legacy.cs": 'var f = @"c:\\schema\\Old.json";\n'})
+               "Src/Newtonsoft.Json.Test/Legacy.cs": 'using Xunit;\nvar f = @"c:\\schema\\Old.json";\n'})
     assert r["value"] == 1
     assert r["findings"][0]["file"] == "Src/Newtonsoft.Json/Serializer.cs"
 

@@ -143,6 +143,72 @@ pub fn is_generated(path: &Path) -> bool {
 /// project `<Project>.Tests` and an exact match never catches `Src/Newtonsoft.Json.Tests/`.
 pub const TEST_DIR_MARKERS: &[&str] = &["test", "tests"];
 
+/// Markers that corroborate a test directory by file content. Mirrors
+/// _TEST_FRAMEWORK_MARKERS.
+const TEST_FRAMEWORK_MARKERS: &[&str] = &[
+    "import pytest", "import unittest", "from unittest", "@pytest",
+    "org.junit", "org.testng", "using Xunit", "using NUnit",
+    "Microsoft.VisualStudio.TestTools", "[TestMethod]", "[Fact]", "@Test",
+    "\"testing\"", "#[test]", "#[cfg(test)]",
+    "require 'rspec'", "require \"rspec\"", "minitest", "describe(",
+    "from vitest", "require('mocha')",
+];
+
+/// The file-NAME half of the test-file conventions. Mirrors _test_file_by_name.
+/// Excludes the path-component arm on purpose: using it would let a renamed directory
+/// corroborate itself, which is the circularity this exists to break.
+pub fn test_file_by_name(path: &Path) -> bool {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
+    let stem = path.file_stem().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
+    name.starts_with("test_") || name.starts_with("test-") || name.starts_with("test.")
+        || stem.ends_with("_test") || stem.ends_with("-test") || stem.ends_with(".test")
+        || stem.ends_with(".spec") || stem.ends_with("_spec") || stem.ends_with("-spec")
+        || crate::indicators::git_ratios::TEST_STEM_SUFFIXES.iter().any(|sfx| {
+            path.file_stem().and_then(|n| n.to_str()).map(|s| s.ends_with(sfx)).unwrap_or(false)
+        })
+}
+
+/// True when a directory named like a test directory actually holds test code.
+/// Mirrors _test_dir_corroborated.
+///
+/// A directory NAMED like a test directory is believed only if its contents corroborate
+/// the claim. Without this, renaming a production package to `Core.Tests` removes it from
+/// L1.15, L1.17 and L1.19 and flips the gate, with zero bytes of code changed. The
+/// instrument's primary consumer is an AI, which optimises exactly what it is told to,
+/// so a scope rule reading a free-to-forge name is an instruction to rename.
+///
+/// One-directional on purpose: a directory that fails to corroborate is MEASURED, never
+/// dropped, so the rule cannot be turned into a cheaper score.
+pub fn test_dir_corroborated(directory: &Path) -> bool {
+    for entry in walkdir::WalkDir::new(directory).into_iter().filter_map(Result::ok) {
+        if !is_file_entry(&entry) {
+            continue;
+        }
+        if test_file_by_name(entry.path()) {
+            return true;
+        }
+        if let Ok(bytes) = std::fs::read(entry.path()) {
+            let head = String::from_utf8_lossy(&bytes[..bytes.len().min(4096)]).into_owned();
+            if TEST_FRAMEWORK_MARKERS.iter().any(|m| head.contains(m)) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// The ancestor directory of `path` whose own name is `component`. Mirrors _claiming_dir.
+fn claiming_dir<'a>(path: &'a Path, component: &str) -> Option<&'a Path> {
+    let mut current = path.parent();
+    while let Some(dir) = current {
+        if dir.file_name().and_then(|n| n.to_str()) == Some(component) {
+            return Some(dir);
+        }
+        current = dir.parent();
+    }
+    None
+}
+
 /// _component_scoped_out: one path component is scoped out by `marker`. Exact for a
 /// general marker; for a test marker, `Tests`, `tests`, `Foo.Tests` and `Foo.Test` count.
 pub fn component_scoped_out(component: &str, marker: &str) -> bool {
@@ -165,10 +231,23 @@ pub fn extra_reason(path: &Path, extra: &[&'static str]) -> Option<&'static str>
             _ => None,
         })
         .collect();
-    extra
-        .iter()
-        .find(|marker| parts.iter().any(|p| component_scoped_out(p, marker)))
-        .copied()
+    for marker in extra {
+        for component in &parts {
+            if !component_scoped_out(component, marker) {
+                continue;
+            }
+            // A TEST marker must also be corroborated by the claiming directory.
+            if TEST_DIR_MARKERS.contains(marker) {
+                if let Some(dir) = claiming_dir(path, component) {
+                    if !test_dir_corroborated(dir) {
+                        continue;
+                    }
+                }
+            }
+            return Some(marker);
+        }
+    }
+    None
 }
 
 /// _bucket_reason: why this source file is scoped out of the audit, or None to keep
@@ -313,6 +392,7 @@ pub fn band(value: f64, healthy: f64, slop: f64, higher_is_better: bool) -> &'st
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     /// The boundary set Python's `str.splitlines()` uses, and the one Rust's
     /// `str::lines()` does not. Each case is the reference's answer, taken from
@@ -352,17 +432,45 @@ mod tests {
     /// a test directory when, lowercased, it equals "tests"/"test" or ends ".tests"/".test".
     #[test]
     fn a_dotted_csharp_test_project_is_scoped_out() {
-        let repo = Path::new("/r");
+        let root = std::env::temp_dir().join(format!("slop-scope-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        // A real test project: its contents corroborate the name.
+        fs::create_dir_all(root.join("Src/Newtonsoft.Json.Tests/Schema")).unwrap();
+        fs::write(root.join("Src/Newtonsoft.Json.Tests/Schema/T.cs"), "using Xunit;\n[Fact] void A(){}\n").unwrap();
+        // Production code, and two words that merely contain a marker.
+        fs::create_dir_all(root.join("Src/Newtonsoft.Json")).unwrap();
+        fs::write(root.join("Src/Newtonsoft.Json/Serializer.cs"), "class Serializer {}\n").unwrap();
+        fs::create_dir_all(root.join("Src/Contests")).unwrap();
+        fs::write(root.join("Src/Contests/Entry.cs"), "class Entry {}\n").unwrap();
+
         const EXTRA: &[&str] = &["tests", "test"];
-        let scoped = |rel: &str| bucket_reason(&repo.join(rel), repo, false, EXTRA);
+        let scoped = |rel: &str| bucket_reason(&root.join(rel), &root, false, EXTRA);
         assert_eq!(scoped("Src/Newtonsoft.Json.Tests/Schema/T.cs"), Some("tests"));
-        assert_eq!(scoped("Src/Newtonsoft.Json.Test/Legacy.cs"), Some("test"));
-        assert_eq!(scoped("Src/Tests/T.cs"), Some("tests")); // capitalised
-        assert_eq!(scoped("Src/tests/t.py"), Some("tests")); // unchanged
-        // Production code keeps its scope: the marker is the whole component after the dot.
         assert_eq!(scoped("Src/Newtonsoft.Json/Serializer.cs"), None);
         assert_eq!(scoped("Src/Contests/Entry.cs"), None);
-        assert_eq!(scoped("Src/Latest/Entry.cs"), None);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The aperture-capture vector, closed. Renaming a production package to `Core.Tests`
+    /// used to remove it from every source indicator and flip the gate, with zero bytes of
+    /// code changed. A directory named like a test directory is now believed only if its
+    /// contents corroborate the claim.
+    #[test]
+    fn a_renamed_production_directory_is_still_measured() {
+        let root = std::env::temp_dir().join(format!("slop-rename-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("Core.Tests")).unwrap();
+        fs::write(root.join("Core.Tests/app.py"), "from typing import Any\nCACHE = {}\n").unwrap();
+
+        const EXTRA: &[&str] = &["tests", "test"];
+        assert_eq!(bucket_reason(&root.join("Core.Tests/app.py"), &root, false, EXTRA), None);
+
+        // The same directory, with one real test file in it, is believed.
+        fs::write(root.join("Core.Tests/test_app.py"), "def test_x(): pass\n").unwrap();
+        assert_eq!(bucket_reason(&root.join("Core.Tests/app.py"), &root, false, EXTRA), Some("tests"));
+
+        let _ = fs::remove_dir_all(&root);
     }
 
     /// The bytes splitter agrees with the str splitter wherever both apply, so the two

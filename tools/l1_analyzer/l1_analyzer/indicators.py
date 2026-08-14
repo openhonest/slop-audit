@@ -24,7 +24,6 @@ import re
 import shutil
 import subprocess
 from collections import Counter
-from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import TypedDict
 
@@ -48,6 +47,26 @@ from l1_analyzer import (
     pytest_trace,
     ruby_trace,
     rust_trace,
+)
+from l1_analyzer.scope import (  # noqa: F401
+    _IGNORE_DIRS,
+    _TEST_DIR_MARKERS,
+    _TEST_STEM_SUFFIXES,
+    _TOOLING_FILES,
+    BucketedPath,
+    BucketedPaths,
+    _bucket_reason,
+    _component_scoped_out,
+    _extra_reason,
+    _in_ignored_dir,
+    _is_generated,
+    _read_source_bytes,
+    _read_text_files,
+    _repo_has_packages,
+    _rglob_files,
+    _test_dir_corroborated,
+    _test_file_by_name,
+    bucketed_paths,
 )
 
 # ---------------------------------------------------------------------------
@@ -80,215 +99,6 @@ def _with_skipped(details: str, skipped: int) -> str:
 # surface partial scans instead of silently dropping unreadable files.
 # ---------------------------------------------------------------------------
 
-_IGNORE_DIRS = frozenset({
-    ".git", "node_modules", "venv", ".venv", "env", "__pycache__",
-    ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
-    "site-packages", "target", "build", "dist", "vendor",
-})
-
-# The two markers that name a test directory. Everything else in an `extra` scope-out
-# tuple is matched on the nose; these two are also matched case-insensitively and as a
-# dotted suffix, because C# names a test project `<Project>.Tests` and an exact match
-# never catches `Src/Newtonsoft.Json.Tests/`. Until this existed, every C# repository's
-# whole test tree was measured as production code by L1.15, L1.17, L1.19 and the
-# absolute-path check (Newtonsoft.Json reported 31 absolute paths, all of them stack-
-# trace fixture data). Deliberately this narrow: "spec", "fixtures" and the rest are
-# not test-directory conventions in the languages this scope covers.
-_TEST_DIR_MARKERS = frozenset({"test", "tests"})
-
-
-def _component_scoped_out(component: str, marker: str) -> bool:
-    """True when one path component is scoped out by `marker`. Exact for a general
-    marker; for a test marker, `Tests`, `tests`, `Foo.Tests` and `Foo.Test` all count."""
-    if component == marker:
-        return True
-    if marker not in _TEST_DIR_MARKERS:
-        return False
-    lowered = component.lower()
-    return lowered == marker or lowered.endswith("." + marker)
-
-
-def _extra_reason(parts: Iterable[str], extra: tuple[str, ...]) -> str | None:
-    """The first `extra` marker any path component is scoped out by, or None."""
-    parts = tuple(parts)
-    for marker in extra:
-        if any(_component_scoped_out(p, marker) for p in parts):
-            return marker
-    return None
-
-
-def _in_ignored_dir(path: Path, extra: tuple[str, ...]) -> bool:
-    """True if any path component is a vendored/tooling dir (or one of `extra`)."""
-    parts = set(path.parts)
-    return bool(parts & _IGNORE_DIRS) or _extra_reason(parts, extra) is not None
-
-
-def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
-    """Every FILE under `repo` matching `pattern`. The single entry point for every
-    scan in this module, so no reader has to remember what `rglob` yields.
-
-    `Path.rglob` yields directories as well as files, so a directory whose name ends in
-    a source extension (node_modules/decimal.js is a real one) used to reach a reader,
-    raise IsADirectoryError, and be disclosed as "1 file(s) unreadable and excluded".
-    It is not a file and it is not unreadable, so that disclosure was false. A directory
-    is now neither measured nor counted. `is_file()` follows symlinks, so a symlinked
-    source file is still read, and a file the process may not read still reaches the
-    reader and is still disclosed as unreadable.
-
-    A nested checkout is also skipped. A directory below the root that carries its own
-    `.git` is a different repository with its own history and its own audit: a submodule
-    working copy, a vendored clone, or a git worktree. Measuring it reports code that is
-    not in this commit. The tool caught this on itself: an agent's worktree under
-    `.claude/worktrees/` held an older checkout of this repository, and the gate charged
-    eleven type escapes that existed only in that second copy.
-
-    `.git` is a directory in a clone and a FILE in a worktree, so the test is existence,
-    not is_dir. The root's own `.git` is not consulted, or every scan would be empty."""
-    root_resolved = repo.resolve()
-    inside_nested: dict[Path, bool] = {}
-
-    def under_nested_checkout(directory: Path) -> bool:
-        """True when `directory` is, or sits under, a nested checkout. Memoised per call
-        so each directory is stat-ed once however many files it holds."""
-        cached = inside_nested.get(directory)
-        if cached is not None:
-            return cached
-        if directory == root_resolved or root_resolved not in directory.parents:
-            result = False
-        elif (directory / ".git").exists():
-            result = True
-        else:
-            result = under_nested_checkout(directory.parent)
-        inside_nested[directory] = result
-        return result
-
-    return (
-        p for p in repo.rglob(pattern)
-        if p.is_file() and not under_nested_checkout(p.parent.resolve())
-    )
-
-
-# Conventional build/test/dev tooling recognised by filename, not by directory.
-_TOOLING_FILES = frozenset({"setup.py", "noxfile.py", "conftest.py", "tasks.py", "manage.py"})
-
-# Strong, low-false-positive sentinels that machine-generated source carries in its
-# header: the machine-readable @generated convention (tree-sitter and many others),
-# the Go convention ("// Code generated by ... DO NOT EDIT."), and the protobuf
-# banner. A generated file is not a god-file: nobody hand-piles code into it and it
-# has no merge-conflict surface; it is regenerated from a grammar or schema.
-_GENERATED_MARKERS = ("@generated", "Code generated by", "Generated by the protocol buffer compiler")
-
-
-def _is_generated(path: Path) -> bool:
-    """True if the file's header marks it as machine-generated. Reads only the head,
-    so a hand-written file that happens to mention the phrase deep inside is unaffected;
-    an unreadable file is treated as not generated (it falls through to normal scope)."""
-    try:
-        head = path.read_bytes()[:2048].decode("utf8", errors="ignore")
-    except OSError:
-        return False
-    return any(marker in head for marker in _GENERATED_MARKERS)
-
-
-def _repo_has_packages(repo: Path) -> bool:
-    """True if the repo is organised into importable packages (any __init__.py).
-    Used to tell a loose dev/entry-point script from a flat script-only repo."""
-    return any(not _in_ignored_dir(f, ()) for f in _rglob_files(repo, "__init__.py"))
-
-
-def _bucket_reason(path: Path, repo: Path, has_packages: bool, extra: tuple[str, ...]) -> str | None:
-    """Why this source file is scoped out of the audit, or None to keep it. General
-    and structural: it references no specific project. Disclosed, never silent."""
-    parts = set(path.parts)
-    if parts & _IGNORE_DIRS:
-        return "vendored"
-    reason = _extra_reason(parts, extra)
-    if reason is not None:
-        return reason
-    if "docs" in parts:
-        return "docs"
-    if path.name in _TOOLING_FILES:
-        return "tooling"
-    # A loose top-level .py sitting beside packages (its own dir is not a package,
-    # and the repo does have packages) is a dev/entry-point script, not the library.
-    # A flat, script-only repo (no packages anywhere) keeps its root scripts: they
-    # are the code.
-    if has_packages and path.parent == repo and not (repo / "__init__.py").exists():
-        return "root-script"
-    return None
-
-
-def _read_source_bytes(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> tuple[list[tuple[Path, bytes]], int]:
-    """Read every source file with one of `extensions` as bytes, excluding scoped-out
-    files (see _bucket_reason). Returns the files read and the number unreadable."""
-    files: list[tuple[Path, bytes]] = []
-    skipped = 0
-    has_packages = _repo_has_packages(repo)
-    for ext in extensions:
-        for f in _rglob_files(repo, f"*{ext}"):
-            if _bucket_reason(f, repo, has_packages, extra_ignore) is not None:
-                continue
-            try:
-                files.append((f, f.read_bytes()))
-            except OSError:
-                skipped += 1
-    return files, skipped
-
-
-class BucketedPath(TypedDict):
-    """One scoped-out file and the reason it was scoped out."""
-    path: str
-    reason: str
-
-
-class BucketedPaths(TypedDict):
-    """The scope disclosure: a count per reason, and the judgment-call exclusions listed
-    file by file. Typed, not dict[str, Any]: the shape is fixed, so a key typo is a type
-    error rather than a KeyError in the report writer."""
-    counts: dict[str, int]
-    paths: list[BucketedPath]
-
-
-def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> BucketedPaths:
-    """The source files scoped out of the audit, with the reason for each, so a
-    reader sees exactly what was not looked at and can challenge it (the cone of
-    light on the meter's own choice of scope). `counts` covers every reason; `paths`
-    lists the judgment-call exclusions (docs / tooling / loose root scripts) that a
-    reader most needs to see, since over-bucketing a real entry point would hide
-    behind a silent skip otherwise. Vendored dependencies are counted, not listed."""
-    has_packages = _repo_has_packages(repo)
-    counts: dict[str, int] = {}
-    paths: list[BucketedPath] = []
-    for ext in extensions:
-        for f in _rglob_files(repo, f"*{ext}"):
-            reason = _bucket_reason(f, repo, has_packages, extra_ignore)
-            if reason is None:
-                continue
-            counts[reason] = counts.get(reason, 0) + 1
-            if reason in ("docs", "tooling", "root-script"):
-                rel = str(f.relative_to(repo)) if repo in f.parents else str(f)
-                paths.append({"path": rel, "reason": reason})
-    return {"counts": counts, "paths": sorted(paths, key=lambda d: d["path"])}
-
-def _read_text_files(repo: Path, extensions: frozenset[str], extra_ignore: tuple[str, ...]) -> tuple[list[tuple[Path, str]], int]:
-    """Read every file whose suffix is in `extensions` as text. Returns the files
-    read and the number that could not be read."""
-    files: list[tuple[Path, str]] = []
-    skipped = 0
-    for f in _rglob_files(repo, "*"):
-        if f.suffix.lower() not in extensions:
-            continue
-        if _in_ignored_dir(f, extra_ignore):
-            continue
-        try:
-            files.append((f, f.read_text(errors="ignore")))
-        except OSError:
-            skipped += 1
-    return files, skipped
-
-# ---------------------------------------------------------------------------
-# Git-based (L1.1-L1.8) - language agnostic
-# ---------------------------------------------------------------------------
 
 def _classify_file(path: str) -> str:
     p = path.lower()
@@ -409,7 +219,6 @@ _TEST_PATH_MARKERS = frozenset({"test", "tests", "spec", "specs", "__tests__"})
 _TEST_DOTTED_MARKERS = ("test", "tests", "spec", "specs")
 # The .NET and JVM file convention, in its original casing. Capitalised on purpose: see
 # _is_test_file.
-_TEST_STEM_SUFFIXES = ("Test", "Tests", "Spec", "Specs")
 _SRC_EXTS = frozenset({".py", ".rs", ".c", ".h", ".cpp", ".js", ".jsx", ".mjs", ".cjs",
                        ".ts", ".tsx", ".java", ".cs", ".go", ".rb", ".kt", ".swift", ".php"})
 

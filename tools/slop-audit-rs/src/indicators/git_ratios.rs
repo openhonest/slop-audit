@@ -32,7 +32,7 @@ const TEST_PATH_MARKERS: &[&str] = &["test", "tests", "spec", "specs", "__tests_
 const TEST_DOTTED_MARKERS: &[&str] = &["test", "tests", "spec", "specs"];
 // The .NET and JVM file convention, in its original casing. Mirrors _TEST_STEM_SUFFIXES;
 // the capital is what keeps `Latest.java` out.
-const TEST_STEM_SUFFIXES: &[&str] = &["Test", "Tests", "Spec", "Specs"];
+pub const TEST_STEM_SUFFIXES: &[&str] = &["Test", "Tests", "Spec", "Specs"];
 
 /// Format a float the way Python's `str(round(value, ndigits))` / json.dumps does:
 /// rounded to `ndigits`, trailing zeros stripped, but always at least one decimal.
