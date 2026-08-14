@@ -57,6 +57,7 @@ class LangSpec(TypedDict, total=False):
     keyed_read: frozenset[str]
     dispatch_methods: frozenset[str]
     literal_types: frozenset[str]
+    unary_types: tuple[str, ...]
     module_enum: str
     lvalue_wrapper: str
     scope_by_receiver: bool
@@ -121,6 +122,18 @@ _GO_LITERALS = frozenset({
     "interpreted_string_literal", "raw_string_literal", "true", "false", "nil",
 })
 
+# A unary operator applied to a literal is itself one compile-time value, so it
+# partitions a domain exactly as a bare literal does: `s[-1]` is the last element,
+# not an unbounded lookup. Every grammar spells the node differently, and none of
+# them treat the operator token as named, so unwrapping to the first named child
+# reaches the operand. `-x` unwraps to an identifier and stays unbounded, which is
+# the whole point of unwrapping rather than whitelisting the node type.
+#
+# C is listed even though `s[-1]` lexes as a single signed `number_literal`: the
+# fold is whitespace-sensitive, and `s[- 1]` is a unary_expression like everywhere
+# else. Binary operators are deliberately absent - `s[1 - 1]` stays unbounded,
+# which is conservative (never a false green).
+
 
 # --------------------------------------------------------------------------
 # Per-language node-type vocabulary. Every value below is the grammar's own node
@@ -153,6 +166,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "mutating": _PY_MUTATING, "keyed_read": frozenset(),
         "literal_types": _PY_LITERALS,
+        "unary_types": ("unary_operator",),
         "module_enum": "python",
     },
     "typescript": {
@@ -177,6 +191,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "this.",
         "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
+        "unary_types": ("unary_expression",),
         "module_enum": "js",
     },
     "javascript": {
@@ -201,6 +216,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "this.",
         "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
+        "unary_types": ("unary_expression",),
         "module_enum": "js",
     },
     "java": {
@@ -225,6 +241,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "mutating": _JAVA_MUTATING, "keyed_read": _JAVA_KEYED_READ,
         "literal_types": _JAVA_LITERALS,
+        "unary_types": ("unary_expression",),
     },
     "csharp": {
         "class_types": ("class_declaration",),
@@ -248,6 +265,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "mutating": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
         "literal_types": _CS_LITERALS,
+        "unary_types": ("prefix_unary_expression",),
     },
     "rust": {
         # No classes: state is struct fields used as self.<field> inside a separate
@@ -275,6 +293,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "mutating": _RUST_MUTATING, "keyed_read": _RUST_KEYED_READ,
         "literal_types": _RUST_LITERALS,
+        "unary_types": ("unary_expression",),
         "module_enum": "rust",
     },
     "ruby": {
@@ -303,6 +322,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "mutating": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
         "literal_types": _RUBY_LITERALS,
+        "unary_types": ("unary",),
     },
     "c": {
         # No classes or methods: state is file-scope variables only (module_enum: c).
@@ -327,6 +347,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "mutating": frozenset(), "keyed_read": frozenset(),
         "literal_types": _C_LITERALS,
+        "unary_types": ("unary_expression",),
         "module_enum": "c",
     },
     "go": {
@@ -356,6 +377,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": frozenset(), "keyed_read": frozenset(),
         "extra_bounded": frozenset({"append", "len", "cap", "copy", "make", "new"}),
         "literal_types": _GO_LITERALS,
+        "unary_types": ("unary_expression",),
         "module_enum": "go",
     },
 }

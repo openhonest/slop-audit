@@ -194,9 +194,22 @@ def _is_closed_set(node: Node | None, closed_sets: set[str]) -> bool:
     return False
 
 
+def _unwrap_unary(node: Node | None, sp: LangSpec) -> Node | None:
+    """Peel unary operators off a value. A unary operator over a literal is itself one
+    compile-time value (`-1` is the last element, `+1` the second), so the wrapper must
+    not hide the literal underneath. Unwrapping rather than whitelisting the wrapper is
+    what keeps `-x` unbounded: it peels to an identifier, which is no literal. The loop
+    handles a stack of them (`- -1`). The operator token is unnamed in every grammar in
+    the table, so the first named child is the operand."""
+    while node is not None and node.type in sp.get("unary_types", ()):
+        node = _first_named(node)
+    return node
+
+
 def _is_unbounded_value(node: Node | None, sp: LangSpec) -> bool:
     """A value used as a lookup key / index. Literals are bounded; anything else
     (a parameter, a variable) ranges over an unbounded domain."""
+    node = _unwrap_unary(node, sp)
     return node is not None and node.type not in sp["literal_types"]
 
 
