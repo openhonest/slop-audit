@@ -1,6 +1,6 @@
 [package]
 name = "slop-audit-rs"
-version = "0.0.1"
+version = "0.2.0"
 edition = "2021"
 description = "Portable slop-audit proof: static panel + tree-sitter, validated against the Python reference."
 

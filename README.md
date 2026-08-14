@@ -33,7 +33,7 @@ cargo build --release
 
 The primary language is detected from the repo's file counts. Override it with `--lang`, which takes `python`, `rust`, `c`, `java`, `typescript`, `csharp`, `javascript`, `ruby` or `go`. Add `--tsv` for one tab-separated row per indicator.
 
-Tagged releases run [`.github/workflows/release.yml`](.github/workflows/release.yml), which cross-builds a static Linux binary, a Windows binary and a macOS binary, and fails the release if the Linux and macOS panels disagree by one byte. The v0.1.0 release predates that workflow and carries no binaries, so build from source until the next tag.
+Tagged releases run [`.github/workflows/release.yml`](.github/workflows/release.yml), which cross-builds a static Linux binary, a Windows binary and a macOS binary, attaches them to the release with a `SHA256SUMS`, and fails the release if the Linux and macOS panels disagree by one byte. The v0.1.0 release predates that workflow and carries no binaries; check the [releases page](https://github.com/openhonest/slop-audit/releases) and build from source only if the platform you need is not there.
 
 ### 2. Docker
 

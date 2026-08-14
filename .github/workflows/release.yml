@@ -90,3 +90,45 @@ jobs:
           path: macos
       - name: Diff the two panels
         run: diff linux/panel-linux.tsv macos/panel-macos.tsv
+
+  publish:
+    # Without this the binaries reach the workflow RUN and never the release, which
+    # requires a login to download, expires in 90 days, arrives zipped and loses the
+    # executable bit. v0.1.0 shipped with zero assets for exactly this reason.
+    name: Attach the binaries to the release
+    needs: [cross-platform-agreement]
+    # workflow_dispatch has no tag, so GITHUB_REF_NAME would be a branch and the upload
+    # would fail. Only a tag publishes.
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Name each binary for its platform, and checksum them
+        run: |
+          mkdir out
+          cp artifacts/slop-audit-rs-x86_64-linux-musl/slop-audit-rs out/slop-audit-rs-x86_64-linux-musl
+          cp artifacts/slop-audit-rs-x86_64-windows/slop-audit-rs.exe out/slop-audit-rs-x86_64-windows.exe
+          cp artifacts/slop-audit-rs-aarch64-macos/slop-audit-rs out/slop-audit-rs-aarch64-macos
+          chmod +x out/slop-audit-rs-x86_64-linux-musl out/slop-audit-rs-aarch64-macos
+          cd out && sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+      - name: Attach them
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" out/* \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file .github/release-notes.md \
+            || gh release upload "$GITHUB_REF_NAME" out/* --clobber
+      - name: Fail the release if it published no assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets | length')
+          echo "assets attached: $n"
+          test "$n" -ge 4
