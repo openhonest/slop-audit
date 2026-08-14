@@ -56,12 +56,13 @@ def render(value) -> str:
     return value if isinstance(value, str) else json.dumps(value)
 
 
-def main() -> int:
-    if len(sys.argv) < 2:
-        print(__doc__)
-        return 2
-    repo = Path(sys.argv[1]).resolve()
-    lang = sys.argv[2] if len(sys.argv) > 2 else "auto"
+def diff_panels(repo: Path, lang: str = "auto", *, quiet: bool = False) -> tuple[int, int]:
+    """Run both tools on `repo` and report each shared indicator EQUAL or DIFF.
+    Returns (diffs, compared). `quiet` prints only the disagreements, which is what a
+    corpus run wants when it is walking several repositories."""
+    def say(line: str) -> None:
+        if not quiet:
+            print(line)
 
     reference = python_panel(repo, lang)
     ported = rust_panel(repo, lang)
@@ -70,7 +71,8 @@ def main() -> int:
         detected_py = reference.pop("lang")
         detected_rs = ported.pop("lang", {}).get("value", "")
         mark = "EQUAL" if detected_py == detected_rs else "DIFF "
-        print(f"{mark} lang: reference={detected_py} ported={detected_rs}")
+        (print if mark.startswith("DIFF") else say)(
+            f"{mark} lang: reference={detected_py} ported={detected_rs}")
 
     # The additive absolute-paths check is keyed differently on the two sides.
     if "absolute_paths" in reference and "abs-paths" in ported:
@@ -84,7 +86,7 @@ def main() -> int:
 
     codes = [c for c in ported if c in reference]
     for code in [c for c in ported if c not in reference]:
-        print(f"SKIP  {code}: not in the reference panel")
+        say(f"SKIP  {code}: not in the reference panel")
     diffs = 0
     for code in sorted(codes, key=order):
         want = reference[code]
@@ -96,7 +98,7 @@ def main() -> int:
         ]
         bad = [(name, a, b) for name, a, b in fields if a != b]
         if not bad:
-            print(f"EQUAL {code}")
+            say(f"EQUAL {code}")
             continue
         diffs += 1
         print(f"DIFF  {code}")
@@ -104,7 +106,17 @@ def main() -> int:
             print(f"        {name}: reference={a!r}")
             print(f"        {name}: ported   ={b!r}")
 
-    print(f"\n{len(codes) - diffs}/{len(codes)} indicators equal on {repo}")
+    return diffs, len(codes)
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print(__doc__)
+        return 2
+    repo = Path(sys.argv[1]).resolve()
+    lang = sys.argv[2] if len(sys.argv) > 2 else "auto"
+    diffs, compared = diff_panels(repo, lang)
+    print(f"\n{compared - diffs}/{compared} indicators equal on {repo}")
     return 1 if diffs else 0
 
 
