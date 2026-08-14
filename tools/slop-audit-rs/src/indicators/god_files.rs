@@ -9,8 +9,8 @@
 
 use crate::lang;
 use crate::{
-    band, bucket_reason, is_generated, parser_for, py_round2, repo_has_packages, splitlines_len,
-    Indicator,
+    band, bucket_reason, is_file_entry, is_generated, parser_for, py_round2, repo_has_packages,
+    splitlines_len, Indicator,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -86,12 +86,14 @@ pub fn analyze(repo: &Path) -> Indicator {
     // ignored dirs). Each path is paired with the extension that matched it, which is
     // the key into the grammar table.
     let mut candidates: Vec<(PathBuf, &'static str)> = Vec::new();
-    // min_depth(1) and no is_file() filter: `rglob` yields descendants only, and it
-    // yields directories as well as files. A directory whose name ends in a source
-    // extension (node_modules/decimal.js) therefore reaches the read and counts as
-    // unreadable in the reference. Filtering to files here would drop it silently and
-    // put the two tools' skipped-counts out of step.
+    // min_depth(1) because `rglob` yields descendants only, and is_file_entry because
+    // the reference's `_rglob_files` keeps files only. A directory whose name ends in a
+    // source extension (node_modules/decimal.js is a real one) is not a file and not
+    // unreadable, so neither tool measures it or counts it against the skipped total.
     for entry in walkdir::WalkDir::new(repo).min_depth(1).into_iter().filter_map(Result::ok) {
+        if !is_file_entry(&entry) {
+            continue;
+        }
         let path = entry.path();
         let name = match path.file_name().and_then(|n| n.to_str()) {
             Some(n) => n,
@@ -164,5 +166,65 @@ pub fn analyze(repo: &Path) -> Indicator {
         value: py_round2(god_pct),
         band: band_value.into(),
         details: with_skipped(note, skipped),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    /// A scratch repo under the system temp dir, named for the calling test so two
+    /// tests never share one. Hand-rolled: the crate ships with no dev-dependency.
+    fn scratch(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("slop-audit-rs-{}-{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create scratch repo");
+        dir
+    }
+
+    /// A directory whose name ends in a source extension (node_modules/decimal.js is a
+    /// real one) is not a file and is not unreadable. It is skipped in silence:
+    /// counting it as an unreadable file was a false disclosure in both tools.
+    #[test]
+    fn a_directory_named_like_a_source_file_is_skipped_in_silence() {
+        let repo = scratch("dir-not-a-file");
+        fs::write(repo.join("app.py"), "x = 1\n").unwrap();
+        fs::create_dir(repo.join("decimal.js")).unwrap();
+        fs::create_dir(repo.join("pkg.py")).unwrap();
+
+        let out = analyze(&repo);
+        fs::remove_dir_all(&repo).unwrap();
+        assert!(!out.details.contains("unreadable"), "details: {}", out.details);
+        assert_eq!(out.details, "0/1 files >1k LOC, 0 >4k LOC");
+    }
+
+    /// The honest disclosure survives the fix: a file the process cannot read is still
+    /// counted and surfaced, and the directory beside it adds nothing to that count.
+    #[test]
+    #[cfg(unix)]
+    fn a_genuinely_unreadable_file_is_still_disclosed() {
+        use std::os::unix::fs::PermissionsExt;
+        let repo = scratch("unreadable-file");
+        fs::write(repo.join("app.py"), "x = 1\n").unwrap();
+        fs::create_dir(repo.join("decimal.js")).unwrap();
+        let blocked = repo.join("blocked.py");
+        fs::write(&blocked, "y = 2\n").unwrap();
+        fs::set_permissions(&blocked, fs::Permissions::from_mode(0o000)).unwrap();
+
+        if fs::read(&blocked).is_ok() {
+            // Running as root, which ignores the mode bits; nothing to prove here.
+            fs::remove_dir_all(&repo).unwrap();
+            return;
+        }
+        let out = analyze(&repo);
+        fs::set_permissions(&blocked, fs::Permissions::from_mode(0o644)).unwrap();
+        fs::remove_dir_all(&repo).unwrap();
+        assert!(
+            out.details.ends_with("1 file(s) unreadable and excluded"),
+            "details: {}",
+            out.details
+        );
     }
 }

@@ -41,6 +41,22 @@ pub fn in_ignored_dir(path: &Path) -> bool {
     })
 }
 
+/// Python's `Path.is_file()` for one walk entry: a regular file, or a symlink that
+/// resolves to one. Every scan in this crate filters on this, mirroring the reference's
+/// `_rglob_files`. Two things it gets right that a bare `entry.file_type().is_file()`
+/// does not: walkdir reports the *link's* own type, so a symlinked source file would be
+/// dropped here and read there; and a directory whose name ends in a source extension
+/// (node_modules/decimal.js is a real one) is excluded on both sides, so it is neither
+/// measured nor counted as an unreadable file.
+pub fn is_file_entry(entry: &walkdir::DirEntry) -> bool {
+    let file_type = entry.file_type();
+    if file_type.is_symlink() {
+        entry.path().is_file()
+    } else {
+        file_type.is_file()
+    }
+}
+
 /// Every file under `repo` whose lowercased extension is in `exts` and not in an ignored
 /// dir, read as text with invalid bytes replaced (mirrors read_text(errors="ignore")).
 pub fn source_files(repo: &Path, exts: &[&str]) -> Vec<(PathBuf, String)> {
@@ -48,7 +64,7 @@ pub fn source_files(repo: &Path, exts: &[&str]) -> Vec<(PathBuf, String)> {
     let mut out = Vec::new();
     for entry in walkdir::WalkDir::new(repo).into_iter().filter_map(Result::ok) {
         let path = entry.path();
-        if !entry.file_type().is_file() || in_ignored_dir(path) {
+        if !is_file_entry(&entry) || in_ignored_dir(path) {
             continue;
         }
         let ext = match path.extension().and_then(|e| e.to_str()) {
@@ -83,7 +99,8 @@ pub fn repo_has_packages(repo: &Path) -> bool {
         .into_iter()
         .filter_map(Result::ok)
         .any(|e| {
-            e.path().file_name().and_then(|n| n.to_str()) == Some("__init__.py")
+            is_file_entry(&e)
+                && e.path().file_name().and_then(|n| n.to_str()) == Some("__init__.py")
                 && !in_ignored_dir(e.path())
         })
 }

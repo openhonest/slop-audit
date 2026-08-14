@@ -8,7 +8,7 @@
 //! fabricated fraction.
 
 use crate::lang;
-use crate::{bucket_reason, parser_for, repo_has_packages, Indicator};
+use crate::{bucket_reason, is_file_entry, parser_for, repo_has_packages, Indicator};
 use std::path::Path;
 use tree_sitter::Node;
 
@@ -76,9 +76,12 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
     let mut files = 0usize;
     let mut skipped = 0usize;
 
-    // min_depth(1) and no is_file() filter: see the note in god_files.rs. `rglob`
-    // yields directories too, and an unreadable one is disclosed, not dropped.
+    // min_depth(1) and is_file_entry: see the note in god_files.rs. A directory whose
+    // name ends in a source extension is not a file, so it is skipped in silence.
     for entry in walkdir::WalkDir::new(repo).min_depth(1).into_iter().filter_map(Result::ok) {
+        if !is_file_entry(&entry) {
+            continue;
+        }
         let path = entry.path();
         let name = match path.file_name().and_then(|n| n.to_str()) {
             Some(n) => n,

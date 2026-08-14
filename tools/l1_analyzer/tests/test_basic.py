@@ -106,6 +106,50 @@ def test_unreadable_file_surfaced_by_text_reader(tmp_path):
     assert "unreadable" in res["details"]
 
 
+# --- a directory is not a file: neither measured nor disclosed ---------------
+
+def test_directory_named_like_a_source_file_is_ignored_by_every_reader(tmp_path):
+    """rglob yields directories too. node_modules/decimal.js is a real directory whose
+    name ends in a source extension; it used to reach the readers, raise
+    IsADirectoryError and be reported as an unreadable file. It is neither."""
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    (tmp_path / "decimal.js").mkdir()
+    (tmp_path / "pkg.py").mkdir()
+
+    files, skipped = indicators._read_source_bytes(tmp_path, (".py",), ())
+    assert skipped == 0
+    assert [p.name for p, _ in files] == ["ok.py"]
+
+    text_files, text_skipped = indicators._read_text_files(tmp_path, frozenset({".py", ".js"}), ())
+    assert text_skipped == 0
+    assert [p.name for p, _ in text_files] == ["ok.py"]
+
+    res = indicators._god_files(tmp_path)
+    assert "unreadable" not in res["details"]
+    assert res["details"].startswith("0/1 files >1k LOC")
+
+
+def test_a_directory_does_not_hide_a_genuinely_unreadable_file(tmp_path):
+    """The honest disclosure survives the fix: a file the process cannot read is still
+    counted and surfaced, and the directory beside it adds nothing to that count."""
+    if os.geteuid() == 0:
+        pytest.skip("root ignores file permissions")
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    (tmp_path / "decimal.js").mkdir()
+    blocked = tmp_path / "blocked.py"
+    blocked.write_text("y = 2\n")
+    blocked.chmod(0o000)
+    try:
+        god = indicators._god_files(tmp_path)
+        _, skipped = indicators._read_source_bytes(tmp_path, (".py",), ())
+        _, text_skipped = indicators._read_text_files(tmp_path, frozenset({".py", ".js"}), ())
+    finally:
+        blocked.chmod(0o644)
+    assert "1 file(s) unreadable and excluded" in god["details"]
+    assert skipped == 1
+    assert text_skipped == 1
+
+
 # --- git indicators run on a real, self-contained repo ----------------------
 
 def test_git_indicators_run(tmp_path):

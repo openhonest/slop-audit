@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 from collections import Counter
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TypedDict
 
@@ -91,6 +92,20 @@ def _in_ignored_dir(path: Path, extra: tuple[str, ...]) -> bool:
     return bool(parts & _IGNORE_DIRS) or any(e in parts for e in extra)
 
 
+def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
+    """Every FILE under `repo` matching `pattern`. The single entry point for every
+    scan in this module, so no reader has to remember what `rglob` yields.
+
+    `Path.rglob` yields directories as well as files, so a directory whose name ends in
+    a source extension (node_modules/decimal.js is a real one) used to reach a reader,
+    raise IsADirectoryError, and be disclosed as "1 file(s) unreadable and excluded".
+    It is not a file and it is not unreadable, so that disclosure was false. A directory
+    is now neither measured nor counted. `is_file()` follows symlinks, so a symlinked
+    source file is still read, and a file the process may not read still reaches the
+    reader and is still disclosed as unreadable."""
+    return (p for p in repo.rglob(pattern) if p.is_file())
+
+
 # Conventional build/test/dev tooling recognised by filename, not by directory.
 _TOOLING_FILES = frozenset({"setup.py", "noxfile.py", "conftest.py", "tasks.py", "manage.py"})
 
@@ -116,7 +131,7 @@ def _is_generated(path: Path) -> bool:
 def _repo_has_packages(repo: Path) -> bool:
     """True if the repo is organised into importable packages (any __init__.py).
     Used to tell a loose dev/entry-point script from a flat script-only repo."""
-    return any(not _in_ignored_dir(f, ()) for f in repo.rglob("__init__.py"))
+    return any(not _in_ignored_dir(f, ()) for f in _rglob_files(repo, "__init__.py"))
 
 
 def _bucket_reason(path: Path, repo: Path, has_packages: bool, extra: tuple[str, ...]) -> str | None:
@@ -148,7 +163,7 @@ def _read_source_bytes(repo: Path, extensions: tuple[str, ...], extra_ignore: tu
     skipped = 0
     has_packages = _repo_has_packages(repo)
     for ext in extensions:
-        for f in repo.rglob(f"*{ext}"):
+        for f in _rglob_files(repo, f"*{ext}"):
             if _bucket_reason(f, repo, has_packages, extra_ignore) is not None:
                 continue
             try:
@@ -183,7 +198,7 @@ def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[
     counts: dict[str, int] = {}
     paths: list[BucketedPath] = []
     for ext in extensions:
-        for f in repo.rglob(f"*{ext}"):
+        for f in _rglob_files(repo, f"*{ext}"):
             reason = _bucket_reason(f, repo, has_packages, extra_ignore)
             if reason is None:
                 continue
@@ -198,7 +213,7 @@ def _read_text_files(repo: Path, extensions: frozenset[str], extra_ignore: tuple
     read and the number that could not be read."""
     files: list[tuple[Path, str]] = []
     skipped = 0
-    for f in repo.rglob("*"):
+    for f in _rglob_files(repo, "*"):
         if f.suffix.lower() not in extensions:
             continue
         if _in_ignored_dir(f, extra_ignore):
@@ -522,7 +537,7 @@ def detect_primary_language(repo: Path) -> str:
     counts: Counter[str] = Counter()
     for lang, cfg in LANG_CFG.items():
         for ext in cfg["extensions"]:
-            counts[lang] += len(list(repo.rglob(f"*{ext}")))
+            counts[lang] += len(list(_rglob_files(repo, f"*{ext}")))
     if not counts or counts.most_common(1)[0][1] == 0:
         return _LANGUAGE_UNKNOWN
     return counts.most_common(1)[0][0]
@@ -675,7 +690,7 @@ def _god_files(repo: Path) -> L1Result:
     prod_files = god_files = big_files = skipped = 0
     scoped_by_reason: dict[str, int] = {}   # >1k-LOC files excluded from the count, by reason
     for ext in _GOD_FILE_EXTS:
-        for f in repo.rglob(f"*{ext}"):
+        for f in _rglob_files(repo, f"*{ext}"):
             reason = _god_file_reason(f, repo, has_packages)
             try:
                 src = f.read_bytes()

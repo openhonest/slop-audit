@@ -138,13 +138,17 @@ pub fn parser_for(key: &str) -> Parser {
 /// detect_primary_language: the LANG_CFG key with the most files, or "unknown" when
 /// the repo holds no recognised source.
 ///
-/// Counts every matching path exactly as `repo.rglob(f"*{ext}")` does, with no
-/// vendored-directory filter. That is the reference's behaviour, so a repo whose
-/// node_modules dwarfs its source resolves the same way in both tools. Filtering
-/// here would be a better meter and a different one.
+/// Counts every matching file exactly as the reference's `_rglob_files(repo, f"*{ext}")`
+/// does, with no vendored-directory filter. That is the reference's behaviour, so a repo
+/// whose node_modules dwarfs its source resolves the same way in both tools. Filtering
+/// vendored code out here would be a better meter and a different one. A directory whose
+/// name ends in a source extension is not counted: it is not a file.
 pub fn detect_primary_language(repo: &Path) -> &'static str {
     let mut counts = vec![0usize; LANGS.len()];
     for entry in walkdir::WalkDir::new(repo).into_iter().filter_map(Result::ok) {
+        if !crate::is_file_entry(&entry) {
+            continue;
+        }
         let name = match entry.path().file_name().and_then(|n| n.to_str()) {
             Some(n) => n,
             None => continue,
