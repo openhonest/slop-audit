@@ -1,0 +1,112 @@
+"""Diff the portable Rust panel against the Python reference on one repo.
+
+The crate's standing discipline: no indicator lands until it is validated equal to
+l1_analyzer on real repos. This runs both tools on the same repo and prints every
+indicator they both produce, marking each EQUAL or DIFF. Exit code 1 on any DIFF, so
+it can gate a commit.
+
+The Python side runs with --no-exec, because the Rust side has no runtime harness yet;
+that is the same static half on both. Usage:
+
+    uv run validate.py <repo> [lang]
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REFERENCE = HERE.parent / "l1_analyzer"
+BINARY = HERE / "target" / "release" / "slop-audit-rs"
+
+
+def python_panel(repo: Path, lang: str) -> dict[str, dict]:
+    """The reference panel, keyed L1.x. Run from the reference package so `uv run`
+    resolves that project's environment, not this directory's."""
+    out = subprocess.run(
+        ["uv", "run", "l1-analyzer", str(repo), "--no-exec", "--format", "json", "--lang", lang],
+        cwd=REFERENCE, capture_output=True, text=True, check=True,
+    ).stdout
+    return json.loads(out)["results"]
+
+
+def rust_panel(repo: Path, lang: str) -> dict[str, dict]:
+    """The portable panel, parsed from --tsv."""
+    args = [str(BINARY), str(repo), "--tsv"]
+    if lang != "auto":
+        args += ["--lang", lang]
+    out = subprocess.run(args, capture_output=True, text=True, check=True).stdout
+    panel: dict[str, dict] = {}
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if parts[0] == "lang":
+            panel["lang"] = {"value": parts[1]}
+            continue
+        code, value, band, details = (parts + ["", "", ""])[:4]
+        panel[code] = {"value": value, "band": band, "details": details}
+    return panel
+
+
+def render(value) -> str:
+    """The reference's JSON value as the Rust side prints it: a string verbatim, any
+    number through json.dumps (so 0.0 stays "0.0" and 47 stays "47")."""
+    return value if isinstance(value, str) else json.dumps(value)
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print(__doc__)
+        return 2
+    repo = Path(sys.argv[1]).resolve()
+    lang = sys.argv[2] if len(sys.argv) > 2 else "auto"
+
+    reference = python_panel(repo, lang)
+    ported = rust_panel(repo, lang)
+
+    if "lang" in reference:
+        detected_py = reference.pop("lang")
+        detected_rs = ported.pop("lang", {}).get("value", "")
+        mark = "EQUAL" if detected_py == detected_rs else "DIFF "
+        print(f"{mark} lang: reference={detected_py} ported={detected_rs}")
+
+    # The additive absolute-paths check is keyed differently on the two sides.
+    if "absolute_paths" in reference and "abs-paths" in ported:
+        reference["abs-paths"] = reference.pop("absolute_paths")
+
+    def order(code: str) -> float:
+        # L1.18b sorts between 18 and 19; the additive checks sort last.
+        if not code.startswith("L1."):
+            return 99.0
+        return float(code[3:].replace("b", ".5"))
+
+    codes = [c for c in ported if c in reference]
+    for code in [c for c in ported if c not in reference]:
+        print(f"SKIP  {code}: not in the reference panel")
+    diffs = 0
+    for code in sorted(codes, key=order):
+        want = reference[code]
+        got = ported[code]
+        fields = [
+            ("value", render(want.get("value", "")), got["value"]),
+            ("band", str(want.get("band", "")), got["band"]),
+            ("details", str(want.get("details", "")), got["details"]),
+        ]
+        bad = [(name, a, b) for name, a, b in fields if a != b]
+        if not bad:
+            print(f"EQUAL {code}")
+            continue
+        diffs += 1
+        print(f"DIFF  {code}")
+        for name, a, b in bad:
+            print(f"        {name}: reference={a!r}")
+            print(f"        {name}: ported   ={b!r}")
+
+    print(f"\n{len(codes) - diffs}/{len(codes)} indicators equal on {repo}")
+    return 1 if diffs else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

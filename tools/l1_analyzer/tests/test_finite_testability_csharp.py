@@ -11,7 +11,6 @@ relies on class scope for C#), so no module-global vector appears here.
 """
 
 import pytest
-
 from l1_analyzer import state_bounds
 
 VECTORS = [

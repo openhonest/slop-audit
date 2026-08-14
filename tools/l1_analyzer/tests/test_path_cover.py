@@ -4,7 +4,7 @@ The graph-math cases are hand-checked; the CFG cases parse real Python and asser
 the attainable number of runs that cover every branch. Pure assertions, no mocks.
 """
 
-from l1_analyzer.indicators import LANG_CFG, _get_parser, _BODY_NODE_TYPES
+from l1_analyzer.indicators import _BODY_NODE_TYPES, LANG_CFG, _get_parser
 from l1_analyzer.path_cover import function_cover, min_path_cover
 
 S, T = "entry", "exit"

@@ -7,7 +7,6 @@ compound assignment is operator_assignment; invoking a stored callable is
 """
 
 import pytest
-
 from l1_analyzer import state_bounds
 
 VECTORS = [

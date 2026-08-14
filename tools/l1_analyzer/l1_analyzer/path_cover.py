@@ -21,7 +21,7 @@ import collections
 import itertools
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
 
 from tree_sitter import Node
 
@@ -242,7 +242,16 @@ def function_cover(body: Node) -> int:
     return max(1, min_path_cover(edges, _ENTRY, _EXIT))
 
 
-def cover_paths(repo: Path, lang: str) -> dict[str, Any]:
+class PathCover(TypedDict, total=False):
+    """The repo-level path-cover result. total=False because the n/a branch carries only
+    value, band and details; the measured branch adds the function count."""
+    value: int | str
+    band: str
+    functions: int
+    details: str
+
+
+def cover_paths(repo: Path, lang: str) -> PathCover:
     """Repo-level minimum path cover: the attainable number of runs that walk
     every branch, testing each function at its own entry (per-function, summed).
 

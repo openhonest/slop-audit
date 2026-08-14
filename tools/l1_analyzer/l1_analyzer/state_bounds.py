@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from tree_sitter import Node
 
@@ -734,7 +734,10 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
     return findings
 
 
-def _na(lang: str) -> dict[str, Any]:
+# object, not Any: the verdict payload mixes strings, counts, nested dicts and a findings
+# list, so no single value type fits. `object` still forces a caller to narrow before use,
+# which is the property Any throws away. Same argument as thread_surface's scan result.
+def _na(lang: str) -> dict[str, object]:
     return {
         "verdict": "n/a", "value": "n/a", "band": "n/a",
         "counts": {NEUTRAL: 0, PROMISCUOUS: 0, UNRESOLVED: 0},
@@ -746,7 +749,7 @@ def _na(lang: str) -> dict[str, Any]:
     }
 
 
-def classify(repo: Path, lang: str) -> dict[str, Any]:
+def classify(repo: Path, lang: str) -> dict[str, object]:
     """L1.18b: the finite-testability verdict distribution. Additive; never
     consulted by L1.18 itself."""
     if lang not in LANG_SPEC:
