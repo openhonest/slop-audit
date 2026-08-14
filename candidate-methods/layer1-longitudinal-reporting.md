@@ -42,6 +42,14 @@ Exactly three outcomes. No fourth, and no hedging between them.
 
 The third verdict is the one most instruments leave out, and it is the one that earns the other two their credibility. The tool must say it whenever it cannot detect a change, and must never report "this is your normal" in its place. A measurement that cannot see a change reporting no change is a false clean bill.
 
+### 2a The rule that keeps the trend honest
+
+**The trend verdict is never shown on its own.** It is always shown beside the level, because the two answer different questions and the trend alone is dangerous.
+
+A reader who sees "no change detected" and nothing else concludes the number is fine. It may be terrible and steady. Worse, the trend reading can be blind inside the failing range: on one real repository the reading cannot detect a fall until well past the point at which the panel already calls the process failing, so a slide deep into a bad score produces no change at all. That is correct behaviour for the question it answers, and a false clean bill for the question the reader is asking.
+
+So the report never prints a trend sentence without the level sentence next to it, and the word "stable" never appears without the level immediately after. "This is your normal" is not good news until the reader knows what the normal is.
+
 ### 3 What the reader should do, which is the point
 
 The verdict is worth nothing without the instruction that follows it. These are the sentences that make the report actionable, and they differ in kind, not in degree.
@@ -89,6 +97,7 @@ can be found.
 
 ## trend.stable
 This is your normal. {indicator} has been at this level since {since}, and it has not moved.
+The level is {band}.
 
 ## trend.stable.bad
 A cleanup will not hold. This level is what your current way of working produces, so it

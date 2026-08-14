@@ -82,7 +82,29 @@ Rule 2 cannot fire until eight subgroups exist beyond the baseline, which is at 
 - If a limit falls outside the metric's own range, the chart is one-sided or dead in that direction.
 - If the chart cannot signal in either direction, the output is **"insufficient signal at this window size"**. It is never "stable".
 
-A chart with no detection power reporting no signal is the process-control equivalent of a passing test that never ran, which is the failure this standard exists to name. Note that the range differs per indicator and must be taken from the definition, not assumed: L1.7 and L1.4 are shares bounded at 0 and 100, while **L1.5 is a ratio of deleted to added lines and is unbounded above** (a real value of 347.3 appears in the worked example). Two reviewers of this draft independently assumed L1.5 was bounded at 100.
+A chart with no detection power reporting no signal is the process-control equivalent of a passing test that never ran, which is the failure this standard exists to name.
+
+**The specification gap.** A one-sided chart is a legitimate object, but it stops being safe the moment a reader takes "no signal" to mean "acceptable". Where a control limit falls beyond a band threshold, the chart cannot signal anywhere inside the failing region, and the report must say so in that direction.
+
+Worked, from the example below: L1.5's lower control limit is 15.1 and its Slop threshold is 30. **Any value from 16 to 29 is Slop and produces no signal.** A repository can fall from 70 to 16, deep into failure, and the chart correctly reports common-cause variation. It is not wrong; it is answering "did something change", and nothing did. But a reader who reads that as "leave it alone" has been misled by an omission. The chart cannot warn about a fall until 14.9 points past the line at which the standard already calls the process failing. Note that the range differs per indicator and must be taken from the definition, not assumed: L1.7 and L1.4 are shares bounded at 0 and 100, while **L1.5 is a ratio of deleted to added lines and is unbounded above** (a real value of 347.3 appears in the worked example). Two reviewers of this draft independently assumed L1.5 was bounded at 100.
+
+### 7a The two limits answer different questions
+
+The bands and the limits are not competing answers. They are different analyses and an operator needs both.
+
+- **Specification limits** are the Healthy / Not Healthy / Slop thresholds, and Paper E's corpus calibration of them. They say what output is **acceptable**.
+- **Control limits** are computed from one repository's own variation. They say what that process **actually does**.
+
+Combining them is standard process-capability analysis and gives four readings rather than a contradiction:
+
+| | Within specification | Outside specification |
+|---|---|---|
+| **In control** | Stable and good. Leave it alone. | **Stable and bad.** A common-cause problem: change the practice, do not react to individual points. |
+| **Out of control** | Passing by luck; it will drift out. | Both. Start with the special cause. |
+
+This dissolves an apparent conflict with Paper E, *Empirical Calibration of Mutable State Thresholds*. That paper computes thresholds from a 200-repository corpus, which are specification limits. Nothing here competes with it. The two disagreeing on a repository whose practice differs from the corpus median is the expected and useful result: **that difference is the capability gap**, and it is the number a CIO actually wants. Paper E can proceed unchanged.
+
+This framing came out of review rather than from the drafting, and it needs the same practitioner confirmation as the rest.
 
 ### 8 Worked example
 
