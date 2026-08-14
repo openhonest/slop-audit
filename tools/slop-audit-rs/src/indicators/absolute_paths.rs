@@ -132,13 +132,7 @@ fn production_files(repo: &Path) -> Vec<(std::path::PathBuf, String)> {
         if in_ignored_dir(path) {
             continue;
         }
-        let ignored = path.components().any(|c| match c {
-            std::path::Component::Normal(os) => {
-                os.to_str().map(|s| EXTRA_IGNORE.contains(&s)).unwrap_or(false)
-            }
-            _ => false,
-        });
-        if ignored {
+        if crate::extra_reason(path, EXTRA_IGNORE).is_some() {
             continue;
         }
         if let Ok(bytes) = std::fs::read(path) {

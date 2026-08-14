@@ -24,7 +24,7 @@ import re
 import shutil
 import subprocess
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import TypedDict
 
@@ -86,10 +86,41 @@ _IGNORE_DIRS = frozenset({
     "site-packages", "target", "build", "dist", "vendor",
 })
 
+# The two markers that name a test directory. Everything else in an `extra` scope-out
+# tuple is matched on the nose; these two are also matched case-insensitively and as a
+# dotted suffix, because C# names a test project `<Project>.Tests` and an exact match
+# never catches `Src/Newtonsoft.Json.Tests/`. Until this existed, every C# repository's
+# whole test tree was measured as production code by L1.15, L1.17, L1.19 and the
+# absolute-path check (Newtonsoft.Json reported 31 absolute paths, all of them stack-
+# trace fixture data). Deliberately this narrow: "spec", "fixtures" and the rest are
+# not test-directory conventions in the languages this scope covers.
+_TEST_DIR_MARKERS = frozenset({"test", "tests"})
+
+
+def _component_scoped_out(component: str, marker: str) -> bool:
+    """True when one path component is scoped out by `marker`. Exact for a general
+    marker; for a test marker, `Tests`, `tests`, `Foo.Tests` and `Foo.Test` all count."""
+    if component == marker:
+        return True
+    if marker not in _TEST_DIR_MARKERS:
+        return False
+    lowered = component.lower()
+    return lowered == marker or lowered.endswith("." + marker)
+
+
+def _extra_reason(parts: Iterable[str], extra: tuple[str, ...]) -> str | None:
+    """The first `extra` marker any path component is scoped out by, or None."""
+    parts = tuple(parts)
+    for marker in extra:
+        if any(_component_scoped_out(p, marker) for p in parts):
+            return marker
+    return None
+
+
 def _in_ignored_dir(path: Path, extra: tuple[str, ...]) -> bool:
     """True if any path component is a vendored/tooling dir (or one of `extra`)."""
     parts = set(path.parts)
-    return bool(parts & _IGNORE_DIRS) or any(e in parts for e in extra)
+    return bool(parts & _IGNORE_DIRS) or _extra_reason(parts, extra) is not None
 
 
 def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
@@ -140,9 +171,9 @@ def _bucket_reason(path: Path, repo: Path, has_packages: bool, extra: tuple[str,
     parts = set(path.parts)
     if parts & _IGNORE_DIRS:
         return "vendored"
-    for e in extra:
-        if e in parts:
-            return e
+    reason = _extra_reason(parts, extra)
+    if reason is not None:
+        return reason
     if "docs" in parts:
         return "docs"
     if path.name in _TOOLING_FILES:

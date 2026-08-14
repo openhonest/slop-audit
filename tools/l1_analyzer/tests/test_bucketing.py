@@ -8,8 +8,10 @@ silent skip. A flat, script-only repo keeps its root scripts, because there they
 the code. Pure assertions, no mocks.
 """
 
+from pathlib import Path
+
 from l1_analyzer import state_bounds
-from l1_analyzer.indicators import _repo_has_packages
+from l1_analyzer.indicators import _bucket_reason, _repo_has_packages
 
 
 def _mkrepo(tmp_path, files):
@@ -56,3 +58,20 @@ def test_flat_script_only_repo_keeps_its_root_scripts(tmp_path):
     r = state_bounds.classify(repo, "python")
     assert not any(b["reason"] == "root-script" for b in r["bucketed"]["paths"])
     assert any(f["file"] == "app.py" for f in r["findings"])   # app.py IS analyzed
+
+
+def test_dotted_csharp_test_project_is_scoped_out():
+    """C# convention is a project directory named `<Project>.Tests`, which an exact
+    component match never catches. Every C# repository's test tree was therefore measured
+    as production code by L1.15, L1.17, L1.19 and the absolute-path check. A component is
+    a test directory when, lowercased, it equals "tests"/"test" or ends ".tests"/".test"."""
+    repo = Path("/r")
+    extra = ("tests", "test")
+    assert _bucket_reason(repo / "Src/Newtonsoft.Json.Tests/Schema/T.cs", repo, False, extra) == "tests"
+    assert _bucket_reason(repo / "Src/Newtonsoft.Json.Test/Legacy.cs", repo, False, extra) == "test"
+    assert _bucket_reason(repo / "Src/Tests/T.cs", repo, False, extra) == "tests"          # capitalised
+    assert _bucket_reason(repo / "Src/tests/t.py", repo, False, extra) == "tests"          # unchanged
+    # Production code keeps its scope: the marker must be the whole component after the dot.
+    assert _bucket_reason(repo / "Src/Newtonsoft.Json/Serializer.cs", repo, False, extra) is None
+    assert _bucket_reason(repo / "Src/Contests/Entry.cs", repo, False, extra) is None
+    assert _bucket_reason(repo / "Src/Latest/Entry.cs", repo, False, extra) is None

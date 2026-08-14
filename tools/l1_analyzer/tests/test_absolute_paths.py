@@ -91,6 +91,17 @@ def test_scopes_out_the_test_tree():
     assert r["findings"][0]["file"] == "src/a.py"
 
 
+def test_scopes_out_a_dotted_csharp_test_project():
+    """C# names a test project `<Project>.Tests`, so the exact component match never caught
+    it: JamesNK/Newtonsoft.Json reported 31 absolute paths, every one of them stack-trace
+    fixture data under Src/Newtonsoft.Json.Tests/."""
+    r = _scan({"Src/Newtonsoft.Json/Serializer.cs": 'var p = "/home/adam/x";\n',
+               "Src/Newtonsoft.Json.Tests/Schema/PersonTests.cs": 'var f = @"c:\\schema\\Person.json";\n',
+               "Src/Newtonsoft.Json.Test/Legacy.cs": 'var f = @"c:\\schema\\Old.json";\n'})
+    assert r["value"] == 1
+    assert r["findings"][0]["file"] == "Src/Newtonsoft.Json/Serializer.cs"
+
+
 def test_reports_every_occurrence_and_counts_files():
     r = _scan({"a.py": 'x = "/home/a/one"\ny = "/tmp/two"\n', "b.go": 'z := "/mnt/data/three"\n'})
     assert r["value"] == 3

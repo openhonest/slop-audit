@@ -117,6 +117,40 @@ pub fn is_generated(path: &Path) -> bool {
     GENERATED_MARKERS.iter().any(|m| head.contains(m))
 }
 
+/// Must equal l1_analyzer.indicators._TEST_DIR_MARKERS. The two markers that name a test
+/// directory. Everything else in an `extra` scope-out list is matched on the nose; these
+/// two are also matched case-insensitively and as a dotted suffix, because C# names a test
+/// project `<Project>.Tests` and an exact match never catches `Src/Newtonsoft.Json.Tests/`.
+pub const TEST_DIR_MARKERS: &[&str] = &["test", "tests"];
+
+/// _component_scoped_out: one path component is scoped out by `marker`. Exact for a
+/// general marker; for a test marker, `Tests`, `tests`, `Foo.Tests` and `Foo.Test` count.
+pub fn component_scoped_out(component: &str, marker: &str) -> bool {
+    if component == marker {
+        return true;
+    }
+    if !TEST_DIR_MARKERS.contains(&marker) {
+        return false;
+    }
+    let lowered = component.to_lowercase();
+    lowered == marker || lowered.ends_with(&format!(".{marker}"))
+}
+
+/// _extra_reason: the first `extra` marker any path component is scoped out by.
+pub fn extra_reason(path: &Path, extra: &[&'static str]) -> Option<&'static str> {
+    let parts: Vec<&str> = path
+        .components()
+        .filter_map(|c| match c {
+            Component::Normal(os) => os.to_str(),
+            _ => None,
+        })
+        .collect();
+    extra
+        .iter()
+        .find(|marker| parts.iter().any(|p| component_scoped_out(p, marker)))
+        .copied()
+}
+
 /// _bucket_reason: why this source file is scoped out of the audit, or None to keep
 /// it. General and structural: it references no specific project. Disclosed, never
 /// silent.
@@ -137,10 +171,8 @@ pub fn bucket_reason(
         return Some("vendored");
     }
     // The reason is the matched directory name itself, as in the reference.
-    for e in extra {
-        if parts.contains(e) {
-            return Some(e);
-        }
+    if let Some(reason) = extra_reason(path, extra) {
+        return Some(reason);
     }
     if parts.contains("docs") {
         return Some("docs");
@@ -292,6 +324,25 @@ mod tests {
             );
         }
         assert_eq!(py_splitlines("a\r\nb\rc\u{2028}d"), vec!["a", "b", "c", "d"]);
+    }
+
+    /// C# convention is a project directory named `<Project>.Tests`, which an exact
+    /// component match never catches, so every C# repository's test tree was measured as
+    /// production code by L1.15, L1.17, L1.19 and the absolute-path check. A component is
+    /// a test directory when, lowercased, it equals "tests"/"test" or ends ".tests"/".test".
+    #[test]
+    fn a_dotted_csharp_test_project_is_scoped_out() {
+        let repo = Path::new("/r");
+        const EXTRA: &[&str] = &["tests", "test"];
+        let scoped = |rel: &str| bucket_reason(&repo.join(rel), repo, false, EXTRA);
+        assert_eq!(scoped("Src/Newtonsoft.Json.Tests/Schema/T.cs"), Some("tests"));
+        assert_eq!(scoped("Src/Newtonsoft.Json.Test/Legacy.cs"), Some("test"));
+        assert_eq!(scoped("Src/Tests/T.cs"), Some("tests")); // capitalised
+        assert_eq!(scoped("Src/tests/t.py"), Some("tests")); // unchanged
+        // Production code keeps its scope: the marker is the whole component after the dot.
+        assert_eq!(scoped("Src/Newtonsoft.Json/Serializer.cs"), None);
+        assert_eq!(scoped("Src/Contests/Entry.cs"), None);
+        assert_eq!(scoped("Src/Latest/Entry.cs"), None);
     }
 
     /// The bytes splitter agrees with the str splitter wherever both apply, so the two
