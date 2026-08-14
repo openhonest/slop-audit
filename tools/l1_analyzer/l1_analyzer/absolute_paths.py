@@ -27,12 +27,27 @@ _UNIX_ROOTS = (
     r"/home/", r"/Users/", r"/root/", r"/tmp/", r"/private/(?:tmp|var)/",
     r"/var/folders/", r"/mnt/", r"/media/", r"/opt/",
 )
-# The lookbehind stops `http://host/home/x` (the root continues a hostname) from matching,
-# while a quoted or bare path such as "/home/adam/x" still does. The Windows arm matches a
+# The lookbehind stops a root that continues a hostname (inside an http URL) from matching,
+# while a quoted or bare home-directory path still does. The Windows arm matches a
 # drive-letter path. A path ends at whitespace or a closing quote/paren.
+#
+# Both arms require the root to be followed by something. A bare root identifies no machine;
+# it names a convention, and the only source that carries bare roots is a tool that lists
+# them, this module included. One trailing character is enough on the unix arm, because a
+# home root plus a single character already names one machine's path.
+#
+# The Windows arm requires TWO characters after the drive backslash, which is what separates
+# a drive path from an escape sequence. A single letter, a colon and a one-character escape
+# is a string escape in every language, not a drive. That false positive fired 21 times on
+# this repo's own tests before the rule was tightened, and two characters still keeps every
+# real drive path, down to a four-character directory at the drive root.
+#
+# The worked examples live in tests/test_absolute_paths.py, not here. A comment in production
+# code that exhibits a machine path is itself a finding, which is how this module came to
+# report on its own documentation.
 _ABSOLUTE = re.compile(
-    r"(?<![A-Za-z0-9._/-])(?:" + "|".join(_UNIX_ROOTS) + r")[^\s\"'`)\]]*"
-    r"|(?<![A-Za-z0-9])[A-Za-z]:\\[^\s\"'`)\]]+"
+    r"(?<![A-Za-z0-9._/-])(?:" + "|".join(_UNIX_ROOTS) + r")[^\s\"'`)\]]+"
+    r"|(?<![A-Za-z0-9])[A-Za-z]:\\[^\s\"'`)\]]{2,}"
 )
 
 _CODE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".cpp", ".hpp", ".js", ".jsx", ".mjs",
@@ -55,7 +70,11 @@ def scan(repo: Path, lang: str) -> dict:
     language). Healthy at zero, Slop otherwise: a hardcoded machine path is never correct."""
     from l1_analyzer.indicators import _read_text_files
 
-    files, _skipped = _read_text_files(repo, _CODE_EXTS, extra_ignore=())
+    # Production scope, the same ("tests", "test") exclusion L1.15, L1.17 and L1.19 use. A
+    # test that proves a path detector fires has to contain the path it detects, so scanning
+    # the test tree measures the fixtures, not the code. This repo's own tests carried 24 of
+    # the 57 findings on the run that prompted the scope fix.
+    files, _skipped = _read_text_files(repo, _CODE_EXTS, extra_ignore=("tests", "test"))
     findings = [
         {"file": str(path.relative_to(repo)) if repo in path.parents else str(path),
          "line": lineno, "path": matched}

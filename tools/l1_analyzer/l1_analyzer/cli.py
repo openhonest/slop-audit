@@ -12,7 +12,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 from l1_analyzer import card, indicators, schedule_silence, thread_surface
 
@@ -289,7 +288,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.gate:
         return _run_gate(args.repo, args.lang, args.max_type_escapes, args.max_thread_exposed)
 
-    results: dict[str, Any] = {}
+    # object, not Any: the panel holds L1Result dicts beside the detected language
+    # string and the additive payloads, and a reader must narrow before use.
+    results: dict[str, object] = {}
 
     inds = [i.strip() for i in args.indicators.split(",")] if args.indicators != "all" else None
 

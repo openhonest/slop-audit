@@ -25,7 +25,7 @@ import shutil
 import subprocess
 from collections import Counter
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
 import tree_sitter_c
 import tree_sitter_c_sharp
@@ -158,7 +158,21 @@ def _read_source_bytes(repo: Path, extensions: tuple[str, ...], extra_ignore: tu
     return files, skipped
 
 
-def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> dict[str, Any]:
+class BucketedPath(TypedDict):
+    """One scoped-out file and the reason it was scoped out."""
+    path: str
+    reason: str
+
+
+class BucketedPaths(TypedDict):
+    """The scope disclosure: a count per reason, and the judgment-call exclusions listed
+    file by file. Typed, not dict[str, Any]: the shape is fixed, so a key typo is a type
+    error rather than a KeyError in the report writer."""
+    counts: dict[str, int]
+    paths: list[BucketedPath]
+
+
+def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> BucketedPaths:
     """The source files scoped out of the audit, with the reason for each, so a
     reader sees exactly what was not looked at and can challenge it (the cone of
     light on the meter's own choice of scope). `counts` covers every reason; `paths`
@@ -167,7 +181,7 @@ def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[
     behind a silent skip otherwise. Vendored dependencies are counted, not listed."""
     has_packages = _repo_has_packages(repo)
     counts: dict[str, int] = {}
-    paths: list[dict[str, str]] = []
+    paths: list[BucketedPath] = []
     for ext in extensions:
         for f in repo.rglob(f"*{ext}"):
             reason = _bucket_reason(f, repo, has_packages, extra_ignore)
@@ -758,21 +772,41 @@ def _count_type_escapes_in_tree(root: Node, escape_tokens: frozenset[str]) -> in
     A type token (Any, object, dynamic, ...) is matched only on a leaf node whose
     exact text is one of `escape_tokens`, so it catches real annotations without
     matching parent nodes (which would double count) or the builtin `any()` call.
-    An ignore-comment is matched only on a comment node, so string literals that
-    happen to contain "# type: ignore" (like this module's own pattern list) are
-    not counted - the false positive that made L1.15 report escapes it never saw.
+
+    Two refinements keep the count on annotations and suppressions rather than on
+    prose and data, both of which the meter used to charge against itself:
+
+    A leaf inside a string is data, not an annotation. `("Any",)` in a pattern table,
+    an "object" key in a C# message, a "dynamic" label: none of them opt out of a type
+    checker. The cost is a stringified forward reference (`x: "Any"`), which is rare,
+    while strings holding these very ordinary words are not. In a language whose escape
+    token is `object` or `Object`, charging every string that says "object" would swamp
+    the measure.
+
+    A comment counts only when it BEGINS with a marker, which is what a real suppression
+    looks like. A comment that mentions `# type: ignore` while explaining the rule is
+    documentation. This module's own pattern list is the proof: it described the marker
+    three times and was charged three escapes for saying so.
     """
     count = 0
+
+    def in_string(n: Node) -> bool:
+        parent = n.parent
+        while parent is not None:
+            if "string" in parent.type:
+                return True
+            parent = parent.parent
+        return False
 
     def walk(n: Node):
         nonlocal count
         if not n.children:  # leaf token
             text = n.text.decode("utf8", errors="ignore") if n.text else ""
-            if text in escape_tokens:
+            if text in escape_tokens and not in_string(n):
                 count += 1
         if "comment" in n.type:
             text = n.text.decode("utf8", errors="ignore") if n.text else ""
-            if any(pat in text for pat in _COMMENT_TYPE_ESCAPES):
+            if any(text.lstrip().startswith(pat) for pat in _COMMENT_TYPE_ESCAPES):
                 count += 1
         for c in n.children:
             walk(c)

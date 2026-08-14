@@ -59,6 +59,38 @@ def test_ignores_non_source_files():
     assert r["value"] == 0   # docs are not scanned; only source extensions are
 
 
+def test_does_not_flag_an_escape_sequence_as_a_windows_path():
+    """`"x:\\n"` is a colon and a newline escape, not drive X. This fired 21 times on the
+    analyzer's own tests: any source writing a single letter, a colon and `\\n` was read as a
+    hardcoded Windows path. Two characters after the drive backslash separate the two."""
+    r = _scan({"a.py": 'label = "x:\\n"\nother = "M:\\n"\n',
+               "b.rs": 'let s = "C:\\t";\n'})
+    assert r["verdict"] == "clean" and r["value"] == 0
+
+
+def test_still_flags_a_short_windows_path():
+    """The escape-sequence rule must not cost a real drive path its finding."""
+    r = _scan({"a.py": 'p = "C:\\\\temp"\n'})
+    assert r["value"] == 1
+
+
+def test_does_not_flag_a_bare_root():
+    """A root with nothing after it names a convention, not a machine. The only source that
+    carries bare roots is a tool that lists them, this checker included."""
+    r = _scan({"a.py": 'ROOTS = ("/home/", "/Users/", "/tmp/", "/var/folders/")\n'})
+    assert r["verdict"] == "clean" and r["value"] == 0
+
+
+def test_scopes_out_the_test_tree():
+    """Production scope, the same exclusion L1.15, L1.17 and L1.19 use. A test that proves a
+    path detector fires has to contain the path it detects."""
+    r = _scan({"src/a.py": 'p = "/home/adam/x"\n',
+               "tests/test_a.py": 'FIXTURE = "/home/adam/y"\n',
+               "test/legacy.py": 'FIXTURE = "/home/adam/z"\n'})
+    assert r["value"] == 1
+    assert r["findings"][0]["file"] == "src/a.py"
+
+
 def test_reports_every_occurrence_and_counts_files():
     r = _scan({"a.py": 'x = "/home/a/one"\ny = "/tmp/two"\n', "b.go": 'z := "/mnt/data/three"\n'})
     assert r["value"] == 3

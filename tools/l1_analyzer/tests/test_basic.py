@@ -173,6 +173,28 @@ def test_l1_15_counts_ignore_comment(tmp_path):
     assert res["details"].startswith("1 escapes")
 
 
+def test_l1_15_a_type_token_inside_a_string_is_data(tmp_path):
+    """`("Any",)` in a pattern table does not opt out of a type checker. The meter used
+    to charge itself for its own vocabulary, and would charge any C# repo for every
+    string that says "object"."""
+    res = _escapes(tmp_path, "python", "a.py", 'PATTERNS = ("Any",)\nLABEL = "Any"\nx = 1\n')
+    assert res["details"].startswith("0 escapes")
+
+
+def test_l1_15_a_comment_explaining_the_marker_is_documentation(tmp_path):
+    """A suppression BEGINS with the marker. A comment that mentions it mid-sentence is
+    prose about the rule, which is how this meter came to report on its own docstrings."""
+    res = _escapes(tmp_path, "python", "a.py",
+                   "# the marker is # type: ignore, written at the head of a line\nx = 1\n")
+    assert res["details"].startswith("0 escapes")
+
+
+def test_l1_15_still_counts_a_real_suppression_with_a_code(tmp_path):
+    """Tightening to a prefix must not cost a real suppression its count."""
+    res = _escapes(tmp_path, "python", "a.py", "x = 1  # type: ignore[attr-defined]\n")
+    assert res["details"].startswith("1 escapes")
+
+
 def test_l1_15_typescript_any_and_unknown(tmp_path):
     res = _escapes(tmp_path, "typescript", "a.ts", "let x: any = 1;\nlet y: unknown = 2;\n")
     assert res["details"].startswith("2 escapes")

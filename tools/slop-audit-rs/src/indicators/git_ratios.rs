@@ -88,7 +88,7 @@ fn test_to_prod_ratio(repo: &Path) -> Indicator {
     let mut test_loc = 0usize;
     let mut prod_loc = 0usize;
     for (path, text) in source_files(repo, SRC_EXTS) {
-        let n = text.lines().count();
+        let n = crate::py_splitlines(&text).len();
         if is_test_file(&path) {
             test_loc += n;
         } else {

@@ -5,7 +5,6 @@ No I/O, no side effects. Accepts source strings, returns plain dicts.
 """
 
 import re
-from typing import Any
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
