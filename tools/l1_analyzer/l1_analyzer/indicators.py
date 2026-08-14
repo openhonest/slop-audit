@@ -373,14 +373,39 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
 
 # Files whose path marks them as test code (used by L1.8).
 _TEST_PATH_MARKERS = frozenset({"test", "tests", "spec", "specs", "__tests__"})
+# A .NET test project is a sibling directory named <Project>.Tests, never a plain
+# `tests/` parent. The production scope learned this in the same pass; L1.8 needs it too.
+_TEST_DOTTED_MARKERS = ("test", "tests", "spec", "specs")
+# The .NET and JVM file convention, in its original casing. Capitalised on purpose: see
+# _is_test_file.
+_TEST_STEM_SUFFIXES = ("Test", "Tests", "Spec", "Specs")
 _SRC_EXTS = frozenset({".py", ".rs", ".c", ".h", ".cpp", ".js", ".jsx", ".mjs", ".cjs",
                        ".ts", ".tsx", ".java", ".cs", ".go", ".rb", ".kt", ".swift", ".php"})
 
 def _is_test_file(path: Path) -> bool:
+    """True when a path is test code, for the L1.8 test-to-production split.
+
+    Two arms beyond the original ones carry the .NET and JVM conventions, which the
+    Python, Go and JavaScript arms could not see. Without them L1.8 reported
+    Newtonsoft.Json as "0 test / 193720 production LOC", band Slop, for a repository
+    with 704 test files: the exact inverse of the truth, on a scored indicator.
+
+    A dotted project directory (Newtonsoft.Json.Tests) is a test directory, matching the
+    same rule the production scope uses. A stem ending in a CAPITALISED Test, Tests, Spec
+    or Specs (JsonSerializerTests.cs) is a test file. The capital is what makes that arm
+    safe: `Latest.java` ends with "test" when lowercased and would otherwise be counted
+    as test code, while `SmokeTests.cs` reads as one only in its original casing.
+    """
     lowered = {p.lower() for p in path.parts}
+    if lowered & _TEST_PATH_MARKERS:
+        return True
+    if any(p.endswith("." + m) for p in lowered for m in _TEST_DOTTED_MARKERS):
+        return True
     name = path.name.lower()
     suffix = path.suffix.lower()
-    return bool(lowered & _TEST_PATH_MARKERS) or name.startswith("test_") or name.endswith(("_test" + suffix, ".test" + suffix, ".spec" + suffix))
+    if name.startswith("test_") or name.endswith(("_test" + suffix, ".test" + suffix, ".spec" + suffix)):
+        return True
+    return path.stem.endswith(_TEST_STEM_SUFFIXES)
 
 def _test_to_prod_ratio(repo: Path) -> L1Result:
     """L1.8: lines of test code / lines of production code."""

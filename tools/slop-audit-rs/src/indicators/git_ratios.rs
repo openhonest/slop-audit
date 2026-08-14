@@ -27,6 +27,12 @@ const SRC_EXTS: &[&str] = &[
 ];
 
 const TEST_PATH_MARKERS: &[&str] = &["test", "tests", "spec", "specs", "__tests__"];
+// A .NET test project is a sibling directory named <Project>.Tests, never a plain
+// `tests/` parent. Mirrors _TEST_DOTTED_MARKERS.
+const TEST_DOTTED_MARKERS: &[&str] = &["test", "tests", "spec", "specs"];
+// The .NET and JVM file convention, in its original casing. Mirrors _TEST_STEM_SUFFIXES;
+// the capital is what keeps `Latest.java` out.
+const TEST_STEM_SUFFIXES: &[&str] = &["Test", "Tests", "Spec", "Specs"];
 
 /// Format a float the way Python's `str(round(value, ndigits))` / json.dumps does:
 /// rounded to `ndigits`, trailing zeros stripped, but always at least one decimal.
@@ -55,11 +61,19 @@ fn classify_file(path: &str) -> &'static str {
 }
 
 /// Mirrors l1_analyzer.indicators._is_test_file.
+///
+/// Two arms beyond the original ones carry the .NET and JVM conventions. Without them
+/// L1.8 reported Newtonsoft.Json as "0 test / 193720 production LOC" for a repository
+/// with 704 test files: the exact inverse of the truth, on a scored indicator.
 fn is_test_file(path: &Path) -> bool {
     let parts_hit = path.components().any(|c| {
         c.as_os_str()
             .to_str()
-            .map(|s| TEST_PATH_MARKERS.contains(&s.to_lowercase().as_str()))
+            .map(|s| {
+                let lowered = s.to_lowercase();
+                TEST_PATH_MARKERS.contains(&lowered.as_str())
+                    || TEST_DOTTED_MARKERS.iter().any(|m| lowered.ends_with(&format!(".{m}")))
+            })
             .unwrap_or(false)
     });
     if parts_hit {
@@ -77,9 +91,15 @@ fn is_test_file(path: &Path) -> bool {
         Some(e) => format!(".{}", e.to_lowercase()),
         None => String::new(),
     };
-    name.ends_with(&format!("_test{suffix}"))
+    if name.ends_with(&format!("_test{suffix}"))
         || name.ends_with(&format!(".test{suffix}"))
         || name.ends_with(&format!(".spec{suffix}"))
+    {
+        return true;
+    }
+    // Path.stem: the file name with its final extension removed, original casing.
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    TEST_STEM_SUFFIXES.iter().any(|s| stem.ends_with(s))
 }
 
 /// L1.8: lines of test code / lines of production code.
@@ -340,4 +360,44 @@ pub fn l1_07(repo: &Path) -> Indicator {
 }
 pub fn l1_08(repo: &Path) -> Indicator {
     analyze(repo).swap_remove(7)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_test_file;
+    use std::path::Path;
+
+    /// The .NET layout: tests live in <Project>.Tests, never a plain tests/ parent.
+    /// Without this arm L1.8 reported Newtonsoft.Json as 0 test LOC against 193,720
+    /// production LOC, for a repository with 704 test files.
+    #[test]
+    fn a_dotted_dotnet_test_project_is_test_code() {
+        assert!(is_test_file(Path::new("Src/Newtonsoft.Json.Tests/Serialization/X.cs")));
+    }
+
+    /// The .NET and JVM file convention, in its original casing.
+    #[test]
+    fn a_capitalised_test_stem_is_test_code() {
+        assert!(is_test_file(Path::new("src/JsonSerializerTests.cs")));
+        assert!(is_test_file(Path::new("src/SmokeTest.java")));
+        assert!(is_test_file(Path::new("src/ReaderSpec.scala")));
+    }
+
+    /// `Latest.java` ends with "test" once lowercased. The capital in the stem arm is
+    /// what keeps production code out of the numerator.
+    #[test]
+    fn a_word_that_merely_ends_in_test_is_production_code() {
+        assert!(!is_test_file(Path::new("src/Latest.java")));
+        assert!(!is_test_file(Path::new("src/manifest.py")));
+        assert!(!is_test_file(Path::new("src/Protest.cs")));
+    }
+
+    /// The arms that already worked keep working.
+    #[test]
+    fn the_original_conventions_still_match() {
+        assert!(is_test_file(Path::new("tests/test_thing.py")));
+        assert!(is_test_file(Path::new("pkg/thing_test.go")));
+        assert!(is_test_file(Path::new("src/thing.spec.ts")));
+        assert!(!is_test_file(Path::new("src/thing.ts")));
+    }
 }

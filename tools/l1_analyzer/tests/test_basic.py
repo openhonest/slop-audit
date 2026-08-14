@@ -727,3 +727,41 @@ def test_l1_18_runs_and_discriminates_per_language(tmp_path, lang):
     # exactly one of the two functions touches external mutable state
     assert res["details"].startswith("1/2"), res["details"]
     assert res["value"] == 50.0
+
+
+# --- L1.8: the .NET and JVM test conventions --------------------------------
+
+from pathlib import Path
+
+
+def test_l1_8_counts_a_dotted_dotnet_test_project_as_test_code():
+    """Newtonsoft.Json reported "0 test / 193720 production LOC", band Slop, for a repo
+    with 704 test files. Its tests live in Src/Newtonsoft.Json.Tests, and no arm of the
+    predicate knew that shape."""
+    assert indicators._is_test_file(Path("Src/Newtonsoft.Json.Tests/Serialization/X.cs"))
+
+
+def test_l1_8_counts_a_capitalised_test_stem_as_test_code():
+    """The .NET and JVM file convention: JsonSerializerTests.cs, SmokeTest.java."""
+    assert indicators._is_test_file(Path("src/JsonSerializerTests.cs"))
+    assert indicators._is_test_file(Path("src/SmokeTest.java"))
+    assert indicators._is_test_file(Path("src/ReaderSpec.scala"))
+
+
+def test_l1_8_does_not_count_a_word_that_merely_ends_in_test():
+    """`Latest.java` ends with "test" once lowercased. The capital in the stem arm is
+    what keeps production code out of the numerator."""
+    assert not indicators._is_test_file(Path("src/Latest.java"))
+    assert not indicators._is_test_file(Path("src/manifest.py"))
+    assert not indicators._is_test_file(Path("src/Protest.cs"))
+
+
+def test_l1_8_ratio_moves_when_the_dotted_project_is_recognised(tmp_path):
+    """End to end: a .NET layout now splits into test and production instead of
+    reporting every line as production."""
+    (tmp_path / "Src" / "Foo").mkdir(parents=True)
+    (tmp_path / "Src" / "Foo.Tests").mkdir(parents=True)
+    (tmp_path / "Src" / "Foo" / "Widget.cs").write_text("a\nb\nc\n")
+    (tmp_path / "Src" / "Foo.Tests" / "WidgetTests.cs").write_text("x\ny\n")
+    res = indicators._test_to_prod_ratio(tmp_path)
+    assert res["details"] == "2 test / 3 production LOC"
