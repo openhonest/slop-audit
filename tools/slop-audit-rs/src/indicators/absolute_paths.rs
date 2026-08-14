@@ -6,7 +6,7 @@
 //! Healthy at zero, Slop otherwise. This hand-rolls the Python regex so it needs no
 //! regex dependency.
 
-use crate::{in_ignored_dir, is_file_entry, py_splitlines, Indicator};
+use crate::{in_ignored_dir, Indicator, is_file_entry, py_splitlines, walk_repo};
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -117,7 +117,7 @@ fn count_line(line: &str) -> usize {
 fn production_files(repo: &Path) -> Vec<(std::path::PathBuf, String)> {
     const EXTRA_IGNORE: &[&str] = &["tests", "test"];
     let mut out = Vec::new();
-    for entry in walkdir::WalkDir::new(repo).min_depth(1).into_iter().filter_map(Result::ok) {
+    for entry in walk_repo(repo) {
         if !is_file_entry(&entry) {
             continue;
         }

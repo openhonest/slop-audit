@@ -8,10 +8,7 @@
 //! line count, exactly as the reference's `_code_line_count` fallback does.
 
 use crate::lang;
-use crate::{
-    band, bucket_reason, is_file_entry, is_generated, parser_for, py_round2, repo_has_packages,
-    splitlines_len, Indicator,
-};
+use crate::{band, bucket_reason, Indicator, is_file_entry, is_generated, parser_for, py_round2, repo_has_packages, splitlines_len, walk_repo};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use tree_sitter::{Node, Parser};
@@ -90,7 +87,7 @@ pub fn analyze(repo: &Path) -> Indicator {
     // the reference's `_rglob_files` keeps files only. A directory whose name ends in a
     // source extension (node_modules/decimal.js is a real one) is not a file and not
     // unreadable, so neither tool measures it or counts it against the skipped total.
-    for entry in walkdir::WalkDir::new(repo).min_depth(1).into_iter().filter_map(Result::ok) {
+    for entry in walk_repo(repo) {
         if !is_file_entry(&entry) {
             continue;
         }

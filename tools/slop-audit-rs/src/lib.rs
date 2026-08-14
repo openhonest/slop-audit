@@ -57,14 +57,38 @@ pub fn is_file_entry(entry: &walkdir::DirEntry) -> bool {
     }
 }
 
+/// Every FILE under `repo`, skipping nested checkouts. The single walk every indicator
+/// uses, mirroring l1_analyzer.indicators._rglob_files.
+///
+/// A directory below the root that carries its own `.git` is a different repository with
+/// its own history and its own audit: a submodule working copy, a vendored clone, or a
+/// git worktree. Measuring it reports code that is not in this commit. The tool caught
+/// this on itself: an agent's worktree held an older checkout of this repository, and the
+/// gate charged eleven type escapes that existed only in that second copy.
+///
+/// `.git` is a directory in a clone and a FILE in a worktree, so the test is existence,
+/// not is_dir. `filter_entry` prunes the whole subtree, so the walk never descends into a
+/// nested checkout at all. `min_depth(1)` keeps the root's own `.git` from pruning
+/// everything.
+pub fn walk_repo(repo: &Path) -> impl Iterator<Item = walkdir::DirEntry> + '_ {
+    walkdir::WalkDir::new(repo)
+        .min_depth(1)
+        .into_iter()
+        .filter_entry(|entry| {
+            !entry.file_type().is_dir() || !entry.path().join(".git").exists()
+        })
+        .filter_map(Result::ok)
+        .filter(is_file_entry)
+}
+
 /// Every file under `repo` whose lowercased extension is in `exts` and not in an ignored
 /// dir, read as text with invalid bytes replaced (mirrors read_text(errors="ignore")).
 pub fn source_files(repo: &Path, exts: &[&str]) -> Vec<(PathBuf, String)> {
     let want: HashSet<&str> = exts.iter().copied().collect();
     let mut out = Vec::new();
-    for entry in walkdir::WalkDir::new(repo).into_iter().filter_map(Result::ok) {
+    for entry in walk_repo(repo) {
         let path = entry.path();
-        if !is_file_entry(&entry) || in_ignored_dir(path) {
+        if in_ignored_dir(path) {
             continue;
         }
         let ext = match path.extension().and_then(|e| e.to_str()) {
@@ -95,14 +119,10 @@ pub const GENERATED_MARKERS: &[&str] = &[
 /// _repo_has_packages: any __init__.py outside a vendored/tooling dir. Tells a loose
 /// dev/entry-point script from a flat script-only repo.
 pub fn repo_has_packages(repo: &Path) -> bool {
-    walkdir::WalkDir::new(repo)
-        .into_iter()
-        .filter_map(Result::ok)
-        .any(|e| {
-            is_file_entry(&e)
-                && e.path().file_name().and_then(|n| n.to_str()) == Some("__init__.py")
-                && !in_ignored_dir(e.path())
-        })
+    walk_repo(repo).any(|e| {
+        e.path().file_name().and_then(|n| n.to_str()) == Some("__init__.py")
+            && !in_ignored_dir(e.path())
+    })
 }
 
 /// _is_generated: the file's header marks it machine-generated. Reads only the head,
@@ -352,5 +372,41 @@ mod tests {
         for input in ["a\nb", "a\nb\n", "", "\n", "a\r\nb", "a\rb", "a\u{0c}b", "a\u{1e}b"] {
             assert_eq!(splitlines_len(input.as_bytes()), py_splitlines(input).len(), "{input:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod walk_tests {
+    use super::walk_repo;
+    use std::fs;
+
+    /// A directory below the root carrying its own `.git` is a different repository.
+    /// Measuring it reports code that is not in this commit. The tool caught this on
+    /// itself: an agent worktree held an older checkout and the gate charged eleven type
+    /// escapes that existed only there.
+    #[test]
+    fn a_nested_checkout_is_not_walked() {
+        let root = std::env::temp_dir().join(format!("slop-walk-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::write(root.join("mine.py"), "x = 1\n").unwrap();
+
+        // A vendored clone: .git is a directory.
+        fs::create_dir_all(root.join("vendored-clone/.git")).unwrap();
+        fs::write(root.join("vendored-clone/theirs.py"), "y = 2\n").unwrap();
+
+        // A git worktree: .git is a FILE, which is the shape that produced the false
+        // reading, so existence is the test rather than is_dir.
+        fs::create_dir_all(root.join("agent-worktree/pkg")).unwrap();
+        fs::write(root.join("agent-worktree/.git"), "gitdir: /elsewhere\n").unwrap();
+        fs::write(root.join("agent-worktree/pkg/theirs.py"), "z = 3\n").unwrap();
+
+        let names: Vec<String> = walk_repo(&root)
+            .filter_map(|e| e.path().file_name()?.to_str().map(str::to_string))
+            .filter(|n| n.ends_with(".py"))
+            .collect();
+        assert_eq!(names, vec!["mine.py".to_string()], "walked {names:?}");
+
+        let _ = fs::remove_dir_all(&root);
     }
 }

@@ -8,10 +8,7 @@
 //! reference does, and the five typed ones each use their own tokens.
 
 use crate::lang;
-use crate::{
-    band, bucket_reason, is_file_entry, parser_for, py_round2, repo_has_packages,
-    splitlines_count_str, Indicator,
-};
+use crate::{band, bucket_reason, Indicator, is_file_entry, parser_for, py_round2, repo_has_packages, splitlines_count_str, walk_repo};
 use std::path::Path;
 use tree_sitter::Node;
 
@@ -109,7 +106,7 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
 
     // min_depth(1) and is_file_entry: see the note in god_files.rs. A directory whose
     // name ends in a source extension is not a file, so it is skipped in silence.
-    for entry in walkdir::WalkDir::new(repo).min_depth(1).into_iter().filter_map(Result::ok) {
+    for entry in walk_repo(repo) {
         if !is_file_entry(&entry) {
             continue;
         }

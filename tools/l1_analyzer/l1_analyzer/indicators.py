@@ -133,8 +133,39 @@ def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
     It is not a file and it is not unreadable, so that disclosure was false. A directory
     is now neither measured nor counted. `is_file()` follows symlinks, so a symlinked
     source file is still read, and a file the process may not read still reaches the
-    reader and is still disclosed as unreadable."""
-    return (p for p in repo.rglob(pattern) if p.is_file())
+    reader and is still disclosed as unreadable.
+
+    A nested checkout is also skipped. A directory below the root that carries its own
+    `.git` is a different repository with its own history and its own audit: a submodule
+    working copy, a vendored clone, or a git worktree. Measuring it reports code that is
+    not in this commit. The tool caught this on itself: an agent's worktree under
+    `.claude/worktrees/` held an older checkout of this repository, and the gate charged
+    eleven type escapes that existed only in that second copy.
+
+    `.git` is a directory in a clone and a FILE in a worktree, so the test is existence,
+    not is_dir. The root's own `.git` is not consulted, or every scan would be empty."""
+    root_resolved = repo.resolve()
+    inside_nested: dict[Path, bool] = {}
+
+    def under_nested_checkout(directory: Path) -> bool:
+        """True when `directory` is, or sits under, a nested checkout. Memoised per call
+        so each directory is stat-ed once however many files it holds."""
+        cached = inside_nested.get(directory)
+        if cached is not None:
+            return cached
+        if directory == root_resolved or root_resolved not in directory.parents:
+            result = False
+        elif (directory / ".git").exists():
+            result = True
+        else:
+            result = under_nested_checkout(directory.parent)
+        inside_nested[directory] = result
+        return result
+
+    return (
+        p for p in repo.rglob(pattern)
+        if p.is_file() and not under_nested_checkout(p.parent.resolve())
+    )
 
 
 # Conventional build/test/dev tooling recognised by filename, not by directory.

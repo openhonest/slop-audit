@@ -170,7 +170,7 @@ pub fn parser_for(key: &str) -> Parser {
 /// name ends in a source extension is not counted: it is not a file.
 pub fn detect_primary_language(repo: &Path) -> &'static str {
     let mut counts = vec![0usize; LANGS.len()];
-    for entry in walkdir::WalkDir::new(repo).into_iter().filter_map(Result::ok) {
+    for entry in crate::walk_repo(repo) {
         if !crate::is_file_entry(&entry) {
             continue;
         }

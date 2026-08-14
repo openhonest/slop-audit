@@ -10,7 +10,7 @@ the code. Pure assertions, no mocks.
 
 from pathlib import Path
 
-from l1_analyzer import state_bounds
+from l1_analyzer import indicators, state_bounds
 from l1_analyzer.indicators import _bucket_reason, _repo_has_packages
 
 
@@ -75,3 +75,49 @@ def test_dotted_csharp_test_project_is_scoped_out():
     assert _bucket_reason(repo / "Src/Newtonsoft.Json/Serializer.cs", repo, False, extra) is None
     assert _bucket_reason(repo / "Src/Contests/Entry.cs", repo, False, extra) is None
     assert _bucket_reason(repo / "Src/Latest/Entry.cs", repo, False, extra) is None
+
+
+# --- nested checkouts are a different repository ----------------------------
+
+def test_a_nested_checkout_is_not_measured(tmp_path):
+    """A directory below the root carrying its own .git is a submodule working copy, a
+    vendored clone or a git worktree. Its code is not in this commit, and measuring it
+    reports another repository's numbers as this one's. The tool caught this on itself:
+    an agent worktree under .claude/worktrees/ held an older checkout and the gate
+    charged eleven type escapes that existed only there."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "mine.py").write_text("x = 1\n")
+
+    nested = tmp_path / "vendored-clone"
+    nested.mkdir()
+    (nested / ".git").mkdir()
+    (nested / "theirs.py").write_text("y = 2\n")
+
+    found = {p.name for p in indicators._rglob_files(tmp_path, "*.py")}
+    assert found == {"mine.py"}
+
+
+def test_a_worktree_dot_git_file_is_recognised_too(tmp_path):
+    """A git worktree carries .git as a FILE, not a directory, so the test is existence
+    rather than is_dir. This is the exact shape that produced the false reading."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "mine.py").write_text("x = 1\n")
+
+    worktree = tmp_path / "agent-worktree"
+    (worktree / "pkg").mkdir(parents=True)
+    (worktree / ".git").write_text("gitdir: /somewhere/else\n")
+    (worktree / "pkg" / "theirs.py").write_text("y = 2\n")
+
+    found = {p.name for p in indicators._rglob_files(tmp_path, "*.py")}
+    assert found == {"mine.py"}
+
+
+def test_the_root_repository_is_still_measured(tmp_path):
+    """The root's own .git must not prune the whole scan."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "a.py").write_text("x = 1\n")
+    (tmp_path / "b.py").write_text("y = 2\n")
+
+    found = {p.name for p in indicators._rglob_files(tmp_path, "*.py")}
+    assert found == {"a.py", "b.py"}
