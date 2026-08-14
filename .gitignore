@@ -34,3 +34,7 @@ tools/l1_analyzer/paper_a_v2/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Agent worktrees. Created by background agents working in isolation; each is a
+# checkout of this same repository and belongs to no commit.
+.claude/worktrees/
