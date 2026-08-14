@@ -708,6 +708,28 @@ def _immutable_const_verdict(refs: list[Node], immutable_ctors: set[str], sp: La
     return NEUTRAL, _reaches_decision(refs, sp)
 
 
+def _binding_line(refs: list[Node], sp: LangSpec) -> int:
+    """The line where the state is BOUND, not the first line its name appears on.
+
+    The earliest reference is the wrong answer and it sends a reader to the wrong place.
+    A module named `app` makes `from app.auth import X` on line 2 the first textual
+    occurrence of the name, so a finding about the variable `app = FastAPI()` on line 4
+    was reported against an import statement that binds nothing. On the repository that
+    surfaced this, the reader was sent to line 19 for an object defined on line 113.
+
+    So prefer the earliest reference that is an assignment target, using the same
+    `_is_lvalue` the classifier already uses to decide what a write is. Falling back to
+    the earliest reference keeps a line for state that is never assigned in this file,
+    which is the case for an injected or inherited name.
+
+    This changes no verdict and no count. It changes only where the reader is sent, which
+    is the whole value of a finding they are meant to act on."""
+    bindings = [r.start_point[0] + 1 for r in refs if _is_lvalue(r, sp)]
+    if bindings:
+        return min(bindings)
+    return min((r.start_point[0] + 1 for r in refs), default=1)
+
+
 def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: set[str], immutable_ctors: set[str], instance: bool) -> Finding:
     const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp is LANG_SPEC["python"] else None
     if const is not None:
@@ -722,8 +744,8 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: se
     # attribute is a provable write-once, memoization cache, or carried-value shape.
     if verdict != NEUTRAL and sp is LANG_SPEC["python"] and state_bounds_filters.is_false_positive(key, refs, verdict):
         verdict, drives = NEUTRAL, False
-    line = min((r.start_point[0] + 1 for r in refs), default=1)
-    return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel, "line": line}
+    return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel,
+            "line": _binding_line(refs, sp)}
 
 
 def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ctors: set[str]) -> list[Finding]:

@@ -112,3 +112,39 @@ def test_grade_summary_is_the_single_source_of_the_published_grade():
     assert report.grade_summary(might)["grade"] == "D"
     # an audit check with no band is excluded, not penalized
     assert report.grade_summary({**base, "L1.17": {"band": "Healthy"}, "L1.15": {"band": "n/a"}})["hygiene"] == 1.0
+
+
+# --- attribution: the finding must point at the binding, not the first text match ------
+
+def test_finding_points_at_the_binding_not_the_first_textual_match(tmp_path):
+    """A module named `app` makes `from app.auth import X` the first occurrence of the
+    name, so a finding about the variable `app = FastAPI()` was reported against an
+    import statement that binds nothing. On the repository that surfaced this, the reader
+    was sent to line 19 for an object defined on line 113. A finding nobody can act on is
+    not a finding."""
+    (tmp_path / "main.py").write_text(
+        "from fastapi import FastAPI\n"
+        "from app.auth.middleware import AuthMiddleware\n"
+        "\n"
+        "app = FastAPI()\n"
+        "app.add_middleware(AuthMiddleware)\n"
+    )
+    result = state_bounds.classify(tmp_path, "python")
+    assert len(result["findings"]) == 1
+    assert result["findings"][0]["line"] == 4          # the assignment, not the import
+
+
+def test_attribution_falls_back_when_the_name_is_never_assigned_here(tmp_path):
+    """State that is read but never bound in this file still needs a line, so the
+    earliest reference remains the fallback."""
+    (tmp_path / "reader.py").write_text(
+        "from settings import registry\n"
+        "\n"
+        "def lookup(key):\n"
+        "    if registry[key]:\n"
+        "        return registry[key]\n"
+        "    return None\n"
+    )
+    result = state_bounds.classify(tmp_path, "python")
+    for finding in result["findings"]:
+        assert finding["line"] >= 1
