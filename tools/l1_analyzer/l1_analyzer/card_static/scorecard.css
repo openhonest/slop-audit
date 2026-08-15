@@ -250,6 +250,7 @@ body {
 .verdict__detail a { color: var(--accent); }
 
 .verdict__score { margin: 1rem 0 0; font-size: 1.05rem; color: var(--text); }
+.verdict__unread { margin: 0.9rem 0 0; font-size: 0.85rem; color: var(--text-dim); }
 .verdict__score strong { font-family: var(--mono); font-size: 1.35rem; font-weight: 700; }
 .verdict--can .verdict__score strong { color: var(--healthy); }
 .verdict--coarse .verdict__score strong { color: var(--nothealthy); }
@@ -291,6 +292,7 @@ body {
 .culprit__fn { font-family: var(--mono); font-weight: 700; color: var(--slop); }
 .culprit--undetermined .culprit__fn, .culprit--unresolved .culprit__fn { color: var(--nothealthy); }
 .culprit__state { color: var(--text-dim); }
+.card__note { color: var(--text-dim); font-size: 0.85rem; margin: 0.9rem 0 0; }
 .culprits__more { color: var(--text-muted); font-size: 0.85rem; margin: 0.6rem 0 0; }
 
 /* --- Thread-safety surface -------------------------------------------------- */

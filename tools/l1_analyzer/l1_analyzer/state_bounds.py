@@ -892,7 +892,8 @@ def _na(lang: str) -> dict[str, object]:
         "partition": state_partition.partition_summary([]),
         # `declared: None`, not 0. A language with no spec was not counted, and a confident
         # zero here would report "there is no state" for a repository nobody read.
-        "census": {"declared": None, "admitted": 0, "admitted_fraction": None, "by_kind": {}, "files": 0},
+        "census": {"declared": None, "admitted": 0, "admitted_fraction": None, "by_kind": {},
+                   "files": 0, "reachable": None, "unread_kinds": []},
         "findings": [],
         "bucketed": {"counts": {}, "paths": []},
         "details": f"finite-testability classifier has no spec for {lang} yet",

@@ -25,7 +25,7 @@ Pure assertions over fixtures written to tmp_path, no mocks (Honest Code Rule 10
 
 from __future__ import annotations
 
-from l1_analyzer import report, state_bounds
+from l1_analyzer import card, report, state_bounds
 
 _HEALTHY = {k: {"band": "Healthy"} for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")}
 
@@ -201,11 +201,15 @@ def test_the_report_says_the_cardinality_does_not_compose_across_states(tmp_path
         "    return 0\n"
     ))
     assert "does not compose" in str(result["details"])
-    r = report.build_report("x", "python", _panel(result))
-    markdown = report.report_markdown(r)
+    # Against the card, because the card is what the CLI and the site print. This assertion
+    # used to run on report_markdown, which had no caller outside this suite, so it proved the
+    # sentence existed and not that any reader met it. Moving it here found that the shipped
+    # card carried the compose limit only inside the D note, and no repository is graded D, so
+    # the claim reached nobody.
+    markdown = card.card_markdown(card.build_card("x", "python", _panel(result)))
     assert "does not compose" in markdown
-    # And the silence index is named beside the grade on every report, not only this one.
-    assert "Silence is what the analyzer could not decide" in markdown
+    # And the silence index is named beside the grade on every card, not only this one.
+    assert "reported separately, as silence, and never folded into the grade" in markdown
 
 
 def test_no_bound_is_configured_so_no_repository_is_graded_d(tmp_path):

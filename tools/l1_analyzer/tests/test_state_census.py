@@ -152,6 +152,115 @@ def test_a_classifier_that_read_the_code_still_grades(tmp_path):
     assert g["grade"] is not None
 
 
+# --------------------------------------------------------------------------
+# The refusal has to separate "no rule existed" from "every rule said no".
+#
+# Both produce zero admitted, and a count comparison cannot tell them apart. The C struct
+# field is the first: `field_decl_types` is empty for C, so the enumerator COULD NOT have
+# admitted it and refusing is right. A codebase built out of TypedDict shapes and immutable
+# module constants is the second: the enumerator has a rule for every kind it declares, it
+# ran that rule over each one, and it declined them on the merits. Refusing there reports a
+# limit that does not exist, and it refused this repository's own analyzer package.
+# --------------------------------------------------------------------------
+
+NO_MUTABLE_STATE_BY_DESIGN = (
+    "from typing import TypedDict\n"
+    "\n"
+    "\n"
+    "class Row(TypedDict):\n"
+    "    name: str\n"
+    "    count: int\n"
+    "\n"
+    "\n"
+    "HEADERS = ('name', 'count')\n"
+    "\n"
+    "\n"
+    "def render(row: Row) -> str:\n"
+    "    return f\"{row['name']}={row['count']}\"\n"
+)
+# The Python spelling of the C struct: a class-body binding is state the enumerator has no
+# rule for, exactly as a struct field is in C.
+PY_CLASS_BODY_CACHE = (
+    "class Store:\n"
+    "    cache = {}\n"
+    "\n"
+    "    def put(self, k, v):\n"
+    "        Store.cache[k] = v\n"
+)
+
+
+def test_a_codebase_with_no_mutable_state_by_design_is_graded_not_refused(tmp_path):
+    """The defect this test was written for: every kind here is one the enumerator can
+    match, it matched none of them because none of them is mutable state, and the report
+    called that insufficient basis."""
+    result = _classify(tmp_path, "m.py", NO_MUTABLE_STATE_BY_DESIGN, "python")
+    assert result["census"]["admitted"] == 0
+    assert result["census"]["declared"] > 0
+    g = report.grade_summary(_results(result), None)
+    assert g["basis"] == report.MEASURED, "the enumerator looked and was right; that is a reading"
+    assert g["grade"] is not None
+
+
+def test_python_state_the_enumerator_has_no_rule_for_refuses_like_the_c_struct(tmp_path):
+    """The other half. A class-body binding is invisible to the Python enumerator the way a
+    struct field is invisible to the C one, so a repository holding nothing else has been
+    read by nothing and gets no grade."""
+    result = _classify(tmp_path, "m.py", PY_CLASS_BODY_CACHE, "python")
+    g = report.grade_summary(_results(result), None)
+    assert g["basis"] == report.UNREAD
+    assert g["grade"] is None
+
+
+def test_the_census_publishes_the_denominator_its_reader_can_actually_reach(tmp_path):
+    (tmp_path / "m.py").write_text(NO_MUTABLE_STATE_BY_DESIGN)
+    census = state_census.count(tmp_path, "python")
+    assert census["reachable"] == 1, "HEADERS is a module binding, a kind the enumerator reads"
+    assert census["unread_kinds"] == [state_census.CLASS_BODY_BINDING]
+
+
+def test_one_reachable_declaration_carries_a_hundred_unreachable_ones_and_the_report_says_so(tmp_path):
+    """The residual blind spot, pinned rather than left implicit.
+
+    The refusal fires only when NOTHING declared here is of a readable kind, so a single
+    readable binding is enough to grade a repository whose remaining state the enumerator
+    cannot see. That is a deliberate limit: the alternative refuses every Python repository
+    with a TypedDict in it, which measures our reading rather than their code. What the
+    report owes the reader instead is the count, and this test fails the day the disclosure
+    goes missing or the day someone teaches the enumerator class-body bindings.
+
+    It asserts against card_markdown and card_html because those are the only renderers left.
+    The first version asserted against report_markdown, which had no caller outside this
+    suite, so it passed green while the disclosure reached no reader at all. That renderer is
+    now deleted; a test against an orphaned one proves a string exists, not that anyone is
+    shown it."""
+    (tmp_path / "m.py").write_text("counter = 0\n\n\n" + PY_CLASS_BODY_CACHE)
+    result = state_bounds.classify(tmp_path, "python")
+    g = report.grade_summary(_results(result), None)
+    assert g["basis"] == report.MEASURED
+    model = card.build_card("o/r", "python", _results(result))
+    assert model["grade"] is not None, "the disclosure belongs on a card that GRADED"
+    for rendered in (card.card_markdown(model), card.card_html(model)):
+        assert "a name bound in a class body" in rendered
+        assert "no rule for" in rendered
+
+
+# --------------------------------------------------------------------------
+# The capability matrix is MEASURED, never asserted. A hand-maintained table of which
+# language handles which declaration kind rots into the blind spot the census exists to
+# detect, so every entry is a fixture run through the real classifier.
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("lang,kind", sorted(state_census.CAPABILITY))
+def test_the_recorded_capability_is_what_the_classifier_actually_does(tmp_path, lang, kind):
+    probe = state_census.CAPABILITY[(lang, kind)]
+    (tmp_path / probe["file"]).write_text(probe["source"])
+    sites = state_census.count(tmp_path, lang)
+    admitted = len(state_bounds.classify(tmp_path, lang)["findings"])
+    assert sites["by_kind"][kind] == 1, "the fixture must declare exactly one site of its kind"
+    assert bool(admitted) == probe["admitted"], (
+        f"{lang}/{kind}: recorded admitted={probe['admitted']}, measured {admitted} findings")
+
+
 @pytest.mark.parametrize("lang,name,src,least", [
     ("rust", "m.rs", "struct S { a: u32, b: u32 }\nstatic mut G: u32 = 0;\n", 3),
     ("go", "m.go", "package p\ntype S struct {\n a int\n b int\n}\nvar g int\n", 3),

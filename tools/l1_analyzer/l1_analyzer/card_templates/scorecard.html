@@ -61,6 +61,7 @@
       <li class="dist dist--cannot">{{ card.promiscuous_count }} unbounded</li>
       <li class="dist dist--silent">{{ card.unresolved_count }} undecided (silence)</li>
     </ul>
+    {% if card.census_note %}<p class="verdict__unread">{{ card.census_note | safe }}</p>{% endif %}
   </div>
   {% endif %}
 
@@ -79,6 +80,26 @@
     </ul>
     {% if card.culprits_more %}<p class="culprits__more">and {{ card.culprits_more }} more</p>{% endif %}
   </section>
+  {% endif %}
+
+  {% if card.silence_sites %}
+  <section class="culprits">
+    <h3 class="culprits__head">{{ copy['silence.heading'] }}</h3>
+    <ul class="culprits__list">
+      {% for s in card.silence_sites %}
+      <li class="culprit culprit--unresolved">
+        <code class="culprit__loc">{{ s.file }}:{{ s.line }}</code>
+        <span class="culprit__fn">{{ s.state }}</span>
+        <span class="culprit__state">{{ s.why }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if card.status != 'na' %}
+  <p class="card__note">{{ card.compose_note }}</p>
+  <p class="card__note">{{ card.silence_note }}</p>
   {% endif %}
 
   {% if card.core %}

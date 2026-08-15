@@ -23,7 +23,7 @@ Pure assertions over fixtures written to tmp_path, no mocks (Honest Code Rule 10
 
 from __future__ import annotations
 
-from l1_analyzer import report, state_bounds, state_partition
+from l1_analyzer import card, report, state_bounds, state_partition
 
 # One class, one piece of state, and one call the analyzer cannot follow. The state is
 # never compared to anything unbounded and never used as an unbounded key, so nothing
@@ -91,9 +91,12 @@ def test_silence_is_reported_with_a_file_and_line_for_every_silent_site(tmp_path
     assert site["reason"]
     # And the reader gets them, not just the JSON: a share nobody can act on is not a
     # measure, it is a number.
-    markdown = report.report_markdown(report.build_report("x", "python", _panel(result)))
-    assert "What the analyzer could not read" in markdown
-    assert "`app.py:5` — `self.workbook`" in markdown
+    markdown = card.card_markdown(card.build_card("x", "python", _panel(result)))
+    assert "What we could not follow" in markdown
+    # The reason, not only the site. Which of the four it is decides whose move is next, and
+    # the card printed the location without it until report.py's renderers were deleted and
+    # this assertion moved to the output that ships.
+    assert "`app.py:5` — `self.workbook` (handed to" in markdown
 
 
 def test_one_silent_state_no_longer_caps_the_grade_at_d(tmp_path):

@@ -34,7 +34,8 @@ CARD_COPY: dict[str, str] = {
     "detail.coarse": "Every piece of data here has a limited set of cases, so a fixed number of tests would cover it. The trouble is how many, and that they have no order. When cases are ordered, such as numbers against a limit, you test each side of the limit and you are done, however wide the range. The cases below are names, and one name is not next to another, so there is no shortcut: covering them means one test each. Cut the number of distinct cases, or give them an order, and the count comes down.",
     "detail.cannot": "{n} {plural} of data here can be almost anything, and the code makes decisions based on it. Because it can be anything, there is always one more case to check, so no fixed number of tests can ever cover them all. Writing more tests will not fix this. The only fix is to limit what that data can be, or stop letting other parts of the code change it.",
     "detail.na": "Point it at a public repository with code in a language the analyzer reads: Python, TypeScript, JavaScript, Java, C#, Rust, Ruby, Go, or C.",
-    "detail.na_unread": "Insufficient basis. No grade, and no claim either way about whether this code can be tested. Reading the source directly, we found {declared} places where it declares data it keeps — struct and class fields, instance attributes, file-scope and package-level bindings — and our analysis reached a verdict on none of them. That is a limit of our reading, not a finding about your code: it means we never got far enough to have an opinion. Every other number we publish is worked out over the data we did recognise, so on this repository they are all worked out over nothing, and we will not turn that into a good grade. The most common cause is a construct our reader does not know yet: a C struct field, or a language feature we have not taught it. Send us the repository and we will fix our end.",
+    "detail.na_unread": "Insufficient basis. No grade, and no claim either way about whether this code can be tested. Reading the source directly, we found {declared} {places} where it declares data it keeps, and every one of them is spelled as {kinds}, which our reader has no rule for, so it reached a verdict on none of them. That is a limit of our reading, not a finding about your code: it means we never got far enough to have an opinion. Every other number we publish is worked out over the data we did recognise, so on this repository they are all worked out over nothing, and we will not turn that into a good grade. Send us the repository and we will teach our reader the construct.",
+    "census.unread": "{unread} of the {declared} places where this code declares data it keeps {verb} spelled as {kinds}, which our reader has no rule for. Nothing above is a verdict about them. That is our gap to close, not yours: send us the repository and we will teach the reader the construct.",
     "detail.na_silent": "No grade. We could not work out what {silent} of the {total} pieces of data here are used for, and that is more than half of them. Most often the data is handed to a library we cannot see inside. We will not hand out a good grade on the part we happened to be able to read, because that would reward code that shows us the least. The list below is every place we stopped, so you can see exactly what we could not follow.",
     "culprits.heading.coarse": "What costs too many tests",
     "culprits.heading.cannot": "What makes it impossible",
@@ -54,6 +55,20 @@ CARD_COPY: dict[str, str] = {
     "footer.cli": "Run under the Slop Audit CLI: the repository's test suite was executed, so decision-space coverage (L1.19) and test determinism (L1.20) below are measured, not estimated. try.slopaudit.org runs the static Layer 1 indicators only and never executes your code.",
     "footer.cli_na": "Run under the Slop Audit CLI, which executes the repository's test suite to measure decision-space coverage (L1.19) and test determinism (L1.20). Those rows read n/a here: the runtime harness is Python-only so far, so it did not run this repo's suite. try.slopaudit.org never executes any repo's code; this is the difference between 'we did not run it' and 'we could not run it here yet.'",
     "grade.rubric": "The grade is verifiability first, by a rule we publish rather than hide. The verdict sets the tier: <strong>CANNOT &rarr; F</strong> (some state is provably unbounded, so no finite test suite covers it), <strong>COARSE &rarr; D</strong> (some state has a countable but unordered set of cases too wide to cover; a wide ORDERED range costs a handful of boundary tests, a wide unordered one costs one test per case). When every piece of state is finitely testable and coverable, the audit checks below decide <strong>A, B, or C</strong> by weighted health &mdash; god-files and type-escapes weigh most (3 each), then CI (2), then containers, pre-commit, and formatting (1 each). The number is the share of DECIDED state that is finitely testable. No hidden weights.",
+    # Migrated from report.py when its renderers were deleted. The claim was published on
+    # every report that module produced and on no card, so the surface people actually read
+    # never carried it. Same argument as the silence note beside it: a limit disclosed only
+    # when it happens to bite is not disclosed.
+    "compose.note": "Each count of cases above is per piece of data and does not compose. Two pieces that decide the same branch multiply rather than add, so the real number of cases is larger than any figure here. A per-piece number we can stand behind beats a combined one we would be guessing.",
+    # What each silent site means to the reader, and whose move it is next. The two that
+    # matter most are opposite: an external boundary is something you can make readable with
+    # an explicit contract, and an unmodeled callee is our backlog. A reader who cannot tell
+    # them apart goes and fixes ours. The card listed the sites without the reason until the
+    # dead renderer that carried these lines was deleted.
+    "silence.reason.external_boundary": "handed to code we cannot read; an explicit contract at this boundary would make it decidable",
+    "silence.reason.unmodeled_callee": "handed to a plain name we have not taught the reader; ours to fix, not yours",
+    "silence.reason.dynamic_dispatch": "the call target is chosen while the program runs, so no reading enumerates it",
+    "silence.reason.injected_slot": "an injected callable whose value at the call site is not provably the one injected",
     "silence.note": "Anything the analyzer could not decide is reported separately, as silence, and never folded into the grade: state we did not read is not evidence about this code. Above half of it undecided, no grade is issued at all, so hiding state from the analyzer buys no letter.",
     "label.L1.19": "Decisions that could be exhaustively checked",
     "tech.L1.19": "L1.19 · decision-space coverage",
@@ -216,7 +231,10 @@ def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts
     # only look here, and that indistinguishability was the defect.
     if status == "na":
         if basis == report.UNREAD:
-            return _t("detail.na_unread", declared=census.get("declared", 0))
+            declared = census.get("declared", 0)
+            return _t("detail.na_unread", declared=declared,
+                      places="place" if declared == 1 else "places",
+                      kinds=report.unread_kinds_phrase(census))
         return _t("detail.na_silent", silent=counts.get("unresolved", 0),
                   total=sum(counts.values())) if sum(counts.values()) else _t("detail.na")
     if status == "cannot":
@@ -224,6 +242,27 @@ def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts
     if status == "can":
         return _t("detail.can", cover=f"{cover:,}") if cover else _t("detail.can_nocover")
     return _t("detail.coarse")
+
+
+def _census_note(census: dict) -> str:
+    """What this repository declares that the reader has no rule for, on a card that GRADED.
+
+    The refusal used to fire whenever nothing was admitted, which caught this case by
+    accident; it now fires only when NO declaration here is of a readable kind, so a
+    repository with one readable binding and two hundred unreadable ones is graded. Those two
+    hundred have to be said out loud on the card a reader actually gets, or relaxing the
+    refusal simply deletes the disclosure.
+
+    The counts and the kind vocabulary come from the census and from
+    report.unread_kinds_phrase, so this module keeps its own voice without being able to
+    disagree with the measurement."""
+    declared, reachable = census.get("declared"), census.get("reachable")
+    if not isinstance(declared, int) or not isinstance(reachable, int) or declared == reachable:
+        return ""
+    unread = declared - reachable
+    return _t("census.unread", unread=unread, declared=declared,
+              verb="is" if unread == 1 else "are",
+              kinds=report.unread_kinds_phrase(census))
 
 
 def _int(v: object) -> int | None:
@@ -298,6 +337,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "grade_pct": pct, "ran_tests": ran_tests, "tests_measured": tests_measured,
         "headline": "" if status == "na" else _t(f"headline.{status}"),
         "basis": g["basis"], "census": g["census"],
+        "census_note": "" if status == "na" else _census_note(g["census"]),
         "detail": _detail(status, g["basis"], promiscuous, cover, counts, g["census"]),
         "paths": cover if status == "can" else None,
         "band": band, "band_word": _BAND_WORD.get(band, "No data"),
@@ -308,7 +348,8 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "culprits_note": _t(f"culprits.note.{status}") if status in _WANT else "",
         "culprits": culprits, "culprits_more": culprits_more,
         "silence": l18b.get("silence") if isinstance(l18b.get("silence"), dict) else None,
-        "silence_note": _t("silence.note"),
+        "silence_note": _t("silence.note"), "compose_note": _t("compose.note"),
+        "silence_sites": _silence_sites(l18b),
         "scoped_out": _scoped_out(l18b),
         "core": _metrics(core_specs, results, "core"),
         "audit": _metrics(_AUDIT, results, "audit"),
@@ -339,6 +380,17 @@ def card_html(card: dict) -> str:
     )
 
 
+def _silence_sites(l18b: dict) -> list[dict]:
+    """Every site the analyzer stopped at, with the reason in the reader's words, for the
+    HTML card. The model carried `silence` and the template rendered none of it, so the site
+    published a grade and named not one place it stopped."""
+    sil = l18b.get("silence") if isinstance(l18b, dict) else None
+    if not isinstance(sil, dict):
+        return []
+    return [{"file": s["file"], "line": s["line"], "state": s["state"],
+             "why": _t("silence.reason." + s["reason"])} for s in (sil.get("sites") or [])]
+
+
 def _silence_lines(card: dict) -> list[str]:
     """Every site the analyzer stopped at. On the `na` card this is the whole content: the
     repository was refused a grade because of silence, so the sites ARE the report."""
@@ -346,7 +398,8 @@ def _silence_lines(card: dict) -> list[str]:
     if not isinstance(sil, dict) or not sil.get("sites"):
         return []
     return ["", f"## {_t('silence.heading')}", ""] + [
-        f"- `{s['file']}:{s['line']}` — `{s['state']}`" for s in sil["sites"]]
+        f"- `{s['file']}:{s['line']}` — `{s['state']}` ({_t('silence.reason.' + s['reason'])})"
+        for s in sil["sites"]]
 
 
 def _verdict_lines(card: dict, strip: re.Pattern) -> list[str]:
@@ -363,6 +416,10 @@ def _verdict_lines(card: dict, strip: re.Pattern) -> list[str]:
               f"- Undecided by the analyzer (silence): {card['unresolved_count']}"]
     if card["status"] == "can" and card["paths"]:
         lines.append(f"- {_t('label.practical').split('.')[0]}: {card['paths']:,}")
+    # Directly under the counts, because it qualifies those counts. A reader who meets it
+    # after the audit table has already read them as the whole story.
+    if card["census_note"]:
+        lines += ["", "> " + strip.sub("", card["census_note"])]
     if card["culprits"]:
         lines += ["", f"## {card['culprits_heading']}", ""]
         for c in card["culprits"]:
@@ -388,7 +445,8 @@ def card_markdown(card: dict) -> str:
     lines += [strip.sub("", card["detail"])] if card["status"] == "na" else _verdict_lines(card, strip)
     lines += _silence_lines(card)
     if card["status"] != "na":
-        lines += ["", "> " + strip.sub("", _t("silence.note"))]
+        lines += ["", "> " + strip.sub("", _t("compose.note")),
+                  "", "> " + strip.sub("", _t("silence.note"))]
     for group, title in (("core", "group.core.title"), ("audit", "group.audit.title")):
         rows = card[group]
         if not rows:

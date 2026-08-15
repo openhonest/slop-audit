@@ -159,8 +159,12 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
     census = (results.get("L1.18b") or {}).get("census")
     if report.census_unread(census):
         declared = census.get("declared") if isinstance(census, dict) else 0
+        one = declared == 1
         state = (f"no proven unbounded state, but the state classifier reached no verdict "
-                 f"(0 of {declared} declarations read), so finite testability is unmeasured")
+                 f"({'the' if one else 'all'} {declared} "
+                 f"{'declaration' if one else 'declarations'} here "
+                 f"{'is' if one else 'are'} {report.unread_kinds_phrase(census)}, which it has "
+                 f"no rule for), so finite testability is unmeasured")
     else:
         state = "finitely testable"
     print(f"Slop audit gate passed: 0 production god-files, {state}{ratchet}.")
