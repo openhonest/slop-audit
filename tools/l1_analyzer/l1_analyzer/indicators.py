@@ -53,6 +53,9 @@ from l1_analyzer.scope import (  # noqa: F401
     _TEST_DIR_MARKERS,
     _TEST_STEM_SUFFIXES,
     _TOOLING_FILES,
+    PRODUCTION,
+    PRODUCTION_WITHOUT_CONFORMANCE,
+    WHOLE_REPO,
     BucketedPath,
     BucketedPaths,
     _bucket_reason,
@@ -249,7 +252,7 @@ def _is_test_file(path: Path) -> bool:
 
 def _test_to_prod_ratio(repo: Path) -> L1Result:
     """L1.8: lines of test code / lines of production code."""
-    files, skipped = _read_text_files(repo, _SRC_EXTS, extra_ignore=())
+    files, skipped = _read_text_files(repo, _SRC_EXTS, scope=WHOLE_REPO)
     test_loc = prod_loc = 0
     for path, text in files:
         n = len(text.splitlines())
@@ -508,7 +511,7 @@ _GOD_FILE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".ts", ".java", ".c
 
 def _trailing_whitespace(repo: Path) -> L1Result:
     """L1.16: percentage of non-blank lines with trailing whitespace."""
-    files, skipped = _read_text_files(repo, _WHITESPACE_EXTS, extra_ignore=())
+    files, skipped = _read_text_files(repo, _WHITESPACE_EXTS, scope=WHOLE_REPO)
     count = total = 0
     for _path, text in files:
         lines = text.splitlines()
@@ -516,12 +519,6 @@ def _trailing_whitespace(repo: Path) -> L1Result:
         count += sum(1 for ln in lines if ln.rstrip() != ln and ln.strip())
     ws_pct = (count / total * 100) if total > 0 else 0.0
     return {"value": round(ws_pct, 2), "band": band(ws_pct, 0.5, 3, higher_is_better=False), "details": _with_skipped(f"{count} lines with trailing ws", skipped)}
-
-# God-file scope matches the finite-testability meter's: production code only, tests
-# and conformance tables scoped out, generated/vendored code scoped out. The god-file
-# smell is a human piling code into one file (every change touches it, merge conflicts
-# multiply); an append-only conformance table or a machine-generated parser is neither.
-_GOD_FILE_IGNORE = ("tests", "test", "conformance")
 
 # A file that is large because it holds a big data table is not the god-file smell:
 # nobody hand-piles logic into a lookup table, and it has no merge-conflict surface a
@@ -573,10 +570,13 @@ def _god_file_reason(f: Path, repo: Path, has_packages: bool) -> str | None:
     scripts) plus generated code, which is L1.17-specific: a machine-generated or
     minified file carries no merge-conflict surface and nobody hand-piles into it.
 
+    The scope is the finite-testability meter's, so L1.17 is declared under it in
+    scope.SCOPES and a change to that scope names L1.17 among the numbers it moves.
+
     Generated-exclusion lives here, NOT in the shared _bucket_reason, so it never
     changes the mutable-state (L1.18) or finite-testability measurements that flow
     through that function; only the god-file indicator is refined."""
-    reason = _bucket_reason(f, repo, has_packages, _GOD_FILE_IGNORE)
+    reason = _bucket_reason(f, repo, has_packages, PRODUCTION_WITHOUT_CONFORMANCE)
     if reason is not None:
         return reason
     if f.name.endswith((".min.js", ".min.css")) or _is_generated(f):
@@ -770,7 +770,7 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
         # Untyped or no configured escape hatch (Ruby, JavaScript, Rust, C).
         return {"value": "n/a", "band": "n/a", "details": f"type-escape density not applicable for {lang}"}
     parser = _get_parser(lang)
-    files, skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    files, skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
 
     escape_count = 0
     total_loc = 0
@@ -801,7 +801,7 @@ def _compute_decision_space(repo: Path, lang: str) -> L1Result:
     if lang not in LANG_CFG:
         return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
     parser = _get_parser(lang)
-    files, skipped = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], extra_ignore=("tests", "test"))
+    files, skipped = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], scope=PRODUCTION)
 
     decision_points = 0
     for _path, src in files:

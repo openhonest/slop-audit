@@ -36,10 +36,80 @@ _IGNORE_DIRS = frozenset({
 _TEST_DIR_MARKERS = frozenset({"test", "tests"})
 
 
+# ---------------------------------------------------------------------------
+# Named measurement scopes
+# ---------------------------------------------------------------------------
+#
+# A scope is the set of directory names an indicator removes from its measurement. It
+# used to travel as a bare tuple argument, and sixteen call sites decided their scope from
+# a tuple written beside them: eight spelled ("tests", "test") out in full, five reached
+# ("tests", "test", "conformance") through three separately defined module constants, and
+# three passed (). The tuple had no name, so nothing in the package recorded which
+# indicators shared it, and a change to a rule underneath it could not be reviewed
+# against a list of what it would move.
+#
+# That is not hypothetical. Commit 2aff645 added the corroboration rule below to close
+# one hole; it moved the published numbers of eight indicators, and the eight were
+# knowable only by reading every call site. The scope is now named, each indicator
+# declares one, and `indicators` is the list the change had no way to produce.
+#
+# The list is a claim, so it is measured rather than trusted: tests/test_scope_policy.py
+# flips one directory from not-corroborated to corroborated and asserts that the set of
+# panel entries that move is exactly the set declared here. An indicator that starts
+# reading a scope without being declared under it fails the suite.
+PRODUCTION = "production"
+PRODUCTION_WITHOUT_CONFORMANCE = "production-without-conformance"
+WHOLE_REPO = "whole-repo"
+
+
+class Scope(TypedDict):
+    """One named measurement scope: the directory names it removes, and every indicator
+    measured under it. `indicators` names panel keys, plus any consumer that publishes a
+    number without being a panel entry (the CLI gate's type-escape ratchet)."""
+    excludes: tuple[str, ...]
+    indicators: tuple[str, ...]
+
+
+SCOPES: dict[str, Scope] = {
+    # The code under audit. A test tree is not the artifact being graded, and a check
+    # that fires on its own fixtures measures the fixtures: this repo's own tests carried
+    # 24 of 57 absolute-path findings on the run that prompted the scope fix.
+    PRODUCTION: {
+        "excludes": ("tests", "test"),
+        "indicators": ("L1.15", "L1.18", "L1.19", "path_cover", "absolute_paths", "gate:type-escapes"),
+    },
+    # The same, and conformance/ as well. A conformance directory holds law and spec
+    # scaffolding and test doubles (fault-injection markers, failing connections), so it
+    # is production neither for the state meters nor for the god-file count: nobody
+    # hand-piles logic into an append-only conformance table.
+    PRODUCTION_WITHOUT_CONFORMANCE: {
+        "excludes": ("tests", "test", "conformance"),
+        "indicators": ("L1.17", "L1.18b", "thread_surface"),
+    },
+    # Everything, tests included, because for these three the test tree IS the subject:
+    # L1.8 is the ratio of test lines to production lines, L1.16 asks whether the
+    # repository's whitespace is disciplined anywhere, and schedule-silence asks which
+    # files carry a model-checker harness.
+    WHOLE_REPO: {
+        "excludes": (),
+        "indicators": ("L1.8", "L1.16", "schedule_silence"),
+    },
+}
+
+
+def excluded_dirs(scope: str) -> tuple[str, ...]:
+    """The directory names `scope` removes from a measurement.
+
+    KeyError on a name that is not in SCOPES, which is the point of routing every reader
+    through here: an indicator cannot quietly measure under a scope that nobody wrote
+    down and no test knows to check."""
+    return SCOPES[scope]["excludes"]
+
+
 # A directory NAMED like a test directory is believed only if its contents corroborate
 # the claim. Without this, renaming a production package to `Core.Tests` removes it from
-# L1.15, L1.17, L1.18, L1.18b, L1.19, path-cover, thread-surface and the absolute-path
-# check, and flips `--gate` from fail to pass, with zero bytes of code changed. The
+# every indicator declared under PRODUCTION and PRODUCTION_WITHOUT_CONFORMANCE above,
+# and flips `--gate` from fail to pass, with zero bytes of code changed. The
 # instrument's primary consumer is an AI, which optimises exactly what it is told to
 # optimise, so a scope rule that reads a free-to-forge name is an instruction to rename.
 #
@@ -212,17 +282,22 @@ def _is_generated(path: Path) -> bool:
 
 def _repo_has_packages(repo: Path) -> bool:
     """True if the repo is organised into importable packages (any __init__.py).
-    Used to tell a loose dev/entry-point script from a flat script-only repo."""
+    Used to tell a loose dev/entry-point script from a flat script-only repo.
+
+    Vendored directories are skipped and nothing else is: this is a question about the
+    repository's layout, not a measurement, so it takes no scope. Scoping out a test tree
+    here would answer "is this repo packaged" with "is its production code packaged",
+    which is a different question and would misclassify a packaged test-only repo."""
     return any(not _in_ignored_dir(f, ()) for f in _rglob_files(repo, "__init__.py"))
 
 
-def _bucket_reason(path: Path, repo: Path, has_packages: bool, extra: tuple[str, ...]) -> str | None:
+def _bucket_reason(path: Path, repo: Path, has_packages: bool, scope: str) -> str | None:
     """Why this source file is scoped out of the audit, or None to keep it. General
     and structural: it references no specific project. Disclosed, never silent."""
     parts = set(path.parts)
     if parts & _IGNORE_DIRS:
         return "vendored"
-    reason = _extra_reason(parts, extra, path)
+    reason = _extra_reason(parts, excluded_dirs(scope), path)
     if reason is not None:
         return reason
     if "docs" in parts:
@@ -238,15 +313,17 @@ def _bucket_reason(path: Path, repo: Path, has_packages: bool, extra: tuple[str,
     return None
 
 
-def _read_source_bytes(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> tuple[list[tuple[Path, bytes]], int]:
-    """Read every source file with one of `extensions` as bytes, excluding scoped-out
-    files (see _bucket_reason). Returns the files read and the number unreadable."""
+def _read_source_bytes(repo: Path, extensions: tuple[str, ...], scope: str) -> tuple[list[tuple[Path, bytes]], int]:
+    """Read every source file with one of `extensions` as bytes, excluding files scoped
+    out under `scope` (see _bucket_reason). Returns the files read and the number
+    unreadable. `scope` is a name from SCOPES, never a tuple: the caller declares which
+    measurement it belongs to and the table records that it does."""
     files: list[tuple[Path, bytes]] = []
     skipped = 0
     has_packages = _repo_has_packages(repo)
     for ext in extensions:
         for f in _rglob_files(repo, f"*{ext}"):
-            if _bucket_reason(f, repo, has_packages, extra_ignore) is not None:
+            if _bucket_reason(f, repo, has_packages, scope) is not None:
                 continue
             try:
                 files.append((f, f.read_bytes()))
@@ -269,7 +346,7 @@ class BucketedPaths(TypedDict):
     paths: list[BucketedPath]
 
 
-def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[str, ...]) -> BucketedPaths:
+def bucketed_paths(repo: Path, extensions: tuple[str, ...], scope: str) -> BucketedPaths:
     """The source files scoped out of the audit, with the reason for each, so a
     reader sees exactly what was not looked at and can challenge it (the cone of
     light on the meter's own choice of scope). `counts` covers every reason; `paths`
@@ -281,7 +358,7 @@ def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[
     paths: list[BucketedPath] = []
     for ext in extensions:
         for f in _rglob_files(repo, f"*{ext}"):
-            reason = _bucket_reason(f, repo, has_packages, extra_ignore)
+            reason = _bucket_reason(f, repo, has_packages, scope)
             if reason is None:
                 continue
             counts[reason] = counts.get(reason, 0) + 1
@@ -290,15 +367,16 @@ def bucketed_paths(repo: Path, extensions: tuple[str, ...], extra_ignore: tuple[
                 paths.append({"path": rel, "reason": reason})
     return {"counts": counts, "paths": sorted(paths, key=lambda d: d["path"])}
 
-def _read_text_files(repo: Path, extensions: frozenset[str], extra_ignore: tuple[str, ...]) -> tuple[list[tuple[Path, str]], int]:
-    """Read every file whose suffix is in `extensions` as text. Returns the files
-    read and the number that could not be read."""
+def _read_text_files(repo: Path, extensions: frozenset[str], scope: str) -> tuple[list[tuple[Path, str]], int]:
+    """Read every file whose suffix is in `extensions` as text, under the named `scope`.
+    Returns the files read and the number that could not be read."""
     files: list[tuple[Path, str]] = []
     skipped = 0
+    excluded = excluded_dirs(scope)
     for f in _rglob_files(repo, "*"):
         if f.suffix.lower() not in extensions:
             continue
-        if _in_ignored_dir(f, extra_ignore):
+        if _in_ignored_dir(f, excluded):
             continue
         try:
             files.append((f, f.read_text(errors="ignore")))

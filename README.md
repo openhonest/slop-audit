@@ -52,9 +52,9 @@ The canonical instrument. It computes every indicator the portable binary does, 
 ```bash
 cd tools/l1_analyzer
 uv sync --extra dev
-uv run l1-analyzer /path/to/repo              # report card
-uv run l1-analyzer /path/to/repo --no-exec    # skip running the target's test suite
-uv run l1-analyzer /path/to/repo --format json
+uv run slop-audit-l1 /path/to/repo              # report card
+uv run slop-audit-l1 /path/to/repo --no-exec    # skip running the target's test suite
+uv run slop-audit-l1 /path/to/repo --format json
 ```
 
 L1.19 and L1.20 run the target repo's own test suite under the target's own runtime, which the tool detects from the repo (`.venv`, rustup, `go.mod`, `global.json`, nvm, rbenv). Pass `--no-exec` to skip that half. Nothing else in Layer 1 executes the code under audit.

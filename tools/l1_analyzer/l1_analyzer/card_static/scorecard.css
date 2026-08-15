@@ -172,7 +172,7 @@ body {
 }
 .grade__pct { font-family: var(--mono); font-size: 0.66rem; color: var(--text-muted); white-space: nowrap; }
 .grade--can .grade__letter { background: var(--healthy); }
-.grade--might .grade__letter { background: var(--nothealthy); }
+.grade--coarse .grade__letter { background: var(--nothealthy); }
 .grade--cannot .grade__letter { background: var(--slop); }
 .grade__rubric { font-size: 0.85rem; color: var(--text-dim); margin: 0 0 0.9rem; }
 
@@ -216,7 +216,7 @@ body {
 
 /* --- Hero: green / yellow / red exhaustive-testability verdict --------------- */
 .card--can { border-top-color: var(--healthy); }
-.card--might { border-top-color: var(--nothealthy); }
+.card--coarse { border-top-color: var(--nothealthy); }
 .card--cannot { border-top-color: var(--slop); }
 .card--na { border-top-color: var(--border); }
 
@@ -228,12 +228,12 @@ body {
   margin-bottom: 1.25rem;
 }
 .verdict--can { background: color-mix(in srgb, var(--healthy) 8%, transparent); border-color: color-mix(in srgb, var(--healthy) 30%, transparent); }
-.verdict--might { background: color-mix(in srgb, var(--nothealthy) 10%, transparent); border-color: color-mix(in srgb, var(--nothealthy) 32%, transparent); }
+.verdict--coarse { background: color-mix(in srgb, var(--nothealthy) 10%, transparent); border-color: color-mix(in srgb, var(--nothealthy) 32%, transparent); }
 .verdict--cannot { background: var(--slop-dim); border-color: color-mix(in srgb, var(--slop) 28%, transparent); }
 
 .verdict__headline { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; margin: 0 0 0.8rem; }
 .verdict--can .verdict__headline { color: var(--healthy); }
-.verdict--might .verdict__headline { color: var(--nothealthy); }
+.verdict--coarse .verdict__headline { color: var(--nothealthy); }
 .verdict--cannot .verdict__headline { color: var(--slop); }
 
 .verdict__paths {
@@ -252,7 +252,7 @@ body {
 .verdict__score { margin: 1rem 0 0; font-size: 1.05rem; color: var(--text); }
 .verdict__score strong { font-family: var(--mono); font-size: 1.35rem; font-weight: 700; }
 .verdict--can .verdict__score strong { color: var(--healthy); }
-.verdict--might .verdict__score strong { color: var(--nothealthy); }
+.verdict--coarse .verdict__score strong { color: var(--nothealthy); }
 .verdict--cannot .verdict__score strong { color: var(--slop); }
 
 .verdict__dist {
@@ -265,7 +265,7 @@ body {
 .dist::before { content: ""; display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; margin-right: 0.35rem; }
 .dist--can::before { background: var(--healthy); }
 .dist--cannot::before { background: var(--slop); }
-.dist--might::before { background: var(--nothealthy); }
+.dist--silent::before { background: var(--nothealthy); }
 .dist--res { margin-left: auto; color: var(--text-muted); }
 
 .scoped { color: var(--text-muted); font-size: 0.8rem; line-height: 1.5; margin: 0 0 1.25rem; }

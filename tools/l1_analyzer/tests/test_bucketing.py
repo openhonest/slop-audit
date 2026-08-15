@@ -9,7 +9,7 @@ the code. Pure assertions, no mocks.
 """
 
 
-from l1_analyzer import indicators, state_bounds
+from l1_analyzer import indicators, scope, state_bounds
 from l1_analyzer.indicators import _bucket_reason, _repo_has_packages
 
 
@@ -63,47 +63,45 @@ def test_dotted_csharp_test_project_is_scoped_out(tmp_path):
     """C# convention is a project directory named `<Project>.Tests`, which an exact
     component match never catches. A component is a test directory when, lowercased, it
     equals "tests"/"test" or ends ".tests"/".test" AND its contents corroborate the claim."""
-    extra = ("tests", "test")
     (tmp_path / "Src/Newtonsoft.Json.Tests/Schema").mkdir(parents=True)
     (tmp_path / "Src/Newtonsoft.Json.Tests/Schema/T.cs").write_text("using Xunit;\n[Fact] void A(){}\n")
     (tmp_path / "Src/Newtonsoft.Json").mkdir(parents=True)
     (tmp_path / "Src/Newtonsoft.Json/Serializer.cs").write_text("class Serializer {}\n")
 
-    assert _bucket_reason(tmp_path / "Src/Newtonsoft.Json.Tests/Schema/T.cs", tmp_path, False, extra) == "tests"
+    assert _bucket_reason(tmp_path / "Src/Newtonsoft.Json.Tests/Schema/T.cs", tmp_path, False, scope.PRODUCTION) == "tests"
     # Production code keeps its scope: the marker must be the whole component after the dot.
-    assert _bucket_reason(tmp_path / "Src/Newtonsoft.Json/Serializer.cs", tmp_path, False, extra) is None
+    assert _bucket_reason(tmp_path / "Src/Newtonsoft.Json/Serializer.cs", tmp_path, False, scope.PRODUCTION) is None
 
 
 def test_a_renamed_production_directory_is_still_measured(tmp_path):
     """The aperture-capture vector, closed. Renaming a production package to `Core.Tests`
-    used to remove it from L1.15, L1.17, L1.18, L1.18b, L1.19, path-cover, thread-surface
-    and the absolute-path check, and flipped `--gate` from fail to pass, with zero bytes
-    of code changed. A directory named like a test directory is now believed only if its
-    contents corroborate the claim, so a bare rename buys nothing."""
-    extra = ("tests", "test")
+    used to remove it from every indicator declared under a test-excluding scope (the list
+    is scope.SCOPES, and tests/test_scope_policy.py measures it), and flipped `--gate` from
+    fail to pass, with zero bytes of code changed. A directory named like a test directory
+    is now believed only if its contents corroborate the claim, so a bare rename buys
+    nothing."""
     (tmp_path / "Core.Tests").mkdir()
     (tmp_path / "Core.Tests/app.py").write_text("from typing import Any\nCACHE = {}\ndef f(x: Any): return x\n")
 
-    assert _bucket_reason(tmp_path / "Core.Tests/app.py", tmp_path, False, extra) is None
+    assert _bucket_reason(tmp_path / "Core.Tests/app.py", tmp_path, False, scope.PRODUCTION) is None
 
 
 def test_corroboration_cannot_be_satisfied_by_the_directory_name_itself(tmp_path):
     """The first attempt at this fix corroborated with _is_test_file, which believes a
     path component, so every file under Core.Tests corroborated Core.Tests and the hole
     stayed open. Corroboration reads file NAMES and file CONTENT only."""
-    extra = ("tests", "test")
     (tmp_path / "Core.Tests").mkdir()
     (tmp_path / "Core.Tests/plain.py").write_text("x = 1\n")
-    assert _bucket_reason(tmp_path / "Core.Tests/plain.py", tmp_path, False, extra) is None
+    assert _bucket_reason(tmp_path / "Core.Tests/plain.py", tmp_path, False, scope.PRODUCTION) is None
 
     # A test-framework import corroborates it; so would a test-shaped file name.
     (tmp_path / "Real.Tests").mkdir()
     (tmp_path / "Real.Tests/suite.py").write_text("import pytest\ndef check(): pass\n")
-    assert _bucket_reason(tmp_path / "Real.Tests/suite.py", tmp_path, False, extra) == "tests"
+    assert _bucket_reason(tmp_path / "Real.Tests/suite.py", tmp_path, False, scope.PRODUCTION) == "tests"
 
     (tmp_path / "Named.Tests").mkdir()
     (tmp_path / "Named.Tests/test_thing.py").write_text("def test_thing(): pass\n")
-    assert _bucket_reason(tmp_path / "Named.Tests/test_thing.py", tmp_path, False, extra) == "tests"
+    assert _bucket_reason(tmp_path / "Named.Tests/test_thing.py", tmp_path, False, scope.PRODUCTION) == "tests"
 
 
 # --- nested checkouts are a different repository ----------------------------

@@ -65,7 +65,18 @@ def _fixture(tmp_path):
     return tmp_path
 
 
-def test_frozen_mode_matches_registered_golden_byte_for_byte(tmp_path):
+# L1.12 (vulture), L1.13 (jscpd) and L1.14 (gitleaks / detect-secrets) are the only
+# indicators in compute_source_indicators that branch on shutil.which. They are the
+# whole ambient-state surface of this golden.
+OPTIONAL_TOOL_INDICATORS = ("L1.12", "L1.13", "L1.14")
+
+
+def test_frozen_mode_matches_registered_golden_byte_for_byte(tmp_path, monkeypatch):
+    # Empty PATH makes every shutil.which gate return None, so the run records the
+    # same thing on a bare CI runner and on a workstation with the optional tools
+    # installed. Without this the golden silently absorbs the capture machine's
+    # tool set and the assertion becomes a test of who ran it.
+    monkeypatch.setenv("PATH", "")
     repo = _fixture(tmp_path)
     result = indicators.compute_source_indicators(
         repo, lang="auto", exec_tests=False, timeout_seconds=5, classify_state_bounds=False
@@ -73,6 +84,22 @@ def test_frozen_mode_matches_registered_golden_byte_for_byte(tmp_path):
     assert "L1.18b" not in result  # off-mode adds nothing
     golden = json.loads(GOLDEN.read_text())
     assert json.dumps(result, sort_keys=True) == json.dumps(golden, sort_keys=True)
+
+
+def test_golden_records_no_optional_tool_as_installed():
+    """The golden must be a no-optional-tools capture, and stay one.
+
+    The frozen golden was once captured on a machine that had gitleaks, so L1.14 read
+    Healthy/0 there and n/a everywhere else. Byte-for-byte equality then held only on
+    that one machine. This assertion is environment-independent: it reads the committed
+    file, so re-capturing on a tooled machine fails here rather than six CI runs later.
+    """
+    golden = json.loads(GOLDEN.read_text())
+    installed = {k: golden[k] for k in OPTIONAL_TOOL_INDICATORS if golden[k]["band"] != "n/a"}
+    assert not installed, (
+        f"golden encodes an optional tool as installed: {installed}. "
+        "Re-capture with vulture, jscpd, gitleaks and detect-secrets off PATH."
+    )
 
 
 def test_on_mode_is_additive_l18_identical_plus_l18b(tmp_path):
@@ -99,19 +126,28 @@ def test_grade_summary_is_the_single_source_of_the_published_grade():
     }
     healthy = {k: {"band": "Healthy"} for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")}
     # every audit check Healthy -> hygiene 1.0 -> grade A (verdict CAN)
-    assert report.grade_summary({**base, **healthy})["hygiene"] == 1.0
-    assert report.grade_summary({**base, **healthy})["grade"] == "A"
+    assert report.grade_summary({**base, **healthy}, report.UNORDERED_CLASS_BOUND)["hygiene"] == 1.0
+    assert report.grade_summary({**base, **healthy}, report.UNORDERED_CLASS_BOUND)["grade"] == "A"
     # L1.15 (weight 3 of 11) at Slop -> 8/11 hygiene (>= 0.60) -> B
-    assert report.grade_summary({**base, **healthy, "L1.15": {"band": "Slop"}})["grade"] == "B"
+    assert report.grade_summary({**base, **healthy, "L1.15": {"band": "Slop"}}, report.UNORDERED_CLASS_BOUND)["grade"] == "B"
     # L1.15 + L1.17 both Slop -> 5/11 hygiene (< 0.60) -> C
-    assert report.grade_summary({**base, **healthy, "L1.15": {"band": "Slop"}, "L1.17": {"band": "Slop"}})["grade"] == "C"
+    assert report.grade_summary({**base, **healthy, "L1.15": {"band": "Slop"}, "L1.17": {"band": "Slop"}}, report.UNORDERED_CLASS_BOUND)["grade"] == "C"
     # the verdict gates the tier regardless of hygiene
     cannot = {**base, "L1.18b": {"counts": {"neutral": 5, "promiscuous": 2, "unresolved": 0}, "resolvable_fraction": 0.7, "findings": []}}
-    assert report.grade_summary(cannot)["grade"] == "F"
-    might = {**base, "L1.18b": {"counts": {"neutral": 5, "promiscuous": 0, "unresolved": 3}, "resolvable_fraction": 0.6, "findings": []}}
-    assert report.grade_summary(might)["grade"] == "D"
+    assert report.grade_summary(cannot, report.UNORDERED_CLASS_BOUND)["grade"] == "F"
+    # Undecided state is silence, not a finding. It used to produce status `might` and
+    # grade D, which reported a limit of the analyzer's reading as a defect in the audited
+    # code. Below the floor the grade is decided on observed state alone.
+    quiet = {**base, "L1.18b": {"counts": {"neutral": 5, "promiscuous": 0, "unresolved": 3}, "resolvable_fraction": 0.6, "findings": []}}
+    assert report.grade_summary({**quiet, **healthy}, report.UNORDERED_CLASS_BOUND)["status"] == "can"
+    assert report.grade_summary({**quiet, **healthy}, report.UNORDERED_CLASS_BOUND)["grade"] == "A"
+    # Above the floor no grade is issued at all, so showing the analyzer almost nothing
+    # buys silence rather than an A on a vacuously clean sample.
+    hidden = {**base, "L1.18b": {"counts": {"neutral": 2, "promiscuous": 0, "unresolved": 8}, "resolvable_fraction": 0.2, "findings": []}}
+    assert report.grade_summary({**hidden, **healthy}, report.UNORDERED_CLASS_BOUND)["status"] == "na"
+    assert report.grade_summary({**hidden, **healthy}, report.UNORDERED_CLASS_BOUND)["grade"] is None
     # an audit check with no band is excluded, not penalized
-    assert report.grade_summary({**base, "L1.17": {"band": "Healthy"}, "L1.15": {"band": "n/a"}})["hygiene"] == 1.0
+    assert report.grade_summary({**base, "L1.17": {"band": "Healthy"}, "L1.15": {"band": "n/a"}}, report.UNORDERED_CLASS_BOUND)["hygiene"] == 1.0
 
 
 # --- attribution: the finding must point at the binding, not the first text match ------

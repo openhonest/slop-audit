@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from l1_analyzer.report import grade_summary
+from l1_analyzer.report import UNORDERED_CLASS_BOUND, grade_summary
 
 _TEMPLATES = Path(__file__).parent / "card_templates"
 _CSS_PATH = Path(__file__).parent / "card_static" / "scorecard.css"
@@ -26,21 +26,23 @@ CARD_COPY: dict[str, str] = {
     "question": "Can this code ever be fully tested?",
     "label.practical": "test runs cover every path through the code, both sides of every yes-or-no. This is the whole list you would work through.",
     "headline.can": "This code definitely CAN be exhaustively tested.",
-    "headline.might": "This code MIGHT be able to be exhaustively tested.",
+    "headline.coarse": "This code can be exhaustively tested in principle, but not in practice.",
     "headline.cannot": "This code mathematically CANNOT be exhaustively tested.",
     "detail.can": "None of the data this code keeps can grow without limit, so a fixed number of tests can check every case. The Slop Audit worked out the fewest test runs that reach every path: {cover} runs cover them all.",
     "detail.can_nocover": "None of the data this code keeps can grow without limit, so a fixed number of tests can check every case. Run the [CLI](https://github.com/openhonest/slop-audit) to get the exact number of runs that cover every path.",
-    "detail.might": "Nothing here is clearly endless, but we could not be sure. Some data gets handed to code we cannot follow: it is chosen while the program runs, or looked up by name, so we cannot list the values it might take. Fix the items below and you get a clear yes or no.",
+    "detail.coarse": "Every piece of data here has a limited set of cases, so a fixed number of tests would cover it. The trouble is how many, and that they have no order. When cases are ordered, such as numbers against a limit, you test each side of the limit and you are done, however wide the range. The cases below are names, and one name is not next to another, so there is no shortcut: covering them means one test each. Cut the number of distinct cases, or give them an order, and the count comes down.",
     "detail.cannot": "{n} {plural} of data here can be almost anything, and the code makes decisions based on it. Because it can be anything, there is always one more case to check, so no fixed number of tests can ever cover them all. Writing more tests will not fix this. The only fix is to limit what that data can be, or stop letting other parts of the code change it.",
     "detail.na": "Point it at a public repository with code in a language the analyzer reads: Python, TypeScript, JavaScript, Java, C#, Rust, Ruby, Go, or C.",
-    "culprits.heading.might": "What you would have to fix",
+    "detail.na_silent": "No grade. We could not work out what {silent} of the {total} pieces of data here are used for, and that is more than half of them. Most often the data is handed to a library we cannot see inside. We will not hand out a good grade on the part we happened to be able to read, because that would reward code that shows us the least. The list below is every place we stopped, so you can see exactly what we could not follow.",
+    "culprits.heading.coarse": "What costs too many tests",
     "culprits.heading.cannot": "What makes it impossible",
-    "culprits.note.might": "For each of these, the data is passed to something we cannot follow (a call chosen while the program runs, or a lookup by name). Make that part concrete, or limit the data to a fixed set of values, and each one turns into a clear yes or no.",
+    "culprits.note.coarse": "Each of these has a countable set of cases with nothing ordering them, and more of them than one test suite reasonably covers. The count shown is for that piece of data on its own: two pieces that decide the same branch multiply, so the real total is larger than any number here.",
     "culprits.note.cannot": "Each of these is data that can be almost anything, used to make a decision. Limit it to a fixed set of values, or stop letting other code change it, and it becomes testable.",
     "share.can": "{slug} passes the Slop Audit: none of its data can grow without limit, so a fixed number of tests can cover every case. slopaudit.org",
-    "share.might": "{slug} might be fully testable. Nothing in it is clearly endless, but some data gets handed to code we cannot follow. slopaudit.org",
+    "share.coarse": "{slug} can be fully tested in principle, but some of its data has too many unordered cases to cover in practice. slopaudit.org",
     "share.cannot": "{slug}: fully testing it would take an endless number of tests. Some of its data can be almost anything, and the code makes decisions on it, so no fixed set of tests can cover every case. slopaudit.org",
     "share.na": "I ran {slug} through the Slop Audit. slopaudit.org",
+    "silence.heading": "What we could not follow",
     "group.core.title": "Can this code be verified?",
     "group.core.note": "The numbers behind the answer above. They carry no compliance tag on purpose: they set the ceiling on what every check below can ever prove.",
     "group.audit.title": "How it maps to your audit",
@@ -49,7 +51,8 @@ CARD_COPY: dict[str, str] = {
     "footer.fine": "A full Slop Audit scores all 18 enterprise compliance dimensions and produces SOC 2 evidence as a byproduct. This page runs the static Layer 1 indicators only. It never executes the repo's code.",
     "footer.cli": "Run under the Slop Audit CLI: the repository's test suite was executed, so decision-space coverage (L1.19) and test determinism (L1.20) below are measured, not estimated. try.slopaudit.org runs the static Layer 1 indicators only and never executes your code.",
     "footer.cli_na": "Run under the Slop Audit CLI, which executes the repository's test suite to measure decision-space coverage (L1.19) and test determinism (L1.20). Those rows read n/a here: the runtime harness is Python-only so far, so it did not run this repo's suite. try.slopaudit.org never executes any repo's code; this is the difference between 'we did not run it' and 'we could not run it here yet.'",
-    "grade.rubric": "The grade is verifiability first, by a rule we publish rather than hide. The verdict sets the tier: <strong>CANNOT &rarr; F</strong> (some state is provably unbounded, so no finite test suite covers it), <strong>MIGHT &rarr; D</strong> (some state is undetermined). When every piece of state is finitely testable, the audit checks below decide <strong>A, B, or C</strong> by weighted health &mdash; god-files and type-escapes weigh most (3 each), then CI (2), then containers, pre-commit, and formatting (1 each). The number is the share of state that is finitely testable. No hidden weights.",
+    "grade.rubric": "The grade is verifiability first, by a rule we publish rather than hide. The verdict sets the tier: <strong>CANNOT &rarr; F</strong> (some state is provably unbounded, so no finite test suite covers it), <strong>COARSE &rarr; D</strong> (some state has a countable but unordered set of cases too wide to cover; a wide ORDERED range costs a handful of boundary tests, a wide unordered one costs one test per case). When every piece of state is finitely testable and coverable, the audit checks below decide <strong>A, B, or C</strong> by weighted health &mdash; god-files and type-escapes weigh most (3 each), then CI (2), then containers, pre-commit, and formatting (1 each). The number is the share of DECIDED state that is finitely testable. No hidden weights.",
+    "silence.note": "Anything the analyzer could not decide is reported separately, as silence, and never folded into the grade: state we did not read is not evidence about this code. Above half of it undecided, no grade is issued at all, so hiding state from the analyzer buys no letter.",
     "label.L1.19": "Decisions that could be exhaustively checked",
     "tech.L1.19": "L1.19 · decision-space coverage",
     "meaning.L1.19": "How many decisions in the code (branches, lookups, and the like) could be listed and checked one by one. The share your tests actually reach is the real number, and getting it means running your test suite; the value here is n/a until that run measures it.",
@@ -88,7 +91,7 @@ CARD_COPY: dict[str, str] = {
 }
 
 _BAND_WORD = {"Healthy": "Clean", "Not Healthy": "Caution", "Slop": "Slop", "n/a": "No data"}
-_WANT = {"cannot": "promiscuous", "might": "unresolved"}
+_WANT = {"cannot": "promiscuous", "coarse": "coarse"}
 _CULPRIT_CAP = 25
 _ZERO = {"neutral": 0, "promiscuous": 0, "unresolved": 0}
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
@@ -136,14 +139,21 @@ def _metrics(specs: tuple, results: dict, group: str) -> list[dict]:
     return [_metric(s, results[s["key"]], group) for s in specs if s["key"] in results]
 
 
-def _culprits(l18b: dict, status: str) -> tuple[list[dict], int]:
-    want = _WANT.get(status)
-    if want is None:
+def _culprits(l18b: dict, status: str, coarse: list[dict]) -> tuple[list[dict], int]:
+    """What limits the grade. CANNOT is limited by proven unbounded state, COARSE by finite
+    state with too many unordered cases. The two lists are selected by different rules - one
+    reads the verdict, the other reads the cardinality against a bound - so they cannot
+    share a single verdict filter without one of them silently coming back empty."""
+    if status == "coarse":
+        flagged = coarse
+    elif status == "cannot":
+        flagged = [f for f in (l18b.get("findings") or []) if f.get("verdict") == "promiscuous"]
+        flagged.sort(key=lambda f: (not f.get("drives_decision", False), f.get("file", ""), f.get("line", 0)))
+    else:
         return [], 0
-    flagged = [f for f in (l18b.get("findings") or []) if f.get("verdict") == want]
-    flagged.sort(key=lambda f: (not f.get("drives_decision", False), f.get("file", ""), f.get("line", 0)))
     shown = [{"file": f.get("file", ""), "line": f.get("line", 0), "state": f.get("state", "?"),
-              "verdict": f.get("verdict", ""), "drives_decision": bool(f.get("drives_decision", False))}
+              "verdict": f.get("verdict", ""), "drives_decision": bool(f.get("drives_decision", False)),
+              "classes": (f.get("partition") or {}).get("classes", 0)}
              for f in flagged[:_CULPRIT_CAP]]
     return shown, max(0, len(flagged) - _CULPRIT_CAP)
 
@@ -178,14 +188,19 @@ def _thread_surface(lang: str, results: dict) -> dict | None:
             "blurb": blurb, "sites": sites, "sites_more": max(0, len(findings) - _THREAD_CAP)}
 
 
-def _detail(status: str, promiscuous: int, cover: int | None) -> str:
+def _detail(status: str, promiscuous: int, cover: int | None, counts: dict) -> str:
+    # Two different things produce `na`, and telling the reader the wrong one wastes their
+    # time: "there is no code here I can read" sends them to check the language, while
+    # "I could not follow most of your state" sends them to the sites. The count of state
+    # tells them apart - a language we cannot read yields none at all.
     if status == "na":
-        return _t("detail.na")
+        return _t("detail.na_silent", silent=counts.get("unresolved", 0),
+                  total=sum(counts.values())) if sum(counts.values()) else _t("detail.na")
     if status == "cannot":
         return _t("detail.cannot", n=promiscuous, plural="piece" if promiscuous == 1 else "pieces")
     if status == "can":
         return _t("detail.can", cover=f"{cover:,}") if cover else _t("detail.can_nocover")
-    return _t("detail.might")
+    return _t("detail.coarse")
 
 
 def _int(v: object) -> int | None:
@@ -238,11 +253,12 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
     band = str(l18.get("band", "n/a"))
     l18b = results.get("L1.18b") if isinstance(results.get("L1.18b"), dict) else {}
     counts = l18b.get("counts") or _ZERO
-    g = grade_summary(results)
+    # The site and CLI are the boundary, so the configured bound is resolved here.
+    g = grade_summary(results, UNORDERED_CLASS_BOUND)
     status, pct, grade = g["status"], g["testable_pct"], g["grade"]
     pc = results.get("path_cover", {})
     cover = _int(pc.get("value"))
-    culprits, culprits_more = _culprits(l18b, status)
+    culprits, culprits_more = _culprits(l18b, status, g["coarse"])
     promiscuous = counts.get("promiscuous", 0)
     core_specs = _CORE_RAN if ran_tests else _CORE_STATIC
     # tests_measured tells the two runtime-CLI cases apart honestly: the suite actually ran
@@ -255,7 +271,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "slug": slug, "lang": lang, "question": _t("question"), "status": status, "grade": grade,
         "grade_pct": pct, "ran_tests": ran_tests, "tests_measured": tests_measured,
         "headline": "" if status == "na" else _t(f"headline.{status}"),
-        "detail": _detail(status, promiscuous, cover),
+        "detail": _detail(status, promiscuous, cover, counts),
         "paths": cover if status == "can" else None,
         "band": band, "band_word": _BAND_WORD.get(band, "No data"),
         "testable": None if pct is None else f"{pct}%",
@@ -264,6 +280,8 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "culprits_heading": _t(f"culprits.heading.{status}") if status in _WANT else "",
         "culprits_note": _t(f"culprits.note.{status}") if status in _WANT else "",
         "culprits": culprits, "culprits_more": culprits_more,
+        "silence": l18b.get("silence") if isinstance(l18b.get("silence"), dict) else None,
+        "silence_note": _t("silence.note"),
         "scoped_out": _scoped_out(l18b),
         "core": _metrics(core_specs, results, "core"),
         "audit": _metrics(_AUDIT, results, "audit"),
@@ -294,27 +312,42 @@ def card_html(card: dict) -> str:
     )
 
 
+def _silence_lines(card: dict) -> list[str]:
+    """Every site the analyzer stopped at. On the `na` card this is the whole content: the
+    repository was refused a grade because of silence, so the sites ARE the report."""
+    sil = card.get("silence")
+    if not isinstance(sil, dict) or not sil.get("sites"):
+        return []
+    return ["", f"## {_t('silence.heading')}", ""] + [
+        f"- `{s['file']}:{s['line']}` — `{s['state']}`" for s in sil["sites"]]
+
+
 def card_markdown(card: dict) -> str:
     """The same card as Markdown, for the CLI and agent-facing output."""
     strip = re.compile(r"<[^>]+>")
     lines = [f"# Slop Audit — {card['slug']} ({card['lang']})", ""]
     if card["status"] == "na":
-        return "\n".join(lines + [strip.sub("", card["detail"])])
+        return "\n".join(lines + [strip.sub("", card["detail"])] + _silence_lines(card))
     if card["grade"] is not None:
         lines += [f"**Grade: {card['grade']}** — {card['grade_pct']}% of its state is finitely testable", ""]
     lines += [card["headline"], "", strip.sub("", card["detail"]), "",
               f"- Finitely testable: {card['neutral_count']}",
               f"- Provably unbounded: {card['promiscuous_count']}",
-              f"- Undetermined: {card['unresolved_count']}"]
+              f"- Undecided by the analyzer (silence): {card['unresolved_count']}"]
     if card["status"] == "can" and card["paths"]:
         lines.append(f"- {_t('label.practical').split('.')[0]}: {card['paths']:,}")
     if card["culprits"]:
         lines += ["", f"## {card['culprits_heading']}", ""]
         for c in card["culprits"]:
             drives = ", drives a decision" if c["drives_decision"] else ""
-            lines.append(f"- `{c['file']}:{c['line']}` — `{c['state']}` ({c['verdict']}{drives})")
+            cases = f", {c['classes']} unordered cases" if card["status"] == "coarse" else ""
+            lines.append(f"- `{c['file']}:{c['line']}` — `{c['state']}` ({c['verdict']}{cases}{drives})")
         if card["culprits_more"]:
             lines.append(f"- …and {card['culprits_more']} more")
+        if card["status"] == "coarse":
+            lines += ["", "> " + strip.sub("", _t("culprits.note.coarse"))]
+    lines += _silence_lines(card)
+    lines += ["", "> " + strip.sub("", _t("silence.note"))]
     for group, title in (("core", "group.core.title"), ("audit", "group.audit.title")):
         rows = card[group]
         if not rows:

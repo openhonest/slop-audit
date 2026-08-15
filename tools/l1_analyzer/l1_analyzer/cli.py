@@ -2,8 +2,8 @@
 
 Run against any repo (language auto-detected or specified).
 Example:
-  uv run --project . l1-analyzer /path/to/repo --since 2025-01-01
-  uv run --project . l1-analyzer /path/to/repo --indicators 1,18 --lang python
+  uv run --project . slop-audit-l1 /path/to/repo --since 2025-01-01
+  uv run --project . slop-audit-l1 /path/to/repo --indicators 1,18 --lang python
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from l1_analyzer import card, indicators, schedule_silence, thread_surface
+from l1_analyzer.scope import PRODUCTION
 
 
 def _count_type_escapes(repo: Path, lang: str) -> int:
@@ -27,7 +28,7 @@ def _count_type_escapes(repo: Path, lang: str) -> int:
     if cfg is None or not cfg["type_escape_patterns"]:
         return 0
     parser = indicators._get_parser(lang)
-    files, _skipped = indicators._read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    files, _skipped = indicators._read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
     return sum(indicators._count_type_escapes_in_tree(parser.parse(src).root_node, cfg) for _path, src in files)
 
 
@@ -142,7 +143,11 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="l1-analyzer")
+    # The name the console script is installed under, so `--help` prints a command the
+    # reader can actually run. argparse defaults `prog` to sys.argv[0], which is right
+    # only by accident; naming it wrong sends a new adopter to a command that does not
+    # exist, at the moment they are most likely to trust the output.
+    parser = argparse.ArgumentParser(prog="slop-audit-l1")
     parser.add_argument("repo", type=Path, help="Path to git repository root")
     parser.add_argument("--since", default=None, help="Start date for git log (e.g. 2025-01-01)")
     parser.add_argument("--until", default=None, help="End date")

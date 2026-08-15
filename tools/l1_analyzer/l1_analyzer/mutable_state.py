@@ -24,6 +24,7 @@ from l1_analyzer.indicators import (
     _with_skipped,
     band,
 )
+from l1_analyzer.scope import PRODUCTION
 
 # ---------------------------------------------------------------------------
 # L1.18 Mutable state ratio (the key "any language" indicator, using tree-sitter)
@@ -256,7 +257,7 @@ def analyze_mutable_state(repo: Path, lang: str) -> L1Result:
         return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
     cfg = LANG_CFG[lang]
     parser = _get_parser(lang)
-    files, skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    files, skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
 
     total_funcs = 0
     mutable_funcs = 0
@@ -308,7 +309,7 @@ def mutable_function_names(repo: Path, lang: str) -> list[str]:
         return []
     cfg = LANG_CFG[lang]
     parser = _get_parser(lang)
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
     names: list[str] = []
     for _path, src in files:
         root = parser.parse(src).root_node
@@ -325,7 +326,7 @@ def module_mutable_names(repo: Path, lang: str) -> set[str]:
         return set()
     cfg = LANG_CFG[lang]
     parser = _get_parser(lang)
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
     out: set[str] = set()
     for _path, src in files:
         root = parser.parse(src).root_node

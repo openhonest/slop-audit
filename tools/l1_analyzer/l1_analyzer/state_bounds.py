@@ -42,7 +42,7 @@ from typing import TypedDict
 
 from tree_sitter import Node
 
-from l1_analyzer import state_bounds_filters
+from l1_analyzer import state_bounds_filters, state_partition
 from l1_analyzer.indicators import (
     LANG_CFG,
     LangCfg,
@@ -52,19 +52,22 @@ from l1_analyzer.indicators import (
     bucketed_paths,
 )
 from l1_analyzer.lang_spec import _PY_MUTATING, LANG_SPEC, LangSpec
-
-_IGNORE = ("tests", "test", "conformance")
+from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
+from l1_analyzer.state_partition import (
+    DYNAMIC_DISPATCH,
+    INJECTED_SLOT,
+    Partition,
+    Reach,
+)
+from l1_analyzer.ts_nodes import arg_value as _arg_value
+from l1_analyzer.ts_nodes import field as _field
+from l1_analyzer.ts_nodes import first_named as _first_named
+from l1_analyzer.ts_nodes import same as _same
+from l1_analyzer.ts_nodes import text as _text
 
 NEUTRAL = "neutral"
 PROMISCUOUS = "promiscuous"
 UNRESOLVED = "unresolved"
-
-# Per-reference categories (internal): how one use of a state value is consumed.
-_WRITE = "write"          # target of an assignment / mutating method: not a decision
-_OUTPUT = "output"        # returned or otherwise handed to the caller: compositional
-_FINITE = "finite"        # reaches a decision whose reaching partition is enumerable
-_UNBOUNDED = "unbounded"  # reaches a decision whose reaching partition is provably unbounded
-_UNDECIDABLE = "undecidable"  # reaches a context whose reaching-set cannot be decided
 
 # Builtins that read a bounded feature of their argument (the value flows onward).
 _BOUNDED_BUILTINS = frozenset({"len", "isinstance", "bool", "id", "type", "hash", "ord", "abs"})
@@ -75,37 +78,18 @@ _COMPARISON_OPS = frozenset({"<", ">", "<=", ">=", "==", "!=", "===", "!==", "<>
 
 
 class Finding(TypedDict):
-    """One piece of state and its verdict. Fixed keys, so a TypedDict, not a bag."""
+    """One piece of state and its verdict. Fixed keys, so a TypedDict, not a bag.
+
+    `silence` carries why the reaching-set could not be decided, and is the empty string
+    on every decided finding. It is on the finding rather than in a parallel list because
+    a silent site and its verdict are one fact, and two lists drift."""
     state: str
     verdict: str
     drives_decision: bool
     file: str
     line: int
-
-
-def _text(node: Node | None) -> str:
-    return node.text.decode("utf8", errors="ignore") if node is not None and node.text else ""
-
-
-def _field(node: Node | None, name: str | None) -> Node | None:
-    return node.child_by_field_name(name) if node is not None and name else None
-
-
-def _same(a: Node | None, b: Node | None) -> bool:
-    """Node identity by id. child_by_field_name returns a fresh wrapper each call,
-    so `is` is unreliable; compare the stable node id instead."""
-    return a is not None and b is not None and a.id == b.id
-
-
-def _first_named(node: Node | None) -> Node | None:
-    return next((c for c in node.children if c.is_named), None) if node is not None else None
-
-
-def _arg_value(node: Node | None) -> Node | None:
-    """Unwrap a C# `argument` wrapper to the expression it carries."""
-    if node is not None and node.type == "argument":
-        return _first_named(node)
-    return node
+    silence: str
+    partition: Partition
 
 
 def _sub_named(subscript: Node) -> list[Node]:
@@ -159,19 +143,20 @@ def _is_immutable_collection(rhs: Node | None) -> bool:
     return False
 
 
-def _collect_closed_sets(root: Node) -> set[str]:
-    names: set[str] = set()
+# name -> member count, with None for a collection that is provably fixed and not countable.
+def _collect_closed_sets(root: Node) -> dict[str, int | None]:
+    names: dict[str, int | None] = {}
 
     def walk(n: Node) -> None:
         if n.type == "assignment":
             left, rhs = _field(n, "left"), _field(n, "right")
             if left is not None and _is_immutable_collection(rhs):
                 if left.type == "identifier":
-                    names.add(_text(left))
+                    names[_text(left)] = state_partition.literal_size(rhs)
                 elif left.type == "attribute":
                     attr = _field(left, "attribute")
                     if attr is not None:
-                        names.add(_text(attr))
+                        names[_text(attr)] = state_partition.literal_size(rhs)
         for c in n.children:
             walk(c)
 
@@ -179,7 +164,7 @@ def _collect_closed_sets(root: Node) -> set[str]:
     return names
 
 
-def _is_closed_set(node: Node | None, closed_sets: set[str]) -> bool:
+def _is_closed_set(node: Node | None, closed_sets: dict[str, int | None]) -> bool:
     if node is None:
         return False
     if node.type in ("set", "tuple", "list"):
@@ -257,18 +242,26 @@ def _is_write_target(ref: Node, parent: Node, sp: LangSpec) -> bool:
     return parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref) and _is_lvalue(parent, sp)
 
 
-def _keyed_read(key_node: Node | None, sp: LangSpec) -> str:
-    return _UNBOUNDED if _is_unbounded_value(key_node, sp) else _FINITE
+def _keyed_read(key_node: Node | None, sp: LangSpec) -> Reach:
+    """`S[k]` read. An unbounded key ranges over an unbounded domain; a literal key cuts
+    one more class out of it, and whether that class has a neighbour is the whole
+    ordered/unordered distinction: `S[3]` sits between `S[2]` and `S[4]`, `S["beta"]` sits
+    between nothing. Distinct literals are distinct discriminators, so d of them leave
+    d+1 classes."""
+    if _is_unbounded_value(key_node, sp):
+        return state_partition.unbounded()
+    key = _unwrap_unary(key_node, sp)
+    return state_partition.finite(2, key is not None and key.type in state_partition.ORDERED_LITERALS, f"key:{_text(key)}")
 
 
-def _categorize(ref: Node, sp: LangSpec, closed_sets: set[str]) -> str:
+def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> Reach:
     """How this single reference to a state value is consumed."""
     parent = ref.parent
     if parent is None:
-        return _OUTPUT
+        return state_partition.output()
 
     if _is_write_target(ref, parent, sp):
-        return _WRITE
+        return state_partition.write()
 
     # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target
     # position is compositional exactly as return position is, and the meter neither
@@ -291,9 +284,9 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: set[str]) -> str:
         gp = parent.parent
         called = gp is not None and gp.type in sp["call_types"] and _same(_field(gp, sp["call_fn"]), parent)
         if called and attr in sp.get("dispatch_methods", frozenset()):
-            return _UNDECIDABLE                   # invoking a stored callable: unbounded target
+            return state_partition.undecided(DYNAMIC_DISPATCH)   # a stored callable: unbounded target
         if called and attr in sp["mutating"]:
-            return _WRITE
+            return state_partition.write()
         if called and attr in sp["keyed_read"]:
             return _keyed_read(_first_arg(gp, sp), sp)
         if called:
@@ -304,9 +297,9 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: set[str]) -> str:
     if sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_recv"]), ref):
         name = _text(_field(parent, sp["call_name"]))
         if name in sp.get("dispatch_methods", frozenset()):
-            return _UNDECIDABLE
+            return state_partition.undecided(DYNAMIC_DISPATCH)
         if name in sp["mutating"]:
-            return _WRITE
+            return state_partition.write()
         if name in sp["keyed_read"]:
             return _keyed_read(_first_arg(parent, sp), sp)
         return _flow(parent, sp, closed_sets)
@@ -317,19 +310,19 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: set[str]) -> str:
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
             return _flow(parent.parent, sp, closed_sets)
         if fname in _EFFECT_CALLS:
-            return _OUTPUT
-        return _UNDECIDABLE
+            return state_partition.output()
+        return state_partition.silence_kind(parent.parent, sp)
 
     return _flow(ref, sp, closed_sets)
 
 
-def _flow(node: Node | None, sp: LangSpec, closed_sets: set[str]) -> str:
+def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -> Reach:
     """Categorise how a value derived from the state (node) reaches a decision."""
     parent = node.parent
     if parent is None:
-        return _OUTPUT
+        return state_partition.output()
     if parent.type in sp["return_types"]:
-        return _OUTPUT
+        return state_partition.output()
     # The state value itself is invoked as a callable, possibly through a wrapper:
     # `(self.f)(x)` in Rust reaches the call via a parenthesized_expression. Same rule as
     # direct `S(x)` in _categorize: follow the call result, do not fail-close.
@@ -346,27 +339,37 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: set[str]) -> str:
         if mem is not None:
             left, right = mem
             if _same(node, right):          # x in S : node is the container
-                if _is_closed_set(node, closed_sets):
-                    return _FINITE
-                return _UNBOUNDED if _is_unbounded_value(left, sp) else _FINITE
-            return _FINITE if _is_closed_set(right, closed_sets) else _UNBOUNDED   # S in Y
+                # The container is asked whether it holds one value: two classes, and no
+                # boundary between "holds it" and "does not". A closed container answers the
+                # same way, so the size of the container is not what is being split here.
+                if _is_closed_set(node, closed_sets) or not _is_unbounded_value(left, sp):
+                    return state_partition.finite(2, False, f"holds:{_text(left)}")
+                return state_partition.unbounded()
+            if _is_closed_set(right, closed_sets):                                 # S in FIXED
+                return state_partition.membership_reach(right, closed_sets)
+            return state_partition.unbounded()
         if _is_comparison(parent, sp):
-            return _FINITE                  # S <cmp> other : two classes
+            # S <cmp> constant: the constant is a cut in an ordered domain, and n distinct
+            # cuts leave n+1 intervals that boundary values reach. Keyed on the comparison
+            # text so the same cut written twice is one cut, not two.
+            return state_partition.finite(2, True, f"cmp:{_text(parent)}")
         return _flow(parent, sp, closed_sets)   # arithmetic / logical: derived value flows on
+    # Truthiness is the SAME two-class split wherever it is written, so every site shares
+    # one key: `if S:` in fifty methods is two classes, not fifty-one.
     if parent.type in sp["branch_types"] and _same(_field(parent, sp["branch_cond"]), node):
-        return _FINITE                      # truthiness: two classes
+        return state_partition.finite(2, True, "truthy")
     if parent.type in sp["elif_types"] and _same(_field(parent, sp["branch_cond"]), node):
-        return _FINITE
+        return state_partition.finite(2, True, "truthy")
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
             return _flow(parent.parent, sp, closed_sets)
         if fname in _EFFECT_CALLS:
-            return _OUTPUT
-        return _UNDECIDABLE
+            return state_partition.output()
+        return state_partition.silence_kind(parent.parent, sp)
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), node):
         return _keyed_read(_sub_key(parent, sp), sp)
-    return _OUTPUT
+    return state_partition.output()
 
 
 def _is_call_target(ref: Node, sp: LangSpec) -> bool:
@@ -411,15 +414,22 @@ def _injected_slot_premise_fails(refs: list[Node], sp: LangSpec, instance: bool)
     return any(_written_through(r, sp) for r in refs)
 
 
-def _verdict(categories: list[str]) -> tuple[str, bool]:
-    """Combine per-reference categories into (verdict, drives_decision)."""
-    if _UNDECIDABLE in categories:
-        return UNRESOLVED, True
-    if _UNBOUNDED in categories:
-        return PROMISCUOUS, True
-    if _FINITE in categories:
-        return NEUTRAL, True
-    return NEUTRAL, False   # observe-only or output-only: empty reaching-set
+def _verdict(reaches: list[Reach]) -> tuple[str, bool, str, Partition]:
+    """Combine per-reference reaches into (verdict, drives_decision, silence, partition).
+
+    The silence reason reported is the FIRST undecided reference in source order, not the
+    worst of them by some ranking. Any ranking would be invented here, and the reader's next
+    move is to open the site, so the site that comes first is the one to send them to."""
+    kinds = [r["kind"] for r in reaches]
+    silent = [r["silence"] for r in reaches if r["kind"] == state_partition.UNDECIDED]
+    if silent:
+        return UNRESOLVED, True, silent[0], state_partition.UNKNOWN
+    if state_partition.UNBOUNDED in kinds:
+        return PROMISCUOUS, True, "", state_partition.UNKNOWN
+    if state_partition.FINITE in kinds:
+        return NEUTRAL, True, "", state_partition.roll_up(reaches)
+    # observe-only or output-only: empty reaching-set, so one class and nothing to cover
+    return NEUTRAL, False, "", state_partition.EMPTY
 
 
 # --------------------------------------------------------------------------
@@ -526,7 +536,7 @@ def _go_receiver(method: Node) -> tuple[str | None, str | None]:
     return _go_type_name(_field(pd, "type")), (_text(name) if name is not None else None)
 
 
-def _go_receiver_findings(root: Node, rel: str, sp: LangSpec, closed_sets: set[str], immutable_ctors: set[str]) -> list[Finding]:
+def _go_receiver_findings(root: Node, rel: str, sp: LangSpec, closed_sets: dict[str, int | None], immutable_ctors: set[str]) -> list[Finding]:
     """Go state, grouped by receiver TYPE across all its methods (spec section 4:
     analyse state across the whole type, not one method). A field is `<recv>.<field>`
     inside a method; the key is `<Type>.<field>` so it is stable across methods whose
@@ -783,22 +793,23 @@ def _binding_line(refs: list[Node], sp: LangSpec) -> int:
     return min((r.start_point[0] + 1 for r in refs), default=1)
 
 
-def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: set[str], immutable_ctors: set[str], instance: bool) -> Finding:
+def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: dict[str, int | None], immutable_ctors: set[str], instance: bool) -> Finding:
     const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp is LANG_SPEC["python"] else None
     if const is not None:
-        verdict, drives = const
+        # An immutable constant has a one-value domain, so its partition is one class.
+        verdict, drives, silence, partition = (*const, "", state_partition.EMPTY)
     else:
-        verdict, drives = _verdict([_categorize(r, sp, closed_sets) for r in refs])
+        verdict, drives, silence, partition = _verdict([_categorize(r, sp, closed_sets) for r in refs])
         # An invoked slot earns NEUTRAL from the compositional rule; that rule has premises.
         if verdict == NEUTRAL and _injected_slot_premise_fails(refs, sp, instance):
-            verdict, drives = UNRESOLVED, True
+            verdict, drives, silence, partition = UNRESOLVED, True, INJECTED_SLOT, state_partition.UNKNOWN
     # Attribute-level false-positive filter (Python): the per-reference verdict conflates
     # unbounded data with an unbounded decision. Clear a finding to NEUTRAL only when the
     # attribute is a provable write-once, memoization cache, or carried-value shape.
     if verdict != NEUTRAL and sp is LANG_SPEC["python"] and state_bounds_filters.is_false_positive(key, refs, verdict):
-        verdict, drives = NEUTRAL, False
+        verdict, drives, silence, partition = NEUTRAL, False, "", state_partition.EMPTY
     return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel,
-            "line": _binding_line(refs, sp)}
+            "line": _binding_line(refs, sp), "silence": silence, "partition": partition}
 
 
 def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ctors: set[str]) -> list[Finding]:
@@ -831,6 +842,8 @@ def _na(lang: str) -> dict[str, object]:
         "counts": {NEUTRAL: 0, PROMISCUOUS: 0, UNRESOLVED: 0},
         "coverage": {v: {"observe_only": 0, "drives_decision": 0} for v in (NEUTRAL, PROMISCUOUS, UNRESOLVED)},
         "resolvable_fraction": "n/a",
+        "silence": state_partition.silence_summary([], 0),
+        "partition": state_partition.partition_summary([]),
         "findings": [],
         "bucketed": {"counts": {}, "paths": []},
         "details": f"finite-testability classifier has no spec for {lang} yet",
@@ -849,8 +862,8 @@ def classify(repo: Path, lang: str) -> dict[str, object]:
     # markers, failing connections), not production state; skip it like tests. docs,
     # tooling, and loose entry-point scripts are scoped out by _read_source_bytes and
     # disclosed below (never a silent skip).
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=_IGNORE)
-    bucketed = bucketed_paths(repo, cfg["extensions"], _IGNORE)
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
+    bucketed = bucketed_paths(repo, cfg["extensions"], PRODUCTION_WITHOUT_CONFORMANCE)
 
     # First pass: parse every file and collect the repo's immutable constructors
     # (functions whose returns are all immutable), so a constant built by one can be
@@ -887,6 +900,8 @@ def classify(repo: Path, lang: str) -> dict[str, object]:
 
     _order = {PROMISCUOUS: 0, UNRESOLVED: 1, NEUTRAL: 2}
     findings.sort(key=lambda f: (_order[f["verdict"]], not f["drives_decision"], f["file"], f["line"]))
+    silence = state_partition.silence_summary(findings, total)
+    partition = state_partition.partition_summary(findings)
 
     return {
         "verdict": verdict,
@@ -895,11 +910,17 @@ def classify(repo: Path, lang: str) -> dict[str, object]:
         "counts": counts,
         "coverage": coverage,
         "resolvable_fraction": resolvable,
+        "silence": silence,
+        "partition": partition,
         "findings": findings,
         "bucketed": bucketed,
         "details": (
             f"finite-testability: {counts[NEUTRAL]} neutral, {counts[PROMISCUOUS]} promiscuous, "
             f"{counts[UNRESOLVED]} unresolved across {total} pieces of state; "
-            f"resolvable fraction {resolvable}"
+            f"resolvable fraction {resolvable}; silence {silence['fraction']}; "
+            f"{partition['uncounted']} of {partition['deciding_states']} deciding partitions uncounted. "
+            "Cardinality is per state and does not compose: two states that decide the same "
+            "branch multiply, and this version reports each separately rather than guessing "
+            "the product."
         ),
     }

@@ -10,9 +10,9 @@
     "value": "n/a"
   },
   "L1.14": {
-    "band": "Healthy",
-    "details": "gitleaks findings",
-    "value": 0
+    "band": "n/a",
+    "details": "install gitleaks or detect-secrets to compute L1.14",
+    "value": "n/a"
   },
   "L1.15": {
     "band": "Healthy",

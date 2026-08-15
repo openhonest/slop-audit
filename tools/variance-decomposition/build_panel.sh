@@ -21,7 +21,7 @@ printf 'repository\twindow'; printf '\t%s' "${INDICATORS[@]}"; printf '\n'
 for repo in "$CACHE"/*/; do
   name=$(basename "$repo")
   for year in $(seq "$FROM" "$TO"); do
-    uv run --project "$ANALYZER" l1-analyzer "$repo" \
+    uv run --project "$ANALYZER" slop-audit-l1 "$repo" \
         --since "$year-01-01" --until "$year-12-31" --no-exec --format json 2>/dev/null \
       | INDICATORS="${INDICATORS[*]}" NAME="$name" YEAR="$year" python3 -c '
 import json, os, sys

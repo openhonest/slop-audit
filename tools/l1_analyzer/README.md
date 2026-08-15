@@ -7,10 +7,10 @@ This is the canonical instrument. The pre-registered study designs are validated
 ## Run it
 
 ```
-uv run l1-analyzer <repo>                      # the full panel, text
-uv run l1-analyzer <repo> --format json        # machine-readable
-uv run l1-analyzer <repo> --no-exec            # static only, skip the runtime indicators
-uv run l1-analyzer <repo> --report ./out       # write <slug>.md and <slug>.html cards
+uv run slop-audit-l1 <repo>                      # the full panel, text
+uv run slop-audit-l1 <repo> --format json        # machine-readable
+uv run slop-audit-l1 <repo> --no-exec            # static only, skip the runtime indicators
+uv run slop-audit-l1 <repo> --report ./out       # write <slug>.md and <slug>.html cards
 ```
 
 Tests run with the dev extra: `uv run --extra dev pytest`.
@@ -26,7 +26,7 @@ Tests run with the dev extra: `uv run --extra dev pytest`.
 
 ## The grade
 
-Verifiability first, by a published rule (`report.py`): any promiscuous state that drives a decision makes the code provably-not-exhaustively-testable, so the verdict is CANNOT and the grade is **F**. State that is merely undetermined is MIGHT, grade **D**. When every piece of state is finitely testable the verdict is CAN, and the grade is A/B/C by hygiene (god-files and type-escapes weigh most). The finitely-testable percentage is a detail, not the tier: a 94%-clean codebase with one promiscuous decision-driver still grades F, because one such driver breaks exhaustive verification.
+Verifiability first, by a published rule (`report.py`): any promiscuous state that drives a decision makes the code provably-not-exhaustively-testable, so the verdict is CANNOT and the grade is **F**. State the analyzer could not decide is **silence**, reported beside the grade and never inside it, because a state we did not read is not evidence about the audited code; above a silence floor of 50% no grade is issued at all, so hiding state from the analyzer buys no letter rather than a good one. D is the COARSE verdict: a reaching partition that is finite and countable, but unordered and wider than a published bound. Boundary values cover a large ordered domain with a handful of tests and cover a large unordered one with none, which is why cardinality alone was never the test. No bound is configured at present (`report.UNORDERED_CLASS_BOUND` is `None`) because the measured distribution does not support one; see `candidate-methods/silence-index-for-finite-testability.md`. When every piece of state is finitely testable and coverable the verdict is CAN, and the grade is A/B/C by hygiene (god-files and type-escapes weigh most). The finitely-testable percentage is a detail, not the tier: a 94%-clean codebase with one promiscuous decision-driver still grades F, because one such driver breaks exhaustive verification.
 
 ## Directory-insensitive by design
 

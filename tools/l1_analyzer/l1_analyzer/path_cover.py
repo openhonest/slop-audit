@@ -31,6 +31,7 @@ from l1_analyzer.indicators import (
     _get_parser,
     _read_source_bytes,
 )
+from l1_analyzer.scope import PRODUCTION
 
 # A control-flow node: an integer basic-block id (from the counter), or the "entry"/
 # "exit" string sentinel. Control that does not fall through is None.
@@ -262,7 +263,7 @@ def cover_paths(repo: Path, lang: str) -> PathCover:
         return {"value": "n/a", "band": "n/a", "details": f"path cover not implemented for {lang} yet (python only)"}
     cfg = LANG_CFG["python"]
     parser = _get_parser("python")
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=("tests", "test"))
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
 
     total = 0
     functions = 0

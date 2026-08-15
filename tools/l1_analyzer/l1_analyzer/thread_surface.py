@@ -47,9 +47,11 @@ from l1_analyzer.indicators import (
     _read_source_bytes,
     bucketed_paths,
 )
+from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
 
-# conformance/ and tests hold scaffolding and doubles, not production surface.
-_IGNORE = ("tests", "test", "conformance")
+# conformance/ and tests hold scaffolding and doubles, not production surface. The scope
+# is named rather than spelled out here, so scope.SCOPES lists this meter among the
+# measurements a change to that rule moves.
 
 EXPOSED = "exposed"
 REVIEW = "review"
@@ -724,8 +726,8 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
     scanner = _SCANNERS[lang]
     cfg = LANG_CFG[lang]
     parser = _get_parser(lang)
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=_IGNORE)
-    bucketed = bucketed_paths(repo, cfg["extensions"], _IGNORE)
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
+    bucketed = bucketed_paths(repo, cfg["extensions"], PRODUCTION_WITHOUT_CONFORMANCE)
 
     findings: list[Finding] = []
     for path, src in files:

@@ -31,6 +31,7 @@ from typing import TypedDict
 
 from l1_analyzer import thread_surface
 from l1_analyzer.indicators import LANG_CFG, _read_source_bytes
+from l1_analyzer.scope import WHOLE_REPO
 
 # What marks a file as carrying a concurrency model in Rust.
 _MODEL_MARKERS = re.compile(r"cfg\((?:loom|shuttle)\)|\b(?:loom|shuttle)::")
@@ -96,7 +97,7 @@ def analyze(repo: Path, lang: str) -> ScheduleSilenceResult:
                 "details": "no hand-overridden concurrency surface to model"}
 
     cfg = LANG_CFG["rust"]
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], extra_ignore=())
+    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=WHOLE_REPO)
     modeled_in_file: set[str] = set()
     modeled_chunks: list[str] = []
     for path, src in files:

@@ -21,6 +21,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from l1_analyzer.scope import PRODUCTION
+
 # Roots that identify one machine: a home or user directory, a temp or scratch location, a
 # mount point. A URL path or an API route never begins with one of these.
 _UNIX_ROOTS = (
@@ -70,11 +72,11 @@ def scan(repo: Path, lang: str) -> dict:
     language). Healthy at zero, Slop otherwise: a hardcoded machine path is never correct."""
     from l1_analyzer.indicators import _read_text_files
 
-    # Production scope, the same ("tests", "test") exclusion L1.15, L1.17 and L1.19 use. A
-    # test that proves a path detector fires has to contain the path it detects, so scanning
-    # the test tree measures the fixtures, not the code. This repo's own tests carried 24 of
-    # the 57 findings on the run that prompted the scope fix.
-    files, _skipped = _read_text_files(repo, _CODE_EXTS, extra_ignore=("tests", "test"))
+    # The production scope, declared once in scope.SCOPES beside the other indicators that
+    # measure under it. A test that proves a path detector fires has to contain the path it
+    # detects, so scanning the test tree measures the fixtures, not the code. This repo's
+    # own tests carried 24 of the 57 findings on the run that prompted the scope fix.
+    files, _skipped = _read_text_files(repo, _CODE_EXTS, scope=PRODUCTION)
     findings = [
         {"file": str(path.relative_to(repo)) if repo in path.parents else str(path),
          "line": lineno, "path": matched}

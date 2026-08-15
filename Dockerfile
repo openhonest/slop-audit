@@ -32,5 +32,5 @@ RUN uv sync --project tools/l1_analyzer --no-dev
 RUN git config --system --add safe.directory '*'
 
 WORKDIR /repo
-ENTRYPOINT ["uv", "run", "--project", "/opt/slop-audit/tools/l1_analyzer", "l1-analyzer", "/repo"]
+ENTRYPOINT ["uv", "run", "--project", "/opt/slop-audit/tools/l1_analyzer", "slop-audit-l1", "/repo"]
 CMD ["--no-exec"]
