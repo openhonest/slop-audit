@@ -1,7 +1,7 @@
 # PRD: Slop Audit in the edit loop
 
-**Status:** Draft for approval. Not approved, not scheduled, not built.
-**Drafted:** 2026-08-15
+**Status:** v0.1 built and shipped. Sections 1 through 13 remain the design; §14 records what has landed.
+**Drafted:** 2026-08-15. **Revised:** 2026-08-15 after the hook shipped.
 **Decision owner:** Adam Zachary Wasserman
 **Related:** `ai-consumer-instruction-contract.md`, `telemetry-for-threshold-calibration.md`, `layer1-longitudinal-method.md`
 
@@ -60,6 +60,8 @@ Measured 2026-08-15 by running the full twenty-indicator panel against a directo
 
 **The surface is four indicators and two checks.** Shipping the full panel would mean thirteen of twenty verdicts being artefacts or false.
 
+**What v0.1 actually ships is two and a half.** L1.16 and L1.17 are computed in the hook, because both are exact arithmetic over lines and neither has a rival implementation to disagree with. L1.18 is delegated to the `slop-audit-l1` binary and reports `UNMEASURED` where that binary is absent, which on a bare plugin install is everywhere. L1.14 secrets is not shipped: a secrets check that misses is worse than none, and the field has mature tools already.
+
 L1.17 needs restating for this context: the canon expresses it as a percentage of files, which is meaningless for one file, but "is this file over a thousand lines" is exactly file-scoped.
 
 ## 7. Delivery and distribution
@@ -72,24 +74,34 @@ A `PostToolUse` hook on Write and Edit. It fires whether or not the agent wants 
 
 ### 7.2 How the hook reaches a machine
 
-Claude Code plugins can ship hooks, and **the marketplace already exists**: `openhonest/honest-skills` carries `.claude-plugin/marketplace.json`, currently publishing three skills at v0.3.0. Adding a hook to that plugin means one command installs the skills and the audit together:
+Claude Code plugins ship hooks in `hooks/hooks.json` at the plugin root, in the same format as the `hooks` object in `settings.json`. They are enabled when the plugin is enabled. **No user edits any configuration file.** Verified against the plugin documentation on 2026-08-15; the documented example is a `PostToolUse` hook matching `Write|Edit`, which is exactly the shape this needs.
+
+The marketplace already exists: `openhonest/honest-skills` publishes three skills at v0.3.0. One command then installs the skills and the audit together:
 
 ```
 /plugin marketplace add openhonest/honest-skills
 /plugin install honest-skills
 ```
 
-The alternative, asking a user to hand-edit `settings.json`, is friction that costs most of the installs.
+**This also removes a question that was open.** An MCP server editing `settings.json` to install its own hook was considered as a fallback. It is unnecessary, and it was always the wrong shape: a tool that rewrites the host's configuration because it was installed for something else is escalating its own privileges, which is not a thing this project should ship.
 
-**Open question, and it needs checking rather than assuming:** whether the current plugin manifest schema accepts a `hooks` key. The manifest in that repo does not use one today.
+### 7.3 One artifact, not two
 
-### 7.3 The MCP tool, and why it still exists
+A plugin root also carries `.mcp.json`, which declares MCP servers. So a single plugin ships the skills, the hook and the MCP server, installed by one command and versioned together.
 
-The hook is Claude Code specific. Cursor, Codex and anything else speaking MCP cannot use it. So the MCP server is the portability path, and it also serves the deliberate case where a developer or agent wants an audit at a moment of its choosing rather than after a write.
+The hook is Claude Code specific and fires without cooperation. The MCP is portable to Cursor, Codex and anything else speaking MCP, and serves the deliberate case: audit this file before I refactor it. Different jobs, same package.
 
-Different jobs: the hook is reliable and narrow, the MCP is portable and elective. Neither replaces the other, and the design should not depend on the elective one.
+### 7.4 Distribution channels
 
-### 7.4 What this is worth beyond the product
+| Channel | Bar | State |
+|---|---|---|
+| `openhonest/honest-skills` marketplace | none, it is ours | Live, three skills |
+| `anthropics/claude-plugins-community` | review pipeline plus automated safety screening; `claude plugin validate` must pass | **Not submitted.** Users add it with one command and install from it; approved plugins are pinned to a commit SHA and the catalog syncs nightly |
+| awesome-claude-code | 14 days old and actively developed, or 100 stars | Blocked until 2026-08-28 |
+
+The community marketplace is the channel worth the most and the one not currently used. Run `claude plugin validate` before submitting; the review pipeline runs the same check.
+
+### 7.5 What this is worth beyond the product
 
 Every install is a machine running the standard rather than reading it. That is adoption by use, which is a different and stronger thing than a citation, and it is a channel the research programme does not currently have.
 
@@ -142,11 +154,16 @@ If the tool samples every write and computes limits from those samples, the agen
 | Card converts "no data" into a capability claim | **Fixed** 2026-08-15 |
 | Findings-list ordering unstable when findings share a line | **Fixed** 2026-08-15 |
 | L1.18 thresholds stale against the corrected computation | **Open.** Values moved up to 12.7 points; bands not recalibrated |
-| Plugin manifest supports a `hooks` key | **Unverified.** Blocks §7.2 |
+| L1.18 declaration classifier still changing | **Open.** A change landing 2026-08-15 teaches it three declaration kinds it has no rule for |
+| Plugin can ship a hook | **Resolved** 2026-08-15. `hooks/hooks.json` at plugin root, auto-enabled, no settings edit |
+| Hook built, tested and published | **Done** 2026-08-15. `openhonest/honest-skills`, 100% branch coverage, CI on 3.9, 3.11 and 3.13 |
+| L1.18 computed in the hook rather than delegated | **Blocked** on the classifier change. Design in `honest-skills/docs/l1-18-in-the-hook.md` |
 | Output contract contradicts `tools/edit-replay/` | **Open.** Resolved in principle by §8.2 and §8.3 |
 | Telemetry spec approved | **Open** |
 
-**L1.18 is the blocker that matters.** It is the most useful of the four in scope, and shipping it means quoting a threshold set against a different calculation from the one producing the number.
+**L1.18 is the blocker that matters.** It is the most useful of the four in scope, and it is blocked twice over: its thresholds were set against a different calculation from the one producing the number, and the classifier producing that number is still changing.
+
+The second blocker moves published figures hard. libuv had 1,133 of 1,345 declarations unreadable; Newtonsoft.Json 678 of 1,360. Grades will fall when those become readable. A repository whose struct fields were 84 percent invisible was not passing, it was unexamined, so the fall is the instrument improving rather than the code degrading. Anything calibrated before it lands is calibrated against numbers that will not exist afterwards.
 
 ## 12. Risks
 
@@ -156,23 +173,27 @@ If the tool samples every write and computes limits from those samples, the agen
 
 **Thresholds are wrong, so verdicts are wrong.** Live today. Every band is provisional and the canon says so.
 
+**The useful indicator does not run.** Live today. A bare install has no `slop-audit-l1` on PATH, so L1.18 reports `UNMEASURED` and the hook is reduced to line count and whitespace. This is honest and it is also thin. Closing it is the L1.18-in-the-hook work, and the cost of closing it is a third implementation to keep equal to the other two.
+
 **Claude Code only.** The hook does not reach other agents. Mitigated by the MCP path, which is why it stays in scope.
 
 **Telemetry poisoned or dominated.** Mitigated by per-UID aggregation, plausibility rejection, and median summaries. See §7 of the telemetry spec.
 
 ## 13. Open decisions
 
-1. Ship four indicators, or wait for more to become file-scoped?
-2. Recalibrate L1.18 before shipping, or ship with a "provisional threshold" caveat in every surfaced verdict?
-3. Is `SHIFTED` in v1 at all, given only 29% of files can produce it?
-4. Does the hook ship in the existing `honest-skills` plugin, or its own?
-5. Does the MCP live in this repository or its own?
+1. Ship four indicators, or wait for more to become file-scoped? **Decided:** shipped three, L1.14 dropped for the reason in §6.
+2. Recalibrate L1.18 before shipping, or ship with a "provisional threshold" caveat in every surfaced verdict? **Decided:** the caveat, carried on every L1.18 finding and rendered to the reader rather than kept in the payload.
+3. Is `SHIFTED` in v1 at all, given only 29% of files can produce it? **Open.**
+4. Does the hook ship in the existing `honest-skills` plugin, or its own? **Decided:** the existing plugin.
+5. Does the MCP live in this repository or its own? **Open.**
 
 ## 14. Suggested phasing
 
-**v0.1** Hook only, four indicators, silent on pass. Ships in the existing plugin. Answers whether the file meets the standard.
+**v0.1 — shipped 2026-08-15.** Hook only, silent on pass, in the existing plugin. L1.16 and L1.17 computed locally, L1.18 delegated to the analyzer and `UNMEASURED` without it, reported once per session rather than once per write. Exit 0 and no output on a clean file; exit 2 and stderr on a finding, which is the only path that reaches the model. Twenty-eight tests, 100% branch coverage, CI on three interpreter versions. `claude plugin validate` clean.
 
-**v0.2** MCP server, same four indicators, for portability off Claude Code.
+**v0.1.1 — blocked.** L1.18 computed in the hook so a bare install measures it. Requires the ratio, a census denominator produced independently of its own enumerator, a refusal rule, capability fixtures that measure rather than assert, and a differential validator against the reference implementation as a CI gate. Waiting on the classifier change.
+
+**v0.2** MCP server in the same plugin via `.mcp.json`, same indicators, for portability off Claude Code.
 
 **v0.3** Telemetry, opt-in, off by default.
 
