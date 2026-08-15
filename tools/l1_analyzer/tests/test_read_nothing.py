@@ -169,21 +169,48 @@ def test_interleaving_robustness_still_reports_a_read_clean():
 
 # --- the survey, pinned so the next reader does not have to re-derive it ---------------
 
-@pytest.mark.parametrize("check", ["L1.15", "L1.16", "L1.17", "absolute_paths"])
+@pytest.mark.parametrize("check", ["L1.16", "L1.17", "absolute_paths"])
 def test_the_remaining_empty_denominator_claims_are_recorded(check):
-    """These four still assert a positive property over an empty set, and this test
+    """These three still assert a positive property over an empty set, and this test
     records that rather than hiding it. It is written to pass on today's behaviour, so it
     fails the day one of them is fixed - at which point the fix moves the assertion here
-    and the survey stays true instead of going stale."""
+    and the survey stays true instead of going stale.
+
+    It was four until 2026-08-15. L1.15 left the list that day, and the assertion moved
+    down to the test below rather than being deleted, which is the protocol this docstring
+    promised. L1.16 and L1.17 divide by a file count and substitute 0.0 when there is no
+    file; `absolute_paths` reads `count == 0` as clean, which is the same number whether it
+    read a thousand files or none. All three are the same shape and none is fixed here.
+    """
     from l1_analyzer import indicators
     empty = _tree({"README.md": "nothing here\n"})
     known = {
-        # A repo under 1,000 production lines gets density 0.0 by a threshold with no
-        # derivation, so Healthy is fabricated even where the lines DO exist and are
-        # nothing but escape hatches.
-        "L1.15": lambda: indicators._compute_type_escapes(empty, "python"),
         "L1.16": lambda: indicators._trailing_whitespace(empty),
         "L1.17": lambda: indicators._god_files(empty),
         "absolute_paths": lambda: absolute_paths.scan(empty, "python"),
     }
     assert known[check]()["band"] == "Healthy"
+
+
+def test_l1_15_no_longer_manufactures_a_band_from_an_empty_denominator():
+    """The survey entry above, moved rather than deleted, so the fix is pinned where the
+    defect was recorded.
+
+    L1.15 carried two claims over inputs it had not measured, and the second was the worse
+    one. Over an empty tree it read Healthy off zero lines. Over a NON-empty tree under a
+    thousand production lines it also read Healthy, because `if total_loc > 1000 else 0.0`
+    substituted a constant for lines it had counted correctly - a fabricated number over a
+    real input rather than an honest refusal over an absent one. Both are gone: no lines
+    refuses, and lines are divided by however few there are.
+    """
+    from l1_analyzer import indicators
+    empty = _tree({"README.md": "nothing here\n"})
+    assert indicators._compute_type_escapes(empty, "python")["band"] == "n/a"
+
+    small = _tree({"a.py": "v: Any = 1\n" * 20})
+    measured = indicators._compute_type_escapes(small, "python")
+    assert measured["value"] == 1000.0 and measured["band"] == "Slop"
+
+    # Honest zero is the control: a small tree really read and really clean keeps Healthy.
+    clean = _tree({"a.py": "def f(x: int) -> int:\n    return x\n" * 20})
+    assert indicators._compute_type_escapes(clean, "python")["band"] == "Healthy"

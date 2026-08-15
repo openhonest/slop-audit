@@ -269,17 +269,31 @@ def test_the_refused_languages_are_named_rather_than_skipped(lang):
 
 # --- the labelled set, pinned so a regression is visible ------------------------------
 
-def test_it_finds_the_four_paths_this_package_still_carries():
+def test_it_finds_the_three_paths_this_package_still_carries():
     """The live labelled set from test_read_nothing.py. The rule was written from the
     shape and finds these without being told where they are; this test records that it
     still does, and names them only here, in the test, never in the rule."""
     result = vacuity.check(PKG)
     hit = {(pathlib.Path(f["file"]).name, f["function"]) for f in result["findings"]}
-    for want in (("indicators.py", "_compute_type_escapes"),      # L1.15
-                 ("indicators.py", "_trailing_whitespace"),       # L1.16
+    for want in (("indicators.py", "_trailing_whitespace"),       # L1.16
                  ("indicators.py", "_god_files"),                 # L1.17
                  ("absolute_paths.py", "scan")):
         assert want in hit, f"the rule stopped finding {want}"
+
+
+def test_the_l1_15_path_is_gone_and_the_checker_is_what_says_so():
+    """It was four until 2026-08-15. L1.15's `if total_loc > 1000 else 0.0` was the
+    headline instance in this module's own docstring, and removing the floor removed the
+    path. This assertion is the one that matters about the fix: the check that found the
+    defect without being told where it was is the check that now reports it absent, so the
+    evidence is independent of the test that drove the change.
+
+    The refusal it was replaced with is not a second instance. `total_loc == 0` returns
+    band `n/a`, and a refusal is what the rule looks for on that branch; a fix that kept
+    publishing a verdict over nothing would still be found here."""
+    result = vacuity.check(PKG)
+    hit = {(pathlib.Path(f["file"]).name, f["function"]) for f in result["findings"]}
+    assert ("indicators.py", "_compute_type_escapes") not in hit
 
 
 def test_a_boolean_flag_parameter_is_not_a_cardinality():

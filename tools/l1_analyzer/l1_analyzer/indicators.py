@@ -819,7 +819,43 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
     return count
 
 def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
-    """L1.15: density of type-escape hatches (Any/object/dynamic and ignore comments)."""
+    """L1.15: density of type-escape hatches (Any/object/dynamic and ignore comments).
+
+    There is no minimum denominator, and the absence of one is the rule.
+
+    This read `if total_loc > 1000 else 0.0` until 2026-08-15. Below a thousand
+    production lines it published 0.0 escapes per kLOC and band Healthy however many
+    escape hatches the input actually held: a twenty-line file of nothing but `Any`
+    scored the same clean as a file with none. That is not an empty-set claim, which
+    would be honest; it is a fabricated number over a non-empty input, written into
+    the one field a reader looks at, and it is the worse of the two failures because
+    the input was there to be measured and was measured correctly right up to the
+    last line of arithmetic. `vacuity.py` names this function among the paths it
+    finds, and the shape it finds is a threshold guard feeding a constant.
+
+    The threshold had no derivation. Not in 03-layer1-indicators.md, whose bands are
+    `<1 / 1-5 / >5` per kLOC with no floor under them; not in the calibration note;
+    not in any amendment. Where the canon and the implementation disagree the canon
+    wins, so the floor goes rather than acquiring a justification after the fact.
+
+    What the floor was reaching for is real and is a different thing: a rate over a
+    small denominator is jumpy. One escape in a 200-line file reads 5.03/kLOC and
+    bands Slop, and the next edit can move it by the width of the whole scale. That
+    is a property of the ratio, disclosed by the count and the line total printed
+    beside it, and not a licence to substitute a number nobody measured. An
+    instrument that hides its own variance by asserting the healthy end of the scale
+    is worse than one that reports a jumpy figure, because a reader can see variance
+    and cannot see a substitution.
+
+    Zero lines is the one case with no density to report, and it refuses. Zero
+    escapes over zero lines is the same 0.0 as zero escapes over a thousand, and
+    band cannot tell them apart, which is the L1.8 precedent four hundred lines up.
+
+    The denominator is now printed exactly rather than as `~{n}kLOC`. Rounded to
+    whole thousands it read "~0kLOC" for every input the floor used to swallow, so
+    the disclosure that exists to let a reader recompute the ratio hid the only term
+    that moved. A count and its exact denominator are recomputable at any size.
+    """
     if lang not in LANG_CFG:
         return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
     cfg = LANG_CFG[lang]
@@ -835,8 +871,10 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
         total_loc += len(src.decode("utf8", errors="ignore").splitlines())
         escape_count += _count_type_escapes_in_tree(parser.parse(src).root_node, cfg)
 
-    density = (escape_count / (total_loc / 1000)) if total_loc > 1000 else 0.0
-    return {"value": round(density, 2), "band": band(density, 1, 5, higher_is_better=False), "details": _with_skipped(f"{escape_count} escapes in ~{total_loc // 1000}kLOC", skipped)}
+    if total_loc == 0:
+        return {"value": "n/a", "band": "n/a", "details": _with_skipped("no production source lines found", skipped)}
+    density = escape_count / (total_loc / 1000)
+    return {"value": round(density, 2), "band": band(density, 1, 5, higher_is_better=False), "details": _with_skipped(f"{escape_count} escapes in {total_loc} production LOC", skipped)}
 
 # Control-flow branch node types across the supported grammars. Exact-type
 # matches (not substring) so short Ruby types like "if"/"case"/"when" are safe.

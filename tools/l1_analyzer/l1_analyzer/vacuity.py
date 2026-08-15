@@ -1,12 +1,19 @@
 """Paths where a check publishes a property it never measured, stated only in the negative.
 
 The shape, which was found eleven times in this package and its neighbours in two days:
-**a denominator that can be zero, feeding an output that asserts a property.** L1.15 hands
-back 0.0 and Healthy for any repository under a thousand production lines. L1.16 and L1.17
-divide by a file count and substitute 0.0 when there is no file. `absolute_paths` reads
-`count == 0` as clean, which is the same number whether it scanned a thousand files or
-none. A wrapper swallowed a scanner's non-zero exit to an empty string, and a repository
+**a denominator that can be zero, feeding an output that asserts a property.** L1.16 and
+L1.17 divide by a file count and substitute 0.0 when there is no file. `absolute_paths`
+reads `count == 0` as clean, which is the same number whether it scanned a thousand files
+or none. A wrapper swallowed a scanner's non-zero exit to an empty string, and a repository
 holding live credentials read Healthy off the count of nothing.
+
+L1.15 was the fourth live instance and the headline one, and it was fixed on 2026-08-15:
+it handed back 0.0 and Healthy for any repository or file under a thousand production
+lines, which made it the only one of the four that fabricated over a NON-empty input as
+well as an empty one. The floor is gone and the zero-line case refuses, so this rule no
+longer finds it. That transition is the intended use of a checker like this one: it named
+the path before anyone went looking, and its silence on that path afterwards is the
+evidence, independent of the tests written to drive the change.
 
 **Why this module can say nothing good.** Every instance above is a positive claim
 manufactured from an empty input. A checker with an affirmative output can manufacture one

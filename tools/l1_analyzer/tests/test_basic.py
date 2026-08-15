@@ -297,6 +297,56 @@ def test_l1_15_untyped_language_is_na(tmp_path):
     assert res["band"] == "n/a"
 
 
+# --- L1.15: the thousand-line floor, removed 2026-08-15 ----------------------
+# The floor read `if total_loc > 1000 else 0.0`. Under it, every input below a
+# thousand production lines reported 0.0 escapes per kLOC and band Healthy
+# however many escape hatches it held. That is not an empty-set claim, which
+# would be honest; it is a fabricated number over a non-empty input, published
+# in the field a reader actually looks at. The threshold has no derivation in
+# 03-layer1-indicators.md, in the calibration note, or in any amendment, and
+# the canon's bands (<1 / 1-5 / >5 per kLOC) name no minimum denominator.
+# The tests below are the four cases the floor got wrong, in order of how badly.
+
+def test_l1_15_a_small_file_of_nothing_but_escapes_is_not_healthy(tmp_path):
+    """Twenty lines, twenty escape hatches, and the floor called it Healthy at 0.0.
+    A rate is a rate at any denominator: 20 escapes in 20 lines is 1000/kLOC."""
+    res = _escapes(tmp_path, "python", "a.py", "v: Any = 1\n" * 20)
+    assert res["value"] == 1000.0
+    assert res["band"] == "Slop"
+
+
+def test_l1_15_one_escape_at_file_scope_is_measured(tmp_path):
+    """The case that motivated the fix. At per-edit tempo an agent holds one file,
+    and under the floor every file below a thousand lines banded Healthy by
+    construction, which made L1.15 useless at exactly the scope it was being
+    built toward. One escape in 200 lines is 5.0/kLOC, which is Slop, and the
+    small denominator makes that reading jumpy rather than wrong."""
+    src = "def f(x):\n    return x\n" * 99 + "v: Any = 1\n"   # 199 lines, 1 escape
+    res = _escapes(tmp_path, "python", "a.py", src)
+    assert res["value"] == 5.03
+    assert res["band"] == "Slop"
+
+
+def test_l1_15_a_clean_small_file_still_reads_healthy(tmp_path):
+    """Honest zero is the control. Removing the floor must not turn every small
+    input into a finding; a file the analyzer really read and found nothing in
+    keeps its Healthy, and it is now earned rather than manufactured."""
+    res = _escapes(tmp_path, "python", "a.py", "def f(x: int) -> int:\n    return x\n" * 20)
+    assert res["value"] == 0.0
+    assert res["band"] == "Healthy"
+
+
+def test_l1_15_no_production_lines_is_na_not_healthy(tmp_path):
+    """The empty-denominator half, and the one the floor shared with L1.16 and
+    L1.17. Zero escapes over zero lines is the same 0.0 as zero escapes over a
+    thousand, and the band field cannot tell them apart. With no line to divide
+    by there is no density, so the indicator refuses instead of publishing one."""
+    (tmp_path / "README.md").write_text("nothing here\n")
+    res = indicators._compute_type_escapes(tmp_path, "python")
+    assert res["value"] == "n/a" and res["band"] == "n/a"
+    assert "no production" in res["details"]
+
+
 # --- L1.16 / L1.17 indicators -----------------------------------------------
 
 def test_l1_16_trailing_whitespace(tmp_path):

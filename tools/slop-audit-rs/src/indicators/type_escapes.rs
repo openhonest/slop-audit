@@ -134,12 +134,34 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
         }
     }
 
-    let density = if total_loc > 1000 {
-        escape_count as f64 / (total_loc as f64 / 1000.0)
-    } else {
-        0.0
-    };
-    let mut details = format!("{escape_count} escapes in ~{}kLOC", total_loc / 1000);
+    // There is no minimum denominator, and the absence of one is the rule.
+    //
+    // This read `if total_loc > 1000 { .. } else { 0.0 }` until 2026-08-15, ported
+    // verbatim from the reference. Below a thousand production lines both tools published
+    // 0.0 per kLOC and band Healthy however many escape hatches the input held: a
+    // twenty-line file of nothing but `Any` scored the same clean as a file with none.
+    // That is a fabricated number over a non-empty input, not an empty-set claim, and it
+    // is the worse of the two because the lines were there and were counted correctly
+    // right up to the last step of arithmetic. The threshold had no derivation anywhere;
+    // the canon's bands are `<1 / 1-5 / >5` per kLOC with no floor under them, and where
+    // the canon and the implementation disagree the canon wins.
+    //
+    // The parity differ is what makes this comment worth writing here rather than only in
+    // the reference: the two sides carried one rule, so they had to lose it together.
+    //
+    // Zero lines is the one case with no density to report, and it refuses.
+    if total_loc == 0 {
+        let mut details = "no production source lines found".to_string();
+        if skipped != 0 {
+            details = format!("{details}; {skipped} file(s) unreadable and excluded");
+        }
+        return na(details);
+    }
+    let density = escape_count as f64 / (total_loc as f64 / 1000.0);
+    // The denominator is printed exactly. Rounded to whole thousands it read "~0kLOC" for
+    // every input the floor used to swallow, so the disclosure that exists to let a reader
+    // recompute the ratio hid the only term that moved.
+    let mut details = format!("{escape_count} escapes in {total_loc} production LOC");
     if skipped != 0 {
         details = format!("{details}; {skipped} file(s) unreadable and excluded");
     }
@@ -188,6 +210,64 @@ mod tests {
     fn java_comment_mentioning_the_marker_is_documentation() {
         let src = "class A {\n    // use @SuppressWarnings(\"unchecked\") only where the cast is proven\n    void m() {\n        String s = \"@SuppressWarnings\";\n    }\n}\n";
         assert_eq!(count("java", src), 0);
+    }
+
+    /// A one-file tree under the system temp directory. No dev-dependency: adding one to
+    /// reach `analyze`, which is the only function here that does I/O, would put a crate in
+    /// the lockfile of a binary whose whole claim is that it is portable.
+    fn one_file_tree(stem: &str, name: &str, source: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!("slop-l115-{stem}"));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("temp tree");
+        std::fs::write(root.join(name), source).expect("write source");
+        root
+    }
+
+    /// The thousand-line floor, removed 2026-08-15. Twenty lines, twenty escape hatches,
+    /// and both tools called it Healthy at 0.0. A rate is a rate at any denominator.
+    #[test]
+    fn a_small_file_of_nothing_but_escapes_is_not_healthy() {
+        let root = one_file_tree("all-escapes", "a.py", &"v: Any = 1\n".repeat(20));
+        let got = analyze(&root, "python");
+        assert_eq!(got.value, "1000.0");
+        assert_eq!(got.band, "Slop");
+        assert_eq!(got.details, "20 escapes in 20 production LOC");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The case that motivated the fix: at per-edit tempo an agent holds one file, and
+    /// under the floor every file below a thousand lines banded Healthy by construction.
+    #[test]
+    fn one_escape_at_file_scope_is_measured() {
+        let src = format!("{}v: Any = 1\n", "def f(x):\n    return x\n".repeat(99));
+        let root = one_file_tree("file-scope", "a.py", &src);
+        let got = analyze(&root, "python");
+        assert_eq!(got.value, "5.03");
+        assert_eq!(got.band, "Slop");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Honest zero is the control. Removing the floor must not make every small input a
+    /// finding; a file that really was read and held nothing keeps its Healthy, earned.
+    #[test]
+    fn a_clean_small_file_still_reads_healthy() {
+        let root = one_file_tree("clean", "a.py", &"def f(x: int) -> int:\n    return x\n".repeat(20));
+        let got = analyze(&root, "python");
+        assert_eq!(got.value, "0.0");
+        assert_eq!(got.band, "Healthy");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The empty-denominator half. Zero escapes over zero lines is the same 0.0 as zero
+    /// over a thousand, and band cannot tell them apart, so there is no density to publish.
+    #[test]
+    fn no_production_lines_is_na_not_healthy() {
+        let root = one_file_tree("empty", "README.md", "nothing here\n");
+        let got = analyze(&root, "python");
+        assert_eq!(got.value, "n/a");
+        assert_eq!(got.band, "n/a");
+        assert_eq!(got.details, "no production source lines found");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// The reference's own L1.15 cases, so the two walkers cannot drift on the rules the
