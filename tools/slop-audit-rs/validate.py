@@ -27,7 +27,7 @@ def python_panel(repo: Path, lang: str) -> dict[str, dict]:
     """The reference panel, keyed L1.x. Run from the reference package so `uv run`
     resolves that project's environment, not this directory's."""
     out = subprocess.run(
-        ["uv", "run", "l1-analyzer", str(repo), "--no-exec", "--format", "json", "--lang", lang],
+        ["uv", "run", "slop-audit-l1", str(repo), "--no-exec", "--format", "json", "--lang", lang],
         cwd=REFERENCE, capture_output=True, text=True, check=True,
     ).stdout
     return json.loads(out)["results"]
@@ -84,10 +84,26 @@ def diff_panels(repo: Path, lang: str = "auto", *, quiet: bool = False) -> tuple
             return 99.0
         return float(code[3:].replace("b", ".5"))
 
-    codes = [c for c in ported if c in reference]
+    # The binary now emits a row for every canonical indicator, and says "not measured"
+    # for the ones it does not compute. Those carry no value to compare, so they are
+    # counted and named rather than diffed. Comparing them would report six false
+    # disagreements; intersecting them away silently is what this differ used to do.
+    unmeasured = sorted(
+        (c for c, row in ported.items() if row.get("band") == "not measured"), key=order)
+    for code in unmeasured:
+        say(f"GAP   {code}: not measured by the binary ({ported[code]['details']})")
+
+    # The direction that was never checked, and the reason parity read 16/16 for weeks
+    # across a key set that excluded L1.18. An indicator the reference produces and the
+    # binary does not mention at all is a coverage defect, not something to skip.
+    missing = sorted((c for c in reference if c not in ported), key=order)
+    for code in missing:
+        print(f"DIFF  {code}: in the reference panel, absent from the binary entirely")
+
+    codes = [c for c in ported if c in reference and c not in set(unmeasured)]
     for code in [c for c in ported if c not in reference]:
         say(f"SKIP  {code}: not in the reference panel")
-    diffs = 0
+    diffs = len(missing)
     for code in sorted(codes, key=order):
         want = reference[code]
         got = ported[code]
@@ -106,6 +122,9 @@ def diff_panels(repo: Path, lang: str = "auto", *, quiet: bool = False) -> tuple
             print(f"        {name}: reference={a!r}")
             print(f"        {name}: ported   ={b!r}")
 
+    if unmeasured:
+        say(f"\n{len(unmeasured)} indicator(s) the binary does not measure: "
+            f"{', '.join(unmeasured)}")
     return diffs, len(codes)
 
 
@@ -116,7 +135,9 @@ def main() -> int:
     repo = Path(sys.argv[1]).resolve()
     lang = sys.argv[2] if len(sys.argv) > 2 else "auto"
     diffs, compared = diff_panels(repo, lang)
-    print(f"\n{compared - diffs}/{compared} indicators equal on {repo}")
+    # "16/16" on its own reads as a complete audit. It is a statement about the indicators
+    # that were compared, and saying so is the whole lesson of this differ's own blind spot.
+    print(f"\n{compared - diffs}/{compared} COMPARED indicators equal on {repo}")
     return 1 if diffs else 0
 
 

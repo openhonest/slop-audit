@@ -12,7 +12,7 @@
 //!
 //! Arguments are parsed by hand: a CLI parser crate would add weight to a binary whose
 //! whole purpose is to be one small self-contained file.
-use slop_audit_rs::{indicators, lang};
+use slop_audit_rs::{lang, panel};
 use std::path::Path;
 
 fn usage() -> ! {
@@ -57,16 +57,9 @@ fn main() {
         None => lang::detect_primary_language(repo).to_string(),
     };
 
-    let mut panel = Vec::new();
-    panel.extend(indicators::git_ratios::analyze(repo)); // L1.1 - L1.8
-    panel.push(indicators::config_presence::l1_09(repo)); // L1.9
-    panel.push(indicators::config_presence::l1_10(repo)); // L1.10
-    panel.push(indicators::config_presence::l1_11(repo)); // L1.11
-    panel.push(indicators::type_escapes::analyze(repo, &language)); // L1.15
-    panel.push(indicators::whitespace::analyze(repo)); // L1.16
-    panel.push(indicators::god_files::analyze(repo)); // L1.17 (all languages)
-    panel.push(indicators::decision_space::analyze(repo, &language)); // L1.19 (static half)
-    panel.push(indicators::absolute_paths::analyze(repo)); // additive
+    // One row per canonical indicator, whether or not this binary computes it. An
+    // indicator it cannot compute prints its reason; see src/coverage.rs.
+    let panel = panel::analyze(repo, &language);
 
     if tsv {
         println!("lang\t{language}");

@@ -72,7 +72,7 @@ def main() -> int:
             print(f"  DIFF  language: manifest says {lang}, both tools detect {detected}")
             failures.append(f"{slug}: detected {detected}, manifest says {lang}")
         status = "OK" if diffs == 0 else f"{diffs} DIFF"
-        print(f"  {compared - diffs}/{compared} indicators equal  [{status}]")
+        print(f"  {compared - diffs}/{compared} compared indicators equal  [{status}]")
         if diffs:
             failures.append(f"{slug}: {diffs} indicator(s) disagree")
 
@@ -81,7 +81,11 @@ def main() -> int:
         for line in failures:
             print(f"FAIL {line}")
         return 1
-    print(f"every indicator equal across {len(entries)} repositories")
+    # Not "every indicator equal": this compares the indicators the binary claims to
+    # measure. The ones it does not are listed per repo as GAP lines by the differ, and
+    # a summary that hides them is how a parity number read 16/16 while L1.18 was absent.
+    print(f"every COMPARED indicator equal across {len(entries)} repositories")
+    print("indicators the binary does not measure are reported as GAP lines above")
     return 0
 
 

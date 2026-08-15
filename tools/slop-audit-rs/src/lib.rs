@@ -9,6 +9,8 @@ use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 use tree_sitter::Node;
 
+pub mod coverage;
+pub mod panel;
 pub mod indicators;
 pub mod lang;
 
