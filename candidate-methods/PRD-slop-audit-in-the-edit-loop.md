@@ -95,11 +95,43 @@ The hook is Claude Code specific and fires without cooperation. The MCP is porta
 
 | Channel | Bar | State |
 |---|---|---|
-| `openhonest/honest-skills` marketplace | none, it is ours | Live, three skills |
+| `openhonest/honest-skills` marketplace | none, it is ours | Live, three skills plus the hook |
 | `anthropics/claude-plugins-community` | review pipeline plus automated safety screening; `claude plugin validate` must pass | **Not submitted.** Users add it with one command and install from it; approved plugins are pinned to a commit SHA and the catalog syncs nightly |
 | awesome-claude-code | 14 days old and actively developed, or 100 stars | Blocked until 2026-08-28 |
 
-The community marketplace is the channel worth the most and the one not currently used. Run `claude plugin validate` before submitting; the review pipeline runs the same check.
+**An earlier draft called the community marketplace the channel worth the most. Measured on 2026-08-15, that is wrong, and by a wide margin.** Audience alone is the wrong measure. What decides a channel is audience multiplied by the share of it that reaches one entry, and the second term is where these two separate.
+
+| | `claude-plugins-community` | awesome-claude-code |
+|---|---|---|
+| Catalog entries | **2,281** | **157** |
+| Structure | flat, alphabetical. Only 156 entries of 2,281 carry any category field, so there is no facet to filter on | 18 named categories |
+| Where we would land | position **1,004 of 2,282**, the middle of the scroll | "Writing & Prose Quality", which holds **2 entries** |
+| Repository stars | 349 | 52,379 |
+| Age | 148 days | 483 days |
+
+**Share of one surface visitor's attention.** Browsing: one of 2,282 is 0.044 percent, against one of three in a named category, which is 33 percent. That is a factor of **760** before any audience term is applied. The marketplace would need 760 times the awesome list's traffic to break even on browsing alone.
+
+**Search changes the number and does not reverse it.** The client can search, so the honest denominator is how many rivals a relevant query returns. Counting matches in name and description across both catalogs:
+
+| Query | Rivals in the marketplace | Rivals in awesome-claude-code |
+|---|---|---|
+| prose | 11 | 3 |
+| lint | 30 | 6 |
+| code quality | 23 | 0 |
+| quality | 121 | 10 |
+| root cause | 10 | 1 |
+| slop | 12 | 5 |
+| review | 314 | 17 |
+
+At the narrowest useful term the marketplace still needs three times the traffic to break even; at a term anyone would actually type it needs eleven times.
+
+**What that argument leaves out, stated rather than buried.** Stars badly undercount the marketplace, because its real surface is `/plugin` inside a client with a large user base, and no figure for that traffic is available to us. Three times is a bar it probably clears. Seven hundred and sixty is not, and the difference between those two conclusions turns entirely on whether people search or scroll, which we cannot observe either.
+
+The marketplace also converts differently. A listing there ends in an installed plugin from one command; an entry on a list ends in a click to a repository and a decision. That multiplier is real and it favours the marketplace. It does not recover a factor of 760.
+
+**Decision: submit to both, and stop treating the marketplace as the priority.** The awesome list is the better slot on every measurable axis and it is the one with a date on it. Run `claude plugin validate` before the marketplace submission; the review pipeline runs the same check.
+
+The category finding is worth more than the ranking. A 52,000-star list has a two-entry section for prose quality. Being one of three there is a position no amount of work buys in a flat catalog of 2,281.
 
 ### 7.5 What this is worth beyond the product
 
