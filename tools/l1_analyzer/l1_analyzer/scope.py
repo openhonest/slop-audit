@@ -76,7 +76,14 @@ SCOPES: dict[str, Scope] = {
     # 24 of 57 absolute-path findings on the run that prompted the scope fix.
     PRODUCTION: {
         "excludes": ("tests", "test"),
-        "indicators": ("L1.15", "L1.18", "L1.19", "path_cover", "absolute_paths", "gate:type-escapes"),
+        # L1.12 measures dead code in production source and divides by production LOC, and
+        # it splits its reference sites into production and test so a symbol only the
+        # tests call is disclosed rather than called dead. L1.14 counts the whole tree,
+        # the way `gitleaks --no-git` does, but splits the count the same way: a fixture
+        # credential and a production credential are not the same finding to an auditor.
+        # Both read this rule, so both are declared here.
+        "indicators": ("L1.12", "L1.14", "L1.15", "L1.18", "L1.19", "path_cover",
+                       "absolute_paths", "gate:type-escapes"),
     },
     # The same, and conformance/ as well. A conformance directory holds law and spec
     # scaffolding and test doubles (fault-injection markers, failing connections), so it

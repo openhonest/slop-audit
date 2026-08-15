@@ -68,7 +68,12 @@ def _fixture(tmp_path):
 # L1.12 (vulture), L1.13 (jscpd) and L1.14 (gitleaks / detect-secrets) are the only
 # indicators in compute_source_indicators that branch on shutil.which. They are the
 # whole ambient-state surface of this golden.
-OPTIONAL_TOOL_INDICATORS = ("L1.12", "L1.13", "L1.14")
+# Only L1.13 still shells out. L1.12 and L1.14 went native on 2026-08-15, so the golden
+# legitimately records real bands for them; guarding them here would now assert that a
+# working indicator is absent. L1.12 and L1.14 were listed while they depended on vulture
+# and gitleaks, which is also how they reported Healthy on a repository holding live
+# secrets: the tool exits non-zero WHEN IT FINDS SOMETHING, and that exit was swallowed.
+OPTIONAL_TOOL_INDICATORS = ("L1.13",)
 
 
 def test_frozen_mode_matches_registered_golden_byte_for_byte(tmp_path, monkeypatch):
@@ -184,3 +189,48 @@ def test_attribution_falls_back_when_the_name_is_never_assigned_here(tmp_path):
     result = state_bounds.classify(tmp_path, "python")
     for finding in result["findings"]:
         assert finding["line"] >= 1
+
+
+# ----------------------------------------------------------------------------
+# Negated membership: the same predicate, spelled two ways.
+# ----------------------------------------------------------------------------
+
+_MEMBERSHIP_SRC = """\
+store = {{}}
+
+def lookup(key):
+    if key {op} store:
+        return None
+    return store.get(key)
+"""
+
+
+def _membership_finding(tmp_path, op: str) -> dict:
+    """The single L1.18b finding for `store`, guarding a membership test spelled `op`."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "app.py").write_text(_MEMBERSHIP_SRC.format(op=op))
+    findings = state_bounds.classify(tmp_path, "python")["findings"]
+    return next(f for f in findings if f["state"] == "store")
+
+
+def test_negating_a_membership_test_does_not_change_the_verdict(tmp_path):
+    """`key in store` and `key not in store` partition the state identically, so a
+    classifier that grades them differently can be moved from F to A by one word.
+
+    tree-sitter emits `not in` as a SINGLE token of type "not in", not as a `not`
+    wrapping an `in`. Matching on `c.type == "in"` therefore missed the negated form
+    entirely: it fell through membership, reached the comparison arm, and was called
+    finite and ordered. That is the cheapest gaming hole this classifier has had, and
+    it inverted a published grade."""
+    plain = _membership_finding(tmp_path / "a", "in")
+    negated = _membership_finding(tmp_path / "b", "not in")
+    assert plain["verdict"] == negated["verdict"]
+    assert plain["partition"] == negated["partition"]
+
+
+def test_a_membership_partition_is_not_ordered(tmp_path):
+    """Set membership has no ordering, so limit testing cannot exploit it. Claiming
+    otherwise is what let the negated form read as two ordered classes."""
+    for op in ("in", "not in"):
+        finding = _membership_finding(tmp_path / op.replace(" ", "_"), op)
+        assert finding["partition"]["ordered"] is False, op

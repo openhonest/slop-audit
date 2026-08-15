@@ -25,8 +25,10 @@ failure 2aff645 did not have.
 What it does not see, said plainly. The guard watches ONE rule, the one that decides
 whether a directory named like a test directory is believed. A scope edit that touches
 nothing else the fixture contains, such as adding a new marker to a scope's `excludes`,
-moves nothing here and passes. The runtime half of L1.19, L1.20, and the external-tool
-indicators L1.12 to L1.14 read no scope at all and are outside its reach either way.
+moves nothing here and passes. The runtime half of L1.19 and L1.20 read no scope at all
+and are outside its reach either way. L1.13 still delegates to an external tool and reads
+no scope; L1.12 and L1.14 became native and now do, so both are declared in the table and
+the fixture plants what each of them needs to see.
 """
 
 from __future__ import annotations
@@ -84,6 +86,13 @@ def _make_repo(root: Path, first_line: str) -> Path:
         "",
         "CACHE = {}",
         'ROOT = "/Users/fixture/checkout"',
+        # A fabricated credential, in BOTH builds, so the guard can see L1.14 move. L1.14
+        # counts the whole tree either way, but it splits the count into production and
+        # test hits, and that split reads the corroboration rule. Without a planted
+        # credential the entry is identical in both builds and L1.14 could join a
+        # test-excluding scope leaving no trace, which is the hole _TRAILING_WS closes for
+        # L1.16.
+        'TOKEN = "' + "ghp_" + "q7Rn2Xk9Lm4Pz8Tv1Bd6Hs3Jw5Ny0Cf8Ge2" + '"',
         "",
         "def collect(items=[]):",
         "    return items",

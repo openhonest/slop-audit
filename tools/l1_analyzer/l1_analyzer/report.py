@@ -58,7 +58,13 @@ SILENCE_FLOOR = 0.50
 UNORDERED_CLASS_BOUND: int | None = None
 
 # Audit checks shown on the card, in order, with their published labels.
+# L1.12 and L1.14 are listed but NOT weighted into the grade. They became measurable only
+# when they went native (both reported n/a on any machine without vulture or gitleaks), and
+# adding a check to _HYGIENE_WEIGHTS moves every published grade, which is a methodology
+# decision and not a side effect of implementing an indicator.
 _AUDIT = [
+    ("L1.12", "L1.12 · unreachable-code ratio", "%"),
+    ("L1.14", "L1.14 · secret-scan hits", ""),
     ("L1.15", "L1.15 · type-escape density", "/kloc"),
     ("L1.17", "L1.17 · god-file concentration", "%"),
     ("L1.16", "L1.16 · trailing-whitespace density", "%"),

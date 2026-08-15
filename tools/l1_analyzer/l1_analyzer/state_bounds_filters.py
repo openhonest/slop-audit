@@ -8,12 +8,18 @@ cardinality, is what bounds testability.
 
 These filters run once per attribute, over all its references, and clear a finding to
 NEUTRAL only when a shape is PROVABLY testable. They are conservative: any doubt keeps the
-finding. Three non-overlapping shapes, each load-bearing on its own case:
+finding. Four shapes, each carrying at least one case the others cannot:
 
   write-once   assigned once (through ANY receiver), never mutated, never handed out whole
   memoization  a presence-gated, result-invariant cache whose stored value never reaches a
                branch condition
   carried      a value that appears in no test expression at all
+  accumulator  a presence-gated counter or tally that is only ever written: no reference
+               reads the stored value out, so nothing observable turns on it
+
+The last two overlap on an UNGATED accumulator, which carried already clears. What only the
+accumulator rule reaches is the gated form, `if k not in self._h: self._h[k] = 0`, where the
+membership test does put a reference in a condition.
 
 Python only. The false positives and their proofs are Python (found and verified against
 declaro-persistum). This is slop-audit's own code; the rules are the spec, ported to
@@ -282,11 +288,161 @@ def _is_memoization(cls: Node, attr: str, refs: list[Node]) -> bool:
     return _has_presence_gate(refs) and _writes_are_plain_stores(cls, attr, refs)
 
 
+# --- Rule: write-only accumulator ------------------------------------------------
+#
+# A per-key counter or tally: `if k not in self._h: self._h[k] = 0` followed by
+# `self._h[k] += 1`. It is not a memoization cache - the augmented assignment inspects and
+# rewrites the stored value, which is exactly why _writes_are_plain_stores rejects it, and
+# that rejection is correct. But nothing ever reads the count back out. The membership test
+# gates a branch whose arms both fall through to the same augmented assignment, so no test
+# can tell the arms apart and none needs to. State that cannot change an observable outcome
+# cannot make anything harder to test.
+#
+# The rule has two halves and needs both. The first is that no reference reads the stored
+# value into a condition; the module-level guard in is_false_positive already establishes
+# that. The second is that no reference hands the value out. Dropping the second half would
+# clear a counter whose count is returned and then branched on by the CALLER, which is the
+# compositional hole the classifier guards everywhere else: the decision moves one frame up
+# and the finding evaporates.
+#
+# Both halves are enforced by whitelisting the positions a reference may occupy. Every role
+# below is a WRITE or a presence test; none of them yields the stored value to anything. A
+# reference anywhere else - returned, passed as an argument, iterated, read by key into an
+# expression, invoked - is not on the list, and the rule declines.
+
+# In-place methods that only write. pop, popitem and setdefault also hand the stored value
+# back to the caller, so they read as well as write and are excluded.
+_PURE_WRITE_METHODS = _IN_PLACE - {"pop", "popitem", "setdefault"}
+
+
+def _is_whole_rebind(ref: Node, parent: Node) -> bool:
+    """`self.attr = {}` - the attribute itself is the assignment target."""
+    return parent.child_by_field_name("left") == ref
+
+
+def _is_presence_gate(ref: Node, parent: Node) -> bool:
+    """`k in self.attr` - the container of a membership test, which reads no stored value."""
+    return _is_membership_container(ref)
+
+
+def _is_confined_subscript(ref: Node, parent: Node) -> bool:
+    """`self.attr[k]` standing as a store target: `= v`, `+= 1`, or `del`. A keyed read in
+    any other position carries the value somewhere this rule cannot follow."""
+    if parent.child_by_field_name("value") != ref:
+        return False
+    gp = parent.parent
+    if gp is None:
+        return False
+    if gp.type in ("assignment", "augmented_assignment"):
+        return gp.child_by_field_name("left") == parent
+    return gp.type == "delete_statement"
+
+
+def _is_pure_write_call(ref: Node, parent: Node) -> bool:
+    """`self.attr.add(k)` - an in-place method that returns no stored value."""
+    if parent.child_by_field_name("object") != ref:
+        return False
+    gp = parent.parent
+    called = gp is not None and gp.type == "call" and gp.child_by_field_name("function") == parent
+    return called and _text(parent.child_by_field_name("attribute")) in _PURE_WRITE_METHODS
+
+
+# The whitelist, keyed by the PARENT node type a reference sits under.
+_CONFINED_ROLES = {
+    "assignment": _is_whole_rebind,
+    "comparison_operator": _is_presence_gate,
+    "subscript": _is_confined_subscript,
+    "attribute": _is_pure_write_call,
+}
+
+
+def _is_confined_reference(ref: Node) -> bool:
+    parent = ref.parent
+    if parent is None:
+        return False
+    role = _CONFINED_ROLES.get(parent.type)
+    return role is not None and role(ref, parent)
+
+
+def _is_attr_write_target(node: Node | None, attr: str) -> bool:
+    """`self.attr` or `self.attr[k]`, as the left-hand side of a write."""
+    if _is_keyed_read_of(node, attr):
+        return True
+    return node is not None and node.type == "attribute" and _text(node.child_by_field_name("attribute")) == attr
+
+
+def _stmt_is_attr_assignment(node: Node, attr: str) -> bool:
+    return _is_attr_write_target(node.child_by_field_name("left"), attr)
+
+
+def _stmt_is_attr_delete(node: Node, attr: str) -> bool:
+    return all(_is_attr_write_target(c, attr) for c in node.named_children)
+
+
+def _stmt_is_attr_write_call(node: Node, attr: str) -> bool:
+    fn = node.child_by_field_name("function")
+    if fn is None or fn.type != "attribute":
+        return False
+    obj = fn.child_by_field_name("object")
+    return _is_attr_write_target(obj, attr) and _is_pure_write_call(obj, fn)
+
+
+_GATED_STATEMENTS = {
+    "assignment": _stmt_is_attr_assignment,
+    "augmented_assignment": _stmt_is_attr_assignment,
+    "delete_statement": _stmt_is_attr_delete,
+    "call": _stmt_is_attr_write_call,
+}
+
+
+def _writes_only_the_attribute(stmt: Node, attr: str) -> bool:
+    """`stmt` writes `attr` and does nothing else the caller could observe."""
+    inner = stmt.named_children[0] if stmt.type == "expression_statement" and stmt.named_children else stmt
+    rule = _GATED_STATEMENTS.get(inner.type)
+    return rule is not None and rule(inner, attr)
+
+
+def _gate_branch(ref: Node) -> Node | None:
+    """The `if` or `elif` whose condition this membership test is. None when the test sits
+    somewhere with no block to read - a ternary, an assert, a comprehension guard - or in a
+    condition the walk leaves without finding one."""
+    cur = ref
+    while cur.parent is not None:
+        parent = cur.parent
+        if parent.type in _FUNCTION_TYPES:
+            return None
+        if parent.type in ("if_statement", "elif_clause") and parent.child_by_field_name("condition") == cur:
+            return parent
+        cur = parent
+    return None
+
+
+def _gated_branches_converge(attr: str, refs: list[Node]) -> bool:
+    """Every membership gate on the attribute guards branches that write only the attribute.
+    Without this, `if k in self._seen: self._misses += 1` would clear: the presence decides
+    something after all, just in a neighbouring slot rather than in a return value, and the
+    module guard's result-invariance check only looks at returns."""
+    for ref in refs:
+        if not _is_membership_container(ref):
+            continue
+        gate = _gate_branch(ref)
+        if gate is None:
+            return False
+        for block in (n for n in _descendants(gate) if n.type == "block"):
+            if not all(_writes_only_the_attribute(s, attr) for s in block.named_children):
+                return False
+    return True
+
+
+def _is_write_only_accumulator(attr: str, refs: list[Node]) -> bool:
+    return all(_is_confined_reference(r) for r in refs) and _gated_branches_converge(attr, refs)
+
+
 # --- entry point -----------------------------------------------------------------
 
 def is_false_positive(key: str, refs: list[Node], verdict: str) -> bool:
     """True when the finding for this attribute is a provable false positive under one of
-    the three rules, and should be reclassified NEUTRAL. Conservative: any doubt is False.
+    the four rules, and should be reclassified NEUTRAL. Conservative: any doubt is False.
 
     The verdict gates which rules may fire. UNRESOLVED means the classifier could not decide
     the reaching set (dynamic dispatch, an unknown callee): that is a genuine fail-closed
@@ -309,5 +465,7 @@ def is_false_positive(key: str, refs: list[Node], verdict: str) -> bool:
     if _is_write_once(cls, attr, refs):
         return True                                   # immutable, read only in bounded ways
     if verdict == "promiscuous":
-        return _is_memoization(cls, attr, refs) or _drives_no_decision(refs)
+        return (_is_memoization(cls, attr, refs)
+                or _drives_no_decision(refs)
+                or _is_write_only_accumulator(attr, refs))
     return False

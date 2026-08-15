@@ -453,11 +453,30 @@ def detect_primary_language(repo: Path) -> str:
 # Full source-based indicators with tree-sitter for multi-lang support
 # ---------------------------------------------------------------------------
 
-def _run_external(cmd: list[str], cwd: Path) -> str:
+class ExternalRun(TypedDict):
+    """The result of shelling out: whether the tool ran, what it exited with, and what
+    it printed. All three, because for a scanner a NON-ZERO EXIT IS THE FINDING.
+
+    This replaces a `check_output` wrapped in `except CalledProcessError: return ""`,
+    which collapsed "tool absent" and "tool ran and found something" into the same empty
+    string. gitleaks exits 1 when it finds leaks and vulture exits 3 when it finds dead
+    code, so under that helper L1.14 and L1.12 reported 0 findings and a Healthy band on
+    exactly the repositories that had findings. The bug survived because the tests
+    stubbed both tools with shell scripts that exit 0, so only the clean path was ever
+    executed. A helper that cannot tell silence from a scream must not be the thing a
+    security indicator reads.
+    """
+    ran: bool
+    status: int
+    output: str
+
+
+def _run_external(cmd: list[str], cwd: Path) -> ExternalRun:
     try:
-        return subprocess.check_output(cmd, cwd=str(cwd), text=True, stderr=subprocess.DEVNULL)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ""
+        done = subprocess.run(cmd, cwd=str(cwd), text=True, capture_output=True, check=False)
+    except (FileNotFoundError, OSError):
+        return {"ran": False, "status": -1, "output": ""}
+    return {"ran": True, "status": done.returncode, "output": done.stdout}
 
 def compute_source_indicators(
     repo: Path,
@@ -490,6 +509,14 @@ def compute_source_indicators(
     results["L1.18"] = analyze_mutable_state(repo, lang)
     results["L1.15"] = _compute_type_escapes(repo, lang)
     results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds, python_executable)
+    # L1.12 and L1.14, native on tree-sitter. Both were external-tool delegations that
+    # reported n/a on any machine without vulture or gitleaks, and reported a fabricated
+    # zero on any machine that had gitleaks and a real leak (see ExternalRun).
+    from l1_analyzer import dead_code, secret_scan
+    # Both return dict[str, object], the same shape state_bounds.classify returns for
+    # L1.18b: value/band/details plus the finding lists that make the number readable.
+    results["L1.12"] = dead_code.analyze(repo, lang)
+    results["L1.14"] = secret_scan.analyze(repo, lang)
     results.update(_compute_external_indicators(repo, lang))
     results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds, python_executable)
     if classify_state_bounds:
@@ -819,47 +846,29 @@ def _compute_decision_space(repo: Path, lang: str) -> L1Result:
     return {"value": decision_points, "band": "n/a", "details": _with_skipped(detail, skipped)}
 
 def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
-    """Indicators that delegate to an external tool. Each reports an honest
-    `n/a` when the tool it needs is not installed, rather than a fabricated
-    number or a misleading "Healthy" that only means "nothing ran".
+    """L1.13, the one indicator still delegated to an external tool. It reports an honest
+    `n/a` when jscpd is not installed, rather than a fabricated number or a misleading
+    "Healthy" that only means "nothing ran".
+
+    L1.12 and L1.14 used to live here, delegated to vulture and gitleaks. They are now
+    native (dead_code.py, secret_scan.py): six ecosystems' toolchains cannot be asked of
+    an auditor at a client site, and while the tools were absent both indicators reported
+    n/a, which is most machines and all of CI.
     """
-    res: dict[str, L1Result] = {}
+    if not shutil.which("jscpd"):
+        return {"L1.13": {"value": "n/a", "band": "n/a", "details": "install jscpd to compute L1.13"}}
 
-    # L1.14 secrets - prefer gitleaks, then detect-secrets
-    if shutil.which("gitleaks"):
-        out = _run_external(["gitleaks", "detect", "--no-git", "--source", ".", "--report-format", "json", "--report-path", "/dev/stdout"], repo)
-        hits = out.count('"RuleID"')
-        res["L1.14"] = {"value": hits, "band": band(hits, 1, 3, higher_is_better=False), "details": "gitleaks findings"}
-    elif shutil.which("detect-secrets"):
-        out = _run_external(["detect-secrets", "scan", "."], repo)
-        hits = out.count('"is_verified"')
-        res["L1.14"] = {"value": hits, "band": band(hits, 1, 3, higher_is_better=False), "details": "detect-secrets findings"}
-    else:
-        res["L1.14"] = {"value": "n/a", "band": "n/a", "details": "install gitleaks or detect-secrets to compute L1.14"}
-
-    # L1.12 dead code - language-specific tool; only Python (vulture) is wired here
-    if lang == "python" and shutil.which("vulture"):
-        out = _run_external(["vulture", ".", "--min-confidence", "80"], repo)
-        unreach = len([line for line in out.splitlines() if line.strip()])
-        res["L1.12"] = {"value": unreach, "band": "Healthy" if unreach < 50 else "Slop", "details": "vulture unreachable/unused symbols"}
-    elif lang == "python":
-        res["L1.12"] = {"value": "n/a", "band": "n/a", "details": "install vulture to compute L1.12 for Python"}
-    else:
-        res["L1.12"] = {"value": "n/a", "band": "n/a", "details": f"no dead-code tool wired for {lang} (Python uses vulture)"}
-
-    # L1.13 clones - jscpd, parse the reported duplication percentage
-    if shutil.which("jscpd"):
-        out = _run_external(["jscpd", "--mode", "weak", "--min-tokens", "50", "--reporters", "console", "."], repo)
-        m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", out)
-        if m:
-            clone_pct = float(m.group(1))
-            res["L1.13"] = {"value": clone_pct, "band": band(clone_pct, 3, 10, higher_is_better=False), "details": "jscpd duplication percentage"}
-        else:
-            res["L1.13"] = {"value": "n/a", "band": "n/a", "details": "jscpd produced no parseable duplication percentage"}
-    else:
-        res["L1.13"] = {"value": "n/a", "band": "n/a", "details": "install jscpd to compute L1.13"}
-
-    return res
+    # jscpd exits non-zero when duplication crosses its threshold, so the exit status is
+    # read, never used to discard the output. See ExternalRun.
+    run = _run_external(["jscpd", "--mode", "weak", "--min-tokens", "50", "--reporters", "console", "."], repo)
+    match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", run["output"])
+    if match is None:
+        reason = ("jscpd produced no parseable duplication percentage"
+                  if run["ran"] else "jscpd is on PATH but could not be executed")
+        return {"L1.13": {"value": "n/a", "band": "n/a", "details": reason}}
+    clone_pct = float(match.group(1))
+    return {"L1.13": {"value": clone_pct, "band": band(clone_pct, 3, 10, higher_is_better=False),
+                      "details": "jscpd duplication percentage"}}
 
 
 # L1.18 mutable-state analysis lives in mutable_state.py; re-exported here so the

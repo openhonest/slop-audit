@@ -415,31 +415,40 @@ def _stub(bin_dir, name, body):
 def test_external_tools_absent_are_na(tmp_path, monkeypatch):
     bind = tmp_path / "bin"
     bind.mkdir()
-    monkeypatch.setenv("PATH", str(bind))  # no gitleaks/vulture/jscpd on PATH
+    monkeypatch.setenv("PATH", str(bind))  # no jscpd on PATH
     res = indicators._compute_external_indicators(tmp_path, "python")
-    assert res["L1.14"]["band"] == "n/a"
-    assert res["L1.12"]["band"] == "n/a"
     assert res["L1.13"]["band"] == "n/a"
 
 
-def test_l1_14_gitleaks_present_counts_findings(tmp_path, monkeypatch):
+def test_a_tool_that_exits_non_zero_still_yields_its_output(tmp_path):
+    """Regression: a scanner's non-zero exit IS its finding.
+
+    `_run_external` used to be `check_output` under `except CalledProcessError: return ""`.
+    gitleaks exits 1 when it finds leaks and vulture exits 3 when it finds dead code, so
+    the finding case was swallowed to an empty string and L1.14 reported 0 hits and a
+    Healthy band on a repository holding live credentials. The old tests stubbed both
+    tools with scripts that exit 0, which is why only the clean path was ever run.
+    """
     bind = tmp_path / "bin"
-    _stub(bind, "gitleaks", "printf '{\"RuleID\":\"a\"}\\n{\"RuleID\":\"b\"}\\n'")
-    monkeypatch.setenv("PATH", str(bind))
-    res = indicators._compute_external_indicators(tmp_path, "python")
-    assert res["L1.14"]["value"] == 2
-    assert res["L1.14"]["band"] == "Not Healthy"  # band(2, 1, 3, lower-is-better)
+    _stub(bind, "noisyfail", "printf 'FOUND: two leaks\\n'; exit 1")
+    run = indicators._run_external([str(bind / "noisyfail")], tmp_path)
+    assert run["ran"] is True and run["status"] == 1
+    assert "FOUND: two leaks" in run["output"]
 
 
-def test_l1_12_vulture_present_and_non_python(tmp_path, monkeypatch):
-    bind = tmp_path / "bin"
-    _stub(bind, "vulture", "printf 'a\\nb\\nc\\n'")
-    monkeypatch.setenv("PATH", str(bind))
-    res = indicators._compute_external_indicators(tmp_path, "python")
-    assert res["L1.12"]["value"] == 3 and res["L1.12"]["band"] == "Healthy"
-    # non-Python has no dead-code tool wired
-    res_go = indicators._compute_external_indicators(tmp_path, "go")
-    assert res_go["L1.12"]["band"] == "n/a" and "no dead-code tool" in res_go["L1.12"]["details"]
+def test_a_tool_that_is_absent_is_distinguishable_from_one_that_failed(tmp_path):
+    run = indicators._run_external([str(tmp_path / "no-such-binary")], tmp_path)
+    assert run["ran"] is False and run["output"] == ""
+
+
+def test_l1_12_and_l1_14_are_native_and_need_no_tool_on_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", "")   # no vulture, no gitleaks, no anything
+    (tmp_path / "app.py").write_text(
+        'AWS = "' + "AKIA" + "2E0RTQ4KJ7X9WZ1P" + '"\n\n\ndef orphan():\n    return 1\n')
+    res = indicators.compute_source_indicators(
+        tmp_path, lang="auto", exec_tests=False, timeout_seconds=5, classify_state_bounds=False)
+    assert res["L1.12"]["band"] != "n/a" and res["L1.12"]["value"] > 0
+    assert res["L1.14"]["value"] == 1 and res["L1.14"]["band"] == "Not Healthy"
 
 
 def test_l1_13_jscpd_present_parseable_and_not(tmp_path, monkeypatch):
@@ -515,13 +524,15 @@ def test_l1_20_timeout_is_na(tmp_path):
     assert res["band"] == "n/a" and "timed out" in res["details"]
 
 
-def test_l1_14_detect_secrets_fallback(tmp_path, monkeypatch):
-    # gitleaks absent, detect-secrets present -> the elif branch
-    bind = tmp_path / "bin"
-    _stub(bind, "detect-secrets", "printf '\"is_verified\": false\\n\"is_verified\": false\\n'")
-    monkeypatch.setenv("PATH", str(bind))
-    res = indicators._compute_external_indicators(tmp_path, "python")
-    assert res["L1.14"]["value"] == 2 and res["L1.14"]["details"].startswith("detect-secrets")
+def test_l1_14_finds_a_planted_secret_rather_than_only_proving_a_clean_tree_clean(tmp_path):
+    """The finding case, which is the case the external-tool version never exercised."""
+    from l1_analyzer import secret_scan
+    (tmp_path / "settings.py").write_text(
+        'GITHUB = "' + "ghp_" + "q7Rn2Xk9Lm4Pz8Tv1Bd6Hs3Jw5Ny0Cf8Ge2" + '"\n'
+        'SLACK = "' + "xoxb" + "-2847361920-4827361958264-Kj8Nm2Pq7Rt4Vw9Xz1Bc5Df" + '"\n')
+    res = secret_scan.analyze(tmp_path, "python")
+    assert res["value"] == 2 and res["band"] == "Not Healthy"
+    assert {f["rule"] for f in res["findings"]} == {"github-token", "slack-token"}
 
 
 def test_git_indicators_binary_file_numstat(tmp_path):

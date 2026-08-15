@@ -59,6 +59,12 @@ CARD_COPY: dict[str, str] = {
     "label.L1.20": "Does the test suite give the same answer twice",
     "tech.L1.20": "L1.20 · test determinism",
     "meaning.L1.20": "How many of five randomized-order suite runs passed cleanly. Flakiness here means shared mutable state leaking between tests, so a green suite is not a stable one.",
+    "label.L1.12": "Code nothing can reach and nothing calls",
+    "tech.L1.12": "L1.12 · unreachable-code ratio",
+    "meaning.L1.12": "The share of production lines that either sit below a return, or define a name nothing in the repository ever uses. AI assistants write helpers nobody calls, because each generation sees only the prompt and not what already exists. Read this as a floor: anything reached by reflection, dynamic dispatch or a framework is reported separately as undecidable, never counted here.",
+    "label.L1.14": "Credentials committed into the code",
+    "tech.L1.14": "L1.14 · secret-scan hits",
+    "meaning.L1.14": "How many distinct API keys, passwords and tokens are sitting in tracked files. In a regulated enterprise any non-zero count is disqualifying. No credential is tested against its issuer, so a hit means credential-shaped, not proven live.",
     "label.L1.15": "Escapes from the type system",
     "tech.L1.15": "L1.15 · type-escape density",
     "meaning.L1.15": "How often the code opts out of its own type checker (any, # type: ignore, interface{}, dynamic) per thousand lines. Each escape is a spot the compiler can no longer protect, so a test has to cover it by hand.",
@@ -100,6 +106,11 @@ _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _CORE_STATIC = ({"key": "L1.19", "unit": "", "maps_to": []},)
 _CORE_RAN = ({"key": "L1.19", "unit": "", "maps_to": []}, {"key": "L1.20", "unit": "", "maps_to": []})
 _AUDIT = (
+    # The canon's own mapping: L1.12 triangulates tech debt with L1.5/L1.6/L1.7
+    # (dimensions/17-tech-debt-management.md), and L1.14 is the first check of the
+    # configuration-and-secrets dimension (dimensions/07-configuration-secrets.md).
+    {"key": "L1.12", "unit": "%", "maps_to": [{"dimension": "Tech-debt management · 4.17", "frameworks": "NIST CM-8 / SA-15 · SOC 2 CC7.1 · ISO/IEC 25010"}]},
+    {"key": "L1.14", "unit": "", "maps_to": [{"dimension": "Configuration and secrets · 4.7", "frameworks": "NIST IA-5 / SC-28 · SOC 2 CC6.1 · OWASP ASVS V6 · Quebec Law 25"}]},
     {"key": "L1.15", "unit": "/kloc", "maps_to": [{"dimension": "Dependency injection · 4.12", "frameworks": "NIST SA-11 · ISO/IEC 25010 (testability)"}]},
     {"key": "L1.17", "unit": "%", "maps_to": [{"dimension": "Tech-debt management · 4.17", "frameworks": "NIST CM-8 / SA-15 · SOC 2 CC7.1 · ISO/IEC 25010"}]},
     {"key": "L1.16", "unit": "%", "maps_to": [{"dimension": "SDLC with AI safeguards · 4.16", "frameworks": "NIST SA-3 / SA-8 · SOC 2 CC8.1 · OSFI B-13 §4.1.3"}]},

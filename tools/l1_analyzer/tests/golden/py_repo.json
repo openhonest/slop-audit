@@ -1,8 +1,33 @@
 {
   "L1.12": {
-    "band": "n/a",
-    "details": "install vulture to compute L1.12 for Python",
-    "value": "n/a"
+    "band": "Slop",
+    "counts": {
+      "definitions": 2,
+      "entry_points": 0,
+      "files_token_pasting": 0,
+      "files_unparsed": 0,
+      "test_only": 0,
+      "undecidable": 0,
+      "unreachable": 0,
+      "unreferenced": 1
+    },
+    "details": "23 flagged line(s) of 28 production python LOC (28 of them analyzed) (1 unreferenced definition(s), 0 unreachable statement(s)); 0 definition(s) undecidable and excluded from the numerator, 0 referenced only by tests, 0 runtime entry point(s); lower bound - dynamic dispatch, reflection and framework registration are not resolved",
+    "findings": [
+      {
+        "category": "unreferenced",
+        "end_line": 28,
+        "file": "app.py",
+        "kind": "class",
+        "line": 6,
+        "name": "Service"
+      }
+    ],
+    "flagged_lines": 23,
+    "production_loc": 28,
+    "test_only": [],
+    "undecidable": [],
+    "unreadable": 0,
+    "value": 82.14
   },
   "L1.13": {
     "band": "n/a",
@@ -10,9 +35,19 @@
     "value": "n/a"
   },
   "L1.14": {
-    "band": "n/a",
-    "details": "install gitleaks or detect-secrets to compute L1.14",
-    "value": "n/a"
+    "band": "Healthy",
+    "confirmed": "not evaluated",
+    "counts": {
+      "by_rule": {},
+      "in_production": 0,
+      "in_tests": 0,
+      "occurrences": 0,
+      "total": 0
+    },
+    "details": "0 distinct secret(s) in 0 occurrence(s) across 1 scanned file(s) (0 in production code, 0 only in the test tree); scope: the whole tree: not a git working copy, so gitignored files cannot be excluded; the canon's second Slop arm, a confirmed true positive, is not evaluated: no credential is validated against its issuer",
+    "files_scanned": 1,
+    "findings": [],
+    "value": 0
   },
   "L1.15": {
     "band": "Healthy",

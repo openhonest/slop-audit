@@ -17,6 +17,31 @@ The methodology is documents, and it is runnable by an assessor from those docum
 
 **Companion instrument.** [Umbra](https://github.com/openhonest/umbra) applies the same discipline at the level of a single module and its tests: it reports what a test suite is structurally unable to see and proves each gap with a real failing test, across six languages. Where the Slop Audit scores a whole codebase, Umbra is the module-level tool you point at the code an assistant just wrote.
 
+## The third consumer: an agent, mid-edit
+
+The two readers above are a trained assessor working through the documents, and someone pasting a repository into the web form. There is a third, and it is the one this standard is being built toward.
+
+Guardrails on AI-written code are inspection. They run after the model has produced its output and sort the good from the bad, and the generator is untouched, so tomorrow it writes the same defect again. Deming's rule is that you cannot inspect quality into a product. You have to build it in.
+
+A slop audit is the other thing. It measures **how the code is built** rather than judging what came out. Can its state be enumerated? Is every decision branch reachable by a test? Does the suite give the same answer twice? Those are properties of the process, and a process can be brought under control.
+
+So the unit under control is not the team's quarterly practice. **It is the agent's edit loop, and every write to a file is a sample.** A file audits in under a second, which is fast enough to return a corrective signal while the code is still being written, and a signal that arrives at the moment of writing is the only one we have seen change behaviour.
+
+Two properties this places on the tool, both of which are requirements rather than niceties. The output has to be deterministic instruction an agent can act on without interpretation. And a run that finds nothing new must be **byte-identical** to the last one, because a number that moves when nothing changed is noise an optimizer will climb.
+
+That work is in progress and is not yet part of the standard. What exists:
+
+| Document | What it settles |
+|---|---|
+| [candidate-methods/ai-consumer-instruction-contract.md](candidate-methods/ai-consumer-instruction-contract.md) | The output contract for an agent consumer, written for edit-loop tempo rather than for a report |
+| [candidate-methods/layer1-longitudinal-method.md](candidate-methods/layer1-longitudinal-method.md) | Reading Layer 1 as a control chart: control limits against specification limits, common cause against special cause |
+| [candidate-methods/layer1-longitudinal-reporting.md](candidate-methods/layer1-longitudinal-reporting.md) | How to report a longitudinal reading without inviting the tampering it warns against |
+| [candidate-methods/silence-index-for-finite-testability.md](candidate-methods/silence-index-for-finite-testability.md) | Reporting what the analyzer could not read as silence, beside the grade and never inside it |
+| [tools/variance-decomposition/](tools/variance-decomposition/) | Within-repository against between-repository variance, which decides whether a single measurement characterizes a repository at all |
+| [tools/edit-replay/](tools/edit-replay/) | Reconstructing the saved states of a file from an agent's transcript, because a control chart needs candidate states and a repository only keeps accepted ones |
+
+Everything in `candidate-methods/` is exactly that: candidate, unapproved, and not part of the standard until it is moved out of that directory.
+
 ## Run it on a repo
 
 Layer 1 is mechanical, so it ships as a tool. Three ways to run it, in the order most auditors will want them.

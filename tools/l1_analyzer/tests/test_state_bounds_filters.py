@@ -59,6 +59,22 @@ def test_carried_value_that_drives_no_decision_clears():
     assert _verdict(src, "self._qs") == "neutral"
 
 
+def test_write_only_counter_clears():
+    # A per-key counter. The accumulator filter is what clears this, and nothing else does:
+    # the membership test puts a reference in a condition, so the carried rule declines, and
+    # the augmented assignment reads and rewrites the stored value, so the memoization rule
+    # declines too. That refusal is right - a counter is not a memo cache - but it left the
+    # counter with no shape to match. Nothing ever reads the count back out, and the gate's
+    # two arms fall through to the same statement, so no test can distinguish them.
+    #
+    # Until the `not in` token fix this test passed for the wrong reason: the negated
+    # membership went unrecognised, so the reference was graded a finite ordered comparison
+    # and never became a finding. Spelling the gate `k in self._h` would have flagged it.
+    src = ("class N:\n    def __init__(self):\n        self._h = {}\n"
+           "    def bump(self, k):\n        if k not in self._h:\n            self._h[k] = 0\n        self._h[k] += 1\n")
+    assert _verdict(src, "self._h") == "neutral"
+
+
 def test_write_once_immutable_clears():
     # assigned once (unknown-typed arg -> unresolved), never mutated, handed out only as a copy.
     src = ("class C:\n    def __init__(self, rows):\n        self._rows = rows\n"
@@ -91,15 +107,6 @@ def test_value_indexed_lookup_keeps_returns_none_on_miss():
     assert _verdict(src, "self._c") == "promiscuous"
 
 
-def test_write_only_counter_is_already_bounded_no_filter_needed():
-    # A per-key counter whose value is never read into a branch is already neutral before any
-    # filter: the membership is binary and the augmented value drives no decision. The filter
-    # must not be needed here, and must not mis-handle it.
-    src = ("class N:\n    def __init__(self):\n        self._h = {}\n"
-           "    def bump(self, k):\n        if k not in self._h:\n            self._h[k] = 0\n        self._h[k] += 1\n")
-    assert _verdict(src, "self._h") == "neutral"
-
-
 def test_counted_value_read_into_a_branch_keeps():
     # the same counter, but now the count drives a branch (self._h[k] > 10): the value is
     # unbounded and inspected, so it stays promiscuous - the memoization filter must not clear it.
@@ -107,6 +114,58 @@ def test_counted_value_read_into_a_branch_keeps():
            "    def hot(self, k):\n        if k in self._h and self._h[k] > 10:\n            return True\n"
            "        return False\n    def bump(self, k):\n        self._h[k] = self._h.get(k, 0) + 1\n")
     assert _verdict(src, "self._h") == "promiscuous"
+
+
+def test_counter_read_into_a_branch_elsewhere_keeps():
+    # The same gated counter, but a second method reads the count into a condition. The
+    # accumulator rule must see every reference to the attribute, not only the ones in the
+    # method that writes it, or the decision hides one method away.
+    src = ("class N:\n    def __init__(self):\n        self._h = {}\n"
+           "    def bump(self, k):\n        if k not in self._h:\n            self._h[k] = 0\n        self._h[k] += 1\n"
+           "    def hot(self, k):\n        if self._h[k] > 10:\n            alert(k)\n")
+    assert _verdict(src, "self._h") == "promiscuous"
+
+
+def test_counter_returned_to_the_caller_keeps():
+    # The count leaves the method. The caller can branch on it, so the decision has moved one
+    # frame up rather than disappeared; a filter that cleared this would erase the finding by
+    # refusing to look across the call. This is the half of the rule the escape check carries.
+    src = ("class N:\n    def __init__(self):\n        self._h = {}\n"
+           "    def bump(self, k):\n        if k not in self._h:\n            self._h[k] = 0\n        self._h[k] += 1\n"
+           "    def count(self, k):\n        return self._h[k]\n")
+    assert _verdict(src, "self._h") == "promiscuous"
+
+
+def test_counter_handed_to_an_unknown_callee_keeps():
+    # The same escape by the other route: the count is passed out as an argument. report()
+    # can branch on it and this analyser cannot see inside report(), so the decision is real
+    # and merely invisible. Passing the whole container (report(self._h)) is stopped earlier,
+    # by the classifier itself, and reads unresolved rather than promiscuous; the keyed read
+    # is the form that reaches this rule and has to be refused here.
+    src = ("class N:\n    def __init__(self):\n        self._h = {}\n"
+           "    def bump(self, k):\n        if k not in self._h:\n            self._h[k] = 0\n        self._h[k] += 1\n"
+           "    def flush(self, k):\n        report(self._h[k])\n")
+    assert _verdict(src, "self._h") == "promiscuous"
+
+
+def test_counter_read_into_a_local_before_leaving_keeps():
+    # A one-hop launder: the count lands in a local and the local is returned. A rule that
+    # only looked at the reference's immediate parent would call this confined. The whitelist
+    # refuses any keyed read that is not a store target, which covers the hop.
+    src = ("class N:\n    def __init__(self):\n        self._h = {}\n"
+           "    def bump(self, k):\n        if k not in self._h:\n            self._h[k] = 0\n        self._h[k] += 1\n"
+           "    def count(self, k):\n        n = self._h[k]\n        return n\n")
+    assert _verdict(src, "self._h") == "promiscuous"
+
+
+def test_gate_that_writes_other_state_keeps():
+    # The gate's arms do not converge: presence decides whether a second attribute moves. The
+    # decision is real, it just lands in a neighbouring slot instead of in a return value, so
+    # the module guard's result-invariance check (which reads returns) cannot see it.
+    src = ("class N:\n    def __init__(self):\n        self._seen = {}\n        self._misses = 0\n"
+           "    def note(self, k):\n        if k not in self._seen:\n            self._misses += 1\n"
+           "            self._seen[k] = 0\n        self._seen[k] += 1\n")
+    assert _verdict(src, "self._seen") == "promiscuous"
 
 
 def test_invoked_only_collaborator_clears():

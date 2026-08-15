@@ -202,11 +202,19 @@ def _is_unbounded_value(node: Node | None, sp: LangSpec) -> bool:
 # Membership and comparison helpers.
 # --------------------------------------------------------------------------
 
+# Every spelling of a membership operator, as tree-sitter TOKENISES it. `not in` is one
+# token of type "not in", not a `not` wrapping an `in`, so matching only "in" missed the
+# negated form entirely. It then fell through to the comparison arm and was graded finite
+# and ORDERED, which inverted the verdict: `key in store` graded the repository F and
+# `key not in store` graded it A. One word, semantics unchanged, and no disclosure.
+_MEMBERSHIP_TOKENS = frozenset({"in", "not in"})
+
+
 def _membership_operands(node: Node | None, sp: LangSpec) -> tuple[Node, Node] | None:
     """(left, right) for an `in` / `not in` membership test, else None."""
     style = sp["membership"]
     if style == "comparison_in" and node.type == "comparison_operator":
-        if not any(c.type == "in" for c in node.children):
+        if not any(c.type in _MEMBERSHIP_TOKENS for c in node.children):
             return None
         named = [c for c in node.children if c.is_named]
         return (named[0], named[-1]) if len(named) >= 2 else None
