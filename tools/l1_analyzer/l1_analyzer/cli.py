@@ -13,7 +13,13 @@ import json
 import sys
 from pathlib import Path
 
-from l1_analyzer import card, indicators, interleaving_robustness, thread_surface
+from l1_analyzer import (
+    card,
+    indicators,
+    interleaving_robustness,
+    report,
+    thread_surface,
+)
 from l1_analyzer.scope import PRODUCTION
 
 
@@ -30,6 +36,26 @@ def _count_type_escapes(repo: Path, lang: str) -> int:
     parser = indicators._get_parser(lang)
     files, _skipped = indicators._read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
     return sum(indicators._count_type_escapes_in_tree(parser.parse(src).root_node, cfg) for _path, src in files)
+
+
+def _slack(actual: int, baseline: int, label: str) -> list[str]:
+    """A baseline looser than reality is slack, and slack is a defect.
+
+    A ratchet set at 4 against 0 actual findings passes silently and leaves room for four
+    free regressions. Nobody notices, because the gate only ever looks upward. So the
+    ratchet has to be tight in both directions: fixing the findings obliges you to lower
+    the number, in the same reviewable edit that raising it would take.
+
+    Borrowed from declaro-persistum, whose KNOWN_ORPHANS list carries a companion test,
+    `test_the_allowlist_does_not_outlive_what_it_excuses`, that fails when an entry no
+    longer excuses anything. An exemption that outlives its reason is the shape this
+    codebase keeps finding, and that is a mechanical answer to it.
+    """
+    if actual >= baseline:
+        return []
+    return [(f"{label}: the ratchet is set at {baseline} and the repo has {actual}. "
+             f"Lower it to {actual} in .pre-commit-config.yaml. A baseline above the real "
+             f"count is {baseline - actual} regression(s) nobody will be told about.")]
 
 
 def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_exposed: int | None) -> int:
@@ -69,6 +95,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
                 "# type: ignore. If a new escape is truly unavoidable, raise the baseline in "
                 ".pre-commit-config.yaml as a deliberate, reviewable change."
             )
+        problems.extend(_slack(escapes, max_type_escapes, "type escapes (L1.15)"))
 
     # Thread-safety surface ratchet (opt-in via --max-thread-exposed): the count of
     # hand-overrides of the compiler's thread-safety guarantee (unsafe impl Send/Sync,
@@ -89,6 +116,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
                 "under free-threading; if it is sound, raise the baseline in .pre-commit-config.yaml "
                 "as a deliberate, reviewable change."
             )
+        problems.extend(_slack(exposed, max_thread_exposed, "thread-safety surface"))
 
     if problems:
         print("Slop audit gate FAILED - the audit flags this repo's own code:")
@@ -98,7 +126,20 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
         return 1
     ratchet = "" if escapes is None else f", {escapes}/{max_type_escapes} type escapes"
     ratchet += "" if exposed is None else f", {exposed}/{max_thread_exposed} thread-safety overrides"
-    print(f"Slop audit gate passed: 0 production god-files, finitely testable{ratchet}.")
+    # The pass line reports what the gate CHECKED, not a property it inferred from an empty
+    # count. "Finitely testable" was the same manufactured claim the card was making: zero
+    # promiscuous findings is the bright line, and on a repository the classifier never read
+    # it is zero of nothing. The gate still passes - no proven unbounded state is a real
+    # result and the bright line is a proof, not a survey - but it says which of the two it
+    # got. The census supplies the denominator that tells them apart.
+    census = (results.get("L1.18b") or {}).get("census")
+    if report.census_unread(census):
+        declared = census.get("declared") if isinstance(census, dict) else 0
+        state = (f"no proven unbounded state, but the state classifier reached no verdict "
+                 f"(0 of {declared} declarations read), so finite testability is unmeasured")
+    else:
+        state = "finitely testable"
+    print(f"Slop audit gate passed: 0 production god-files, {state}{ratchet}.")
     return 0
 
 

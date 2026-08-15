@@ -42,7 +42,7 @@ from typing import TypedDict
 
 from tree_sitter import Node
 
-from l1_analyzer import state_bounds_filters, state_partition
+from l1_analyzer import state_bounds_filters, state_census, state_partition
 from l1_analyzer.indicators import (
     LANG_CFG,
     LangCfg,
@@ -492,15 +492,34 @@ def _field_decl_names(fd: Node, sp: LangSpec) -> list[str]:
     return names
 
 
-def _enum_instance_state(cls: Node, sp: LangSpec) -> set[str]:
-    """State keys for a class. Member-style languages name state through a receiver
-    (self.x / this.x) and may also declare fields; identifier-style languages (Java,
+# Both enumerators return an insertion-ordered dict of keys, not a set, and the ordering is
+# the whole reason for the type. `_analyze_file` iterates them to build findings, and the
+# final `findings.sort` keys on verdict, drives_decision, file and line, so two states
+# declared on the SAME line tie on every key. Python's sort is stable, so a tie preserves
+# whatever order the enumerator handed over, and set iteration order over strings varies
+# between processes. Six module dicts on one line serialized in six different orders across
+# six runs of unchanged code.
+#
+# Nothing about the MEASUREMENT moved: identical verdicts, counts, bands and grade every
+# time. Only the row order did, which is a serialization defect and not a determinism one.
+# It still has to be fixed, because a diff of two runs over unchanged code must be empty or
+# an agent watching for change is shown change that is not there (bead slop-audit-8rt).
+#
+# Insertion order is chosen over sorting the keys because insertion order IS source order:
+# the walks below are pre-order, so a reader scanning findings down a file meets the states
+# in the order they are written. `dict[str, None]` is the ordered set Python does not have.
+Keys = dict[str, None]
+
+
+def _enum_instance_state(cls: Node, sp: LangSpec) -> Keys:
+    """State keys for a class, in source order. Member-style languages name state through a
+    receiver (self.x / this.x) and may also declare fields; identifier-style languages (Java,
     C#) reference fields by bare name, so the key is the field name itself."""
-    keys: set[str] = set()
+    keys: Keys = {}
     if sp.get("instance_enum") == "ruby_ivar":
         # Ruby: state is @instance_variables, a node type of their own (no receiver).
         for iv in _local_refs(cls, lambda n: n.type == "instance_variable", sp):
-            keys.add(_text(iv))
+            keys[_text(iv)] = None
         return keys
     if sp.get("instance_enum") == "self_usage":
         # Rust: the field list is on the struct, but state is used as self.<field> in
@@ -508,7 +527,7 @@ def _enum_instance_state(cls: Node, sp: LangSpec) -> set[str]:
         for m in _local_refs(cls, lambda n: n.type in sp["member_types"], sp):
             obj = _field(m, sp["mem_object"])
             if obj is not None and _text(obj) in sp["this_idents"]:
-                keys.add(_text(m))              # "self.<field>"
+                keys[_text(m)] = None           # "self.<field>"
         return keys
     if sp["instance_ref_style"] == "member":
         for n in _local_refs(cls, lambda n: n.type in sp["assign_types"], sp):
@@ -516,10 +535,10 @@ def _enum_instance_state(cls: Node, sp: LangSpec) -> set[str]:
             if left is not None and left.type in sp["member_types"]:
                 obj = _field(left, sp["mem_object"])
                 if obj is not None and _text(obj) in sp["this_idents"]:
-                    keys.add(_text(left))       # "self.x" / "this.x"
+                    keys[_text(left)] = None    # "self.x" / "this.x"
     for fd in _local_refs(cls, lambda n: n.type in sp["field_decl_types"], sp):
         for name in _field_decl_names(fd, sp):
-            keys.add(sp["key_prefix"] + name)
+            keys[sp["key_prefix"] + name] = None
     return keys
 
 
@@ -630,14 +649,33 @@ def _state_refs(scope: Node, key: str, sp: LangSpec) -> list[Node]:
     return _bound_to(hits, key, sp)
 
 
-def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> set[str]:
-    """Top-level mutable bindings, per language (spec key module_enum). Java/C#/Ruby
-    keep module/static state out of this prototype and rely on class scope; C is the
-    reverse (no classes, so file-scope variables are the only state)."""
+def _in_source_order(root: Node, names: set[str]) -> Keys:
+    """`names` re-ordered by where each one first appears in the file.
+
+    The Python module scan lives in mutable_state and returns a set, which L1.18 uses for
+    membership tests where order is meaningless. Rather than change that contract for every
+    caller, the order is recovered here from the tree, which is the authority on it anyway.
+    A name in the set that appears nowhere as a bare identifier cannot happen (the set is
+    built from the tree), and if it ever did it would be dropped, so the leftovers are
+    appended in a fixed order rather than silently lost."""
+    ordered: Keys = {}
+    for node in _refs(root, lambda n: n.type == "identifier"):
+        name = _text(node)
+        if name in names and name not in ordered:
+            ordered[name] = None
+    for name in sorted(names - set(ordered)):
+        ordered[name] = None
+    return ordered
+
+
+def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> Keys:
+    """Top-level mutable bindings, per language (spec key module_enum), in source order.
+    Java/C#/Ruby keep module/static state out of this prototype and rely on class scope; C is
+    the reverse (no classes, so file-scope variables are the only state)."""
     mode = sp.get("module_enum")
-    names: set[str] = set()
+    names: Keys = {}
     if mode == "python":
-        return _find_module_mutable_names(root, cfg)
+        return _in_source_order(root, _find_module_mutable_names(root, cfg))
     if mode == "js":
         # top-level `let`/`var` declarators (const is not module-mutable state)
         for decl in root.children:
@@ -649,7 +687,7 @@ def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> set[str]:
             for vd in _refs(decl, lambda n: n.type == "variable_declarator"):
                 name = _field(vd, "name")
                 if name is not None and name.type == "identifier":
-                    names.add(_text(name))
+                    names[_text(name)] = None
         return names
     if mode == "rust":
         # `static mut NAME` only; a plain static or const is immutable, not counted.
@@ -657,7 +695,7 @@ def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> set[str]:
             if st.type == "static_item" and any(c.type == "mutable_specifier" for c in st.children):
                 name = _field(st, "name")
                 if name is not None:
-                    names.add(_text(name))
+                    names[_text(name)] = None
         return names
     if mode == "go":
         # package-level `var` declarations (const is immutable, not counted)
@@ -666,7 +704,7 @@ def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> set[str]:
                 for vs in _refs(decl, lambda n: n.type == "var_spec"):
                     nm = _field(vs, "name")
                     if nm is not None and nm.type == "identifier":
-                        names.add(_text(nm))
+                        names[_text(nm)] = None
         return names
     if mode == "c":
         # C has no classes: file-scope variable declarations are the only state. Skip
@@ -677,9 +715,9 @@ def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> set[str]:
             for dcl in decl.children:
                 nm = _c_declarator_name(dcl)
                 if nm is not None:
-                    names.add(nm)
+                    names[nm] = None
         return names
-    return set()
+    return {}
 
 
 def _c_declarator_name(node: Node | None) -> str | None:
@@ -852,6 +890,9 @@ def _na(lang: str) -> dict[str, object]:
         "resolvable_fraction": "n/a",
         "silence": state_partition.silence_summary([], 0),
         "partition": state_partition.partition_summary([]),
+        # `declared: None`, not 0. A language with no spec was not counted, and a confident
+        # zero here would report "there is no state" for a repository nobody read.
+        "census": {"declared": None, "admitted": 0, "admitted_fraction": None, "by_kind": {}, "files": 0},
         "findings": [],
         "bucketed": {"counts": {}, "paths": []},
         "details": f"finite-testability classifier has no spec for {lang} yet",
@@ -917,6 +958,15 @@ def classify(repo: Path, lang: str) -> dict[str, object]:
     silence = state_partition.silence_summary(findings, total)
     partition = state_partition.partition_summary(findings)
 
+    # The independent denominator. Every number above this line - the counts, the resolvable
+    # fraction, the silence index, the partition summary - is computed over the state THIS
+    # function recognized, and no measure over the enumerated set can see non-enumeration.
+    # The census counts state-bearing declarations from the parse tree by a separate route,
+    # so a struct field no enumerator here knows about still lands in the denominator and the
+    # gap becomes visible. `value`, `band` and `details` are untouched: they are the fields
+    # the Rust port is validated equal against, and the census is not ported yet.
+    census = state_census.compare(repo, lang, len(findings))
+
     return {
         "verdict": verdict,
         "value": f"{counts[NEUTRAL]} neutral / {counts[PROMISCUOUS]} promiscuous / {counts[UNRESOLVED]} unresolved",
@@ -926,6 +976,7 @@ def classify(repo: Path, lang: str) -> dict[str, object]:
         "resolvable_fraction": resolvable,
         "silence": silence,
         "partition": partition,
+        "census": census,
         "findings": findings,
         "bucketed": bucketed,
         "details": (

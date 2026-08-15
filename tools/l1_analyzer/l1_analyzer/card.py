@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from l1_analyzer import report
 from l1_analyzer.report import UNORDERED_CLASS_BOUND, grade_summary
 
 _TEMPLATES = Path(__file__).parent / "card_templates"
@@ -33,6 +34,7 @@ CARD_COPY: dict[str, str] = {
     "detail.coarse": "Every piece of data here has a limited set of cases, so a fixed number of tests would cover it. The trouble is how many, and that they have no order. When cases are ordered, such as numbers against a limit, you test each side of the limit and you are done, however wide the range. The cases below are names, and one name is not next to another, so there is no shortcut: covering them means one test each. Cut the number of distinct cases, or give them an order, and the count comes down.",
     "detail.cannot": "{n} {plural} of data here can be almost anything, and the code makes decisions based on it. Because it can be anything, there is always one more case to check, so no fixed number of tests can ever cover them all. Writing more tests will not fix this. The only fix is to limit what that data can be, or stop letting other parts of the code change it.",
     "detail.na": "Point it at a public repository with code in a language the analyzer reads: Python, TypeScript, JavaScript, Java, C#, Rust, Ruby, Go, or C.",
+    "detail.na_unread": "Insufficient basis. No grade, and no claim either way about whether this code can be tested. Reading the source directly, we found {declared} places where it declares data it keeps — struct and class fields, instance attributes, file-scope and package-level bindings — and our analysis reached a verdict on none of them. That is a limit of our reading, not a finding about your code: it means we never got far enough to have an opinion. Every other number we publish is worked out over the data we did recognise, so on this repository they are all worked out over nothing, and we will not turn that into a good grade. The most common cause is a construct our reader does not know yet: a C struct field, or a language feature we have not taught it. Send us the repository and we will fix our end.",
     "detail.na_silent": "No grade. We could not work out what {silent} of the {total} pieces of data here are used for, and that is more than half of them. Most often the data is handed to a library we cannot see inside. We will not hand out a good grade on the part we happened to be able to read, because that would reward code that shows us the least. The list below is every place we stopped, so you can see exactly what we could not follow.",
     "culprits.heading.coarse": "What costs too many tests",
     "culprits.heading.cannot": "What makes it impossible",
@@ -199,12 +201,17 @@ def _thread_surface(lang: str, results: dict) -> dict | None:
             "blurb": blurb, "sites": sites, "sites_more": max(0, len(findings) - _THREAD_CAP)}
 
 
-def _detail(status: str, promiscuous: int, cover: int | None, counts: dict) -> str:
-    # Two different things produce `na`, and telling the reader the wrong one wastes their
-    # time: "there is no code here I can read" sends them to check the language, while
-    # "I could not follow most of your state" sends them to the sites. The count of state
-    # tells them apart - a language we cannot read yields none at all.
+def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts: dict, census: dict) -> str:
+    # Three different things produce `na`, and telling the reader the wrong one wastes their
+    # time: "there is no code here I can read" sends them to check the language, "I could not
+    # follow most of your state" sends them to the sites, and "I read none of your state"
+    # sends them to us. The basis names which, and it is read rather than re-derived from the
+    # counts, because the counts are exactly what the unread case has none of: zero neutral,
+    # zero promiscuous and zero unresolved is indistinguishable from a clean repository if you
+    # only look here, and that indistinguishability was the defect.
     if status == "na":
+        if basis == report.UNREAD:
+            return _t("detail.na_unread", declared=census.get("declared", 0))
         return _t("detail.na_silent", silent=counts.get("unresolved", 0),
                   total=sum(counts.values())) if sum(counts.values()) else _t("detail.na")
     if status == "cannot":
@@ -268,7 +275,10 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
     g = grade_summary(results, UNORDERED_CLASS_BOUND)
     status, pct, grade = g["status"], g["testable_pct"], g["grade"]
     pc = results.get("path_cover", {})
-    cover = _int(pc.get("value"))
+    # The path-cover figure is coverage of the ENUMERATED state, so on an ungraded card it
+    # would be a precise number standing next to a refusal to give one. It was the worst part
+    # of the defect: "1,080 runs cover them all" is a coverage claim over an empty set.
+    cover = _int(pc.get("value")) if status != "na" else None
     culprits, culprits_more = _culprits(l18b, status, g["coarse"])
     promiscuous = counts.get("promiscuous", 0)
     core_specs = _CORE_RAN if ran_tests else _CORE_STATIC
@@ -282,7 +292,8 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "slug": slug, "lang": lang, "question": _t("question"), "status": status, "grade": grade,
         "grade_pct": pct, "ran_tests": ran_tests, "tests_measured": tests_measured,
         "headline": "" if status == "na" else _t(f"headline.{status}"),
-        "detail": _detail(status, promiscuous, cover, counts),
+        "basis": g["basis"], "census": g["census"],
+        "detail": _detail(status, g["basis"], promiscuous, cover, counts, g["census"]),
         "paths": cover if status == "can" else None,
         "band": band, "band_word": _BAND_WORD.get(band, "No data"),
         "testable": None if pct is None else f"{pct}%",
@@ -333,12 +344,12 @@ def _silence_lines(card: dict) -> list[str]:
         f"- `{s['file']}:{s['line']}` — `{s['state']}`" for s in sil["sites"]]
 
 
-def card_markdown(card: dict) -> str:
-    """The same card as Markdown, for the CLI and agent-facing output."""
-    strip = re.compile(r"<[^>]+>")
-    lines = [f"# Slop Audit — {card['slug']} ({card['lang']})", ""]
-    if card["status"] == "na":
-        return "\n".join(lines + [strip.sub("", card["detail"])] + _silence_lines(card))
+def _verdict_lines(card: dict, strip: re.Pattern) -> list[str]:
+    """The state verdict and what limits it. Empty on an ungraded card: the grade sentence,
+    the capability claim, the three counts and the path-cover figure are all statements about
+    state, and an ungraded card is one where no state was read. Printing the counts alone
+    would put "0 provably unbounded" under a refusal to grade, which reads as good news."""
+    lines: list[str] = []
     if card["grade"] is not None:
         lines += [f"**Grade: {card['grade']}** — {card['grade_pct']}% of its state is finitely testable", ""]
     lines += [card["headline"], "", strip.sub("", card["detail"]), "",
@@ -357,8 +368,22 @@ def card_markdown(card: dict) -> str:
             lines.append(f"- …and {card['culprits_more']} more")
         if card["status"] == "coarse":
             lines += ["", "> " + strip.sub("", _t("culprits.note.coarse"))]
+    return lines
+
+
+def card_markdown(card: dict) -> str:
+    """The same card as Markdown, for the CLI and agent-facing output."""
+    strip = re.compile(r"<[^>]+>")
+    lines = [f"# Slop Audit — {card['slug']} ({card['lang']})", ""]
+    # An ungraded card keeps the checks that WERE measured. Withholding the state verdict is
+    # a statement about the state classifier, and god-files, secrets, type escapes and CI were
+    # measured by other indicators that the missing state has nothing to do with. The first
+    # version of this returned here and printed one paragraph, which threw away eight measured
+    # results to avoid publishing the one it did not have.
+    lines += [strip.sub("", card["detail"])] if card["status"] == "na" else _verdict_lines(card, strip)
     lines += _silence_lines(card)
-    lines += ["", "> " + strip.sub("", _t("silence.note"))]
+    if card["status"] != "na":
+        lines += ["", "> " + strip.sub("", _t("silence.note"))]
     for group, title in (("core", "group.core.title"), ("audit", "group.audit.title")):
         rows = card[group]
         if not rows:

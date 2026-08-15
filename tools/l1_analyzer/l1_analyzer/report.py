@@ -34,6 +34,42 @@ _A_MIN, _B_MIN = 0.85, 0.60
 # and this number comes down with it.
 SILENCE_FLOOR = 0.50
 
+# Why the floor above cannot catch a repository the analyzer never read, and what does.
+#
+# Silence, the resolvable fraction and the section-7 partition count are all computed over
+# the state the classifier RECOGNIZED. Nothing measured over the enumerated set can see
+# non-enumeration: zero undecided of zero total is 0%, so the floor structurally cannot fire
+# on a repository that produced no findings at all, and the card read that empty denominator
+# as maximum confidence and issued an affirmative "none of the data this code keeps can grow
+# without limit". The state_census module supplies the independent denominator - state-bearing
+# declarations counted straight from the parse tree - and `basis` below is what the comparison
+# decides.
+#
+# THE GAP THRESHOLD IS ZERO ADMITTED, AND NO FRACTIONAL BOUND IS SET. That is the measurement
+# result, not an omission. admitted/declared over the same seventeen trees the silence floor
+# was measured on (the six pinned corpus repositories, this repository, the analyzer package,
+# and nine local Python trees):
+#
+#   gson 1.000  junit4 0.997  Newtonsoft.Json 0.471  json-c 0.348  RestSharp 0.280
+#   multicardz 0.161  libuv 0.158  declaro 0.139  honest-starter 0.069  slop-audit-web 0.068
+#   honest-framework 0.036  open-vrm-app 0.034  umbra 0.007
+#   slop-audit 0.000  l1_analyzer 0.000  weights-watch 0.000  challenge 0.000
+#
+# The positive values are a continuum from 0.007 to 1.0 with no gap to cut at. The widest
+# interior gap is 0.471 to 0.997, which would put a bound near 0.7 and refuse to grade fifteen
+# of the seventeen - measuring the reach of our reading rather than the obscurity of their
+# code, which is the same argument that rejected a 0.10 silence floor. A bound at 0.10 refuses
+# eight of seventeen on the same grounds. Any number in that range would be invented here.
+#
+# Zero is not a small fraction, it is a different fact: no finding at all, so every number
+# downstream has an empty denominator and the report has no evidence to grade. That boundary
+# is where the defect lives and it needs no number. What would settle a fractional bound is a
+# labelled set - repositories where a human has enumerated the state by hand - so the ratio
+# could be scored against a known truth instead of against itself. Until that exists, a thin
+# reading and a thorough one are told apart only at zero, and the census publishes the ratio
+# on every report so a reader can see how thin the reading was.
+NO_SOURCE, UNREAD, SILENT, MEASURED = "no-source", "unread", "silent", "measured"
+
 # A finite, unordered partition wider than this is D. NO NUMBER IS SET, and that is the
 # measurement result, not an omission.
 #
@@ -80,6 +116,20 @@ _VERDICT_LINE = {
     "na": "not graded (too much of its state went undecided, or there is no source in a "
           "language the analyzer reads).",
 }
+# The `na` line, by why. The generic line above is wrong for the unread case in the way that
+# matters: it reads as a fact about the repository, and the unread case is a fact about the
+# analyzer. A reader told "too much of its state went undecided" goes looking for their own
+# obscure code; the truthful message is that we reached no verdict at all and the next move
+# is ours.
+_BASIS_LINE = {
+    UNREAD: "on insufficient basis: the parser found {declared} state-bearing declarations "
+            "and the classifier reached a verdict on none of them, so every number below is "
+            "computed over an empty set. This is the reach of our reading, not a finding "
+            "about this code, and no grade is issued on it.",
+    SILENT: "not graded: more than half its state went undecided, so a good grade would "
+            "reward the code that showed the analyzer least.",
+    NO_SOURCE: "not graded: there is no source here in a language the analyzer reads.",
+}
 # What each silence reason means to the reader, and whose move it is next. The two that
 # matter most are opposite: an external boundary is something the adopter can make readable
 # with an explicit contract, and an unmodeled callee is our backlog. A reader who cannot
@@ -122,6 +172,7 @@ class Report(TypedDict, total=False):
     slug: str
     lang: str
     status: str
+    basis: str
     grade: str | None
     testable_pct: int | None
     neutral: int
@@ -152,7 +203,40 @@ def silence_fraction(counts: dict) -> float:
     return (counts.get("unresolved", 0) / total) if total else 0.0
 
 
-def _status(band: str, counts: dict, coarse: bool, meter_ran: bool) -> str:
+def census_unread(census: object) -> bool:
+    """True when the parser found state-bearing declarations and the classifier produced no
+    finding whatever. The two counts come from different readings on purpose: a shared
+    enumerator would make them agree by construction and this gap could never open."""
+    if not isinstance(census, dict):
+        return False
+    declared = census.get("declared")
+    return isinstance(declared, int) and declared > 0 and census.get("admitted") == 0
+
+
+def _basis(band: str, counts: dict, meter_ran: bool, census: object) -> str:
+    """What evidence the report actually has. Four cases, and three of them forbid a grade.
+
+    The order is the argument. A promiscuous finding is a PROOF, and a proof does not need
+    coverage of everything else to stand: one state that provably reaches an unbounded
+    decision means no finite suite covers the code, however much of the rest went unread.
+    So the silence floor is consulted after it. The floor exists to stop obscurity buying a
+    GOOD grade; letting it erase a proven bad one would be the same error backwards.
+
+    The census check sits above the proof and does not compete with it. `admitted == 0` is
+    the condition, so a repository with any finding at all - a proof included - is never
+    UNREAD, and the two branches cannot both apply to one repository."""
+    if not meter_ran or band == "n/a":
+        return NO_SOURCE
+    if census_unread(census):
+        return UNREAD
+    if counts.get("promiscuous", 0) > 0:
+        return MEASURED
+    if silence_fraction(counts) > SILENCE_FLOOR:
+        return SILENT
+    return MEASURED
+
+
+def _status(basis: str, counts: dict, coarse: bool) -> str:
     """The verifiability status, decided on OBSERVED state only.
 
     An undecided state used to produce `might`, and `might` graded D, so one call the
@@ -160,21 +244,16 @@ def _status(band: str, counts: dict, coarse: bool, meter_ran: bool) -> str:
     as a defect in their code. Undecided state now leaves the status alone and is published
     as the silence index instead.
 
-    The floor is the poka-yoke, and it is the part that cannot be dropped. Grading on
-    observed state alone would hand an A to code that shows the analyzer nothing, because
-    zero observed state is vacuously clean. Above the floor there is no grade at all, so
-    hiding everything buys silence rather than a good letter."""
-    if not meter_ran or band == "n/a":
+    The two ways of showing the analyzer nothing are the poka-yoke, and they are the part
+    that cannot be dropped. Grading on observed state alone would hand an A to code that
+    shows the analyzer nothing, because zero observed state is vacuously clean. Hiding state
+    behind an unreadable boundary trips the silence floor; hiding it in a construct the
+    enumerator does not know about trips the census. Either way there is no grade, so
+    obscurity buys silence rather than a good letter."""
+    if basis != MEASURED:
         return "na"
-    # A promiscuous finding is a PROOF, and a proof does not need coverage of everything
-    # else to stand: one state that provably reaches an unbounded decision means no finite
-    # suite covers the code, however much of the rest we could not read. So the proof is
-    # reported before the floor is consulted. The floor exists to stop obscurity buying a
-    # GOOD grade; letting it erase a proven bad one would be the same error backwards.
     if counts.get("promiscuous", 0) > 0:
         return "cannot"
-    if silence_fraction(counts) > SILENCE_FLOOR:
-        return "na"
     # D, now that silence has vacated it: the reaching partition is finite and countable,
     # its members are unordered, and there are more of them than the bound. Limit testing
     # defeats a large ORDERED domain with a handful of boundary values and defeats a large
@@ -235,11 +314,13 @@ def coarse_states(l18b: dict, bound: int | None) -> list[dict]:
 
 class GradeSummary(TypedDict):
     status: str                 # can | coarse | cannot | na
+    basis: str                  # measured | unread | silent | no-source: why na, when na
     counts: dict[str, int]      # neutral / promiscuous / unresolved
     testable_pct: int | None    # share of DECIDED state that is finitely testable
     hygiene: float | None       # weighted health of the audit checks, 0..1
     grade: str | None           # A/B/C (can), D (coarse), F (cannot), None (na)
     silence: float              # share of state the analyzer could not decide
+    census: dict[str, object]   # declared vs admitted: the independent denominator
     coarse: list[dict]          # the states that made the verdict coarse, widest first
 
 
@@ -257,16 +338,19 @@ def grade_summary(results: dict, unordered_class_bound: int | None) -> GradeSumm
     l18b = results.get("L1.18b") or {}
     counts = (l18b.get("counts") if isinstance(l18b, dict) else None) or {"neutral": 0, "promiscuous": 0, "unresolved": 0}
     coarse = coarse_states(l18b if isinstance(l18b, dict) else {}, unordered_class_bound)
-    status = _status(band, counts, bool(coarse), _meter_ran(l18b))
+    census = l18b.get("census") if isinstance(l18b, dict) else None
+    basis = _basis(band, counts, _meter_ran(l18b), census)
+    status = _status(basis, counts, bool(coarse))
     # The denominator is DECIDED state, not all state. Undecided state is no longer held
     # against the grade, so holding it against the published percentage would put the same
     # blind spot back through a second door.
     decided = counts.get("neutral", 0) + counts.get("promiscuous", 0)
     pct = None if status == "na" else (100 if decided == 0 else round(counts.get("neutral", 0) / decided * 100))
     hygiene = _hygiene(results)
-    return {"status": status, "counts": counts, "testable_pct": pct, "hygiene": hygiene,
-            "grade": _grade(status, pct, hygiene), "silence": silence_fraction(counts),
-            "coarse": coarse}
+    return {"status": status, "basis": basis, "counts": counts, "testable_pct": pct,
+            "hygiene": hygiene, "grade": _grade(status, pct, hygiene),
+            "silence": silence_fraction(counts),
+            "census": census if isinstance(census, dict) else {}, "coarse": coarse}
 
 
 def build_report(slug: str, lang: str, results: dict) -> Report:
@@ -296,7 +380,8 @@ def build_report(slug: str, lang: str, results: dict) -> Report:
     culprits_more = max(0, len(flagged) - 15)
 
     return {
-        "slug": slug, "lang": lang, "status": status, "grade": grade, "testable_pct": pct,
+        "slug": slug, "lang": lang, "status": status, "basis": g["basis"],
+        "census": g["census"], "grade": grade, "testable_pct": pct,
         "neutral": counts.get("neutral", 0), "promiscuous": counts.get("promiscuous", 0),
         "unresolved": counts.get("unresolved", 0),
         "paths": _int((results.get("path_cover") or {}).get("value")),
@@ -328,10 +413,20 @@ def _silence_lines(r: Report) -> list[str]:
                     for s in sil["sites"]]
 
 
+def _na_line(r: Report) -> str:
+    """Why this repository is ungraded, in its own words. `census` carries the count the
+    unread line quotes, and it is the count from the SECOND reading: quoting the classifier's
+    own zero would tell the reader nothing they could act on."""
+    basis = str(r.get("basis", ""))
+    census = r.get("census") if isinstance(r.get("census"), dict) else {}
+    line = _BASIS_LINE.get(basis, _VERDICT_LINE["na"])
+    return f"This repo is {line.format(declared=census.get('declared', 0))}"
+
+
 def report_markdown(r: Report) -> str:
     lines = [f"# Slop Audit — {r['slug']} ({r['lang']})", ""]
     if r["status"] == "na":
-        return "\n".join(lines + [f"This repo is {_VERDICT_LINE['na']}"]
+        return "\n".join(lines + [_na_line(r)]
                           + _silence_lines(r) + ["", f"> {_SILENCE_NOTE}"])
     if r["grade"] is not None:
         lines += [f"**Grade: {r['grade']}** — {r['testable_pct']}% of its state is finitely testable", ""]
@@ -409,7 +504,7 @@ def _silence_html(r: Report, e) -> str:
 def report_html(r: Report) -> str:
     e = _html.escape
     if r["status"] == "na":
-        body = f"<p>This repo is {_VERDICT_LINE['na']}</p>{_silence_html(r, e)}<p class=note>{e(_SILENCE_NOTE)}</p>"
+        body = f"<p>{e(_na_line(r))}</p>{_silence_html(r, e)}<p class=note>{e(_SILENCE_NOTE)}</p>"
         return f"<!doctype html><meta charset=utf-8><title>Slop Audit — {e(r['slug'])}</title><style>{_CSS}</style><h1>Slop Audit — {e(r['slug'])}</h1>{body}"
     grade = f"<div class=grade><span>{r['grade']}</span><small>{r['testable_pct']}% finitely testable</small></div>" if r["grade"] else ""
     audit_rows = "".join(
