@@ -25,6 +25,24 @@ Two rule families:
   expression is not a committed credential, and charging one is the false positive that
   makes an auditor stop believing the number.
 
+A scan that opened no file refuses instead of reporting zero. Zero hits over zero files is
+the same number as zero hits over a thousand, and `band: Healthy` is the field a reader
+looks at, so the count arm read as a clean bill of health on a repository the scanner never
+opened. It is reachable: this scanner reads the git index rather than the filesystem, so a
+tree whose files are all untracked - a fresh checkout before the first commit, or a
+repository whose tracked paths all sit under an ignored directory - excludes every file
+before it is read. Of all eighteen indicators this is the worst one to fabricate, because
+its whole job is finding live credentials and the answer it fabricates is "none".
+
+`files_scanned` is the denominator and it needs no second reading to check it, which is
+where this differs from the thread-safety meter beside it. Every rule here is a regular
+expression over the file's decoded text, so a file counted as scanned WAS scanned end to
+end: nothing between the count and the match can quietly return empty. The tree-sitter
+parse narrows the generic rule to string literals where a grammar is available, and a
+grammar that fails only widens that rule, never silences the provider rules that catch a
+real AKIA or ghp_ token. Zero is therefore the only bright line needed, and no fraction of
+files is set: a partial reading is a different fact from no reading.
+
 The known limits: a repository's own `.gitleaksignore` and any `[allowlist]` in a
 `.gitleaks.toml` are NOT honoured, so a repository that has already triaged its findings
 will read higher here than under gitleaks; lock files, minified bundles and vendored
@@ -356,18 +374,33 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
               "by_rule": dict(sorted(Counter(f["rule"] for f in findings).items()))}
     scope_note = ("git-tracked files only" if tracked is not None
                   else "the whole tree: not a git working copy, so gitignored files cannot be excluded")
+    # "distinct secret(s) ... in production code" counts FINDINGS, not files, and reading it
+    # as a file count is how a one-file reading and a no-file reading looked alike in prose.
+    # The file counts are now named as file counts and stand on their own.
     details = (
         f"{total} distinct secret(s) in {len(raw_hits)} occurrence(s) across {scanned} scanned "
-        f"file(s) ({total - in_tests} in production code, {in_tests} only in the test tree); "
-        f"scope: {scope_note}; "
+        f"file(s); {total - in_tests} of the secret(s) are in production code and {in_tests} "
+        f"only in the test tree; scope: {scope_note}; "
         "the canon's second Slop arm, a confirmed true positive, is not evaluated: "
         "no credential is validated against its issuer"
     )
     if skipped:
         details += f"; {skipped} file(s) unreadable or oversized and excluded"
+    if scanned == 0:
+        # The refusal, in value and band rather than in the prose beneath them. The counts,
+        # findings and confirmed keys stay on the result so a consumer reading them does not
+        # have to special-case the shape; they are all empty, which is the point.
+        details = (
+            f"not measured: no file was read. Scope: {scope_note}, and every candidate file "
+            "was excluded before it was opened. A count of zero here would be a clean bill of "
+            "health on a repository this scanner never read, which for a credential scanner "
+            "is the worst answer it could fabricate"
+        )
+        if skipped:
+            details += f"; {skipped} file(s) unreadable or oversized and excluded"
     return {
-        "value": total,
-        "band": _band_for(total),
+        "value": "n/a" if scanned == 0 else total,
+        "band": "n/a" if scanned == 0 else _band_for(total),
         "details": details,
         "findings": sorted(findings, key=lambda f: (f["file"], f["line"], f["rule"])),
         "counts": counts,

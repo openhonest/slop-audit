@@ -154,8 +154,20 @@ def test_hits_in_the_test_tree_are_counted_but_disclosed_separately():
 
 
 def test_binary_and_vendored_files_are_skipped_and_disclosed():
+    # A clean production file sits beside the vendored one on purpose. Without it the
+    # fixture's only file is skipped, the scan reads nothing, and this asserted a zero the
+    # scanner had no basis for - the test was demonstrating the false pass it was written
+    # to rule out. The zero below is now over a file that was actually read.
+    r = _scan({"node_modules/pkg/a.js": f'const k = "{AWS_KEY}";\n',
+               "app.py": "KEY = os.environ['KEY']\n"})
+    assert r["value"] == 0 and r["band"] == "Healthy"
+    assert r["files_scanned"] == 1
+
+
+def test_a_tree_of_nothing_but_vendored_files_refuses_rather_than_reporting_zero():
     r = _scan({"node_modules/pkg/a.js": f'const k = "{AWS_KEY}";\n'})
-    assert r["value"] == 0
+    assert r["files_scanned"] == 0
+    assert r["value"] == "n/a" and r["band"] == "n/a"
 
 
 # --- the three defects the real-repository run exposed -------------------------------

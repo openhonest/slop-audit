@@ -91,6 +91,7 @@ CARD_COPY: dict[str, str] = {
     "thread.blurb.candidate": "No hand-overrides and no review-level footguns. Low-precision candidate shapes only ({candidate}); confirm with the prove stage.",
     "thread.blurb.clean": "No concurrency escape hatches found. Nothing overrides or bypasses the language's own thread-safety guarantee.",
     "thread.blurb.na": "Not analyzed for {lang} yet.",
+    "thread.blurb.unread": "Not measured, and no claim either way. We can read this language, but we got no source to read it in: {read} file(s) were in scope and we could parse {parsed} of them. \"Nothing overrides your thread-safety guarantee\" would be counted over no code at all, so we will not say it. What was set aside is listed above; if it should have been read, send us the repository.",
     "thread.note": "This measures audit surface, not races. It shows where a language's thread-safety guarantee is overridden or missing, so a human or a runtime tool knows where to look. It does not detect data races: that needs [ThreadSanitizer](https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html#threadsanitizer) or an equivalent at runtime. A site here means \"verify this\", never \"a race exists\".",
     "proofs.heading": "Adoptable proofs",
     "proofs.note": "Each proof below is a runnable test slop-audit generated for one located gap and then executed. It is shown only because running it settled the matter: the coverage proof genuinely failed (so it pins a decision your suite never reached), or the concurrency proof fired a data race (so it reproduces the hazard). slop-audit proves the gap; it never writes into your test file. Adopting a surviving proof is your choice. Following Umbra's discipline, an unproven gap is reported but never dressed up as a test.",
@@ -191,8 +192,12 @@ def _thread_surface(lang: str, results: dict) -> dict | None:
     if verdict == "n/a":
         blurb = _t("thread.blurb.na", lang=lang)
     else:
+        # Every blurb gets every field. The unread blurb needs the file counts and the other
+        # three need the severity counts, and a per-verdict argument list would be one more
+        # place a new verdict can KeyError on a card the reader is looking at.
         blurb = _t(f"thread.blurb.{verdict}", exposed=counts.get("exposed", 0),
-                   review=counts.get("review", 0), candidate=counts.get("candidate", 0))
+                   review=counts.get("review", 0), candidate=counts.get("candidate", 0),
+                   read=ts.get("files_read", 0), parsed=ts.get("files_parsed", 0))
     findings = ts.get("findings") if isinstance(ts.get("findings"), list) else []
     sites = [{"file": f.get("file", ""), "line": f.get("line", 0),
               "kind": _THREAD_KINDS.get(f.get("kind", ""), f.get("kind", "")),

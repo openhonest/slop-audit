@@ -21,7 +21,33 @@ Verdicts (repo-level), worst site wins:
   EXPOSED - at least one hand-override of the thread-safety guarantee present
   REVIEW  - only lower-severity footguns (e.g. relaxed atomic ordering) present
   CLEAN   - a spec exists for the language and no surface was found
+  UNREAD  - a spec exists and the scanner got no readable source to run it over
   n/a     - no spec for the language
+
+UNREAD and CLEAN were one verdict until 2026-08-15, and collapsing them was a false pass
+of exactly the shape `state_census.py` closed for the state classifier. Every number this
+meter publishes is counted over the sites it RECOGNIZED, so an empty recognition set
+produces zero exposed, zero review, zero candidate - the same triple a genuinely clean
+repository produces - and `clean` is then read off an empty denominator. A repository
+whose whole tree buckets out as tests got a clean concurrency verdict having had no file
+opened.
+
+The denominator that tells them apart is the count of files that PARSED, not the count
+opened, and the difference is not pedantry. Every rule below is a tree-sitter node-type
+query. Hand tree-sitter source it cannot read and it returns an ERROR-bearing tree whose
+node queries all come back empty, which is indistinguishable from clean code by every
+number this module produces. A file count cannot see that; `root_node.has_error` can, and
+the scanner's rule table never consults it, so the two cannot agree by construction the
+way a shared helper would make them. The limit is real on the pinned corpus: tree-sitter
+fails on 25 of json-c's 38 production files and 48 of libuv's 118. Neither has a scanner
+here, but the same parser feeds the languages that do.
+
+Two things deliberately do NOT trigger the refusal. A finding recovered from an
+error-bearing tree keeps the verdict, because the scanner demonstrably read something and
+discarding the site to keep the two counts tidy would trade a false clean for a missed
+hazard. And one readable file among many unreadable ones is enough to grade: a thin
+reading is not the same fact as no reading, which is the rule the state census settled,
+and `files_read` beside `files_parsed` discloses how thin it was.
 
 Rust surface, first pass:
   EXPOSED  unsafe impl Send / unsafe impl Sync  - Send/Sync asserted by hand
@@ -47,7 +73,7 @@ from l1_analyzer.indicators import (
     _read_source_bytes,
     bucketed_paths,
 )
-from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
+from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE, BucketedPaths
 
 # conformance/ and tests hold scaffolding and doubles, not production surface. The scope
 # is named rather than spelled out here, so scope.SCOPES lists this meter among the
@@ -60,6 +86,11 @@ REVIEW = "review"
 # reads as "confirm with the prove stage", not as an accusation. Honest confidence tier.
 CANDIDATE = "candidate"
 CLEAN = "clean"
+# unread: a scanner exists for the language and had nothing readable to run over. Its own
+# word rather than n/a, because "we have no scanner for your language" sends the reader to
+# us and "we could not read your source" sends them to their scope rules or their syntax,
+# and one label for both sent them to neither.
+UNREAD = "unread"
 
 
 class Finding(TypedDict):
@@ -73,14 +104,23 @@ class Finding(TypedDict):
 
 class SurfaceResult(TypedDict):
     """The scan result. A TypedDict, not dict[str, Any]: the shape is fixed, and the
-    tool must not escape its own type discipline to describe itself (`bucketed` is
-    object-valued, not Any, so no # type: ignore / Any hatch is introduced)."""
+    tool must not escape its own type discipline to describe itself. `bucketed` carries
+    the scope module's own BucketedPaths rather than the looser dict[str, object] it held
+    until 2026-08-15; the loose spelling was avoiding an import and cost a standing type
+    error on the very line that fills the field.
+
+    `files_read` and `files_parsed` are the reading's own disclosure and they are published
+    on every result, not only the refusals. A limit that surfaces only when it bites is not
+    disclosed: a reader looking at `clean` over 3 parsed files of 40 read should see the
+    gap without having to reproduce the run."""
     verdict: str
     value: str
     band: str
     counts: dict[str, int]
     findings: list[Finding]
-    bucketed: dict[str, object]
+    bucketed: BucketedPaths
+    files_read: int
+    files_parsed: int
     details: str
 
 
@@ -714,7 +754,37 @@ def _na(lang: str) -> SurfaceResult:
         "counts": {EXPOSED: 0, REVIEW: 0, CANDIDATE: 0},
         "findings": [],
         "bucketed": {"counts": {}, "paths": []},
+        "files_read": 0,
+        "files_parsed": 0,
         "details": f"thread-safety surface meter has no scanner for {lang} yet",
+    }
+
+
+def _unread(lang: str, read: int, bucketed: BucketedPaths) -> SurfaceResult:
+    """The refusal. `value` and `band` carry it too, because those are the fields a reader
+    and a report template look at, and the first version of this disclosure lived in the
+    details prose while `verdict` still said clean. Prose is not a disclosure when the
+    headline says otherwise.
+
+    `bucketed` is kept and is the whole reason it is kept: on the motivating case it is the
+    entire answer, naming the scope rule that set every file aside."""
+    why = ("no file was in scope" if read == 0
+           else f"the parser could not read any of the {read} file(s) in scope")
+    return {
+        "verdict": UNREAD,
+        "value": "n/a",
+        "band": "n/a",
+        "counts": {EXPOSED: 0, REVIEW: 0, CANDIDATE: 0},
+        "findings": [],
+        "bucketed": bucketed,
+        "files_read": read,
+        "files_parsed": 0,
+        "details": (
+            f"thread-safety surface: not measured for {lang}, because {why}. This is a limit "
+            "of the reading, not a finding about the code: a clean verdict here would be "
+            "counted over no source at all. Check what the scope rules set aside (listed "
+            "beside this) and whether the source parses."
+        ),
     }
 
 
@@ -730,9 +800,21 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
     bucketed = bucketed_paths(repo, cfg["extensions"], PRODUCTION_WITHOUT_CONFORMANCE)
 
     findings: list[Finding] = []
+    parsed = 0
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
-        findings.extend(scanner(parser.parse(src).root_node, rel))
+        root = parser.parse(src).root_node
+        # Counted, then scanned regardless. The error flag is a denominator, never a filter:
+        # tree-sitter recovers usefully from most errors, and a hazard it did recover is a
+        # hazard whatever else in the file defeated it.
+        parsed += not root.has_error
+        findings.extend(scanner(root, rel))
+
+    # A finding is positive evidence the scanner read something, so it outranks the parse
+    # count. Same rule as the silence floor, which gates the good grades and lets a proven
+    # unbounded state stand: a result stands whatever else went unread.
+    if parsed == 0 and not findings:
+        return _unread(lang, len(files), bucketed)
 
     counts = {EXPOSED: 0, REVIEW: 0, CANDIDATE: 0}
     for f in findings:
@@ -757,9 +839,12 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
         "counts": counts,
         "findings": findings,
         "bucketed": bucketed,
+        "files_read": len(files),
+        "files_parsed": parsed,
         "details": (
             f"thread-safety surface: {counts[EXPOSED]} hand-overrides of the thread-safety "
             f"guarantee, {counts[REVIEW]} lower-severity footguns, {counts[CANDIDATE]} "
-            f"low-precision candidate shape(s) across {len(findings)} sites"
+            f"low-precision candidate shape(s) across {len(findings)} sites; read over "
+            f"{parsed} of {len(files)} file(s) in scope that the parser could read"
         ),
     }

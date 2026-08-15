@@ -58,6 +58,18 @@ def _slack(actual: int, baseline: int, label: str) -> list[str]:
              f"count is {baseline - actual} regression(s) nobody will be told about.")]
 
 
+def _verdict_of(result: object) -> str:
+    """A panel entry's verdict, or n/a when it carries none.
+
+    The panel is typed `dict[str, L1Result]` and L1Result declares only value, band and
+    details, so the richer results stored in it - the surface scan among them - are read
+    across a gap that predates this function. Reading through `object` keeps the gap where
+    it is instead of widening it to Any or papering over it with a type: ignore, either of
+    which this repository's own L1.15 ratchet counts against it.
+    """
+    return str(result["verdict"]) if isinstance(result, dict) and "verdict" in result else "n/a"
+
+
 def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_exposed: int | None) -> int:
     """Dogfood gate for a pre-commit hook: run the source indicators against the repo
     and fail the commit if the tool would flag its own code. Bright-line invariants:
@@ -104,11 +116,22 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
     # commit unless the baseline is raised deliberately. It is a fact about surface, not
     # a race claim - the meter never says "safe". n/a for a language with no scanner
     # (so it is a no-op on a Python repo until the Python scanner lands).
+    #
+    # The ratchet is skipped, not passed, when the meter read nothing. Zero overrides over
+    # no source is not zero overrides, and worse, the downward arm below would then demand
+    # the baseline be lowered to 0 on the strength of a reading that never happened - the
+    # ratchet would ratchet itself open. `thread_ratchet` records which of the two the pass
+    # line is reporting, so it says "not measured" rather than "0/N".
     exposed: int | None = None
+    thread_ratchet = ""
     if max_thread_exposed is not None:
         ts = results.get("thread_surface") or thread_surface.scan(repo, audited_lang)
-        exposed = ts["counts"].get(thread_surface.EXPOSED, 0)
-        if exposed > max_thread_exposed:
+        if _verdict_of(ts) == thread_surface.UNREAD:
+            thread_ratchet = ", thread-safety surface not measured (the meter read no source)"
+        else:
+            exposed = ts["counts"].get(thread_surface.EXPOSED, 0)
+            thread_ratchet = f", {exposed}/{max_thread_exposed} thread-safety overrides"
+        if exposed is not None and exposed > max_thread_exposed:
             problems.append(
                 f"thread-safety surface: {exposed} hand-overrides of the thread-safety guarantee "
                 f"(unsafe impl Send/Sync, static mut), over the ratchet of {max_thread_exposed}. "
@@ -116,7 +139,8 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
                 "under free-threading; if it is sound, raise the baseline in .pre-commit-config.yaml "
                 "as a deliberate, reviewable change."
             )
-        problems.extend(_slack(exposed, max_thread_exposed, "thread-safety surface"))
+        if exposed is not None:
+            problems.extend(_slack(exposed, max_thread_exposed, "thread-safety surface"))
 
     if problems:
         print("Slop audit gate FAILED - the audit flags this repo's own code:")
@@ -125,7 +149,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
         print("Fix the above (split the file, resolve the state, type the escape) before committing.")
         return 1
     ratchet = "" if escapes is None else f", {escapes}/{max_type_escapes} type escapes"
-    ratchet += "" if exposed is None else f", {exposed}/{max_thread_exposed} thread-safety overrides"
+    ratchet += thread_ratchet
     # The pass line reports what the gate CHECKED, not a property it inferred from an empty
     # count. "Finitely testable" was the same manufactured claim the card was making: zero
     # promiscuous findings is the bright line, and on a repository the classifier never read

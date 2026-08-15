@@ -98,6 +98,13 @@ def analyze(repo: Path, lang: str) -> InterleavingRobustnessResult:
         return _na(f"interleaving-robustness meter is Rust/loom/shuttle only; {lang} not supported yet")
 
     surface = thread_surface.scan(repo, "rust")
+    # An unread surface scan makes "no exposed surface to model" a claim about nothing, and
+    # inheriting it would put the fabricated clean back one module downstream, which is where
+    # a fixed defect returns. The input's own refusal is passed through rather than reworded:
+    # this meter has no independent reading of the source to fall back on.
+    if surface["verdict"] == thread_surface.UNREAD:
+        return _na("the thread-safety surface meter read no source, so there is no surface to "
+                   "compare against the model checkers: " + str(surface["details"]))
     surface_files = {f["file"] for f in surface["findings"] if f["severity"] == thread_surface.EXPOSED}
     if not surface_files:
         return {"verdict": CLEAN, "value": "no exposed surface", "band": "n/a", "unmodeled": [],

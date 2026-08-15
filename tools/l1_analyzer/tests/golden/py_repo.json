@@ -44,7 +44,7 @@
       "occurrences": 0,
       "total": 0
     },
-    "details": "0 distinct secret(s) in 0 occurrence(s) across 1 scanned file(s) (0 in production code, 0 only in the test tree); scope: the whole tree: not a git working copy, so gitignored files cannot be excluded; the canon's second Slop arm, a confirmed true positive, is not evaluated: no credential is validated against its issuer",
+    "details": "0 distinct secret(s) in 0 occurrence(s) across 1 scanned file(s); 0 of the secret(s) are in production code and 0 only in the test tree; scope: the whole tree: not a git working copy, so gitignored files cannot be excluded; the canon's second Slop arm, a confirmed true positive, is not evaluated: no credential is validated against its issuer",
     "files_scanned": 1,
     "findings": [],
     "value": 0
