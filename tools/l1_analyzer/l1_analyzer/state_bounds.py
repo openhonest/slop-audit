@@ -42,7 +42,12 @@ from typing import TypedDict
 
 from tree_sitter import Node
 
-from l1_analyzer import state_bounds_filters, state_census, state_partition
+from l1_analyzer import (
+    record_state,
+    state_bounds_filters,
+    state_census,
+    state_partition,
+)
 from l1_analyzer.indicators import (
     LANG_CFG,
     LangCfg,
@@ -475,23 +480,6 @@ def _local_refs(scope: Node, predicate: Callable[[Node], bool], sp: LangSpec) ->
     return out
 
 
-def _field_decl_names(fd: Node, sp: LangSpec) -> list[str]:
-    """Declared field names inside a field-declaration node. TypeScript names the
-    field directly; Java and C# nest one or more variable_declarators."""
-    if fd.type == "public_field_definition":   # TypeScript
-        name = _field(fd, "name")
-        return [_text(name)] if name is not None else []
-    if fd.type == "field_definition":          # JavaScript
-        name = _field(fd, "property")
-        return [_text(name)] if name is not None else []
-    names: list[str] = []
-    for vd in _refs(fd, lambda n: n.type == "variable_declarator"):
-        name = _field(vd, "name")
-        if name is not None:
-            names.append(_text(name))
-    return names
-
-
 # Both enumerators return an insertion-ordered dict of keys, not a set, and the ordering is
 # the whole reason for the type. `_analyze_file` iterates them to build findings, and the
 # final `findings.sort` keys on verdict, drives_decision, file and line, so two states
@@ -537,7 +525,7 @@ def _enum_instance_state(cls: Node, sp: LangSpec) -> Keys:
                 if obj is not None and _text(obj) in sp["this_idents"]:
                     keys[_text(left)] = None    # "self.x" / "this.x"
     for fd in _local_refs(cls, lambda n: n.type in sp["field_decl_types"], sp):
-        for name in _field_decl_names(fd, sp):
+        for name in record_state.field_decl_names(fd):
             keys[sp["key_prefix"] + name] = None
     return keys
 
@@ -875,6 +863,15 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
             refs = _state_refs(cls, key, sp)
             if refs:
                 findings.append(_finding(key, refs, rel, sp, closed_sets, immutable_ctors, instance=True))
+
+    # State declared inside a record, which neither enumerator above can reach: both work
+    # from a reference, and a slot declared once and thereafter only used is spelled one way
+    # at its declaration and another at every use. record_state owns both halves, and it is
+    # handed the keys already claimed for a record so it can stand down instead of reporting
+    # the same slot twice (see its module docstring).
+    for slot in record_state.slots(root, sp, lambda cls: list(_enum_instance_state(cls, sp))):
+        findings.append(_finding(slot["state"], slot["refs"], rel, sp, closed_sets,
+                                 immutable_ctors, instance=slot["writers_enumerable"]))
 
     return findings
 

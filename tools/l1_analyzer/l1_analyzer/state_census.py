@@ -30,13 +30,18 @@ never resolves a type, and never decides whether the state is bounded.
 
 WHICH DECLARATIONS COUNT TOWARDS THE DENOMINATOR, and why a raw count could not decide it.
 "No rule existed" and "every rule said no" both leave the classifier with nothing admitted,
-and comparing two totals cannot separate them. `struct Store { int cache[256]; }` in C is
-the first: `field_decl_types` is empty for C, so the enumerator COULD NOT have admitted it
-and a refusal is right. This repository's own analyzer package is the second: every state
-it declares is a TypedDict body or an all-caps module constant, the enumerator has a rule
-for the module bindings, it ran that rule over each one and declined them on the merits,
-and a planted `self.cache = {}` beside them is admitted. Same zero, opposite facts, and the
-first version of this module refused both.
+and comparing two totals cannot separate them. A Rust or Go struct field is the first: the
+classifier enumerates those from usage and from nothing else, so a field no method touches
+could not have been admitted and a refusal is right. This repository's own analyzer package
+is the second: every state it declares is a TypedDict body or an all-caps module constant,
+the enumerator has a rule for the module bindings, it ran that rule over each one and
+declined them on the merits, and a planted `self.cache = {}` beside them is admitted. Same
+zero, opposite facts, and the first version of this module refused both.
+
+`struct Store { int cache[256]; }` in C was the first case too, until `record_state` taught
+the classifier struct fields. Three of these entries have flipped from unreadable to
+readable that way, which is what the table is for: it is measured, so it moved on its own
+when the rule landed.
 
 So the denominator is declaration sites of a KIND THE ENUMERATOR HAS A RULE CAPABLE OF
 MATCHING, published as `reachable`, and the refusal is that nothing declared here is of
@@ -57,6 +62,21 @@ Per-language limits are recorded against each extractor below, and the limits ar
 a language whose state hides somewhere the census does not look will report a small
 denominator and let a thin analysis pass. The census narrows the blind spot; it does not
 close it.
+
+AND AS OF THE THREE RECORD RULES, NO PAIR IN `CAPABILITY` IS UNREADABLE. That is the good
+news and the bad news in one sentence. `reachable` now equals `declared` for every language
+in the table, so the refusal this module exists to issue - no grade, because nothing declared
+here is of a kind the reader has a rule for - can no longer fire on any of them. The check is
+not wrong, it is unexercised, and an unexercised check is one nobody will notice rotting.
+
+The blind spot did not go away with it; it moved somewhere this table's granularity cannot
+see. A kind is recorded readable when ONE fixture of that kind can be read, and a C struct
+field declared in a header and used in another translation unit is a field declaration the
+classifier still cannot reach. libuv declares 1,345 of them, all counted `reachable`, and
+373 reach a finding. What discloses that is `admitted_fraction`, which divides by `declared`
+and reports 0.277 rather than the 1.0 `reachable` would flatter it to. Splitting the kind -
+a field declared and used in one translation unit against one that is not - would put the
+gap back where the refusal can act on it, and it is not done here.
 """
 
 from __future__ import annotations
@@ -135,21 +155,25 @@ def _named_field(node: Node, names: tuple[str, ...]) -> str:
 
 # --------------------------------------------------------------------------
 # Record fields. Every language in the table spells "a slot declared inside a
-# record type" with its own node, and the classifier reads only some of them:
-# LANG_SPEC leaves field_decl_types empty for C, Rust and Go entirely.
+# record type" with its own node, and the classifier reads them by two different
+# routes: LANG_SPEC's field_decl_types for the languages whose fields are named
+# the same way at their uses, and record_state for C, whose fields are not.
+# Rust and Go go through neither, and are enumerated from usage instead.
 # --------------------------------------------------------------------------
 
 # (field-declaration node types, name node types, declarator node types, record node types)
 _FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]] = {
-    # C: the case the census exists for. A struct or union field is invisible to the
-    # classifier, whose C enumerator reads file-scope declarations only.
+    # C: the case the census exists for. A struct or union field was invisible to the
+    # classifier until record_state, whose C enumerator read file-scope declarations only.
+    # It is still invisible when the struct is declared in a header and used elsewhere,
+    # which the census counts and the classifier cannot reach.
     "c": (("field_declaration",), ("field_identifier",), (),
           ("struct_specifier", "union_specifier")),
     "rust": (("field_declaration",), ("field_identifier",), (), ("struct_item", "union_item")),
     "go": (("field_declaration",), ("field_identifier",), (), ("struct_type",)),
     "java": (("field_declaration",), (), ("variable_declarator",), ("class_declaration",)),
-    # C# properties hold state as surely as fields do, and the classifier's field_decl_types
-    # names only field_declaration, so an auto-property is state nobody counted.
+    # C# properties hold state as surely as fields do, and field_decl_types named only
+    # field_declaration, so an auto-property was state nobody counted until it was added.
     "csharp": (("field_declaration", "property_declaration"), ("identifier",),
                ("variable_declarator",), ("class_declaration", "record_declaration", "struct_declaration")),
     "typescript": (("public_field_definition",), (), (), ("class_declaration",)),
@@ -381,11 +405,12 @@ CAPABILITY: dict[tuple[str, str], Probe] = {
         "file": "m.py", "admitted": True,
         "source": "cache = {}\n\n\ndef put(k, v):\n    cache[k] = v\n",
     },
-    # The Python spelling of the C struct field, and the same answer: LANG_SPEC leaves
-    # field_decl_types empty for Python, and the module scan reaches root children and one
-    # level below, so a name bound in a class body is read by nothing.
+    # The Python spelling of the C struct field. It read as nothing until `record_state`
+    # taught the classifier the class body: field_decl_types is empty for Python and the
+    # module scan reaches root children and one level below, so this binding sat between the
+    # two enumerators and neither one touched it.
     ("python", CLASS_BODY_BINDING): {
-        "file": "m.py", "admitted": False,
+        "file": "m.py", "admitted": True,
         "source": "class Store:\n    cache = {}\n\n    def put(self, k, v):\n        Store.cache[k] = v\n",
     },
     ("python", RECEIVER_ATTRIBUTE): {
@@ -424,10 +449,11 @@ CAPABILITY: dict[tuple[str, str], Probe] = {
         "file": "M.cs", "admitted": True,
         "source": "class Store {\n    System.Collections.Generic.Dictionary<string, int> cache = new();\n    void Put(string k, int v) { cache[k] = v; }\n}\n",
     },
-    # The C# blind spot the census was already commenting on, now measured: field_decl_types
-    # names field_declaration only, so an auto-property holds state nobody enumerated.
+    # The C# blind spot the census was already commenting on. field_decl_types named
+    # field_declaration only, so an auto-property held state nobody enumerated until
+    # property_declaration was added beside it.
     ("csharp", PROPERTY_DECLARATION): {
-        "file": "M.cs", "admitted": False,
+        "file": "M.cs", "admitted": True,
         "source": "class Store {\n    public System.Collections.Generic.Dictionary<string, int> Cache { get; set; }\n    void Put(string k, int v) { Cache[k] = v; }\n}\n",
     },
     ("rust", MODULE_BINDING): {
@@ -450,10 +476,12 @@ CAPABILITY: dict[tuple[str, str], Probe] = {
         "file": "m.c", "admitted": True,
         "source": "static int cache[256];\n\nvoid put(int k, int v) { cache[k] = v; }\n",
     },
-    # The case the whole census exists for. One syntactic level of hiding, and no rule in
-    # the C spec reaches it.
+    # The case the whole census exists for. `record_state` reaches it now, within one file:
+    # the fixture declares the struct and uses it in the same translation unit, which is what
+    # the rule can see. A struct declared in a header and used elsewhere still reads as
+    # nothing, and this probe cannot measure that - see `_c_struct_field` for the limit.
     ("c", FIELD_DECLARATION): {
-        "file": "m.c", "admitted": False,
+        "file": "m.c", "admitted": True,
         "source": "struct Store { int cache[256]; };\n\nvoid put(struct Store *s, int k, int v) { s->cache[k] = v; }\n",
     },
     ("ruby", INSTANCE_VARIABLE): {

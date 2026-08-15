@@ -280,3 +280,27 @@ def test_it_finds_the_four_paths_this_package_still_carries():
                  ("indicators.py", "_god_files"),                 # L1.17
                  ("absolute_paths.py", "scan")):
         assert want in hit, f"the rule stopped finding {want}"
+
+
+def test_a_boolean_flag_parameter_is_not_a_cardinality():
+    """`if higher_is_better:` looks exactly like `if total:` in the tree, and reading the
+    flag as a tally made the shared banding helper itself a vacuous path - which then put
+    a finding on every indicator that calls it. The evidence is arithmetic or indexing,
+    not the bare truth test."""
+    found = _scan(
+        "def band(value, healthy, higher_is_better):\n"
+        "    if higher_is_better:\n"
+        "        return 'Healthy' if value >= healthy else 'Slop'\n"
+        "    return 'Healthy' if value < healthy else 'Slop'\n"
+        "def f(n):\n"
+        "    return {'band': band(n, 5, True)}\n")
+    assert found == []
+
+
+def test_a_count_passed_in_as_a_parameter_is_a_cardinality():
+    """The other side of the same line. This one is never indexed either, but it is
+    divided by, and a parameter the body does arithmetic with is a size."""
+    found = _scan(
+        "def summary(items, total):\n"
+        "    return {'fraction': round(len(items) / total, 3) if total else 0.0}\n")
+    assert len(found) == 1 and found[0]["field"] == "fraction"

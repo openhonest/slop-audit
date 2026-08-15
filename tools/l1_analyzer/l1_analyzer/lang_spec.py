@@ -52,6 +52,7 @@ class LangSpec(TypedDict, total=False):
     instance_ref_style: str
     instance_enum: str
     field_decl_types: tuple[str, ...]
+    record_enum: str
     key_prefix: str
     mutating: frozenset[str]
     keyed_read: frozenset[str]
@@ -163,6 +164,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"self"}),
         "instance_ref_style": "member",
         "field_decl_types": (),
+        "record_enum": "python_class_body",
         "key_prefix": "",
         "mutating": _PY_MUTATING, "keyed_read": frozenset(),
         "literal_types": _PY_LITERALS,
@@ -188,6 +190,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "member",
         "field_decl_types": ("public_field_definition",),
+        "record_enum": "none",
         "key_prefix": "this.",
         "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
@@ -213,6 +216,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "member",
         "field_decl_types": ("field_definition",),
+        "record_enum": "none",
         "key_prefix": "this.",
         "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
@@ -238,6 +242,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "identifier",
         "field_decl_types": ("field_declaration",),
+        "record_enum": "none",
         "key_prefix": "",
         "mutating": _JAVA_MUTATING, "keyed_read": _JAVA_KEYED_READ,
         "literal_types": _JAVA_LITERALS,
@@ -261,7 +266,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "membership": "none",
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "identifier",
-        "field_decl_types": ("field_declaration",),
+        "field_decl_types": ("field_declaration", "property_declaration"),
+        "record_enum": "none",
         "key_prefix": "",
         "mutating": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
         "literal_types": _CS_LITERALS,
@@ -290,6 +296,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_ref_style": "member",
         "instance_enum": "self_usage",
         "field_decl_types": (),
+        "record_enum": "none",
         "key_prefix": "",
         "mutating": _RUST_MUTATING, "keyed_read": _RUST_KEYED_READ,
         "literal_types": _RUST_LITERALS,
@@ -319,6 +326,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_ref_style": "member",
         "instance_enum": "ruby_ivar",
         "field_decl_types": (),
+        "record_enum": "none",
         "key_prefix": "",
         "mutating": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
         "literal_types": _RUBY_LITERALS,
@@ -344,6 +352,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset(),
         "instance_ref_style": "identifier",
         "field_decl_types": (),
+        "record_enum": "c_struct_field",
         "key_prefix": "",
         "mutating": frozenset(), "keyed_read": frozenset(),
         "literal_types": _C_LITERALS,
@@ -373,6 +382,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_ref_style": "member",
         "scope_by_receiver": True,
         "field_decl_types": (),
+        "record_enum": "none",
         "key_prefix": "",
         "mutating": frozenset(), "keyed_read": frozenset(),
         "extra_bounded": frozenset({"append", "len", "cap", "copy", "make", "new"}),

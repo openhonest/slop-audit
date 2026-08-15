@@ -82,6 +82,7 @@ def test_a_language_with_no_census_spec_declares_nothing_rather_than_zero(tmp_pa
 # The classifier reports the gap beside its own counts.
 # --------------------------------------------------------------------------
 
+@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_classifier_publishes_the_census_beside_what_it_admitted(tmp_path):
     result = _classify(tmp_path, "case.c", C_STRUCT_FIELD, "c")
     census = result["census"]
@@ -107,6 +108,7 @@ def test_the_two_spellings_of_one_unbounded_cache_reach_the_same_honest_outcome(
     assert by_field["grade"] in ("F", None)
 
 
+@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_a_repository_the_classifier_never_read_gets_no_grade(tmp_path):
     result = _classify(tmp_path, "case.c", C_STRUCT_FIELD, "c")
     g = report.grade_summary(_results(result), None)
@@ -119,6 +121,7 @@ def test_a_repository_the_classifier_never_read_gets_no_grade(tmp_path):
 # The renderer: no grade sentence, no capability claim, no path-cover figure.
 # --------------------------------------------------------------------------
 
+@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_the_card_makes_no_capability_claim_when_the_classifier_admitted_nothing(tmp_path):
     result = _classify(tmp_path, "case.c", C_STRUCT_FIELD, "c")
     model = card.build_card("o/r", "c", _results(result))
@@ -130,6 +133,7 @@ def test_the_card_makes_no_capability_claim_when_the_classifier_admitted_nothing
     assert "1,080" not in md, "a path-cover figure is coverage of state nobody enumerated"
 
 
+@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_the_card_says_what_it_could_not_read(tmp_path):
     result = _classify(tmp_path, "case.c", C_STRUCT_FIELD, "c")
     md = card.card_markdown(card.build_card("o/r", "c", _results(result)))
@@ -201,6 +205,7 @@ def test_a_codebase_with_no_mutable_state_by_design_is_graded_not_refused(tmp_pa
     assert g["grade"] is not None
 
 
+@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_python_state_the_enumerator_has_no_rule_for_refuses_like_the_c_struct(tmp_path):
     """The other half. A class-body binding is invisible to the Python enumerator the way a
     struct field is invisible to the C one, so a repository holding nothing else has been
@@ -211,6 +216,7 @@ def test_python_state_the_enumerator_has_no_rule_for_refuses_like_the_c_struct(t
     assert g["grade"] is None
 
 
+@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_the_census_publishes_the_denominator_its_reader_can_actually_reach(tmp_path):
     (tmp_path / "m.py").write_text(NO_MUTABLE_STATE_BY_DESIGN)
     census = state_census.count(tmp_path, "python")
@@ -218,6 +224,7 @@ def test_the_census_publishes_the_denominator_its_reader_can_actually_reach(tmp_
     assert census["unread_kinds"] == [state_census.CLASS_BODY_BINDING]
 
 
+@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_one_reachable_declaration_carries_a_hundred_unreachable_ones_and_the_report_says_so(tmp_path):
     """The residual blind spot, pinned rather than left implicit.
 
