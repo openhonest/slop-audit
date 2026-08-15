@@ -68,14 +68,20 @@ Feature: L1.18 Mutable state ratio analyzer
     When I run L1.18 analysis on it
     Then the mutable state ratio is 1.0
 
-  # A function that declares itself an I/O boundary (`# honest: boundary` /
-  # `// honest: boundary`) is excluded from the L1.18 ratio: I/O at the boundary
-  # legitimately touches state. Recognition is by declaration, never by guessing.
+  # WITHDRAWN 2026-08-15. L1.18 has no I/O boundary exclusion. The canon described
+  # one, but what was implemented was a `honest: boundary` comment a function had to
+  # carry, which fired on no repository that had not adopted this project's private
+  # marker. Recognising a route handler, a database adapter or a CLI entry point by
+  # analysis needs a per-framework enumeration and was measured to be undoable
+  # credibly, so the claim was dropped and the marker deleted with it: an exclusion a
+  # subject opts into is a lever a subject controls. This scenario now asserts the
+  # withdrawal, which is what stops the marker returning by the door it left by.
+  # See tools/l1_analyzer/docs/amendment-2026-08-15-l1-18-corrected-ratio.md.
   @multi-lang
-  Scenario Outline: IO boundary functions are excluded from L1.18 count
+  Scenario Outline: IO boundary functions are NOT excluded from the L1.18 count
     Given a <lang> source file containing an IO boundary function that also touches global state
     When I run L1.18 analysis on it
-    Then the IO boundary function is excluded from the mutable state ratio
+    Then the IO boundary function is counted like any other function
 
     Examples:
       | lang   |

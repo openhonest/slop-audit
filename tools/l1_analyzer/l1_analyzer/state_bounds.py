@@ -859,8 +859,14 @@ def _na(lang: str) -> dict[str, object]:
 
 
 def classify(repo: Path, lang: str) -> dict[str, object]:
-    """L1.18b: the finite-testability verdict distribution. Additive; never
-    consulted by L1.18 itself."""
+    """L1.18b: the finite-testability verdict distribution.
+
+    Additive as a PANEL ENTRY: nothing reads this function's return value except the
+    report. Its per-file machinery is another matter. Since 2026-08-15 L1.18 calls
+    `_analyze_file` directly for its bound-awareness correction, so this module's
+    verdicts now decide part of L1.18's number and the two can no longer be changed
+    independently. A change to `_categorize`, `_verdict` or the partition roll-up moves
+    both indicators, and the amendment record for either has to say so."""
     if lang not in LANG_SPEC:
         return _na(lang)
     sp = LANG_SPEC[lang]

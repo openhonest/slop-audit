@@ -1,13 +1,14 @@
-"""Behavioural spec for the schedule-silence meter (concurrency anti-coverage), wired
-to the REAL schedule_silence module. Steps build tiny Rust repos on disk and run the
-meter, or exercise the pure classifier directly. State threads through a `ctx` fixture.
+"""Behavioural spec for the interleaving-robustness meter (concurrency anti-coverage),
+wired to the REAL interleaving_robustness module. Steps build tiny Rust repos on disk
+and run the meter, or exercise the pure classifier directly. State threads through a
+`ctx` fixture.
 """
 
 import pytest
-from l1_analyzer import schedule_silence
+from l1_analyzer import interleaving_robustness
 from pytest_bdd import given, parsers, scenarios, then, when
 
-scenarios("../features/schedule_silence.feature")
+scenarios("../features/interleaving_robustness.feature")
 
 # A struct with a hand-asserted Sync: the exposed surface the meter cares about.
 _SURFACE = (
@@ -54,14 +55,14 @@ def given_clean(ctx, tmp_path):
     ctx["repo"] = tmp_path
 
 
-@given("a repository whose language the schedule-silence meter does not support")
+@given("a repository whose language the interleaving-robustness meter does not support")
 def given_unsupported(ctx, tmp_path):
     ctx["repo"], ctx["lang"] = tmp_path, "java"
 
 
-@when("I run the schedule-silence meter")
+@when("I run the interleaving-robustness meter")
 def when_run(ctx):
-    ctx["result"] = schedule_silence.analyze(ctx["repo"], ctx.get("lang", "rust"))
+    ctx["result"] = interleaving_robustness.analyze(ctx["repo"], ctx.get("lang", "rust"))
 
 
 @then(parsers.parse("the verdict is {verdict}"))
@@ -95,7 +96,7 @@ def given_names_module(ctx, module):
 
 @when("I classify the surface against the models")
 def when_classify(ctx):
-    ctx["split"] = schedule_silence.classify(ctx["surface_files"], set(), ctx["modeled_text"])
+    ctx["split"] = interleaving_robustness.classify(ctx["surface_files"], set(), ctx["modeled_text"])
 
 
 @then(parsers.parse('"{path}" is modeled-elsewhere, not unmodeled'))

@@ -1,13 +1,17 @@
-"""Schedule-silence meter (concurrency anti-coverage).
+"""Interleaving-robustness meter (concurrency anti-coverage).
 
 Cross-references the static thread-surface (WHERE shared concurrency state is) against
 which of that surface a model checker actually exercises (loom / shuttle in Rust).
-Surface that no model touches is schedule-silent: the interleavings its invariants
-depend on are never forced in testing, so a green suite says nothing about them.
+Surface that no model touches is unmodeled: the interleavings its invariants depend on
+are never forced in testing, so a green suite says nothing about them.
 
-This is the concurrency generalization of Umbra's Silence index. Umbra: a line runs
-(covered) but nothing asserts on it (silent). Here: some schedule passed but the racy
-interleaving was never explored. Both measure the complement of real verification.
+This check was called `schedule_silence` until 2026-08-15, and the rename is not
+cosmetic. "Silence" is the instrument's word for what the analyzer could not read,
+reported beside the grade and never inside it (see `state_partition.silence_summary`).
+This meter measures something else entirely: it reads its input fine and reports what
+the target's own model checkers do not exercise. One word naming two measurements is
+how a reader comes to believe a coverage-disclosure number is a concurrency result, so
+the concurrency check took a name that says what it measures.
 
 Honesty, stated plainly because Rust reviewers will check:
   - Measures model PRESENCE, not model ADEQUACY. "unmodeled" (no model touches this
@@ -19,7 +23,7 @@ Honesty, stated plainly because Rust reviewers will check:
     nothing does. The distinction is disclosed, never collapsed.
   - Rust / loom / shuttle only; other languages return n/a rather than guess.
 
-The verdict is a prioritized audit list, never a bug claim: a schedule-silent site is
+The verdict is a prioritized audit list, never a bug claim: an unmodeled site is
 "force these schedules with a model", not "this races".
 """
 
@@ -36,13 +40,17 @@ from l1_analyzer.scope import WHOLE_REPO
 # What marks a file as carrying a concurrency model in Rust.
 _MODEL_MARKERS = re.compile(r"cfg\((?:loom|shuttle)\)|\b(?:loom|shuttle)::")
 
-SCHEDULE_SILENT = "schedule-silent"
+# The verdict vocabulary. UNMODELED replaced "schedule-silent" in the same rename that
+# moved the check off the word "silence": a verdict string is panel output a reader sees,
+# so leaving the old word inside a renamed check would have kept the collision alive in
+# the one place the reader actually looks.
+UNMODELED = "unmodeled"
 MODELED = "modeled"
 CLEAN = "clean"
 NA = "n/a"
 
 
-class ScheduleSilenceResult(TypedDict):
+class InterleavingRobustnessResult(TypedDict):
     verdict: str
     value: str
     band: str
@@ -78,16 +86,16 @@ def classify(surface_files: set[str], modeled_in_file: set[str], modeled_text: s
     return {"unmodeled": unmodeled, "modeled_elsewhere": elsewhere, "modeled_in_file": in_file}
 
 
-def _na(reason: str) -> ScheduleSilenceResult:
+def _na(reason: str) -> InterleavingRobustnessResult:
     return {"verdict": NA, "value": "n/a", "band": "n/a", "unmodeled": [], "modeled_elsewhere": [],
             "modeled_in_file": [], "details": reason}
 
 
-def analyze(repo: Path, lang: str) -> ScheduleSilenceResult:
-    """The schedule-silence verdict: of the flagged concurrency surface, which files
-    no model checker touches. Depends on the static thread-surface meter."""
+def analyze(repo: Path, lang: str) -> InterleavingRobustnessResult:
+    """The interleaving-robustness verdict: of the flagged concurrency surface, which
+    files no model checker touches. Depends on the static thread-surface meter."""
     if lang != "rust":
-        return _na(f"schedule-silence meter is Rust/loom/shuttle only; {lang} not supported yet")
+        return _na(f"interleaving-robustness meter is Rust/loom/shuttle only; {lang} not supported yet")
 
     surface = thread_surface.scan(repo, "rust")
     surface_files = {f["file"] for f in surface["findings"] if f["severity"] == thread_surface.EXPOSED}
@@ -109,7 +117,7 @@ def analyze(repo: Path, lang: str) -> ScheduleSilenceResult:
 
     split = classify(surface_files, modeled_in_file, "\n".join(modeled_chunks))
     unmodeled = split["unmodeled"]
-    verdict = SCHEDULE_SILENT if unmodeled else MODELED
+    verdict = UNMODELED if unmodeled else MODELED
     return {
         "verdict": verdict,
         "value": f"{len(unmodeled)} of {len(surface_files)} exposed-surface files unmodeled",

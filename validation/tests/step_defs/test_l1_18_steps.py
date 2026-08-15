@@ -8,10 +8,12 @@ without the system under test is a lie (Honest Code applies to tests too).
 State is threaded through a per-scenario `ctx` fixture, not module globals, so no
 mutable state is shared between scenarios (which is exactly what L1.20 measures).
 
-Rewiring these steps to real code surfaced two contradictions the old fabricated
-steps hid; both are tagged @xfail in l1_18.feature with the reason:
-  - the analyzer implements no IO-boundary exclusion (Scenario: IO boundary ...);
-  - its own source scores 11.7%, not the 0.0 the bootstrap scenario claims.
+Rewiring these steps to real code once surfaced two contradictions the old fabricated
+steps hid. Both are now resolved rather than tolerated:
+  - the IO-boundary exclusion was withdrawn on 2026-08-15 (it could not be done by
+    analysis), and the scenario now asserts the withdrawal instead of the promise;
+  - the analyzer's own source scored 11.7% and now scores 0.0, after the path_cover
+    refactor recorded in docs/amendment-2026-08-02-self-clean-path-cover.md.
 """
 
 import textwrap
@@ -117,9 +119,8 @@ def then_bound_literal(ctx, name):
     assert name not in ctx["module_mutables"], f"{name!r} counted as mutable: {ctx['module_mutables']}"
 
 
-@then("the IO boundary function is excluded from the mutable state ratio")
-def then_io_excluded(ctx):
-    # xfail: the analyzer implements no IO-boundary exclusion, so the boundary
-    # function is counted and the ratio is not zero. This assertion states the
-    # feature's intent; it fails until exclusion is implemented or the claim dropped.
-    assert ctx["result"]["value"] == 0.0
+@then("the IO boundary function is counted like any other function")
+def then_io_counted(ctx):
+    # The claim was dropped, so the marked function is counted. Each fixture holds
+    # exactly one function and it touches unbounded global state, so the ratio is 100.
+    assert ctx["result"]["value"] == 100.0

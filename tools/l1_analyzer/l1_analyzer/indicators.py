@@ -299,9 +299,10 @@ class LangCfg(TypedDict, total=False):
     type_escape_patterns: tuple[str, ...]
     annotation_escape_nodes: tuple[str, ...]
     annotation_escape_names: tuple[str, ...]
-    field_based_globals: bool
-    mutable_specifier_globals: bool
+    module_scan: str
     const_keywords: tuple[str, ...]
+    field_decl_types: tuple[str, ...]
+    immutable_modifiers: frozenset[str]
     instance_field_types: tuple[str, ...]
     raw_mut_patterns: tuple[str, ...]
 
@@ -318,7 +319,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
         # Read the binding name from the assignment's `left` field, not by text-
         # splitting the node. See docs/amendment-2026-08-01-l1-18-module-global.md.
-        "field_based_globals": True,
+        "module_scan": "python_fields",
     },
     "rust": {
         "language": Language(tree_sitter_rust.language()),
@@ -336,7 +337,7 @@ LANG_CFG: dict[str, LangCfg] = {
         # (`static mut NAME: TYPE`). The name is the declaration's identifier child;
         # the legacy text split grabbed the type (`i32`) instead, so no global was
         # ever recognized. See docs/amendment-2026-08-02-rust-receiver-and-static.md.
-        "mutable_specifier_globals": True,
+        "module_scan": "mutable_specifier",
         "type_escape_patterns": (),
         # Retained per docs/amendment-2026-07-31-rust-raw-pattern-scope.md; structural
         # detection above now carries the load, and these never fire inside a body.
@@ -351,6 +352,10 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": set(),
         "module_level_assign": ("declaration", "init_declarator"),
         "type_escape_patterns": (),
+        "module_scan": "text",
+        # C's only immutability keyword. It used to inherit a shared default carrying
+        # `let `, `val ` and `readonly `, none of which are C.
+        "const_keywords": ("const ",),
     },
     "java": {
         "language": Language(tree_sitter_java.language()),
@@ -365,6 +370,12 @@ LANG_CFG: dict[str, LangCfg] = {
         # docs/amendment-2026-08-14-java-suppression-marker.md.
         "annotation_escape_nodes": ("annotation", "marker_annotation"),
         "annotation_escape_names": ("SuppressWarnings",),
+        # A Java field is state wherever it sits in the class body, and it is reached
+        # by bare name, not through `this.`. See
+        # docs/amendment-2026-08-15-l1-18-corrected-ratio.md.
+        "module_scan": "class_fields",
+        "field_decl_types": ("field_declaration",),
+        "immutable_modifiers": frozenset({"final"}),
     },
     "typescript": {
         "language": Language(tree_sitter_typescript.language_typescript()),
@@ -375,6 +386,12 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": ("any", "unknown"),  # plus // @ts-ignore
+        "module_scan": "text",
+        # `const` is the only immutable module binding; `let` and `var` are mutable
+        # state. TypeScript inherited a shared default containing `let `, so every
+        # module-level `let` read as immutable and the same construct was mutable in
+        # a .js file and not in a .ts file.
+        "const_keywords": ("const ",),
     },
     "csharp": {
         "language": Language(tree_sitter_c_sharp.language()),
@@ -385,6 +402,9 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_declaration_statement"),
         "type_escape_patterns": ("object", "dynamic"),
+        "module_scan": "class_fields",
+        "field_decl_types": ("field_declaration",),
+        "immutable_modifiers": frozenset({"readonly", "const"}),
     },
     "javascript": {
         "language": Language(tree_sitter_javascript.language()),
@@ -395,6 +415,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": (),  # untyped
+        "module_scan": "text",
         # `const` bindings are immutable; `let`/`var` are mutable module state
         "const_keywords": ("const ",),
     },
@@ -410,6 +431,11 @@ LANG_CFG: dict[str, LangCfg] = {
         "instance_field_types": ("instance_variable", "global_variable"),
         "module_level_assign": ("assignment", "operator_assignment"),
         "type_escape_patterns": (),  # untyped
+        "module_scan": "text",
+        # Ruby has no immutability keyword: a constant is spelled in capitals, which
+        # the scan already honours. The empty tuple says so; it used to inherit a
+        # default whose words (`let `, `val `, `final `) are not Ruby at all.
+        "const_keywords": (),
     },
     "go": {
         "language": Language(tree_sitter_go.language()),
@@ -421,6 +447,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": set(),
         "module_level_assign": ("var_declaration",),
         "type_escape_patterns": ("any",),  # Go's `any` alias for interface{}
+        "module_scan": "text",
         "const_keywords": ("const ",),
     },
 }
@@ -430,7 +457,10 @@ _BODY_NODE_TYPES = ("block", "compound_statement", "body", "function_body", "bod
 
 # Every LANG_CFG entry must define these keys; access them directly (a missing
 # key is a config bug that should raise, not silently default). Genuinely
-# optional keys (instance_field_types, const_keywords) still use .get().
+# optional keys (instance_field_types, raw_mut_patterns) still use .get().
+# `const_keywords` is NO LONGER optional for a text-scanned language: a shared
+# default is what let TypeScript inherit `let ` as an immutability keyword, so the
+# key is now read by direct subscript and a language that omits it raises.
 _LANGUAGE_UNKNOWN = "unknown"
 
 def _get_parser(lang: str) -> Parser:

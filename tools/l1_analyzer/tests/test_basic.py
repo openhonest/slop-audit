@@ -317,9 +317,16 @@ def test_l1_17_god_files(tmp_path):
 def test_l1_18_counts_mutable_module_global_but_not_constant(tmp_path):
     # `counter` (lowercase, reassigned) is mutable module state; `LIMIT`
     # (uppercase) is a constant and must NOT be counted as mutable-state access.
+    #
+    # The fixture reassigns `counter`, which the comment always claimed and the
+    # source never did. Until L1.18 became bound-aware on 2026-08-15 the difference
+    # did not show: a binding written once with `0` and never touched again is a
+    # constant whose partition has exactly one class, and the finite-testability
+    # classifier says so. The old fixture therefore passed on the strength of the
+    # name's casing rather than on the mutation it was written to demonstrate.
     (tmp_path / "m.py").write_text(
         "counter = 0\nLIMIT = 100\n"
-        "def bump():\n    return counter + 1\n"      # reads mutable global -> counted
+        "def bump():\n    global counter\n    counter += 1\n    return counter\n"   # mutates -> counted
         "def bounded(x):\n    return x < LIMIT\n"     # reads constant only -> not counted
         "def pure(a, b):\n    return a + b\n"
     )
@@ -622,24 +629,29 @@ def test_l1_18_rust_const_is_not_mutable_state(tmp_path):
     assert analyze_mutable_state(tmp_path, "rust")["value"] == 0.0
 
 
-def test_l1_18_declared_boundary_is_excluded(tmp_path):
-    # A function that declares itself an I/O boundary is excluded from the ratio,
-    # numerator and denominator, even though it touches a module global. An
-    # unmarked reader of the same global is still counted. Recognition is by
-    # declaration, never by guessing.
+def test_l1_18_has_no_boundary_exclusion_a_subject_can_claim(tmp_path):
+    # There is no I/O boundary exclusion, and this test is what stops one returning
+    # by the door it left by. The exclusion the canon described was implemented as a
+    # `honest: boundary` comment a function had to carry, which fired on no repository
+    # that had not adopted this project's private marker. Recognising a boundary by
+    # analysis needs a per-framework enumeration and cannot be done credibly, so the
+    # claim was dropped on 2026-08-15 rather than faked, and the marker went with it:
+    # an exclusion a subject opts into is a lever a subject controls, and this
+    # instrument's primary consumer is an AI that optimises what it is told to
+    # optimise. Both functions below are counted, marker or no marker.
     from l1_analyzer.indicators import mutable_function_names
     (tmp_path / "m.py").write_text(
         "CACHE = []\n"
         "def handler():\n"
         "    # honest: boundary\n"
         "    print(CACHE)\n"
-        "    return len(CACHE)\n"
-        "def reader():\n"
         "    return CACHE[0]\n"
+        "def reader(i):\n"
+        "    return CACHE[i]\n"      # a variable key leaves CACHE unbounded
     )
     res = analyze_mutable_state(tmp_path, "python")
-    assert res["details"].startswith("1/1")          # handler excluded; only reader counts
-    assert mutable_function_names(tmp_path, "python") == ["reader"]
+    assert res["details"].startswith("2/2")          # neither is excluded
+    assert sorted(mutable_function_names(tmp_path, "python")) == ["handler", "reader"]
 
 
 def test_l1_18_analyzer_is_self_clean(tmp_path):

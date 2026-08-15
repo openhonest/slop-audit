@@ -66,8 +66,8 @@
   },
   "L1.18": {
     "band": "Slop",
-    "details": "5/6 functions reference external mutable state (python)",
-    "value": 83.3
+    "details": "3/6 functions reference unbounded external mutable state (python)",
+    "value": 50.0
   },
   "L1.19": {
     "band": "n/a",

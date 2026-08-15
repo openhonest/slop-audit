@@ -8,7 +8,7 @@ The suite is written in Gherkin so the expected behaviour of each indicator is r
 
 The step definitions build a real fixture (a temp file, a real git repository, real stub binaries on `PATH`) and call the real `l1_analyzer` on it, then assert its real output. There is no in-memory simulation, no substring ladder, and no reimplementation of an indicator's formula inside the test. A step that cannot import the analyzer fails loudly at collection time. A suite that stays green without the system under test is a lie, so this suite cannot be green without it.
 
-Where a scenario carried a fabricated number in units the analyzer does not use (for example a dead-code density where the analyzer reports a finding count), the scenario states the real units, and the reconciliation is noted in a comment in the `.feature` file. Two L1.18 scenarios are tagged `@xfail` because wiring them to real code surfaced genuine gaps (no IO-boundary exclusion; the analyzer's own source is not self-clean); the tag reason records the finding rather than faking a pass.
+Where a scenario carried a fabricated number in units the analyzer does not use (for example a dead-code density where the analyzer reports a finding count), the scenario states the real units, and the reconciliation is noted in a comment in the `.feature` file. Two L1.18 scenarios once carried `@xfail` tags because wiring them to real code surfaced genuine gaps. Both are resolved: the analyzer's own source is self-clean again, and the IO-boundary exclusion was withdrawn on 2026-08-15 after it was measured to be undoable by analysis, so that scenario now asserts the withdrawal rather than a promise the instrument does not keep.
 
 ## Structure
 
