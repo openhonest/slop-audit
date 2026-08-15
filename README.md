@@ -95,7 +95,7 @@ L1.19 and L1.20 run the target repo's own test suite under the target's own runt
 | L1.19 coverage, L1.20 determinism (runtime) | not yet | yes |
 | L1.12, L1.13, L1.14 | not yet | only when `vulture`, `jscpd` and `gitleaks` are installed, otherwise `n/a` |
 | Additive: absolute paths | yes | yes |
-| Additive: thread surface, path cover, schedule silence | not yet | yes |
+| Additive: thread surface, path cover, interleaving robustness | not yet | yes |
 
 The portable binary is a certified-equivalent redistribution, not a second opinion. Each ported indicator is validated equal to the Python reference on a real repository in each of the nine languages, and [`.github/workflows/parity.yml`](.github/workflows/parity.yml) fails the build if the two ever disagree. Where they differ in coverage, the Python instrument is canonical.
 
@@ -227,7 +227,7 @@ The methodology is stack-agnostic. A tool here demonstrates how to mechanise par
 
 | Tool | Purpose |
 |---|---|
-| [tools/l1_analyzer/](tools/l1_analyzer/) | **Canonical.** The Python implementation of L1.1 through L1.20, the additive checks (finite-testability classification, thread surface, path cover, absolute paths, schedule silence) and the opt-in prove loops, which generate a runnable failing test for an uncovered branch or a concurrency hazard. Git indicators are language-agnostic; source indicators use tree-sitter across nine languages; the runtime indicators execute the target's own suite under the target's own detected runtime. |
+| [tools/l1_analyzer/](tools/l1_analyzer/) | **Canonical.** The Python implementation of L1.1 through L1.20, the additive checks (finite-testability classification, thread surface, path cover, absolute paths, interleaving robustness) and the opt-in prove loops, which generate a runnable failing test for an uncovered branch or a concurrency hazard. Git indicators are language-agnostic; source indicators use tree-sitter across nine languages; the runtime indicators execute the target's own suite under the target's own detected runtime. |
 | [tools/slop-audit-rs/](tools/slop-audit-rs/) | The portable redistribution: one static binary per platform with the nine grammars linked in, no interpreter and no shipped `.so`. Ported indicator by indicator and validated equal to the canonical instrument on a repository in each language, with a CI job that fails on any disagreement. Cross-builds to macOS, Linux and Windows. |
 | [tools/ui-audit/](tools/ui-audit/) | One example implementation for stacks that use the playground/enhance component pattern. Compares playground controls against the component library's enhance functions and reports dead controls, hidden features, and wiring mismatches. Maps to one aspect of dimension 4.18 (UX from code). |
 

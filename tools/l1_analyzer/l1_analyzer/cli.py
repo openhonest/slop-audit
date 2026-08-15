@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from l1_analyzer import card, indicators, schedule_silence, thread_surface
+from l1_analyzer import card, indicators, interleaving_robustness, thread_surface
 from l1_analyzer.scope import PRODUCTION
 
 
@@ -319,9 +319,12 @@ def main(argv: list[str] | None = None) -> int:
             classify_state_bounds=not args.no_state_bounds, python_executable=args.python,
         )
         results.update(source_results)
-        # Schedule-silence (static, cheap): of the flagged concurrency surface, which
-        # files no loom/shuttle model touches. The concurrency form of Umbra's Silence.
-        results["schedule_silence"] = schedule_silence.analyze(args.repo, str(results.get("lang", args.lang)))
+        # Interleaving robustness (static, cheap): of the flagged concurrency surface,
+        # which files no loom/shuttle model touches. Named for what it measures rather
+        # than for silence, which this instrument reserves for what the analyzer could
+        # not read.
+        results["interleaving_robustness"] = interleaving_robustness.analyze(
+            args.repo, str(results.get("lang", args.lang)))
 
     # Runtime thread-safety (opt-in): the dynamic counterpart to the static surface
     # meter. Runs untrusted code, so only on explicit --race, never by default.

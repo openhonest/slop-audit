@@ -95,11 +95,11 @@ SCOPES: dict[str, Scope] = {
     },
     # Everything, tests included, because for these three the test tree IS the subject:
     # L1.8 is the ratio of test lines to production lines, L1.16 asks whether the
-    # repository's whitespace is disciplined anywhere, and schedule-silence asks which
-    # files carry a model-checker harness.
+    # repository's whitespace is disciplined anywhere, and interleaving robustness asks
+    # which files carry a model-checker harness.
     WHOLE_REPO: {
         "excludes": (),
-        "indicators": ("L1.8", "L1.16", "schedule_silence"),
+        "indicators": ("L1.8", "L1.16", "interleaving_robustness"),
     },
 }
 

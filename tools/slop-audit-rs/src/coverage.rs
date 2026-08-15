@@ -99,7 +99,7 @@ pub const CANONICAL: &[(&str, &str, Coverage)] = &[
     ("abs-paths", "absolute-paths", Coverage::Measured),
     ("path_cover", "path-cover", Coverage::NotPorted),
     ("thread_surface", "thread-surface", Coverage::NotPorted),
-    ("schedule_silence", "schedule-silence", Coverage::NotPorted),
+    ("interleaving_robustness", "interleaving-robustness", Coverage::NotPorted),
 ];
 
 /// The canonical row for a code, or `None` if the code is not canonical.

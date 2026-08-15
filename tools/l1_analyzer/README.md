@@ -22,7 +22,7 @@ Tests run with the dev extra: `uv run --extra dev pytest`.
 - **L1.12 through L1.17** are source metrics via tree-sitter (dead code, duplication, secrets, type-escape density, trailing whitespace, god-file concentration), across `--lang {c, csharp, go, java, javascript, python, ruby, rust, typescript}` or `auto`.
 - **L1.18** mutable-state ratio and **L1.18b** the state-bounds classifier: the finite-testability meter. This sets the grade (see below).
 - **L1.19** decision-space coverage and **L1.20** test determinism: the two runtime indicators. They execute the target's own suite.
-- **Additive checks** reported alongside: `path_cover`, `thread_surface`, `absolute_paths` (hardcoded machine-specific paths), and, when the prove loops run, `coverage_proofs` and `schedule_silence`.
+- **Additive checks** reported alongside: `path_cover`, `thread_surface`, `absolute_paths` (hardcoded machine-specific paths), and, when the prove loops run, `coverage_proofs` and `interleaving_robustness`.
 
 ## The grade
 
@@ -49,7 +49,7 @@ Pass `--python PATH` to force the interpreter (for example a 3.11 target audited
 
 These generate and run code, so they are explicit and need `ANTHROPIC_API_KEY`:
 
-- `--prove` locates concurrency hazards and generates a test that reproduces the race (concurrency proofs → `schedule_silence`).
+- `--prove` locates concurrency hazards and generates a test that reproduces the race (concurrency proofs → `interleaving_robustness`).
 - `--prove-coverage-repo` locates uncovered decision branches (L1.19's own gaps) and generates one test per gap, runs it under the target's runtime, and keeps it only if it fails on its own assertion (a proven divergence). Missing-test generation exists for **Rust and Python**; the flag dispatches by language. `--coverage-repair-rounds N` caps the compiler/setup-error repair loop; `--prove-max` caps gaps per module.
 
 slop-audit proves the gap; it never writes into your test file. Adopting a surviving proof is your choice.

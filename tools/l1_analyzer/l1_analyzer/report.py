@@ -2,7 +2,7 @@
 
 Ported into the engine so the CLI and the web produce the same report: the single A-F
 grade, the verifiability verdict (CAN / COARSE / CANNOT), the finitely-testable share, the
-audit checks with bands, and the concurrency layer (thread-surface + schedule-silence).
+audit checks with bands, and the concurrency layer (thread-surface + interleaving robustness).
 build_report is a pure mapping from analyzer results to a model; report_markdown and
 report_html render it. No copy.md dependency; the prose is inlined here.
 
@@ -134,7 +134,7 @@ class Report(TypedDict, total=False):
     culprits_more: int
     silence: dict[str, object] | None
     thread_surface: dict[str, object] | None
-    schedule_silence: dict[str, object] | None
+    interleaving_robustness: dict[str, object] | None
     absolute_paths: dict[str, object] | None
 
 
@@ -304,7 +304,7 @@ def build_report(slug: str, lang: str, results: dict) -> Report:
         "audit": audit, "culprits": culprits, "culprits_more": culprits_more,
         "silence": l18b.get("silence") if isinstance(l18b.get("silence"), dict) else None,
         "thread_surface": results.get("thread_surface"),
-        "schedule_silence": results.get("schedule_silence"),
+        "interleaving_robustness": results.get("interleaving_robustness"),
         "absolute_paths": results.get("absolute_paths"),
     }
 
@@ -362,10 +362,10 @@ def report_markdown(r: Report) -> str:
         for f in (ts.get("findings") or [])[:12]:
             lines.append(f"- `{f['file']}:{f['line']}` — {f['kind']} ({f['severity']}) `{f['symbol']}`")
         lines += ["", "> Audit surface, not a race verdict. A site here means \"verify this\", never \"a race exists\"."]
-    ss = r.get("schedule_silence")
-    if isinstance(ss, dict) and ss.get("verdict") not in (None, "n/a"):
-        lines += ["", f"## Schedule-silence (concurrency anti-coverage) — {ss['verdict']}", ""]
-        for f in (ss.get("unmodeled") or []):
+    ir = r.get("interleaving_robustness")
+    if isinstance(ir, dict) and ir.get("verdict") not in (None, "n/a"):
+        lines += ["", f"## Interleaving robustness (concurrency anti-coverage) — {ir['verdict']}", ""]
+        for f in (ir.get("unmodeled") or []):
             lines.append(f"- `{f}` — flagged surface no loom/shuttle model touches")
     ap = r.get("absolute_paths")
     if isinstance(ap, dict) and ap.get("verdict") == "flagged":
@@ -428,11 +428,11 @@ def report_html(r: Report) -> str:
         sites = "".join(f"<li><code>{e(f['file'])}:{f['line']}</code> — {e(f['kind'])} ({e(f['severity'])}) <code>{e(f['symbol'])}</code></li>" for f in (ts.get("findings") or [])[:12])
         ts_html = (f"<h2>Thread-safety surface — {e(str(ts['verdict']))}</h2><p>{e(str(ts.get('details','')))}</p><ul>{sites}</ul>"
                    f"<p class=note>Audit surface, not a race verdict. A site here means \"verify this\", never \"a race exists\".</p>")
-    ss = r.get("schedule_silence")
-    ss_html = ""
-    if isinstance(ss, dict) and ss.get("verdict") not in (None, "n/a"):
-        um = "".join(f"<li><code>{e(f)}</code></li>" for f in (ss.get("unmodeled") or []))
-        ss_html = f"<h2>Schedule-silence — {e(str(ss['verdict']))}</h2><p class=note>Flagged concurrency surface that no loom/shuttle model touches.</p><ul>{um}</ul>"
+    ir = r.get("interleaving_robustness")
+    ir_html = ""
+    if isinstance(ir, dict) and ir.get("verdict") not in (None, "n/a"):
+        um = "".join(f"<li><code>{e(f)}</code></li>" for f in (ir.get("unmodeled") or []))
+        ir_html = f"<h2>Interleaving robustness — {e(str(ir['verdict']))}</h2><p class=note>Flagged concurrency surface that no loom/shuttle model touches.</p><ul>{um}</ul>"
     silence_html = _silence_html(r, e)
     ap = r.get("absolute_paths")
     ap_html = ""
@@ -449,7 +449,7 @@ def report_html(r: Report) -> str:
         f"<div class=dist><span><b>{r['neutral']}</b> finitely testable</span><span><b>{r['promiscuous']}</b> provably unbounded</span><span><b>{r['unresolved']}</b> undecided (silence)</span></div>"
         f"{culprits}{silence_html}<p class=note>{e(_COMPOSE_NOTE)}</p><p class=note>{e(_SILENCE_NOTE)}</p>"
         f"<h2>Audit checks</h2><table><thead><tr><th>Check</th><th>Value</th><th>Band</th></tr></thead><tbody>{audit_rows}</tbody></table>"
-        f"{ts_html}{ss_html}{ap_html}"
+        f"{ts_html}{ir_html}{ap_html}"
         f"<h2>How the grade is computed</h2><p class=rubric>{e(_RUBRIC)}</p>"
         f"<p class=rubric>Full methodology: <a href='https://slopaudit.org'>slopaudit.org</a></p>"
         f"</body></html>"
