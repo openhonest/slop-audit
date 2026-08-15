@@ -72,11 +72,31 @@ not wrong, it is unexercised, and an unexercised check is one nobody will notice
 The blind spot did not go away with it; it moved somewhere this table's granularity cannot
 see. A kind is recorded readable when ONE fixture of that kind can be read, and a C struct
 field declared in a header and used in another translation unit is a field declaration the
-classifier still cannot reach. libuv declares 1,345 of them, all counted `reachable`, and
-373 reach a finding. What discloses that is `admitted_fraction`, which divides by `declared`
-and reports 0.277 rather than the 1.0 `reachable` would flatter it to. Splitting the kind -
-a field declared and used in one translation unit against one that is not - would put the
-gap back where the refusal can act on it, and it is not done here.
+classifier still cannot reach. libuv declares 1,002 of them, all counted `reachable`, and
+367 reach a finding. Splitting the kind - a field declared and used in one translation unit
+against one that is not - would put the gap back where the refusal can act on it, and it is
+not done here.
+
+WHAT DISCLOSES THAT GAP NOW, and what used to pretend to. `admitted_fraction` divided
+`len(findings)` by `declared`: conclusions over declarations, two counts of different things.
+A file holding one TypedDict of five fields and one module-level `cache = {}` published 0.167
+with nothing missed at all - the reader walked every one of the six declarations and was right
+about five of them - so a codebase using more typed records scored worse for being no less well
+read. That number reached every report card, every adopter's JSON and the public web card, and
+it was quoted as coverage. It is deleted, not repaired.
+
+In its place `compare` publishes two fractions over ONE unit, the declaration site.
+`visited_fraction` is sites the classifier's enumerator reached over sites declared: how much
+of what this code spells did the reader look at. `judged_fraction` is sites that reached a
+verdict over sites reached: of what it looked at, how much held state there was anything to
+conclude about. The visits come from the enumerators' own walk and never from a second
+traversal guessing where the first one went; `state_sites` holds the vocabulary the two walks
+name a site in, and the full list of the places that naming cannot be made to match.
+
+libuv now reads 1.0 visited and 0.366 judged, and both are the truth: the C rule reaches every
+field declaration in every file, and joins barely more than a third of them to a use, because
+the rest are used in a translation unit a file-at-a-time reading never opens. The old 0.277 was
+wrong in direction as well as in size - it read as a reader that had seen a quarter of the code.
 """
 
 from __future__ import annotations
@@ -89,67 +109,83 @@ from tree_sitter import Node
 
 from l1_analyzer.indicators import LANG_CFG, _get_parser, _read_source_bytes
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
+from l1_analyzer.state_sites import (
+    CLASS_BODY_BINDING,
+    FIELD_DECLARATION,
+    INSTANCE_VARIABLE,
+    MODULE_BINDING,
+    PROPERTY_DECLARATION,
+    RECEIVER_ATTRIBUTE,
+    Site,
+)
+from l1_analyzer.state_sites import (
+    DECL_KIND as _DECL_KIND,
+)
+from l1_analyzer.state_sites import (
+    enclosing_owner as _owner,
+)
+from l1_analyzer.state_sites import (
+    owner_name as _owner_name,
+)
 from l1_analyzer.ts_nodes import field as _field
+from l1_analyzer.ts_nodes import local_refs as _local_refs
+from l1_analyzer.ts_nodes import refs as _refs
 from l1_analyzer.ts_nodes import text as _text
 
-# The declaration kinds, one per construct a language spells state with. They are finer than
-# the three the census started with (field / attribute / module), and the extra cuts are
-# where capability was measured to differ INSIDE one of the old buckets: a C# auto-property
-# and a C# field were both "field", and the enumerator reads one and not the other. A kind
-# that hides a capability difference is a kind that hides a blind spot.
-MODULE_BINDING = "module_binding"            # file-scope or package-level binding
-CLASS_BODY_BINDING = "class_body_binding"    # a name bound in a class body, not through self
-RECEIVER_ATTRIBUTE = "receiver_attribute"    # self.x / this.x, assigned in a method
-INSTANCE_VARIABLE = "instance_variable"      # Ruby @ivar, which has no receiver
-FIELD_DECLARATION = "field_declaration"      # a slot declared inside a record type
-PROPERTY_DECLARATION = "property_declaration"  # C# property: a slot with accessors
-
-# One declaration site, keyed so the same slot spelled twice in one file counts once:
-# `self.x = 0` in __init__ and `self.x = 1` in reset() are one piece of state, and a
-# denominator that counted them twice would open a gap the code never had. The scope id is
-# the enclosing record's byte offset, which keeps `A.x` and `B.x` apart without needing to
-# resolve either name.
-Site = tuple[str, str]      # (kind, scope-qualified name)
-
-
-def _descendants(node: Node) -> list[Node]:
-    out: list[Node] = []
-
-    def walk(n: Node) -> None:
-        out.append(n)
-        for c in n.children:
-            walk(c)
-
-    walk(node)
-    return out
+# The declaration kinds and the shape of a site both live in `state_sites`, because the
+# classifier's enumerators now name the declarations THEY reach in the same vocabulary and the
+# two walks are compared site by site. Sharing the names is not sharing the count: nothing
+# below calls the classifier, and the sites here come from this file's own walk.
+#
+# One site is (kind, owning record, declared name), keyed so the same slot spelled twice in one
+# file counts once: `self.x = 0` in __init__ and `self.x = 1` in reset() are one piece of state,
+# and a denominator that counted them twice would open a gap the code never had.
 
 
 def _of_type(root: Node, types: tuple[str, ...]) -> list[Node]:
-    return [n for n in _descendants(root) if n.type in types]
+    return _refs(root, lambda n: n.type in types)
 
 
-def _enclosing(node: Node, types: tuple[str, ...]) -> Node | None:
-    """The nearest ancestor of one of `types`, or None. Used to qualify a name by the
-    record that owns it, so two classes with a field of the same name are two sites."""
-    parent = node.parent
-    while parent is not None:
-        if parent.type in types:
-            return parent
-        parent = parent.parent
-    return None
+def _own(scope: Node, types: tuple[str, ...], stop: tuple[str, ...]) -> list[Node]:
+    """Nodes of `types` belonging to `scope` itself, never to a record or declaration nested
+    inside it. A nested one is reached on its own turn and counted against its own owner."""
+    return _local_refs(scope, lambda n: n.type in types, stop)
 
 
-def _scope_key(node: Node, types: tuple[str, ...]) -> str:
-    owner = _enclosing(node, types)
-    return "-" if owner is None else str(owner.start_byte)
+# The declarator wrappers a field declaration can put between itself and the name it binds.
+# `int cache[256]`, `char *name` and `void (*cb)(int)` each declare one slot behind one to
+# three of them. Whitelisted rather than unwrapped by "take the first named child", which
+# would walk into an anonymous member's struct body and return another record's field.
+#
+# Re-derived here rather than imported from `record_state`, which unwraps the same wrappers on
+# the classifier's side: the census is the second reading, and a shared extractor is a shared
+# blind spot. What the two DO have to agree on is the name they arrive at, because the coverage
+# number is measured by matching those names. That agreement was missing and is what this
+# helper fixes: the census named a C field `cache[256]` where the classifier named it `cache`,
+# so every array, pointer and function-pointer field in C read as a declaration nothing had
+# visited. libuv reported 0.582 visited on that defect and reports 0.928 without it.
+_DECLARATOR_WRAPPERS = ("array_declarator", "pointer_declarator", "function_declarator",
+                        "parenthesized_declarator", "attributed_declarator", "init_declarator")
+
+
+def _bound_name(node: Node | None) -> str:
+    """The identifier a name-ish declaration node binds, past any declarator wrappers."""
+    if node is None:
+        return ""
+    if node.type not in _DECLARATOR_WRAPPERS:
+        return _text(node)
+    inner = _field(node, "declarator")
+    if inner is None:
+        inner = next((c for c in node.children if c.is_named), None)
+    return _bound_name(inner)
 
 
 def _named_field(node: Node, names: tuple[str, ...]) -> str:
-    """The first present name-ish field of a declaration node, as text."""
+    """The name the first present name-ish field of a declaration node binds."""
     for name in names:
         found = _field(node, name)
         if found is not None:
-            return _text(found)
+            return _bound_name(found)
     return ""
 
 
@@ -170,12 +206,22 @@ _FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], tupl
     "c": (("field_declaration",), ("field_identifier",), (),
           ("struct_specifier", "union_specifier")),
     "rust": (("field_declaration",), ("field_identifier",), (), ("struct_item", "union_item")),
-    "go": (("field_declaration",), ("field_identifier",), (), ("struct_type",)),
-    "java": (("field_declaration",), (), ("variable_declarator",), ("class_declaration",)),
+    # The owner is the `type_spec` the struct sits under, not the anonymous `struct_type`
+    # itself: the classifier reaches a Go field from a method receiver and can name only the
+    # type. An inline struct bound to no named type has no type_spec and is unmatchable.
+    "go": (("field_declaration",), ("field_identifier",), (), ("type_spec",)),
+    # Every body a field can be declared in, not just a class: an interface constant and
+    # an enum field are declaration sites too, and with only class_declaration listed they
+    # got no owner at all. A site with no owner cannot be matched against a walk that
+    # names one, so it read as unvisited whether or not anything had looked at it.
+    "java": (("field_declaration",), (), ("variable_declarator",),
+             ("class_declaration", "interface_declaration", "enum_declaration",
+              "record_declaration", "annotation_type_declaration")),
     # C# properties hold state as surely as fields do, and field_decl_types named only
     # field_declaration, so an auto-property was state nobody counted until it was added.
     "csharp": (("field_declaration", "property_declaration"), ("identifier",),
-               ("variable_declarator",), ("class_declaration", "record_declaration", "struct_declaration")),
+               ("variable_declarator",), ("class_declaration", "record_declaration", "struct_declaration",
+                                          "interface_declaration", "enum_declaration")),
     "typescript": (("public_field_definition",), (), (), ("class_declaration",)),
     "javascript": (("field_definition",), (), (), ("class_declaration",)),
     "python": ((), (), (), ("class_definition",)),
@@ -184,30 +230,35 @@ _FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], tupl
 # The name-carrying field of a field declaration, tried in order.
 _FIELD_NAME_FIELDS = ("name", "property", "declarator")
 
-# The kind each field-declaration node type belongs to, read from the node the parser
-# produced rather than from the language. Subscripted, never `.get`: adding a node type to
-# _FIELDS without deciding its kind is a KeyError on the next run, and the alternative - a
-# default kind - would quietly file a new construct under an existing capability answer.
-_DECL_KIND: dict[str, str] = {
-    "field_declaration": FIELD_DECLARATION,
-    "public_field_definition": FIELD_DECLARATION,    # TypeScript
-    "field_definition": FIELD_DECLARATION,           # JavaScript
-    "property_declaration": PROPERTY_DECLARATION,    # C#
-}
-
-
 def _field_sites(root: Node, lang: str) -> list[Site]:
     decl_types, name_types, declarator_types, record_types = _FIELDS[lang]
     if not decl_types:
         return []
     sites: list[Site] = []
     for fd in _of_type(root, decl_types):
-        scope = _scope_key(fd, record_types)
-        declared = [_named_field(d, ("name",)) for d in _of_type(fd, declarator_types)] if declarator_types else []
+        owner = _owner(fd, record_types)
+        # Bounded at the next record or the next declaration, so a declaration only ever
+        # names its OWN slots. An anonymous member is the case that forced this: C spells
+        # `union { int b; int c; };` as a field declaration wrapping a union whose members
+        # are field declarations of their own, and an unbounded name walk read b and c off
+        # the wrapper as well as off themselves. libuv counted 1,345 field declarations that
+        # way, of which the wrapper duplicates were sites nothing could ever visit, because
+        # they were attributed to the outer struct while the fields themselves belong to the
+        # union. The double count inflated the denominator and read as a hole in the reader.
+        inner = record_types + decl_types
+        declared = [_named_field(d, ("name",)) for d in _own(fd, declarator_types, inner)] if declarator_types else []
         if not declared:
             direct = _named_field(fd, _FIELD_NAME_FIELDS)
-            declared = [direct] if direct else [_text(n) for n in _of_type(fd, name_types)]
-        sites += [(_DECL_KIND[fd.type], f"{scope}.{name}") for name in declared if name]
+            declared = [direct] if direct else [_text(n) for n in _own(fd, name_types, inner)]
+        # A field declaration with no record around it is not a field declaration. Every
+        # grammar here produces the node only inside a record body, so an ownerless one is the
+        # parser recovering from something it could not read - in libuv, 255 macro-prefixed
+        # function prototypes (`UV_EXTERN void uv_mutex_unlock(uv_mutex_t*);`) parsed as
+        # top-level field declarations and were counted as places the code keeps data. They
+        # inflated the denominator by a fifth and every one of them read as a declaration
+        # nothing had visited, which is a reading failure the reader never committed.
+        if owner:
+            sites += [(_DECL_KIND[fd.type], owner, name) for name in declared if name]
     return sites
 
 
@@ -250,7 +301,7 @@ def _receiver_sites(root: Node, lang: str) -> list[Site]:
             continue
         attr = _field(left, attr_field)
         if attr is not None:
-            sites.append((RECEIVER_ATTRIBUTE, f"{_scope_key(assign, record_types)}.{_text(attr)}"))
+            sites.append((RECEIVER_ATTRIBUTE, _owner(assign, record_types), _text(attr)))
     return sites
 
 
@@ -262,7 +313,7 @@ def _ruby_ivar_sites(root: Node) -> list[Site]:
     for assign in _of_type(root, ("assignment", "operator_assignment")):
         left = _field(assign, "left")
         if left is not None and left.type == "instance_variable":
-            sites.append((INSTANCE_VARIABLE, f"{_scope_key(assign, ('class', 'module'))}.{_text(left)}"))
+            sites.append((INSTANCE_VARIABLE, _owner(assign, ("class", "module")), _text(left)))
     return sites
 
 
@@ -281,8 +332,9 @@ def _py_toplevel(root: Node) -> list[Site]:
         for assign in _of_type(stmt, ("assignment",)):
             left = _field(assign, "left")
             if left is not None and left.type == "identifier":
-                sites.append((MODULE_BINDING, _text(left)))
+                sites.append((MODULE_BINDING, "", _text(left)))
     for cls in _of_type(root, ("class_definition",)):
+        owner = _owner_name(cls)
         body = _field(cls, "body")
         for stmt in (body.children if body is not None else []):
             if stmt.type != "expression_statement":
@@ -290,7 +342,7 @@ def _py_toplevel(root: Node) -> list[Site]:
             for assign in _of_type(stmt, ("assignment",)):
                 left = _field(assign, "left")
                 if left is not None and left.type == "identifier":
-                    sites.append((CLASS_BODY_BINDING, f"{cls.start_byte}.{_text(left)}"))
+                    sites.append((CLASS_BODY_BINDING, owner, _text(left)))
     return sites
 
 
@@ -305,7 +357,7 @@ def _js_toplevel(root: Node) -> list[Site]:
         for vd in _of_type(decl, ("variable_declarator",)):
             name = _field(vd, "name")
             if name is not None and name.type == "identifier":
-                sites.append((MODULE_BINDING, _text(name)))
+                sites.append((MODULE_BINDING, "", _text(name)))
     return sites
 
 
@@ -313,7 +365,7 @@ def _rust_toplevel(root: Node) -> list[Site]:
     """`static` items. A plain `static` is immutable and the classifier skips it; the
     census counts it, because immutability is a verdict about the state and the census
     issues none."""
-    return [(MODULE_BINDING, _named_field(st, ("name",)))
+    return [(MODULE_BINDING, "", _named_field(st, ("name",)))
             for st in root.children if st.type == "static_item" and _named_field(st, ("name",))]
 
 
@@ -325,7 +377,7 @@ def _go_toplevel(root: Node) -> list[Site]:
         for spec in _of_type(decl, ("var_spec",)):
             name = _field(spec, "name")
             if name is not None:
-                sites.append((MODULE_BINDING, _text(name)))
+                sites.append((MODULE_BINDING, "", _text(name)))
     return sites
 
 
@@ -352,7 +404,7 @@ def _c_toplevel(root: Node) -> list[Site]:
         for child in decl.children:
             name = _c_declarator_name(child)
             if name:
-                sites.append((MODULE_BINDING, name))
+                sites.append((MODULE_BINDING, "", name))
     return sites
 
 
@@ -524,55 +576,111 @@ def _kinds(lang: str) -> list[str]:
     return [kind for (spoken, kind) in CAPABILITY if spoken == lang]
 
 
-def count(repo: Path, lang: str) -> dict[str, object]:
-    """The census over a repository, in the same scope the classifier uses.
+def _walk(repo: Path, lang: str) -> dict[str, set[Site]]:
+    """The declaration sites of every file in scope, keyed by the path the classifier reports
+    its findings against.
 
-    `declared` is None, never 0, for a language with no census spec. A confident zero is
-    exactly the failure this module exists to stop: it would let an unread repository
-    report a full denominator and pass. None says "not counted here", which withholds the
-    gap check rather than faking it.
-
-    `reachable` is the subset of `declared` whose kind the classifier's enumerator has a
-    rule capable of matching, and it is the denominator the refusal is decided on.
-    `unread_kinds` names the kinds that were declared here and have no such rule, so a
-    refusal can say what it could not read instead of quoting a bare count."""
-    if lang not in _FIELDS or lang not in LANG_CFG:
-        return {"declared": None, "by_kind": {}, "files": 0, "reachable": None, "unread_kinds": []}
+    Keyed per file, not merged, because the site names are only unique within one file: two
+    files can each declare `Store.cache`, and merging them into one set would count one site
+    where two exist and would let a visit to either one cover both."""
     cfg = LANG_CFG[lang]
     parser = _get_parser(lang)
     files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
+    by_file: dict[str, set[Site]] = {}
+    for path, src in files:
+        rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
+        by_file[rel] = _file_sites(parser.parse(src).root_node, lang)
+    return by_file
+
+
+def uncounted(admitted: int) -> dict[str, object]:
+    """The census of a language it has no spec for. Every count is None rather than 0.
+
+    A confident zero is exactly the failure this module exists to stop: it would let an
+    unread repository report a full denominator and pass. None says "not counted here",
+    which withholds the gap check rather than faking it."""
+    return {"declared": None, "by_kind": {}, "files": 0, "reachable": None, "unread_kinds": [],
+            "admitted": admitted, "visited": None, "visited_fraction": None,
+            "judged": None, "judged_fraction": None}
+
+
+def _tally(by_file: dict[str, set[Site]], lang: str) -> dict[str, object]:
+    """The counts a census reports, rolled up from the per-file sites.
+
+    `reachable` is the subset of `declared` whose kind the classifier's enumerator has a rule
+    capable of matching, and it is the denominator the refusal is decided on. `unread_kinds`
+    names the kinds that were declared here and have no such rule, so a refusal can say what
+    it could not read instead of quoting a bare count."""
     # Seeded from the capability matrix, so every kind this language can spell appears with
     # its count even at zero, and a kind the extractors emit without a capability entry is a
     # KeyError below rather than a site quietly missing from the denominator.
     by_kind: dict[str, int] = {kind: 0 for kind in _kinds(lang)}
     declared = 0
-    for _path, src in files:
-        for kind, _name in _file_sites(parser.parse(src).root_node, lang):
+    for sites in by_file.values():
+        for kind, _owner_of, _name in sites:
             by_kind[kind] += 1
             declared += 1
     reachable = sum(n for kind, n in by_kind.items() if CAPABILITY[(lang, kind)]["admitted"])
     unread_kinds = [kind for kind, n in by_kind.items() if n and not CAPABILITY[(lang, kind)]["admitted"]]
-    return {"declared": declared, "by_kind": by_kind, "files": len(files),
+    return {"declared": declared, "by_kind": by_kind, "files": len(by_file),
             "reachable": reachable, "unread_kinds": unread_kinds}
 
 
-def compare(repo: Path, lang: str, admitted: int) -> dict[str, object]:
-    """The census beside what the classifier admitted, which is the only comparison that
-    can see non-enumeration.
+def count(repo: Path, lang: str) -> dict[str, object]:
+    """The census over a repository, in the same scope the classifier uses."""
+    if lang not in _FIELDS or lang not in LANG_CFG:
+        return {"declared": None, "by_kind": {}, "files": 0, "reachable": None, "unread_kinds": []}
+    return _tally(_walk(repo, lang), lang)
 
-    `admitted_fraction` is None when nothing was declared or the language has no census.
-    Those two are not a ratio of zero; they are the absence of a ratio, and a caller that
-    reads them as 0.0 would refuse a grade to every repository the census cannot count.
 
-    The published fraction keeps `declared` as its denominator while the refusal uses
-    `reachable`, and the two answer different questions. The refusal asks whether the reader
-    had a rule at all, so it must not charge a repository for kinds nobody can reach. The
-    fraction is a disclosure of how thin the reading was, and dividing by the narrower count
-    would flatter it: a C repository whose state is mostly struct fields would report a high
-    fraction over the file-scope globals alone."""
-    census = count(repo, lang)
+def _hit(by_file: dict[str, set[Site]], reached: dict[str, set[Site]]) -> int:
+    """Declared sites that the classifier's walk reached, counted file by file.
+
+    A file the classifier never opened contributes nothing rather than raising: the two walks
+    read the same directory with the same scope and should agree on the file list, and if they
+    ever do not, the honest reading of the difference is that those declarations went unread.
+    The error direction is the safe one - a file missing here lowers coverage, never raises it."""
+    return sum(len(sites & reached[rel]) for rel, sites in by_file.items() if rel in reached)
+
+
+def compare(repo: Path, lang: str, admitted: int,
+            visited: dict[str, set[Site]], judged: dict[str, set[Site]]) -> dict[str, object]:
+    """The census beside what the classifier's own walk reached, which is the only comparison
+    that can see non-enumeration.
+
+    TWO FRACTIONS, BECAUSE THERE WERE ALWAYS TWO QUESTIONS. `visited_fraction` is declared
+    sites the enumerator reached over declared sites: how much of what this code spells did
+    the reader look at. `judged_fraction` is sites that yielded a verdict over sites reached:
+    of what it looked at, how much held state there was anything to conclude about. A site the
+    reader reached and declined is not a gap; a site it never reached is, and only the first
+    fraction can see one.
+
+    WHAT WAS DELETED AND WHY IT IS NOT COMING BACK. `admitted_fraction` was `len(findings)`
+    over `declared`: conclusions over declarations, two counts of different things. One
+    TypedDict of five fields beside one module-level dict published 0.167 with nothing missed,
+    and a codebase that used more typed records scored worse for being no less well read. That
+    figure reached every report card, every adopter's JSON and the public web card, and it was
+    quoted as coverage. `admitted` stays, as the raw count of findings it always was, divided
+    by nothing.
+
+    HOW THE TWO WALKS ARE MATCHED, and where the match cannot be made: `state_sites` holds the
+    site vocabulary and the full list of the places the correspondence fails. In short, a site
+    is (kind, owning record's name, declared name) within one file, and the classifier can name
+    the owner only where a name exists to name - never for an anonymous Go struct type, and for
+    Rust only through an `impl` block in the same file.
+
+    `visited` and `judged` come from the enumerators' own walk, handed down through
+    `_analyze_file`. Nothing here re-derives where the classifier went: a second traversal
+    written to work out where the first one probably looked is a guess with a measurement's
+    name, which is the class of defect this number replaced."""
+    if lang not in _FIELDS or lang not in LANG_CFG:
+        return uncounted(admitted)
+    by_file = _walk(repo, lang)
+    census = _tally(by_file, lang)
     declared = census["declared"]
-    fraction = None
-    if isinstance(declared, int) and declared > 0:
-        fraction = round(min(admitted / declared, 1.0), 3)
-    return {**census, "admitted": admitted, "admitted_fraction": fraction}
+    seen, decided = _hit(by_file, visited), _hit(by_file, judged)
+    return {**census, "admitted": admitted, "visited": seen, "judged": decided,
+            # None, not 0.0, when there is no denominator. Nothing declared is not "we read
+            # none of it", and nothing reached is not "we judged none of what we reached".
+            "visited_fraction": round(seen / declared, 3) if isinstance(declared, int) and declared else None,
+            "judged_fraction": round(decided / seen, 3) if seen else None}

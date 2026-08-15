@@ -36,7 +36,6 @@ return n/a rather than guess.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
@@ -46,12 +45,12 @@ from l1_analyzer import (
     record_state,
     state_bounds_filters,
     state_census,
+    state_enum,
     state_partition,
 )
 from l1_analyzer.indicators import (
     LANG_CFG,
     LangCfg,
-    _find_module_mutable_names,
     _get_parser,
     _read_source_bytes,
     bucketed_paths,
@@ -64,9 +63,12 @@ from l1_analyzer.state_partition import (
     Partition,
     Reach,
 )
+from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import arg_value as _arg_value
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import first_named as _first_named
+from l1_analyzer.ts_nodes import local_refs as _local_refs
+from l1_analyzer.ts_nodes import refs as _refs
 from l1_analyzer.ts_nodes import same as _same
 from l1_analyzer.ts_nodes import text as _text
 
@@ -449,133 +451,6 @@ def _verdict(reaches: list[Reach]) -> tuple[str, bool, str, Partition]:
 # State enumeration and file analysis.
 # --------------------------------------------------------------------------
 
-def _refs(scope: Node, predicate: Callable[[Node], bool]) -> list[Node]:
-    out: list[Node] = []
-
-    def walk(n: Node) -> None:
-        if predicate(n):
-            out.append(n)
-        for c in n.children:
-            walk(c)
-
-    walk(scope)
-    return out
-
-
-def _local_refs(scope: Node, predicate: Callable[[Node], bool], sp: LangSpec) -> list[Node]:
-    """Like _refs, but does not descend into a nested class: an inner class owns its
-    own fields and is analysed as its own scope, so the enclosing class must not
-    harvest the inner class's state (which double-counts it)."""
-    out: list[Node] = []
-
-    def walk(n: Node, is_root: bool) -> None:
-        if not is_root and n.type in sp["class_types"]:
-            return
-        if predicate(n):
-            out.append(n)
-        for c in n.children:
-            walk(c, False)
-
-    walk(scope, True)
-    return out
-
-
-# Both enumerators return an insertion-ordered dict of keys, not a set, and the ordering is
-# the whole reason for the type. `_analyze_file` iterates them to build findings, and the
-# final `findings.sort` keys on verdict, drives_decision, file and line, so two states
-# declared on the SAME line tie on every key. Python's sort is stable, so a tie preserves
-# whatever order the enumerator handed over, and set iteration order over strings varies
-# between processes. Six module dicts on one line serialized in six different orders across
-# six runs of unchanged code.
-#
-# Nothing about the MEASUREMENT moved: identical verdicts, counts, bands and grade every
-# time. Only the row order did, which is a serialization defect and not a determinism one.
-# It still has to be fixed, because a diff of two runs over unchanged code must be empty or
-# an agent watching for change is shown change that is not there (bead slop-audit-8rt).
-#
-# Insertion order is chosen over sorting the keys because insertion order IS source order:
-# the walks below are pre-order, so a reader scanning findings down a file meets the states
-# in the order they are written. `dict[str, None]` is the ordered set Python does not have.
-Keys = dict[str, None]
-
-
-def _enum_instance_state(cls: Node, sp: LangSpec) -> Keys:
-    """State keys for a class, in source order. Member-style languages name state through a
-    receiver (self.x / this.x) and may also declare fields; identifier-style languages (Java,
-    C#) reference fields by bare name, so the key is the field name itself."""
-    keys: Keys = {}
-    if sp.get("instance_enum") == "ruby_ivar":
-        # Ruby: state is @instance_variables, a node type of their own (no receiver).
-        for iv in _local_refs(cls, lambda n: n.type == "instance_variable", sp):
-            keys[_text(iv)] = None
-        return keys
-    if sp.get("instance_enum") == "self_usage":
-        # Rust: the field list is on the struct, but state is used as self.<field> in
-        # the impl (reads and writes). Enumerate from that usage, not from assignments.
-        for m in _local_refs(cls, lambda n: n.type in sp["member_types"], sp):
-            obj = _field(m, sp["mem_object"])
-            if obj is not None and _text(obj) in sp["this_idents"]:
-                keys[_text(m)] = None           # "self.<field>"
-        return keys
-    if sp["instance_ref_style"] == "member":
-        for n in _local_refs(cls, lambda n: n.type in sp["assign_types"], sp):
-            left = _field(n, sp["assign_left"])
-            if left is not None and left.type in sp["member_types"]:
-                obj = _field(left, sp["mem_object"])
-                if obj is not None and _text(obj) in sp["this_idents"]:
-                    keys[_text(left)] = None    # "self.x" / "this.x"
-    for fd in _local_refs(cls, lambda n: n.type in sp["field_decl_types"], sp):
-        for name in record_state.field_decl_names(fd):
-            keys[sp["key_prefix"] + name] = None
-    return keys
-
-
-def _go_type_name(typ: Node | None) -> str | None:
-    """The struct type a Go receiver binds to, unwrapping `*T` to `T`."""
-    if typ is None:
-        return None
-    if typ.type == "pointer_type":
-        return _go_type_name(_first_named(typ))
-    if typ.type == "type_identifier":
-        return _text(typ)
-    return None
-
-
-def _go_receiver(method: Node) -> tuple[str | None, str | None]:
-    """(receiver type, receiver variable name) for a Go method_declaration."""
-    recv = _field(method, "receiver")               # parameter_list `(c *Cache)`
-    pd = _first_named(recv) if recv is not None else None
-    if pd is None:
-        return None, None
-    name = _field(pd, "name")
-    return _go_type_name(_field(pd, "type")), (_text(name) if name is not None else None)
-
-
-def _go_receiver_findings(root: Node, rel: str, sp: LangSpec, closed_sets: dict[str, int | None], immutable_ctors: set[str]) -> list[Finding]:
-    """Go state, grouped by receiver TYPE across all its methods (spec section 4:
-    analyse state across the whole type, not one method). A field is `<recv>.<field>`
-    inside a method; the key is `<Type>.<field>` so it is stable across methods whose
-    receivers are named differently."""
-    by_type: dict[str, list[tuple[Node, str]]] = {}
-    for m in _refs(root, lambda n: n.type == "method_declaration"):
-        tname, rname = _go_receiver(m)
-        if tname and rname:
-            by_type.setdefault(tname, []).append((m, rname))
-
-    findings: list[Finding] = []
-    for tname, methods in by_type.items():
-        field_refs: dict[str, list[Node]] = {}
-        for method, rname in methods:
-            for sel in _refs(method, lambda n: n.type == "selector_expression"):
-                operand = _field(sel, "operand")
-                if operand is not None and operand.type == "identifier" and _text(operand) == rname:
-                    field = _text(_field(sel, "field"))
-                    field_refs.setdefault(field, []).append(sel)
-        for field, refs in field_refs.items():
-            findings.append(_finding(f"{tname}.{field}", refs, rel, sp, closed_sets, immutable_ctors, instance=True))
-    return findings
-
-
 # Node types whose subtree is a module path rather than a value: `from app.auth import X`
 # names a package, not the variable `app` defined below it. Matching on identifier text
 # alone made the two the same state.
@@ -629,97 +504,13 @@ def _bound_to(refs: list[Node], key: str, sp: LangSpec) -> list[Node]:
 
 
 def _state_refs(scope: Node, key: str, sp: LangSpec) -> list[Node]:
-    if sp.get("instance_enum") == "ruby_ivar":
-        return _local_refs(scope, lambda n: n.type == "instance_variable" and _text(n) == key, sp)
+    stop = sp["class_types"]
+    if sp["instance_enum"] == "ruby_ivar":
+        return _local_refs(scope, lambda n: n.type == "instance_variable" and _text(n) == key, stop)
     if sp["instance_ref_style"] == "member":
-        return _local_refs(scope, lambda n: n.type in sp["member_types"] and _text(n) == key, sp)
-    hits = _local_refs(scope, lambda n: n.type == "identifier" and _text(n) == key, sp)
+        return _local_refs(scope, lambda n: n.type in sp["member_types"] and _text(n) == key, stop)
+    hits = _local_refs(scope, lambda n: n.type == "identifier" and _text(n) == key, stop)
     return _bound_to(hits, key, sp)
-
-
-def _in_source_order(root: Node, names: set[str]) -> Keys:
-    """`names` re-ordered by where each one first appears in the file.
-
-    The Python module scan lives in mutable_state and returns a set, which L1.18 uses for
-    membership tests where order is meaningless. Rather than change that contract for every
-    caller, the order is recovered here from the tree, which is the authority on it anyway.
-    A name in the set that appears nowhere as a bare identifier cannot happen (the set is
-    built from the tree), and if it ever did it would be dropped, so the leftovers are
-    appended in a fixed order rather than silently lost."""
-    ordered: Keys = {}
-    for node in _refs(root, lambda n: n.type == "identifier"):
-        name = _text(node)
-        if name in names and name not in ordered:
-            ordered[name] = None
-    for name in sorted(names - set(ordered)):
-        ordered[name] = None
-    return ordered
-
-
-def _enum_module_state(root: Node, sp: LangSpec, cfg: LangCfg) -> Keys:
-    """Top-level mutable bindings, per language (spec key module_enum), in source order.
-    Java/C#/Ruby keep module/static state out of this prototype and rely on class scope; C is
-    the reverse (no classes, so file-scope variables are the only state)."""
-    mode = sp.get("module_enum")
-    names: Keys = {}
-    if mode == "python":
-        return _in_source_order(root, _find_module_mutable_names(root, cfg))
-    if mode == "js":
-        # top-level `let`/`var` declarators (const is not module-mutable state)
-        for decl in root.children:
-            if decl.type == "lexical_declaration":
-                if decl.children and _text(decl.children[0]) == "const":
-                    continue
-            elif decl.type != "variable_declaration":
-                continue
-            for vd in _refs(decl, lambda n: n.type == "variable_declarator"):
-                name = _field(vd, "name")
-                if name is not None and name.type == "identifier":
-                    names[_text(name)] = None
-        return names
-    if mode == "rust":
-        # `static mut NAME` only; a plain static or const is immutable, not counted.
-        for st in root.children:
-            if st.type == "static_item" and any(c.type == "mutable_specifier" for c in st.children):
-                name = _field(st, "name")
-                if name is not None:
-                    names[_text(name)] = None
-        return names
-    if mode == "go":
-        # package-level `var` declarations (const is immutable, not counted)
-        for decl in root.children:
-            if decl.type == "var_declaration":
-                for vs in _refs(decl, lambda n: n.type == "var_spec"):
-                    nm = _field(vs, "name")
-                    if nm is not None and nm.type == "identifier":
-                        names[_text(nm)] = None
-        return names
-    if mode == "c":
-        # C has no classes: file-scope variable declarations are the only state. Skip
-        # function declarations and typedefs; take the innermost declared identifier.
-        for decl in root.children:
-            if decl.type != "declaration" or any(c.type == "type_definition" for c in decl.children):
-                continue
-            for dcl in decl.children:
-                nm = _c_declarator_name(dcl)
-                if nm is not None:
-                    names[nm] = None
-        return names
-    return {}
-
-
-def _c_declarator_name(node: Node | None) -> str | None:
-    """The identifier a C declarator binds, unwrapping init/array/pointer declarators.
-    Returns None for a function declarator (not a variable) or a non-declarator node."""
-    if node is None:
-        return None
-    if node.type == "identifier":
-        return _text(node)
-    if node.type == "function_declarator":
-        return None
-    if node.type in ("init_declarator", "array_declarator", "pointer_declarator"):
-        return _c_declarator_name(_field(node, "declarator"))
-    return None
 
 
 # --- immutable-constant recognition (Python only) ---------------------------
@@ -846,34 +637,64 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
             "line": _binding_line(refs, sp), "silence": silence, "partition": partition}
 
 
-def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ctors: set[str]) -> list[Finding]:
+class FileRead(TypedDict):
+    """What the classifier made of one file, and what it walked to get there.
+
+    `visited` and `judged` are the two halves the old coverage number could not separate.
+    `visited` is every declaration the enumerators reached, admitted or declined; `judged` is
+    the subset that yielded a state key which then reached a verdict. A declaration in neither
+    is one nothing looked at, and only that is a gap in the reading.
+
+    They are sets of census-vocabulary sites, not counts, because the comparison happens
+    against the census's own per-file site set and a count cannot be intersected."""
+    findings: list[Finding]
+    visited: set[Site]
+    judged: set[Site]
+
+
+def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ctors: set[str]) -> FileRead:
     closed_sets = _collect_closed_sets(root) if sp is LANG_SPEC["python"] else set()
     findings: list[Finding] = []
+    visited: set[Site] = set()
+    judged: set[Site] = set()
 
-    for name in _enum_module_state(root, sp, cfg):
+    module = state_enum.module_cands(root, sp, cfg)
+    visited |= set(module)
+    for name in state_enum.keys_of(module):
         refs = _bound_to(_refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm), name, sp)
         if refs:
             findings.append(_finding(name, refs, rel, sp, closed_sets, immutable_ctors, instance=False))
+            judged |= state_enum.sites_of(module, name)
 
     if sp.get("scope_by_receiver"):    # Go: state spans methods, grouped by receiver type
-        findings.extend(_go_receiver_findings(root, rel, sp, closed_sets, immutable_ctors))
+        for slot in state_enum.go_slots(root):
+            findings.append(_finding(slot["state"], slot["refs"], rel, sp, closed_sets,
+                                     immutable_ctors, instance=slot["writers_enumerable"]))
+            visited.add(slot["site"])
+            judged.add(slot["site"])
 
     for cls in _refs(root, lambda n: n.type in sp["class_types"]):
-        for key in _enum_instance_state(cls, sp):
+        cands = state_enum.instance_cands(cls, sp)
+        visited |= set(cands)
+        for key in state_enum.keys_of(cands):
             refs = _state_refs(cls, key, sp)
             if refs:
                 findings.append(_finding(key, refs, rel, sp, closed_sets, immutable_ctors, instance=True))
+                judged |= state_enum.sites_of(cands, key)
 
     # State declared inside a record, which neither enumerator above can reach: both work
     # from a reference, and a slot declared once and thereafter only used is spelled one way
     # at its declaration and another at every use. record_state owns both halves, and it is
     # handed the keys already claimed for a record so it can stand down instead of reporting
     # the same slot twice (see its module docstring).
-    for slot in record_state.slots(root, sp, lambda cls: list(_enum_instance_state(cls, sp))):
+    read = record_state.slots(root, sp, lambda cls: state_enum.instance_keys(cls, sp))
+    visited |= set(read["visited"])
+    for slot in read["slots"]:
         findings.append(_finding(slot["state"], slot["refs"], rel, sp, closed_sets,
                                  immutable_ctors, instance=slot["writers_enumerable"]))
+        judged.add(slot["site"])
 
-    return findings
+    return {"findings": findings, "visited": visited, "judged": judged}
 
 
 # object, not Any: the verdict payload mixes strings, counts, nested dicts and a findings
@@ -888,9 +709,9 @@ def _na(lang: str) -> dict[str, object]:
         "silence": state_partition.silence_summary([], 0),
         "partition": state_partition.partition_summary([]),
         # `declared: None`, not 0. A language with no spec was not counted, and a confident
-        # zero here would report "there is no state" for a repository nobody read.
-        "census": {"declared": None, "admitted": 0, "admitted_fraction": None, "by_kind": {},
-                   "files": 0, "reachable": None, "unread_kinds": []},
+        # zero here would report "there is no state" for a repository nobody read. The two
+        # coverage fractions are None for the same reason: no denominator exists to divide by.
+        "census": state_census.uncounted(0),
         "findings": [],
         "bucketed": {"counts": {}, "paths": []},
         "details": f"finite-testability classifier has no spec for {lang} yet",
@@ -931,8 +752,17 @@ def classify(repo: Path, lang: str) -> dict[str, object]:
             immutable_ctors |= _collect_immutable_ctors(root)
 
     findings: list[Finding] = []
+    # The visit record, per file, in the census's site vocabulary. It is collected here rather
+    # than re-derived later because only the enumerators know where they went: a second walk
+    # written to work out where the first one probably looked is a guess wearing a
+    # measurement's name, which is the defect this number replaced.
+    visited: dict[str, set[Site]] = {}
+    judged: dict[str, set[Site]] = {}
     for root, rel in roots:
-        findings.extend(_analyze_file(root, rel, sp, cfg, immutable_ctors))
+        read = _analyze_file(root, rel, sp, cfg, immutable_ctors)
+        findings.extend(read["findings"])
+        visited[rel] = read["visited"]
+        judged[rel] = read["judged"]
 
     counts = {NEUTRAL: 0, PROMISCUOUS: 0, UNRESOLVED: 0}
     coverage = {v: {"observe_only": 0, "drives_decision": 0} for v in (NEUTRAL, PROMISCUOUS, UNRESOLVED)}
@@ -963,7 +793,7 @@ def classify(repo: Path, lang: str) -> dict[str, object]:
     # so a struct field no enumerator here knows about still lands in the denominator and the
     # gap becomes visible. `value`, `band` and `details` are untouched: they are the fields
     # the Rust port is validated equal against, and the census is not ported yet.
-    census = state_census.compare(repo, lang, len(findings))
+    census = state_census.compare(repo, lang, len(findings), visited, judged)
 
     return {
         "verdict": verdict,

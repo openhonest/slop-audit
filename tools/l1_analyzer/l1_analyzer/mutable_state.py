@@ -215,7 +215,7 @@ def _module_mutables_text(root: Node, cfg: LangCfg) -> set[str]:
     const_keywords = cfg["const_keywords"]
     this_idents = cfg["this_ident"]
     mutables: set[str] = set()
-    for node in _shallow_candidates(root, cfg["module_level_assign"]):
+    for node in shallow_candidates(root, cfg["module_level_assign"]):
         for line in _text(node).splitlines():
             if "=" in line and not any(kw in line.lower() for kw in const_keywords):
                 parts = line.split("=")[0].strip().split()
@@ -227,16 +227,23 @@ def _module_mutables_text(root: Node, cfg: LangCfg) -> set[str]:
 
 
 def _module_mutables_python_scan(root: Node, cfg: LangCfg) -> set[str]:
-    return _module_mutables_python(_shallow_candidates(root, cfg["module_level_assign"]), cfg["this_ident"])
+    return _module_mutables_python(shallow_candidates(root, cfg["module_level_assign"]), cfg["this_ident"])
 
 
 def _module_mutables_specifier_scan(root: Node, cfg: LangCfg) -> set[str]:
-    return _module_mutables_by_specifier(_shallow_candidates(root, cfg["module_level_assign"]))
+    return _module_mutables_by_specifier(shallow_candidates(root, cfg["module_level_assign"]))
 
 
-def _shallow_candidates(root: Node, assign_types: tuple[str, ...]) -> list[Node]:
+def shallow_candidates(root: Node, assign_types: tuple[str, ...]) -> list[Node]:
     """Top-level assignments, allowing one wrapper: Python nests `x = 0` inside an
-    `expression_statement`, so the `assignment` node is a child of a root child."""
+    `expression_statement`, so the `assignment` node is a child of a root child.
+
+    Public, and imported by `state_enum`, because it defines WHICH declarations the module
+    scan considers. The scan reports only the names it judges mutable, and the coverage
+    number needs the ones it judged and declined as well: a binding the reader walked and
+    ruled out is read, not missed, and the two are separable only at the candidate list.
+    A second walk written to guess the same candidates would drift from this one silently,
+    which is the class of defect the coverage number exists to expose."""
     candidates: list[Node] = []
     for node in root.children:
         if node.type in assign_types:
@@ -341,9 +348,9 @@ def _bounded_state_keys(root: Node, rel: str, lang: str, cfg: LangCfg, immutable
     state_bounds imports from indicators, which imports this module at its foot.
     """
     from l1_analyzer import state_bounds
-    findings = state_bounds._analyze_file(root, rel, LANG_SPEC[lang], cfg, immutable_ctors)
+    read = state_bounds._analyze_file(root, rel, LANG_SPEC[lang], cfg, immutable_ctors)
     return {
-        f["state"] for f in findings
+        f["state"] for f in read["findings"]
         if f["verdict"] == state_bounds.NEUTRAL and f["drives_decision"] and f["partition"]["counted"]
     }
 

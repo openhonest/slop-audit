@@ -50,6 +50,11 @@ class LangSpec(TypedDict, total=False):
     membership: str
     this_idents: frozenset[str]
     instance_ref_style: str
+    # Which enumerator reads this language's instance state, and which reads its module
+    # state. Both are now named by EVERY entry, including the two that read nothing
+    # ("none"), so the dispatch tables in state_enum can subscript them. A spec that omits
+    # one used to fall through to a default, which is how a language ends up on a rule
+    # nobody chose for it: silence in the table read as a decision.
     instance_enum: str
     field_decl_types: tuple[str, ...]
     record_enum: str
@@ -163,6 +168,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "membership": "comparison_in",
         "this_idents": frozenset({"self"}),
         "instance_ref_style": "member",
+        "instance_enum": "member",
         "field_decl_types": (),
         "record_enum": "python_class_body",
         "key_prefix": "",
@@ -189,6 +195,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "membership": "binary_in",
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "member",
+        "instance_enum": "member",
         "field_decl_types": ("public_field_definition",),
         "record_enum": "none",
         "key_prefix": "this.",
@@ -215,6 +222,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "membership": "binary_in",
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "member",
+        "instance_enum": "member",
         "field_decl_types": ("field_definition",),
         "record_enum": "none",
         "key_prefix": "this.",
@@ -241,9 +249,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "membership": "none",
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "identifier",
+        "instance_enum": "identifier",
         "field_decl_types": ("field_declaration",),
         "record_enum": "none",
         "key_prefix": "",
+        "module_enum": "none",
         "mutating": _JAVA_MUTATING, "keyed_read": _JAVA_KEYED_READ,
         "literal_types": _JAVA_LITERALS,
         "unary_types": ("unary_expression",),
@@ -266,9 +276,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "membership": "none",
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "identifier",
+        "instance_enum": "identifier",
         "field_decl_types": ("field_declaration", "property_declaration"),
         "record_enum": "none",
         "key_prefix": "",
+        "module_enum": "none",
         "mutating": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
         "literal_types": _CS_LITERALS,
         "unary_types": ("prefix_unary_expression",),
@@ -328,6 +340,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",
+        "module_enum": "none",
         "mutating": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
         "literal_types": _RUBY_LITERALS,
         "unary_types": ("unary",),
@@ -351,6 +364,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "membership": "none",
         "this_idents": frozenset(),
         "instance_ref_style": "identifier",
+        "instance_enum": "none",
         "field_decl_types": (),
         "record_enum": "c_struct_field",
         "key_prefix": "",
@@ -380,6 +394,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "membership": "none",
         "this_idents": frozenset(),
         "instance_ref_style": "member",
+        "instance_enum": "none",
         "scope_by_receiver": True,
         "field_decl_types": (),
         "record_enum": "none",

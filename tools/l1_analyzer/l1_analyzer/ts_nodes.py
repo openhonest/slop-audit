@@ -1,4 +1,4 @@
-"""The five tree-sitter node accessors every analysis module needs.
+"""The tree-sitter node accessors every analysis module needs.
 
 They lived inside state_bounds, which meant a second module that wanted `_text` either
 imported a private name across a module boundary or wrote its own copy. Both happened.
@@ -11,7 +11,41 @@ Nothing here knows what a state is or what a partition is. These read a parse tr
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from tree_sitter import Node
+
+
+def refs(scope: Node, predicate: Callable[[Node], bool]) -> list[Node]:
+    """Every node under `scope` matching `predicate`, in pre-order, which is source order."""
+    out: list[Node] = []
+
+    def walk(n: Node) -> None:
+        if predicate(n):
+            out.append(n)
+        for c in n.children:
+            walk(c)
+
+    walk(scope)
+    return out
+
+
+def local_refs(scope: Node, predicate: Callable[[Node], bool], stop: tuple[str, ...]) -> list[Node]:
+    """Like `refs`, but never descends into a nested record. An inner class owns its own
+    fields and is analysed as its own scope, so the enclosing class must not harvest the
+    inner class's state, which would count it twice."""
+    out: list[Node] = []
+
+    def walk(n: Node, is_root: bool) -> None:
+        if not is_root and n.type in stop:
+            return
+        if predicate(n):
+            out.append(n)
+        for c in n.children:
+            walk(c, False)
+
+    walk(scope, True)
+    return out
 
 
 def text(node: Node | None) -> str:

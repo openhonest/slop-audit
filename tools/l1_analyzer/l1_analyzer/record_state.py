@@ -37,14 +37,19 @@ recorded here rather than left for a reader to discover from a suspiciously clea
 
 WHAT THESE RULES COST THE CENSUS, said plainly because nothing else says it. Capability is
 recorded per (language, declaration kind), and a kind is now readable if ONE fixture of that
-kind can be read. Every one of libuv's 1,345 field declarations therefore counts as
-`reachable`, while the classifier reaches 373 of them, because the rest are declared in a
-header this file-at-a-time reading never joins to their uses. The refusal the census can
-issue - no grade when nothing declared here is of a readable kind - is correspondingly
-weaker for C than it was. What still discloses the gap is `admitted_fraction`, which divides
-by `declared` and reports 0.277 where `reachable` would flatter it to 1.0. A finer kind,
-splitting a field declared and used in one translation unit from one that is not, is the fix;
-it is not made here, and until it is, `reachable` overstates C.
+kind can be read. Every one of libuv's 1,002 field declarations therefore counts as
+`reachable`, while only 367 of them reach a finding, because the rest are declared in a header
+this file-at-a-time reading never joins to their uses. The refusal the census can issue - no
+grade when nothing declared here is of a readable kind - is correspondingly weaker for C than
+it was. A finer kind, splitting a field declared and used in one translation unit from one
+that is not, is the fix; it is not made here, and until it is, `reachable` overstates C.
+
+What discloses the gap in the meantime is the census's `judged_fraction`, and reading it needs
+one distinction this module is the reason for. Every finder here reports TWO things: the slots
+it produced, and every record declaration it walked to produce them. libuv reads 1.0 visited
+and 0.366 judged, which says the rule reaches every field declaration and joins a third of them
+to a use. The single ratio that preceded it said 0.277 and was read as a reader that had seen a
+quarter of the code, which is a different and worse claim than the true one.
 """
 
 from __future__ import annotations
@@ -54,7 +59,9 @@ from typing import TypedDict
 
 from tree_sitter import Node
 
+from l1_analyzer import state_sites
 from l1_analyzer.lang_spec import LangSpec
+from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import text as _text
 
@@ -68,10 +75,27 @@ class Slot(TypedDict):
     methods of its own class, so an invoked slot can be proved to hold what was injected. A
     C struct field has no such boundary: any translation unit that can see the struct can
     assign a function pointer into it, so a called field is undecidable and must fail closed
-    rather than earn NEUTRAL from a premise that does not hold."""
+    rather than earn NEUTRAL from a premise that does not hold.
+
+    `site` names the declaration in the census's vocabulary, so the coverage number can say
+    which declared site this verdict is about. It travels with the slot for the same reason
+    `writers_enumerable` does: the finder is the only thing that knows which record it read
+    the slot out of, and a caller recomputing it from the finding's name would be guessing."""
     state: str
     refs: list[Node]
     writers_enumerable: bool
+    site: Site
+
+
+class RecordRead(TypedDict):
+    """What one file's record rules produced, and what they walked to produce it.
+
+    Two outputs rather than one, because a declaration the rule read and declined is not the
+    same fact as a declaration nobody looked at, and a list of slots alone cannot tell them
+    apart. Five TypedDict fields nothing references produce no slot at all; they were still
+    read, one by one, and the coverage number is wrong by five without `visited`."""
+    slots: list[Slot]
+    visited: list[Site]
 
 
 def _descend(node: Node, types: tuple[str, ...], stop: tuple[str, ...]) -> list[Node]:
@@ -140,7 +164,7 @@ def _py_receivers(cls: Node) -> frozenset[str]:
     return frozenset({"self", "cls"}) | ({_text(name)} if name is not None else frozenset())
 
 
-def _python_class_body(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> list[Slot]:
+def _python_class_body(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> RecordRead:
     """Class-body bindings, minus the ones the receiver rule already reports.
 
     The subtraction is what keeps this additive. A default declared in the class body and
@@ -148,13 +172,23 @@ def _python_class_body(root: Node, sp: LangSpec, already: Callable[[Node], list[
     a second finding about it would inflate every count computed over findings - the verdict
     distribution, the resolvable fraction, the silence denominator - without a single new
     piece of state being read. The receiver rule keeps it, because it was there first and its
-    reference matching is narrower; this rule takes only what nothing else claims."""
-    found: list[Slot] = []
+    reference matching is narrower; this rule takes only what nothing else claims.
+
+    Both ways of taking nothing are still a reading, and both are recorded as visited. A
+    binding the receiver rule claimed was walked here and handed over; a binding nothing
+    references was walked here and found to hold no state anything reaches. Neither one is a
+    declaration the reader missed, and counting them as missed is the defect that made a file
+    of five TypedDict fields report a sixth of its declarations read."""
+    slots: list[Slot] = []
+    visited: list[Site] = []
     for cls in _descend(root, sp["class_types"], ()):
         enumerated = set(already(cls))
         receivers = _py_receivers(cls)
+        owner = state_sites.owner_name(cls)
         members = _by_attr(_descend(cls, sp["member_types"], sp["class_types"]), sp["mem_attr"])
         for name, binding in _py_class_body_bindings(cls):
+            site = (state_sites.CLASS_BODY_BINDING, owner, name)
+            visited.append(site)
             if any(f"{ident}.{name}" in enumerated for ident in sp["this_idents"]):
                 continue
             # The binding site leads the reference list so `_binding_line` sends a reader to
@@ -162,9 +196,9 @@ def _python_class_body(root: Node, sp: LangSpec, already: Callable[[Node], list[
             refs = [binding] + [m for m in members.get(name, [])
                                 if _text(_field(m, sp["mem_object"])) in receivers]
             if len(refs) > 1:
-                found.append({"state": f"{_text(_field(cls, 'name'))}.{name}",
-                              "refs": refs, "writers_enumerable": True})
-    return found
+                slots.append({"state": f"{owner}.{name}", "refs": refs,
+                              "writers_enumerable": True, "site": site})
+    return {"slots": slots, "visited": visited}
 
 
 # --------------------------------------------------------------------------
@@ -200,7 +234,7 @@ def _c_field_name(node: Node | None) -> str:
     return _c_field_name(inner)
 
 
-def _c_struct_field(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> list[Slot]:
+def _c_struct_field(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> RecordRead:
     """Struct and union fields, with every same-file member access that names them.
 
     TWO LIMITS, both real, both consequences of what C does not give a reader. The first is
@@ -218,24 +252,38 @@ def _c_struct_field(root: Node, sp: LangSpec, already: Callable[[Node], list[str
     work. In C that is not a corner case, it is the normal shape of a library, and it means
     this rule reads the structs a file both declares and uses and stays blind to the rest.
     The census keeps counting all of them, so the gap stays on the report rather than closing
-    on paper."""
-    found: list[Slot] = []
+    on paper.
+
+    BOTH LIMITS ARE VISITS, not misses, and the coverage number reports them as such. This walk
+    reaches every field declaration in the file and reads the name off it; what it then fails to
+    do is join that name to a use, either because another record claimed the name first or
+    because the use is in a translation unit this file-at-a-time reading never opens. So
+    `visited` is every field declaration and `judged` is the subset that reached a verdict, and
+    the distance between the two is exactly the cross-unit gap, published rather than folded
+    into a single ratio that made it look like a reading failure."""
+    slots: list[Slot] = []
+    visited: list[Site] = []
     claimed: set[str] = set()
     members = _by_attr(_descend(root, sp["member_types"], ()), sp["mem_attr"])
     for rec in _descend(root, _C_RECORDS, ()):
         name_node = _field(rec, "name")
         tag = _text(name_node) if name_node is not None else f"struct@{rec.start_point[0] + 1}"
+        owner = state_sites.owner_name(rec)
         for fd in _descend(rec, ("field_declaration",), _C_RECORDS):
             for declarator in fd.children:
                 name = _c_field_name(declarator)
-                if not name or name in claimed:
+                if not name:
+                    continue
+                visited.append((state_sites.FIELD_DECLARATION, owner, name))
+                if name in claimed:
                     continue
                 claimed.add(name)
                 refs = members.get(name, [])
                 if refs:
-                    found.append({"state": f"{tag}.{name}", "refs": refs,
-                                  "writers_enumerable": False})
-    return found
+                    slots.append({"state": f"{tag}.{name}", "refs": refs,
+                                  "writers_enumerable": False,
+                                  "site": (state_sites.FIELD_DECLARATION, owner, name)})
+    return {"slots": slots, "visited": visited}
 
 
 # --------------------------------------------------------------------------
@@ -275,24 +323,25 @@ def field_decl_names(fd: Node) -> list[str]:
     return names
 
 
-def _no_records(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> list[Slot]:
+def _no_records(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> RecordRead:
     """A language whose record fields are already reachable from a reference, or that has no
     record type at all. Named and dispatched to explicitly rather than defaulted: a spec that
     forgot to say which rule it wants must be a KeyError below, not a silent nothing."""
-    return []
+    return {"slots": [], "visited": []}
 
 
 NONE = "none"
 
-RECORD_STATES: dict[str, Callable[[Node, LangSpec, Callable[[Node], list[str]]], list[Slot]]] = {
+RECORD_STATES: dict[str, Callable[[Node, LangSpec, Callable[[Node], list[str]]], RecordRead]] = {
     NONE: _no_records,
     "python_class_body": _python_class_body,
     "c_struct_field": _c_struct_field,
 }
 
 
-def slots(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> list[Slot]:
-    """The record-declared state of one file, with the references that denote it.
+def slots(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> RecordRead:
+    """The record-declared state of one file, with the references that denote it, beside every
+    record declaration the rule walked to find it.
 
     `already` reports the state keys another enumerator has claimed for a given record, so a
     finder can stand down rather than double-count. Subscripted, never `.get`: a LANG_SPEC
