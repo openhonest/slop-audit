@@ -33,14 +33,14 @@ That work is in progress and is not yet part of the standard. What exists:
 
 | Document | What it settles |
 |---|---|
-| [candidate-methods/ai-consumer-instruction-contract.md](candidate-methods/ai-consumer-instruction-contract.md) | The output contract for an agent consumer, written for edit-loop tempo rather than for a report |
-| [candidate-methods/layer1-longitudinal-method.md](candidate-methods/layer1-longitudinal-method.md) | Reading Layer 1 as a control chart: control limits against specification limits, common cause against special cause |
-| [candidate-methods/layer1-longitudinal-reporting.md](candidate-methods/layer1-longitudinal-reporting.md) | How to report a longitudinal reading without inviting the tampering it warns against |
-| [candidate-methods/silence-index-for-finite-testability.md](candidate-methods/silence-index-for-finite-testability.md) | Reporting what the analyzer could not read as silence, beside the grade and never inside it |
+| [research/candidates/ai-consumer-instruction-contract.md](research/candidates/ai-consumer-instruction-contract.md) | The output contract for an agent consumer, written for edit-loop tempo rather than for a report |
+| [research/candidates/layer1-longitudinal-method.md](research/candidates/layer1-longitudinal-method.md) | Reading Layer 1 as a control chart: control limits against specification limits, common cause against special cause |
+| [research/candidates/layer1-longitudinal-reporting.md](research/candidates/layer1-longitudinal-reporting.md) | How to report a longitudinal reading without inviting the tampering it warns against |
+| [research/candidates/silence-index-for-finite-testability.md](research/candidates/silence-index-for-finite-testability.md) | Reporting what the analyzer could not read as silence, beside the grade and never inside it |
 | [tools/variance-decomposition/](tools/variance-decomposition/) | Within-repository against between-repository variance, which decides whether a single measurement characterizes a repository at all |
 | [tools/edit-replay/](tools/edit-replay/) | Reconstructing the saved states of a file from an agent's transcript, because a control chart needs candidate states and a repository only keeps accepted ones |
 
-Everything in `candidate-methods/` is exactly that: candidate, unapproved, and not part of the standard until it is moved out of that directory.
+Everything in `research/candidates/` is exactly that: candidate, unapproved, and not part of the standard until it is moved out of that directory.
 
 ## Run it on a repo
 
@@ -176,16 +176,16 @@ What would be dishonest is moving the numbers. Writing commits shaped to shift a
 
 | # | File | Contents | Lines |
 |---|---|---|---|
-| 0 | [Frontmatter](00-frontmatter.md) | Title, status, confidentiality statement | ~14 |
-| 1 | [Purpose and scope](01-purpose-and-scope.md) | What the audit produces, who runs it, scope of one audit | ~28 |
-| 2 | [Four-layer model](02-four-layer-model.md) | Layer 1 through Layer 4 definitions, composition, why the model exists, Phase 0/Phase 1 boundary | ~135 |
-| 3 | [Layer 1 indicators](03-layer1-indicators.md) | Twenty quantitative indicators (seventeen git-history + three finite-testability), reporting format, automation, limitations | ~314 |
-| 4 | [Dimensions](dimensions/) | The 18 per-dimension entries (Layer 2 + Layer 3 + Layer 4 for each) | ~1,700 |
-| 5 | [Conducting an audit](05-conducting-audit.md) | The 5-day operational walkthrough, prerequisites, common time-budget failures | ~90 |
-| 6 | [Slop Report template](06-slop-report-template.md) | Report structure, SOC 2 deliverable extraction, length/tone guidance | ~214 |
-| 7 | [Validation](07-validation.md) | Validation set, cross-rater test, "would the auditor agree" test | ~38 |
-| 8 | [Training](08-training.md) | Curriculum tracks, certification levels, cross-rater calibration, recertification | ~182 |
-| 9 | [TODO and attribution](09-todo-and-attribution.md) | Outstanding work items, source attribution, future extensions backlog | ~95 |
+| 0 | [Frontmatter](spec/00-frontmatter.md) | Title, status, confidentiality statement | ~14 |
+| 1 | [Purpose and scope](spec/01-purpose-and-scope.md) | What the audit produces, who runs it, scope of one audit | ~28 |
+| 2 | [Four-layer model](spec/02-four-layer-model.md) | Layer 1 through Layer 4 definitions, composition, why the model exists, Phase 0/Phase 1 boundary | ~135 |
+| 3 | [Layer 1 indicators](spec/03-layer1-indicators.md) | Twenty quantitative indicators (seventeen git-history + three finite-testability), reporting format, automation, limitations | ~314 |
+| 4 | [Dimensions](spec/dimensions/) | The 18 per-dimension entries (Layer 2 + Layer 3 + Layer 4 for each) | ~1,700 |
+| 5 | [Conducting an audit](spec/05-conducting-audit.md) | The 5-day operational walkthrough, prerequisites, common time-budget failures | ~90 |
+| 6 | [Slop Report template](spec/06-slop-report-template.md) | Report structure, SOC 2 deliverable extraction, length/tone guidance | ~214 |
+| 7 | [Validation](spec/07-validation.md) | Validation set, cross-rater test, "would the auditor agree" test | ~38 |
+| 8 | [Training](spec/08-training.md) | Curriculum tracks, certification levels, cross-rater calibration, recertification | ~182 |
+| 9 | [TODO and attribution](spec/09-todo-and-attribution.md) | Outstanding work items, source attribution, future extensions backlog | ~95 |
 
 ## Dimensions index
 
@@ -193,32 +193,32 @@ Each dimension is a self-contained file in `dimensions/`. An assessor can refere
 
 | # | File | Dimension | Lifecycle category |
 |---|---|---|---|
-| — | [Quick reference](dimensions/00-quick-reference.md) | The one-row-per-dimension lookup table for mid-audit use | — |
-| 4.1 | [01-entitlement.md](dimensions/01-entitlement.md) | Entitlement system | Security architecture |
-| 4.2 | [02-authentication.md](dimensions/02-authentication.md) | Authentication | Security architecture |
-| 4.3 | [03-inter-service-security.md](dimensions/03-inter-service-security.md) | Inter-service security | Security architecture |
-| 4.4 | [04-multi-tenancy.md](dimensions/04-multi-tenancy.md) | Multi-tenancy | Data architecture |
-| 4.5 | [05-audit-infrastructure.md](dimensions/05-audit-infrastructure.md) | Audit infrastructure | Compliance engineering |
-| 4.6 | [06-rate-limiting.md](dimensions/06-rate-limiting.md) | Rate limiting | Operational security |
-| 4.7 | [07-configuration-secrets.md](dimensions/07-configuration-secrets.md) | Configuration and secrets | Operational security |
-| 4.8 | [08-caching.md](dimensions/08-caching.md) | Caching | Performance engineering |
-| 4.9 | [09-notifications.md](dimensions/09-notifications.md) | Notifications | Operations |
-| 4.10 | [10-cicd.md](dimensions/10-cicd.md) | CI/CD | DevOps |
-| 4.11 | [11-containerization.md](dimensions/11-containerization.md) | Containerization | Infrastructure |
-| 4.12 | [12-dependency-injection.md](dimensions/12-dependency-injection.md) | Dependency injection | Software architecture |
-| 4.13 | [13-pattern-sophistication.md](dimensions/13-pattern-sophistication.md) | Pattern sophistication | Software architecture |
-| 4.14 | [14-architectural-philosophy.md](dimensions/14-architectural-philosophy.md) | Architectural philosophy | Software architecture |
-| 4.15 | [15-live-documentation.md](dimensions/15-live-documentation.md) | Live documentation | Governance |
-| 4.16 | [16-sdlc-ai-safeguards.md](dimensions/16-sdlc-ai-safeguards.md) | SDLC with AI safeguards | Process engineering |
-| 4.17 | [17-tech-debt-management.md](dimensions/17-tech-debt-management.md) | Tech debt management | Lifecycle management |
-| 4.18 | [18-ux-from-code.md](dimensions/18-ux-from-code.md) | UX from code | Software development |
+| — | [Quick reference](spec/dimensions/00-quick-reference.md) | The one-row-per-dimension lookup table for mid-audit use | — |
+| 4.1 | [01-entitlement.md](spec/dimensions/01-entitlement.md) | Entitlement system | Security architecture |
+| 4.2 | [02-authentication.md](spec/dimensions/02-authentication.md) | Authentication | Security architecture |
+| 4.3 | [03-inter-service-security.md](spec/dimensions/03-inter-service-security.md) | Inter-service security | Security architecture |
+| 4.4 | [04-multi-tenancy.md](spec/dimensions/04-multi-tenancy.md) | Multi-tenancy | Data architecture |
+| 4.5 | [05-audit-infrastructure.md](spec/dimensions/05-audit-infrastructure.md) | Audit infrastructure | Compliance engineering |
+| 4.6 | [06-rate-limiting.md](spec/dimensions/06-rate-limiting.md) | Rate limiting | Operational security |
+| 4.7 | [07-configuration-secrets.md](spec/dimensions/07-configuration-secrets.md) | Configuration and secrets | Operational security |
+| 4.8 | [08-caching.md](spec/dimensions/08-caching.md) | Caching | Performance engineering |
+| 4.9 | [09-notifications.md](spec/dimensions/09-notifications.md) | Notifications | Operations |
+| 4.10 | [10-cicd.md](spec/dimensions/10-cicd.md) | CI/CD | DevOps |
+| 4.11 | [11-containerization.md](spec/dimensions/11-containerization.md) | Containerization | Infrastructure |
+| 4.12 | [12-dependency-injection.md](spec/dimensions/12-dependency-injection.md) | Dependency injection | Software architecture |
+| 4.13 | [13-pattern-sophistication.md](spec/dimensions/13-pattern-sophistication.md) | Pattern sophistication | Software architecture |
+| 4.14 | [14-architectural-philosophy.md](spec/dimensions/14-architectural-philosophy.md) | Architectural philosophy | Software architecture |
+| 4.15 | [15-live-documentation.md](spec/dimensions/15-live-documentation.md) | Live documentation | Governance |
+| 4.16 | [16-sdlc-ai-safeguards.md](spec/dimensions/16-sdlc-ai-safeguards.md) | SDLC with AI safeguards | Process engineering |
+| 4.17 | [17-tech-debt-management.md](spec/dimensions/17-tech-debt-management.md) | Tech debt management | Lifecycle management |
+| 4.18 | [18-ux-from-code.md](spec/dimensions/18-ux-from-code.md) | UX from code | Software development |
 
 ## Other methodology files
 
 | File | Contents |
 |---|---|
-| [papers/peer-review-strategy.md](papers/peer-review-strategy.md) | Publication program, venue selection, framework extension cadence |
-| [papers/paper-2-preregistration.md](papers/paper-2-preregistration.md) | Pre-registration for the independent instrument validation study |
+| [research/peer-review-strategy.md](research/peer-review-strategy.md) | Publication program, venue selection, framework extension cadence |
+| [research/preregistrations/paper-c-instrument-validation-preregistration.md](research/preregistrations/paper-c-instrument-validation-preregistration.md) | Pre-registration for the independent instrument validation study |
 | [validation/protocol.md](validation/protocol.md) | Validation protocol details |
 
 ## Tools

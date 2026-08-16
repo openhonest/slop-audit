@@ -21,6 +21,20 @@ The last two overlap on an UNGATED accumulator, which carried already clears. Wh
 accumulator rule reaches is the gated form, `if k not in self._h: self._h[k] = 0`, where the
 membership test does put a reference in a condition.
 
+Two module-level guards sit in front of the rules and refuse a shape outright, because a
+rule that argues from where a reference sits cannot see either of them:
+
+  value-in-a-condition  the stored value is inspected in a branch, so presence or magnitude
+                        is the answer and the cache is a decision
+  open-key selection    the container is read at a key the class does not bound, so it
+                        answers one way per key and the caller chooses which
+
+Only memoization is allowed past the second guard, and only because a presence-gated,
+result-invariant cache can be deleted without changing an answer. The guard is the fix for a
+cross-language defect: `return self.cache[k]` cleared here while C reported the identical
+shape promiscuous, because C has no filter to clear it with. tests/
+test_finite_testability_cross_language.py is the comparison that now holds the two together.
+
 Python only. The false positives and their proofs are Python (found and verified against
 declaro-persistum). This is slop-audit's own code; the rules are the spec, ported to
 tree-sitter, not a dependency.
@@ -30,6 +44,9 @@ from __future__ import annotations
 
 from tree_sitter import Node
 
+from l1_analyzer.lang_spec import LANG_SPEC
+
+_PY = LANG_SPEC["python"]
 _FUNCTION_TYPES = frozenset({"function_definition", "lambda"})
 # Method names that mutate a container in place (a superset of the classifier's, stated
 # here so the filter's plain-store rule is self-contained).
@@ -288,6 +305,75 @@ def _is_memoization(cls: Node, attr: str, refs: list[Node]) -> bool:
     return _has_presence_gate(refs) and _writes_are_plain_stores(cls, attr, refs)
 
 
+# --- Guard: an open key selects among the stored values --------------------------
+#
+# The rules above all argue from where a reference SITS: assigned once, inside an `if`,
+# written by a plain store. None of them asks the question the classifier already answered,
+# which is what made the reference unbounded in the first place. A subscript by a key the
+# class does not bound is itself the decision - the container answers one way per key, and
+# the caller chooses the key - so the classes cannot be enumerated whether or not an `if`
+# follows the read. Reading the decision off the KEYWORD rather than off the values is what
+# let `return self.cache[k]` clear here while C reported the same shape promiscuous
+# (tests/test_finite_testability_c.py, value-indexed-cache). C has no attribute-level filter,
+# so it never lost the finding, and the two languages disagreed about identical runtime
+# behaviour for as long as this rule has shipped.
+#
+# The guard is scoped to keys from OUTSIDE the class, and that scope is the whole of it. A
+# key that is itself state here - `self._rows[self._i]` - already carries its own finding,
+# bounded there by `self._i >= len(self._rows)`; charging the container for it as well counts
+# one decision twice, which is the cursor false positive this module removed on purpose. A
+# key that arrives as a parameter is carried by no other finding, so it lands here or nowhere.
+#
+# A store target is not a selection: `d[k] = v`, `d[k] += 1` and `del d[k]` put a value in
+# rather than take one out, and the accumulator rule below argues separately about them.
+
+
+def _unwrap_unary(node: Node | None) -> Node | None:
+    """Peel unary operators off a key. `s[-1]` is the last element, one compile-time value,
+    so the wrapper must not hide the literal underneath it."""
+    while node is not None and node.type in _PY.get("unary_types", ()):
+        named = node.named_children
+        node = named[0] if named else None
+    return node
+
+
+def _is_state_of_this_class(node: Node) -> bool:
+    """`self.x` / `cls.x`: state the enumerator reports separately, with its own verdict."""
+    return node.type == "attribute" and _text(node.child_by_field_name("object")) in ("self", "cls")
+
+
+def _is_open_key(key: Node | None) -> bool:
+    """A single key the class does not bound. A SLICE is not a key and never reaches this
+    rule: `self._hash[:4]` selects a contiguous run at a fixed width, and `self.alerts
+    [-limit:]` selects a run at a caller's width, but neither picks one stored value out of
+    unboundedly many, which is the argument the guard rests on. Measured on buckler/iam,
+    where `self.e164_hash[:4].hex()` was flagged by an earlier draft of this rule: a slice
+    bounded by the literal 4, called promiscuous because the `slice` node is not itself a
+    literal node. Whatever a variable-width slice is worth, the carried-value rule below is
+    what decided it before this guard existed and it decides it still."""
+    if key is not None and key.type == "slice":
+        return False
+    key = _unwrap_unary(key)
+    if key is None or key.type in _PY["literal_types"]:
+        return False
+    return not _is_state_of_this_class(key)
+
+
+def _selects_on_an_open_key(refs: list[Node]) -> bool:
+    for ref in refs:
+        parent = ref.parent
+        if parent is None or parent.type != "subscript" or parent.child_by_field_name("value") != ref:
+            continue
+        gp = parent.parent
+        store = gp is not None and (
+            (gp.type in ("assignment", "augmented_assignment") and gp.child_by_field_name("left") == parent)
+            or gp.type == "delete_statement"
+        )
+        if not store and _is_open_key(parent.child_by_field_name("subscript")):
+            return True
+    return False
+
+
 # --- Rule: write-only accumulator ------------------------------------------------
 #
 # A per-key counter or tally: `if k not in self._h: self._h[k] = 0` followed by
@@ -462,10 +548,17 @@ def is_false_positive(key: str, refs: list[Node], verdict: str) -> bool:
     # such decision exists is a shape eligible to clear.
     if _value_reaches_condition(refs) or not _result_invariant(attr, refs):
         return False
+    # Memoization is settled BEFORE the open-key guard, and it is the one shape allowed past
+    # it. A presence-gated, result-invariant cache answers the same for a key whether or not
+    # that key is stored, so the partition its keyed read cuts belongs to the function being
+    # memoised and not to the cache: delete the cache and every observable answer is
+    # unchanged. No other rule can make that argument, which is why no other rule is exempt.
+    if verdict == "promiscuous" and _is_memoization(cls, attr, refs):
+        return True
+    if _selects_on_an_open_key(refs):
+        return False
     if _is_write_once(cls, attr, refs):
         return True                                   # immutable, read only in bounded ways
     if verdict == "promiscuous":
-        return (_is_memoization(cls, attr, refs)
-                or _drives_no_decision(refs)
-                or _is_write_only_accumulator(attr, refs))
+        return _drives_no_decision(refs) or _is_write_only_accumulator(attr, refs)
     return False

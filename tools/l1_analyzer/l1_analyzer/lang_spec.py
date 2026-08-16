@@ -56,6 +56,24 @@ class LangSpec(TypedDict, total=False):
     # one used to fall through to a default, which is how a language ends up on a rule
     # nobody chose for it: silence in the table read as a decision.
     instance_enum: str
+    # Where this grammar spells the DECLARATION of a piece of state: node type -> the field
+    # holding the declared name. A reference sitting in that field binds the state; it does
+    # not consume it, so it is a write like any other assignment target.
+    #
+    # It is a map rather than a tuple because one language spells the same job two ways:
+    # JavaScript names a class field through `property` and a module variable through
+    # `name`, and a single field name for the language would have to be wrong about one of
+    # them. Every entry declares its own, including the two that declare nothing
+    # (Python and Ruby have no declarator node - binding there IS an assignment), because
+    # a spec that omits the key should raise rather than decline silently.
+    binding_sites: dict[str, str]
+    # Where a value comes to REST, so it reaches no decision in this scope. Two shapes, one
+    # conclusion. The language discards it: a bare expression statement's result is read by
+    # nobody. Or the language hands it back without a keyword: the tail expression of a Ruby
+    # body and of a Rust block is that language's return, and `return_types` above only
+    # knows the spelled form. Either way no arm selector reads the value, which is the same
+    # thing `return_types` concludes and is why this sits beside it.
+    sink_types: tuple[str, ...]
     field_decl_types: tuple[str, ...]
     record_enum: str
     key_prefix: str
@@ -169,6 +187,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"self"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
+        "binding_sites": {},
+        "sink_types": ("expression_statement", "global_statement", "nonlocal_statement"),
         "field_decl_types": (),
         "record_enum": "python_class_body",
         "key_prefix": "",
@@ -196,6 +216,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
+        "binding_sites": {"public_field_definition": "name", "variable_declarator": "name"},
+        "sink_types": ("expression_statement",),
         "field_decl_types": ("public_field_definition",),
         "record_enum": "none",
         "key_prefix": "this.",
@@ -223,6 +245,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
+        "binding_sites": {"field_definition": "property", "variable_declarator": "name"},
+        "sink_types": ("expression_statement",),
         "field_decl_types": ("field_definition",),
         "record_enum": "none",
         "key_prefix": "this.",
@@ -250,6 +274,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
+        "binding_sites": {"variable_declarator": "name"},
+        "sink_types": ("expression_statement",),
         "field_decl_types": ("field_declaration",),
         "record_enum": "none",
         "key_prefix": "",
@@ -277,6 +303,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
+        "binding_sites": {"variable_declarator": "name", "property_declaration": "name"},
+        "sink_types": ("expression_statement",),
         "field_decl_types": ("field_declaration", "property_declaration"),
         "record_enum": "none",
         "key_prefix": "",
@@ -307,6 +335,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"self"}),
         "instance_ref_style": "member",
         "instance_enum": "self_usage",
+        "binding_sites": {"static_item": "name", "field_declaration": "name", "let_declaration": "pattern"},
+        "sink_types": ("expression_statement", "block"),
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",
@@ -337,6 +367,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset(),
         "instance_ref_style": "member",
         "instance_enum": "ruby_ivar",
+        "binding_sites": {},
+        "sink_types": ("body_statement",),
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",
@@ -365,6 +397,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset(),
         "instance_ref_style": "identifier",
         "instance_enum": "none",
+        "binding_sites": {"declaration": "declarator", "init_declarator": "declarator", "array_declarator": "declarator", "pointer_declarator": "declarator", "field_declaration": "declarator"},
+        "sink_types": ("expression_statement",),
         "field_decl_types": (),
         "record_enum": "c_struct_field",
         "key_prefix": "",
@@ -396,6 +430,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_ref_style": "member",
         "instance_enum": "none",
         "scope_by_receiver": True,
+        "binding_sites": {"var_spec": "name", "field_declaration": "name"},
+        "sink_types": ("expression_statement",),
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",

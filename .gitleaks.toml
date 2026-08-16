@@ -1,7 +1,7 @@
 # gitleaks configuration for the Slop Audit repository.
 #
 # The methodology documents the credential-leak antipattern by showing it. The example in
-# dimensions/07-configuration-secrets.md is a Flask config.py holding a Stripe key, a
+# spec/dimensions/07-configuration-secrets.md is a Flask config.py holding a Stripe key, a
 # database URL and a JWT secret, and the whole point of the passage is that a reader
 # recognises the shape. gitleaks recognises it too, and reports the documentation as a leak.
 #
@@ -19,7 +19,7 @@ useDefault = true
 [allowlist]
 description = "Invented credentials that appear in the methodology's own antipattern examples"
 regexes = [
-  # dimensions/07-configuration-secrets.md, the "Example absence (Python / Flask)" block.
+  # spec/dimensions/07-configuration-secrets.md, the "Example absence (Python / Flask)" block.
   '''sk_live_51ABC\.\.\.''',
   '''postgres://app:hunter2@db\.prod\.internal:5432/myapp''',
   '''the-quick-brown-fox-jumps-over-the-lazy-dog''',

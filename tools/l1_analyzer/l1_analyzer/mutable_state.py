@@ -8,7 +8,7 @@ the parser, the boundary readers, band); it never imports back the indicator
 computations, so the two modules do not form a cycle.
 
 Corrected in place on 2026-08-15, four defects at once. See
-docs/amendment-2026-08-15-l1-18-corrected-ratio.md for the evidence, the rules and
+../../../research/amendments/amendment-2026-08-15-l1-18-corrected-ratio.md for the evidence, the rules and
 the measured movement. In brief, and each is commented at its site below:
 
 1. The I/O boundary exclusion is GONE. It only ever fired on a literal

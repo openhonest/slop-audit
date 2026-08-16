@@ -40,7 +40,18 @@ packages = ["l1_analyzer"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-bdd_features_base_dir = "tests/features"
+# bdd_features_base_dir is deliberately unset. pytest-bdd resolves it against the
+# rootdir, so setting it made every scenarios() call depend on where pytest was
+# invoked from - the reason the old BDD README told readers not to run the suite
+# from the repository root. Unset, pytest-bdd resolves a relative feature path
+# against the step-definition module's own directory, so tests/bdd/step_defs/*.py
+# find tests/bdd/features/*.feature from any working directory.
+markers = [
+    "python: scenario exercises the Python grammar",
+    "rust: scenario exercises the Rust grammar",
+    "c: scenario exercises the C grammar",
+    "multi-lang: scenario is asserted across every supported grammar",
+]
 
 # Coverage is scoped to the package under audit, not the test scaffolding, so
 # decision-space coverage (L1.19) measures the source's branches - the subject

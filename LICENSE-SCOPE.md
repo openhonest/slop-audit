@@ -27,7 +27,7 @@ over. Five of the six directories it names do not exist here:
     track-b-delivery-kit/               ABSENT
     track-c-administrator-enablement/   ABSENT
 
-This repository actually contains: curriculum/, dimensions/, papers/, tools/,
+This repository actually contains: curriculum/, spec/, research/, tools/,
 validation/. So the scope statement describes a layout that is no longer the
 one it governs, and the proprietary and governance carve-outs point at nothing.
 

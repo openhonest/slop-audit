@@ -54,7 +54,9 @@ EXTERNAL_BOUNDARY = "external_boundary"   # a call into code the analyzer cannot
 UNMODELED_CALLEE = "unmodeled_callee"     # a plain name we could model and have not
 DYNAMIC_DISPATCH = "dynamic_dispatch"     # the call target is chosen while the program runs
 INJECTED_SLOT = "injected_slot"           # an invoked slot whose compositional premise fails
-SILENCE_REASONS = (EXTERNAL_BOUNDARY, UNMODELED_CALLEE, DYNAMIC_DISPATCH, INJECTED_SLOT)
+UNMODELED_CONSTRUCT = "unmodeled_construct"   # a syntax shape no dispatch row covers
+SILENCE_REASONS = (EXTERNAL_BOUNDARY, UNMODELED_CALLEE, DYNAMIC_DISPATCH, INJECTED_SLOT,
+                   UNMODELED_CONSTRUCT)
 
 WRITE = "write"            # target of an assignment / mutating method: not a decision
 OUTPUT = "output"          # returned or handed to the caller: compositional
@@ -74,6 +76,7 @@ class Reach(TypedDict):
     counted: bool     # False when the class count could not be recovered
     key: str          # identity of the discriminator, for de-duplication
     silence: str      # why undecided; empty on every decided reach
+    construct: str    # the syntax shape no row covered; empty on every reach a row decided
 
 
 class Partition(TypedDict):
@@ -84,29 +87,63 @@ class Partition(TypedDict):
 
 
 def write() -> Reach:
-    return {"kind": WRITE, "classes": 0, "ordered": True, "counted": True, "key": "", "silence": ""}
+    return {"kind": WRITE, "classes": 0, "ordered": True, "counted": True, "key": "",
+            "silence": "", "construct": ""}
 
 
 def output() -> Reach:
-    return {"kind": OUTPUT, "classes": 0, "ordered": True, "counted": True, "key": "", "silence": ""}
+    return {"kind": OUTPUT, "classes": 0, "ordered": True, "counted": True, "key": "",
+            "silence": "", "construct": ""}
 
 
 def unbounded() -> Reach:
-    return {"kind": UNBOUNDED, "classes": 0, "ordered": False, "counted": True, "key": "", "silence": ""}
+    return {"kind": UNBOUNDED, "classes": 0, "ordered": False, "counted": True, "key": "",
+            "silence": "", "construct": ""}
 
 
 def undecided(reason: str) -> Reach:
-    return {"kind": UNDECIDED, "classes": 0, "ordered": True, "counted": True, "key": "", "silence": reason}
+    return {"kind": UNDECIDED, "classes": 0, "ordered": True, "counted": True, "key": "",
+            "silence": reason, "construct": ""}
+
+
+def unmeasured(node_type: str, parent_type: str) -> Reach:
+    """The total row of the categoriser's table: this construct has no rule, so nothing is
+    concluded about it.
+
+    It exists because a table with a fallthrough cannot tell "no rule applies" apart from
+    "the compositional rule applies". The classifier used to run off the bottom of
+    `_categorize` into `_flow`, and off the bottom of `_flow` into `output()` - and
+    `output()` is a VERDICT. It says the value is handed to the caller, reaches no decision
+    and costs no tests. So a walrus in a condition, a `match` subject and a comprehension
+    source were not left unhandled, they were cleared, and the finding read to an adopter as
+    evidence that the code was fine. Measured across eleven repositories before this row
+    existed, that terminal decided 55 percent of every reference the classifier read.
+
+    Two properties make it a rule rather than a hole. It is reached only when every row
+    above it has declined, so an unhandled construct comes out unmeasured by construction
+    rather than by whoever remembered to check. And it is handed two node-type strings, so
+    no tree, no language spec and no closed-set table are in scope: no verdict is reachable
+    from what it holds, which is the apophatic rule applied at the dispatch instead of at
+    the renderer.
+
+    The silence is OURS. A construct nobody taught the reader is the same class of fact as a
+    callee nobody modeled, so it reports under its own reason beside UNMODELED_CALLEE and
+    not under the adopter's boundary, and `construct` carries the shape so the backlog can
+    be read off the report and worked down."""
+    return {"kind": UNDECIDED, "classes": 0, "ordered": True, "counted": True, "key": "",
+            "silence": UNMODELED_CONSTRUCT, "construct": f"{node_type} in {parent_type}"}
 
 
 def finite(classes: int, ordered: bool, key: str) -> Reach:
-    return {"kind": FINITE, "classes": classes, "ordered": ordered, "counted": True, "key": key, "silence": ""}
+    return {"kind": FINITE, "classes": classes, "ordered": ordered, "counted": True,
+            "key": key, "silence": "", "construct": ""}
 
 
 def uncounted(key: str) -> Reach:
     """Provably finite, count unrecoverable. Ordered is False because we cannot show it is
     ordered, and claiming order we have not established would be the optimistic direction."""
-    return {"kind": FINITE, "classes": 0, "ordered": False, "counted": False, "key": key, "silence": ""}
+    return {"kind": FINITE, "classes": 0, "ordered": False, "counted": False, "key": key,
+            "silence": "", "construct": ""}
 
 
 # A state with no finite reach at all is observe-only or output-only: its reaching set is
@@ -166,7 +203,11 @@ def silence_summary(findings: list[dict], total: int) -> dict[str, object]:
         "count": len(silent),
         "fraction": round(len(silent) / total, 3) if total else 0.0,
         "by_reason": by_reason,
-        "sites": [{"file": f["file"], "line": f["line"], "state": f["state"], "reason": f["silence"]}
+        # `construct` is empty on every reason but UNMODELED_CONSTRUCT, and on that one it
+        # names the syntax shape no dispatch row covered. Without it the reader is told a
+        # rule is missing and not which one, which is a complaint rather than a backlog.
+        "sites": [{"file": f["file"], "line": f["line"], "state": f["state"],
+                   "reason": f["silence"], "construct": f["construct"]}
                   for f in silent],
     }
 

@@ -1,7 +1,7 @@
 """Regression tests for L1.18 module-global detection (_find_module_mutable_names).
 
 These lock the four defects fixed on 2026-08-01 (see
-docs/amendment-2026-08-01-l1-18-module-global.md). Per the bug report, they
+research/amendments/amendment-2026-08-01-l1-18-module-global.md). Per the bug report, they
 assert on the NAMES the extractor registers, not only on the ratio, because every
 defect was visible in the name set and invisible in an aggregate count.
 """

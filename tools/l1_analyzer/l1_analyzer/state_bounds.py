@@ -89,13 +89,16 @@ class Finding(TypedDict):
 
     `silence` carries why the reaching-set could not be decided, and is the empty string
     on every decided finding. It is on the finding rather than in a parallel list because
-    a silent site and its verdict are one fact, and two lists drift."""
+    a silent site and its verdict are one fact, and two lists drift. `construct` names the
+    syntax shape when the reason is that no dispatch row covered it, and is empty for every
+    other reason: a missing rule the reader cannot name is a complaint, not a backlog."""
     state: str
     verdict: str
     drives_decision: bool
     file: str
     line: int
     silence: str
+    construct: str
     partition: Partition
 
 
@@ -250,8 +253,27 @@ def _is_lvalue(node: Node | None, sp: LangSpec) -> bool:
     return p is not None and p.type in sp["assign_types"] and _same(_field(p, sp["assign_left"]), node)
 
 
+def _is_binding_site(ref: Node, parent: Node, sp: LangSpec) -> bool:
+    """The reference is the DECLARED NAME in a declaration: `String[] stack;`,
+    `static int cache[4];`, `public int N { get; set; }`.
+
+    A declaration binds the state, it does not consume it, which is what an assignment
+    target does too - so this is the same row as `_is_write_target`, spelled the way a
+    grammar with declarations spells it. It is a separate predicate only because the node
+    is not an assignment in any of the nine and would never match `assign_types`.
+
+    Two facts make this a rule rather than a convenience. The enumerators ALREADY find state
+    by these very nodes (`field_decl_types`, and the census's FIELD_DECLARATION and
+    PROPERTY_DECLARATION site kinds), so the classifier reaching a declaration it cannot
+    name is the reader failing to recognise the site it arrived through. And the field is
+    checked, not just the node type: `int y = stack.length;` puts `stack` under a
+    variable_declarator too, in the VALUE, where it is read and not bound."""
+    field = sp["binding_sites"].get(parent.type)
+    return field is not None and _same(_field(parent, field), ref)
+
+
 def _is_write_target(ref: Node, parent: Node, sp: LangSpec) -> bool:
-    if _is_lvalue(ref, sp):
+    if _is_lvalue(ref, sp) or _is_binding_site(ref, parent, sp):
         return True
     # S[k] = v  -> ref (S) is the collection of a subscript that is the assign target
     return parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref) and _is_lvalue(parent, sp)
@@ -328,6 +350,12 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> 
             return state_partition.output()
         return state_partition.silence_kind(parent.parent, sp)
 
+    # Not a write, a call target, a subscript, a member access or an argument: the parent
+    # does not CONSUME the value, so the reference is the value itself and the question
+    # moves to where that value goes. This is a row of the table, not a fallthrough - the
+    # row that says "the host construct is transparent, follow the flow" - and `_flow`
+    # below is where the table ends. It matters which of the two is the last one, because
+    # only the last one can be the total handler and only one of them can be it.
     return _flow(ref, sp, closed_sets)
 
 
@@ -337,6 +365,14 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
     if parent is None:
         return state_partition.output()
     if parent.type in sp["return_types"]:
+        return state_partition.output()
+    # The value comes to rest. Either the language DISCARDS it - `app.add_middleware(x)` as a
+    # statement, whose result nobody reads - or the language hands it back with no keyword,
+    # which is what the tail expression of a Ruby body and of a Rust block is. Both reach no
+    # arm selector, which is the conclusion the row above draws for a spelled `return`, so
+    # they sit together. Written as a row because the total handler below exposed that this
+    # was one of four rules the old fallthrough was carrying without being asked.
+    if parent.type in sp["sink_types"]:
         return state_partition.output()
     # The state value itself is invoked as a callable, possibly through a wrapper:
     # `(self.f)(x)` in Rust reaches the call via a parenthesized_expression. Same rule as
@@ -384,7 +420,14 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
         return state_partition.silence_kind(parent.parent, sp)
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), node):
         return _keyed_read(_sub_key(parent, sp), sp)
-    return state_partition.output()
+    # THE TOTAL ROW. Every row above declined, so no rule in this table describes how this
+    # construct consumes the value, and the handler says exactly that and stops. It used to
+    # be `output()`, which is a verdict: compositional, reaches no decision, costs no tests.
+    # That is how a `match` on a piece of state, a walrus in a condition and a comprehension
+    # source came back neutral with an empty silence field - not unhandled, cleared. The
+    # handler is handed two node types and nothing else, so it has no verdict available to
+    # reach for; see state_partition.unmeasured for why that placement is the point.
+    return state_partition.unmeasured(node.type, parent.type)
 
 
 def _is_call_target(ref: Node, sp: LangSpec) -> bool:
@@ -429,22 +472,26 @@ def _injected_slot_premise_fails(refs: list[Node], sp: LangSpec, instance: bool)
     return any(_written_through(r, sp) for r in refs)
 
 
-def _verdict(reaches: list[Reach]) -> tuple[str, bool, str, Partition]:
-    """Combine per-reference reaches into (verdict, drives_decision, silence, partition).
+def _verdict(reaches: list[Reach]) -> tuple[str, bool, str, str, Partition]:
+    """Combine per-reference reaches into (verdict, drives_decision, silence, construct,
+    partition).
 
     The silence reason reported is the FIRST undecided reference in source order, not the
     worst of them by some ranking. Any ranking would be invented here, and the reader's next
-    move is to open the site, so the site that comes first is the one to send them to."""
+    move is to open the site, so the site that comes first is the one to send them to. The
+    construct travels with that same reference for the same reason: it names the shape at
+    the site the reader is being sent to, and picking it from a different reference would
+    send them to one place and describe another."""
     kinds = [r["kind"] for r in reaches]
-    silent = [r["silence"] for r in reaches if r["kind"] == state_partition.UNDECIDED]
+    silent = [r for r in reaches if r["kind"] == state_partition.UNDECIDED]
     if silent:
-        return UNRESOLVED, True, silent[0], state_partition.UNKNOWN
+        return UNRESOLVED, True, silent[0]["silence"], silent[0]["construct"], state_partition.UNKNOWN
     if state_partition.UNBOUNDED in kinds:
-        return PROMISCUOUS, True, "", state_partition.UNKNOWN
+        return PROMISCUOUS, True, "", "", state_partition.UNKNOWN
     if state_partition.FINITE in kinds:
-        return NEUTRAL, True, "", state_partition.roll_up(reaches)
+        return NEUTRAL, True, "", "", state_partition.roll_up(reaches)
     # observe-only or output-only: empty reaching-set, so one class and nothing to cover
-    return NEUTRAL, False, "", state_partition.EMPTY
+    return NEUTRAL, False, "", "", state_partition.EMPTY
 
 
 # --------------------------------------------------------------------------
@@ -622,19 +669,22 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
     const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp is LANG_SPEC["python"] else None
     if const is not None:
         # An immutable constant has a one-value domain, so its partition is one class.
-        verdict, drives, silence, partition = (*const, "", state_partition.EMPTY)
+        verdict, drives, silence, construct, partition = (*const, "", "", state_partition.EMPTY)
     else:
-        verdict, drives, silence, partition = _verdict([_categorize(r, sp, closed_sets) for r in refs])
+        verdict, drives, silence, construct, partition = _verdict(
+            [_categorize(r, sp, closed_sets) for r in refs])
         # An invoked slot earns NEUTRAL from the compositional rule; that rule has premises.
         if verdict == NEUTRAL and _injected_slot_premise_fails(refs, sp, instance):
-            verdict, drives, silence, partition = UNRESOLVED, True, INJECTED_SLOT, state_partition.UNKNOWN
+            verdict, drives, silence, construct, partition = (
+                UNRESOLVED, True, INJECTED_SLOT, "", state_partition.UNKNOWN)
     # Attribute-level false-positive filter (Python): the per-reference verdict conflates
     # unbounded data with an unbounded decision. Clear a finding to NEUTRAL only when the
     # attribute is a provable write-once, memoization cache, or carried-value shape.
     if verdict != NEUTRAL and sp is LANG_SPEC["python"] and state_bounds_filters.is_false_positive(key, refs, verdict):
-        verdict, drives, silence, partition = NEUTRAL, False, "", state_partition.EMPTY
+        verdict, drives, silence, construct, partition = NEUTRAL, False, "", "", state_partition.EMPTY
     return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel,
-            "line": _binding_line(refs, sp), "silence": silence, "partition": partition}
+            "line": _binding_line(refs, sp), "silence": silence, "construct": construct,
+            "partition": partition}
 
 
 class FileRead(TypedDict):

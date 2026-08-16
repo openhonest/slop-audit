@@ -318,7 +318,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "module_level_assign": ("assignment", "augmented_assignment"),
         "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
         # Read the binding name from the assignment's `left` field, not by text-
-        # splitting the node. See docs/amendment-2026-08-01-l1-18-module-global.md.
+        # splitting the node. See ../../../research/amendments/amendment-2026-08-01-l1-18-module-global.md.
         "module_scan": "python_fields",
     },
     "rust": {
@@ -336,10 +336,10 @@ LANG_CFG: dict[str, LangCfg] = {
         # A Rust global is mutable state iff its declaration carries `mut`
         # (`static mut NAME: TYPE`). The name is the declaration's identifier child;
         # the legacy text split grabbed the type (`i32`) instead, so no global was
-        # ever recognized. See docs/amendment-2026-08-02-rust-receiver-and-static.md.
+        # ever recognized. See ../../../research/amendments/amendment-2026-08-02-rust-receiver-and-static.md.
         "module_scan": "mutable_specifier",
         "type_escape_patterns": (),
-        # Retained per docs/amendment-2026-07-31-rust-raw-pattern-scope.md; structural
+        # Retained per ../../../research/amendments/amendment-2026-07-31-rust-raw-pattern-scope.md; structural
         # detection above now carries the load, and these never fire inside a body.
         "raw_mut_patterns": ("static mut", "&mut self", "mut self"),
     },
@@ -367,12 +367,12 @@ LANG_CFG: dict[str, LangCfg] = {
         "module_level_assign": ("field_declaration", "local_variable_declaration"),
         "type_escape_patterns": ("Object",),  # raw types, etc.
         # Java's suppression marker is an annotation node, not a comment. See
-        # docs/amendment-2026-08-14-java-suppression-marker.md.
+        # ../../../research/amendments/amendment-2026-08-14-java-suppression-marker.md.
         "annotation_escape_nodes": ("annotation", "marker_annotation"),
         "annotation_escape_names": ("SuppressWarnings",),
         # A Java field is state wherever it sits in the class body, and it is reached
         # by bare name, not through `this.`. See
-        # docs/amendment-2026-08-15-l1-18-corrected-ratio.md.
+        # ../../../research/amendments/amendment-2026-08-15-l1-18-corrected-ratio.md.
         "module_scan": "class_fields",
         "field_decl_types": ("field_declaration",),
         "immutable_modifiers": frozenset({"final"}),
@@ -746,7 +746,7 @@ def _annotation_name(node: Node) -> str:
     The field is followed down as far as it goes, so a scoped annotation
     (`@java.lang.SuppressWarnings`) reads as `SuppressWarnings`: a scoped_identifier
     carries its own `name` field holding the final segment. Reading the field beats
-    splitting the node's text, which is the mistake docs/amendment-2026-08-02-rust-
+    splitting the node's text, which is the mistake ../../../research/amendments/amendment-2026-08-02-rust-
     receiver-and-static.md records.
     """
     name = node.child_by_field_name("name")

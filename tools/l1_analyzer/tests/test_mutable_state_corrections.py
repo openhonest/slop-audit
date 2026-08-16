@@ -4,7 +4,7 @@ One test per defect, each written against a fixture the uncorrected indicator
 answered wrongly, so the test fails while the defect stands and passes only once the
 correction lands. All four were run against the unfixed code first and failed there,
 so they measure the fix and not the fixture (see
-docs/amendment-2026-08-15-l1-18-corrected-ratio.md).
+research/amendments/amendment-2026-08-15-l1-18-corrected-ratio.md).
 
 Self-contained: every test builds its own source tree under tmp_path, so nothing
 depends on an external checkout. Pure assertions, no mocks (Honest Code Rule 10).

@@ -69,6 +69,7 @@ CARD_COPY: dict[str, str] = {
     "silence.reason.unmodeled_callee": "handed to a plain name we have not taught the reader; ours to fix, not yours",
     "silence.reason.dynamic_dispatch": "the call target is chosen while the program runs, so no reading enumerates it",
     "silence.reason.injected_slot": "an injected callable whose value at the call site is not provably the one injected",
+    "silence.reason.unmodeled_construct": "consumed by a piece of syntax the reader has no rule for; ours to fix, not yours",
     "silence.note": "Anything the analyzer could not decide is reported separately, as silence, and never folded into the grade: state we did not read is not evidence about this code. Above half of it undecided, no grade is issued at all, so hiding state from the analyzer buys no letter.",
     "label.L1.19": "Decisions that could be exhaustively checked",
     "tech.L1.19": "L1.19 · decision-space coverage",
@@ -125,8 +126,8 @@ _CORE_STATIC = ({"key": "L1.19", "unit": "", "maps_to": []},)
 _CORE_RAN = ({"key": "L1.19", "unit": "", "maps_to": []}, {"key": "L1.20", "unit": "", "maps_to": []})
 _AUDIT = (
     # The canon's own mapping: L1.12 triangulates tech debt with L1.5/L1.6/L1.7
-    # (dimensions/17-tech-debt-management.md), and L1.14 is the first check of the
-    # configuration-and-secrets dimension (dimensions/07-configuration-secrets.md).
+    # (../../../spec/dimensions/17-tech-debt-management.md), and L1.14 is the first check of the
+    # configuration-and-secrets dimension (../../../spec/dimensions/07-configuration-secrets.md).
     {"key": "L1.12", "unit": "%", "maps_to": [{"dimension": "Tech-debt management · 4.17", "frameworks": "NIST CM-8 / SA-15 · SOC 2 CC7.1 · ISO/IEC 25010"}]},
     {"key": "L1.14", "unit": "", "maps_to": [{"dimension": "Configuration and secrets · 4.7", "frameworks": "NIST IA-5 / SC-28 · SOC 2 CC6.1 · OWASP ASVS V6 · Quebec Law 25"}]},
     {"key": "L1.15", "unit": "/kloc", "maps_to": [{"dimension": "Dependency injection · 4.12", "frameworks": "NIST SA-11 · ISO/IEC 25010 (testability)"}]},

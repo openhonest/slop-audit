@@ -23,7 +23,7 @@ pub struct LangCfg {
     pub annotation_escape_nodes: &'static [&'static str],
     /// LANG_CFG["annotation_escape_names"]: the annotation names that suppress a type
     /// diagnostic. Java only for now; see
-    /// l1_analyzer/docs/amendment-2026-08-14-java-suppression-marker.md.
+    /// research/amendments/amendment-2026-08-14-java-suppression-marker.md.
     pub annotation_escape_names: &'static [&'static str],
     /// _LITERAL_NODES[lang]: container-literal node types that read as a data table,
     /// discounted from the L1.17 code-line count.

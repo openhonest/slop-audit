@@ -7,7 +7,7 @@ provably finite, graded D because the analyzer could not read one call. Nothing 
 the code caused that letter; our reading did.
 
 The four invariants below are the design in
-candidate-methods/silence-index-for-finite-testability.md:
+research/candidates/silence-index-for-finite-testability.md:
 
   1. Silence is its own measure, with the file and line of every silent site.
   2. The grade is decided on observed state only.

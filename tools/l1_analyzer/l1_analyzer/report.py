@@ -27,7 +27,7 @@ _BAND_POINTS = {"Healthy": 1.0, "Not Healthy": 0.5, "Slop": 0.0}
 _A_MIN, _B_MIN = 0.85, 0.60
 
 # Above this share of undecided state, no grade is issued at all. The number is measured,
-# not chosen: see candidate-methods/silence-index-for-finite-testability.md for the
+# not chosen: see ../../../research/candidates/silence-index-for-finite-testability.md for the
 # distribution it comes from. It gates only the good grades - a proven unbounded state is
 # still F above the floor, because a proof stands whatever else went unread.
 #

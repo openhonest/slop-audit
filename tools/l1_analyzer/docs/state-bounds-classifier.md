@@ -4,7 +4,7 @@ Added 2026-07-31. This records what the classifier is and, more importantly, wha
 
 ## What it does
 
-L1.18 counts functions that read external mutable state. It cannot tell whether that state is *bounded* (a `bool`, an enum → a finite behavior domain, exhaustively testable) or *unbounded* (a growing `dict`/`list`, a `str`, an arbitrary-precision `int` → an infinite behavior domain, per `papers/paper-c-amendment-l118-rationale.md`, where the `State(S)` term is unbounded). L1.18b makes that call and reports, of the functions L1.18 flags, how many read unbounded state, how many read only bounded state, and how many are undetermined.
+L1.18 counts functions that read external mutable state. It cannot tell whether that state is *bounded* (a `bool`, an enum → a finite behavior domain, exhaustively testable) or *unbounded* (a growing `dict`/`list`, a `str`, an arbitrary-precision `int` → an infinite behavior domain, per `../../../research/amendments/paper-c-amendment-l118-rationale.md`, where the `State(S)` term is unbounded). L1.18b makes that call and reports, of the functions L1.18 flags, how many read unbounded state, how many read only bounded state, and how many are undetermined.
 
 ## Guarantees, and why the pre-registration is untouched
 

@@ -12,7 +12,7 @@ Reference implementations of audit instruments. **Not canonical.** The Slop Audi
 
 ## What "one example implementation" means
 
-A tool here is a *demonstration* that the dimension is mechanically auditable for some stack — not a *requirement* to use that tool. If your stack doesn't use the pattern the tool assumes, the dimension is still auditable; you just need a different implementation. The dimension documentation in `../dimensions/` describes what to audit; the tool documentation here describes one way to do it.
+A tool here is a *demonstration* that the dimension is mechanically auditable for some stack — not a *requirement* to use that tool. If your stack doesn't use the pattern the tool assumes, the dimension is still auditable; you just need a different implementation. The dimension documentation in `../spec/dimensions/` describes what to audit; the tool documentation here describes one way to do it.
 
 ## Adding a tool
 

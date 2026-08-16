@@ -1,20 +1,13 @@
 #!/bin/sh
-# Global git hook shim (core.hooksPath). Preserves repo-local hooks by delegating.
-name=$(basename "$0")
-
-if [ "$name" = "commit-msg" ]; then
-    tmp="$1.strip.$$"
-    if grep -ivE '^co-authored-by:.*(claude|anthropic)|^claude-session:|generated with.*claude' "$1" > "$tmp" 2>/dev/null; then
-        mv "$tmp" "$1"
-    else
-        rm -f "$tmp"
-    fi
-fi
-
-# Run the repo's own hook of this name, if it has one (the real .git/hooks, not this dir).
-common=$(git rev-parse --git-common-dir 2>/dev/null) || common=.git
-local_hook="$common/hooks/$name"
-if [ -x "$local_hook" ]; then
-    exec "$local_hook" "$@"
-fi
-exit 0
+# Chain to the machine-wide git hook.
+#
+# WHY THIS FILE EXISTS
+# core.hooksPath is set locally in this repository, which REPLACES the global
+# one and silently disabled both the Claude-attribution strip and the commit
+# message check. Measured 2026-08-15: 249 commits across nine repositories had
+# already landed with attribution because of it.
+#
+# The earlier fix was to copy the global shim in here. Three copies then
+# drifted to three different contents, which is the same defect one layer up.
+# This file delegates instead, so there is one implementation.
+exec "$HOME/.config/git/hooks/$(basename "$0")" "$@"
