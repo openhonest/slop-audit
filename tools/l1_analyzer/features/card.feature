@@ -3,6 +3,25 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. This module is the counter-example in the set. It is already honest about
+  # an absent measurement: _value_str and _metric print n/a and No data rather than a bare zero,
+  # _detail reads the basis rather than re-deriving it from the counts, precisely because
+  # zero-zero-zero is what an unread repository and a clean one have in common, and build_card
+  # withholds the path-cover figure from an ungraded card. Its one silent case is its own copy.
+  # Today _t returns the key for a key CARD_COPY does not hold, so a sentence nobody wrote prints
+  # to the reader as a raw dotted key instead of raising.
+  @undecidable @not-implemented
+  Scenario: undecidable a copy key the card's own table does not hold
+    Given a section asking for a sentence under a key absent from CARD_COPY, such as a verdict or band spelling added after the copy table was written
+    When build_card renders that section and _t looks the key up
+    Then it is recorded as unread rather than returned as the key itself, so a card that prints a sentence means the sentence was written and never that the lookup missed
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _t looks up one piece of card copy and fills its fields in
     Given a copy key and any values the sentence needs
     When _t finds the key in the card's copy table and formats the values in as text

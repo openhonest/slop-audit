@@ -3,6 +3,21 @@ Feature: race_harness — running a repository's own tests under a race detector
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today parse_tsan splits the output at the data-race banner alone, so every
+  # other warning class the same detector emits leaves no finding, and a run that reported one
+  # comes back with the no-race-in-tests verdict and the Healthy band.
+  @undecidable @not-implemented
+  Scenario: undecidable a race-detector warning that is not a data race
+    Given a run whose output carries a lock-order inversion, a leaked thread, or a signal-unsafe call inside a signal handler, and no data-race banner at all
+    When detect_races hands the combined output to parse_tsan, which splits it at the data-race banner
+    Then it is recorded as unread rather than resolved to the no-race-in-tests verdict and the Healthy band, so a clean verdict means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: parse_tsan turns a race detector's output into one finding per reported race
     Given the text a run under the race detector produced
     When parse_tsan splits it at each race banner, reads the summary line for the file, line and symbol, and takes the first source frame under each access header

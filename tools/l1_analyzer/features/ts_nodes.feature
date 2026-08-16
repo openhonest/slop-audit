@@ -3,6 +3,21 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today text decodes with errors ignored, so a byte the decoder cannot read
+  # is dropped without a trace and the caller receives a shortened name, or the empty string,
+  # with nothing to say which of the two it holds.
+  @undecidable @not-implemented
+  Scenario: undecidable a node whose source bytes are not valid utf-8
+    Given a node spanning bytes the utf-8 decoder cannot read, such as an identifier in a file written in another encoding
+    When text decodes the span with the undecodable bytes ignored
+    Then it is recorded as unread rather than returned as the shortened or empty string every caller reads as the node's whole text, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: refs collects every matching node beneath a scope in source order
     Given a scope node and a test that says whether one node is wanted
     When refs walks the whole subtree, testing each node before its children

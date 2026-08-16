@@ -3,6 +3,21 @@ Feature: java_trace — running a Maven project's own test suite to measure bran
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the coverage report is looked for at one path under the repository
+  # root, so a build whose modules each write their own report, and whose root writes one only
+  # when an aggregate goal is configured, is reported as a build carrying no coverage plugin.
+  @undecidable @not-implemented
+  Scenario: undecidable a multi-module build whose coverage reports are written one per module
+    Given a project whose build file declares modules, each writing its own coverage report under its own build directory and none at the repository root
+    When decision_space_coverage runs the build and looks only for the report at the root's own coverage path
+    Then it is recorded as unread rather than reported as a build with the coverage plugin missing, so a not-applicable names what was not read and never a plugin the build already carries
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _maven picks the build command this project should be driven with
     Given a repository directory
     When _maven looks for the project's own build wrapper and then for a system build tool

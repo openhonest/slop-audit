@@ -3,6 +3,21 @@ Feature: path_cover — the fewest end-to-end runs that walk every branch of a r
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the statement dispatch collapses anything it does not name into the
+  # current control point, and models a try as its body alone, so every except handler and every
+  # finally is dropped and the cover comes back smaller than the code it was computed over.
+  @undecidable @not-implemented
+  Scenario: undecidable a control-flow construct the statement dispatch has no rule for
+    Given a function whose branching is carried by an except handler, a finally, or another construct _build_stmt does not name
+    When _build_stmt reads the statement kind, finds no rule, and returns the current control point unchanged
+    Then it is recorded as unread rather than collapsed into straight-line code, where the cover then reads as the smaller number genuinely simpler code earns, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _add records one directed edge and the reverse edge that can undo it
     Given the flow graph being built, a from-node, a to-node and a capacity
     When _add appends the edge

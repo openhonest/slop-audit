@@ -3,6 +3,22 @@ Feature: csharp_trace — the L1.19 and L1.20 runtime harness for C# repositorie
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today a project that targets several frameworks runs its suite once per
+  # framework, each writing its report into its own run directory, and the first path in sort
+  # order is read; the frameworks compile different conditional regions, so a run identifier
+  # rather than the code decides which branch counts get published.
+  @undecidable @not-implemented
+  Scenario: undecidable a project that targets several frameworks in one run
+    Given a test project naming more than one target framework, whose conditional compilation directives include different code in each, so the run wrote one report per framework
+    When decision_space_coverage sorts the reports it found and reads the branch counts out of the first
+    Then it is recorded as unread rather than scored from whichever framework's report sorted first, so a percentage means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _dotnet finds the SDK command the measurement would run under
     Given the executable search path of the machine running the audit
     When _dotnet looks for the dotnet command

@@ -3,6 +3,22 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the god-file arm appends a problem only above zero, so a repository
+  # the L1.17 indicator never parsed prints the same pass line as a repository it read and cleared.
+  # The state and thread-safety halves of that line were corrected for exactly this; this half
+  # was not.
+  @undecidable @not-implemented
+  Scenario: undecidable a repository whose production source the god-file indicator never opened
+    Given a repository in which the god-file indicator matched no production file, so L1.17 carries no positive value
+    When _run_gate reads L1.17 off the panel, finds nothing above zero, and composes the pass line
+    Then it is recorded as unread rather than printed as "0 production god-files", so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _count_type_escapes counts this repository's own type-escape hatches
     Given a repository and the language it is written in
     When _count_type_escapes parses the production source and counts the escape hatches the L1.15 vocabulary names

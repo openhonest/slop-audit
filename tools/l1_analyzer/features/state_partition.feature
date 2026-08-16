@@ -3,6 +3,21 @@ Feature: state_partition — what a finite verdict carries beside the word "fini
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today this module names the silence one reference at a time and then loses
+  # it in the roll-up: a state whose every reach came back undecided returns the empty partition,
+  # counted and ordered, so the disclosure that exists per reference is missing per state.
+  @undecidable @not-implemented
+  Scenario: undecidable a state whose every reach came back undecided
+    Given every reach collected for one piece of state, all of them undecided, with no finite reach among them to sum
+    When roll_up de-duplicates the finite reaches by discriminator and finds none
+    Then it is recorded as unread rather than rolled up to one counted, ordered class, which is the partition a state that was read and found single-valued gets, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: write records that a reference is an assignment target and decides nothing
     Given no input at all
     When write is asked for the category of a reference that is written to

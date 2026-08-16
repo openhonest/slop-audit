@@ -11,6 +11,13 @@
 # Affected-only: checks just the modules whose source OR feature file is staged for commit.
 # Bijection per module: the set of module-level function names in l1_analyzer/<m>.py must equal
 # the set of scenario subjects in features/<m>.feature (counts equal, none missing, none extra).
+#
+# Plus one reserved scenario per file, `Scenario: undecidable ...`, excluded from the bijection
+# and separately required. A measure that meets a construct it has no rule for must say so rather
+# than return a verdict, and must offer the shape of what it could not read for collection. That
+# is the whole finding of the L1.18 root-cause analysis: the meter returned 0.0 and Healthy for a
+# closure it never looked at, because nothing obliged it to state the case where it decides
+# nothing. Requiring the scenario is how the obligation becomes structural instead of remembered.
 set -uo pipefail
 root=$(git rev-parse --show-toplevel)
 pkg="$root/tools/l1_analyzer/l1_analyzer"
@@ -41,8 +48,22 @@ for m in $mods; do
     continue
   fi
 
-  scen=$(grep -hE '^  Scenario:' "$feat" | sed -E 's/^  Scenario: ([A-Za-z_][A-Za-z0-9_]*).*/\1/' | sort)
+  all_scen=$(grep -hE '^  Scenario:' "$feat" | sed -E 's/^  Scenario: ([A-Za-z_][A-Za-z0-9_]*).*/\1/' | sort)
+  nu=$(printf '%s\n' "$all_scen" | grep -cx 'undecidable')
+  scen=$(printf '%s\n' "$all_scen" | grep -vx 'undecidable' | sort)
   ns=$(printf '%s\n' "$scen" | grep -c .)
+
+  if [ "$nu" -ne 1 ]; then
+    fail=1
+    echo ""
+    echo "feature-gate: $m — $nu undecidable scenarios, expected exactly 1."
+    echo "  Every feature states what the module does when it meets a construct it has no rule"
+    echo "  for, and what it offers the operator about it. Add, to features/$m.feature:"
+    echo "    Scenario: undecidable <what this module cannot decide>"
+    echo "  It must say that the module reports the case rather than returning a verdict, and"
+    echo "  that the shape of what it could not read is offered for collection, opt-in per run,"
+    echo "  node types only. See research/candidates/collecting-unmeasured-constructs.md."
+  fi
   missing=$(comm -23 <(printf '%s\n' "$funcs" | uniq) <(printf '%s\n' "$scen" | uniq))
   extra=$(comm -13 <(printf '%s\n' "$funcs" | uniq) <(printf '%s\n' "$scen" | uniq))
 

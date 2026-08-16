@@ -3,6 +3,21 @@ Feature: js_trace — running a JavaScript or TypeScript project's own suite to 
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the manifest's test script is split on whitespace and handed to the
+  # coverage tool as one argument vector, so a script only a shell can run is neither refused nor
+  # understood: its operators arrive as filenames, and whatever the first command did is measured.
+  @undecidable @not-implemented
+  Scenario: undecidable a test script that is a shell line rather than one command
+    Given a package whose test script joins two commands with a shell operator, redirects its output, or carries an environment prefix that only a shell resolves
+    When decision_space_coverage splits that script into words and runs it under the coverage tool as a single argument vector
+    Then it is recorded as unread rather than measured from whichever part of the line ran first, so a percentage means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _node finds the Node runtime the harness needs before anything else runs
     Given the current search path
     When _node looks for the node program on it

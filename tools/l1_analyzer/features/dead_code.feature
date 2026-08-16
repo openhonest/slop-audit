@@ -3,6 +3,23 @@ Feature: dead_code — finding unreachable statements and unreferenced definitio
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. This module names its four refusals plainly in prose - an unwired language,
+  # no production source, Ruby metaprogramming, and a grammar under four-fifths - but it names
+  # them in a shape that drops a field. _na omits the unreadable count the measured result
+  # carries, so a consumer asking how many files went unread gets nothing from a run that read
+  # nothing at all, and reads that as none.
+  @undecidable @not-implemented
+  Scenario: undecidable how many files a refusal could not read
+    Given a repository the module refuses outright, because no grammar is wired for the language or the grammar parsed under four-fifths of its production files
+    When analyze builds the not-applicable result through _na and a consumer reads its unreadable count
+    Then it is recorded as unread rather than absent from the shape, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _parser builds one parser per grammar and keeps it for the rest of the run
     Given the name of one of the ten grammars this module parses
     When _parser is asked for that grammar's parser

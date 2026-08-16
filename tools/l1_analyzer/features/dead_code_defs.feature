@@ -3,6 +3,24 @@ Feature: dead_code_defs — the per-language definition collectors that route ev
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. This module has an honest channel already - the undecidable status, with a
+  # named reason - and uses it well for a decorator, an export or an external linkage. It has no
+  # channel at all for a node whose type reaches no branch of a collector's dispatch. Every
+  # collector is handed src bytes it never reads and facts it mostly ignores, _ruby never reads
+  # ruby_metaprogramming, and a name the chain does not name is collected as nothing: not a
+  # candidate, not undecidable, not excluded, and absent from the disclosure that counts them.
+  @undecidable @not-implemented
+  Scenario: undecidable a top-level declaration whose node type reaches no branch of the collector
+    Given a source file declaring a name through a construct no collector's dispatch chain names, such as a Ruby define_method call at the top level or a C declarator whose wrappers yield no identifier
+    When the collector for that language walks the top-level children and the node matches no branch
+    Then it is recorded as unread rather than dropped from the definition list, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _text reads the source text of one syntax node
     Given a syntax node, or nothing at all
     When _text decodes the node's bytes

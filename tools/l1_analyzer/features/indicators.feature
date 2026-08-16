@@ -3,6 +3,21 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today L1.17 globs ten extensions and no others, so a repository written in a
+  # language nobody enumerated leaves the production file count at zero, and the guarded division
+  # substitutes 0.0 for the figure it could not compute and bands that as Healthy.
+  @undecidable @not-implemented
+  Scenario: undecidable a source file in a language the L1.17 extension list does not name
+    Given a repository whose production source carries none of the ten extensions the god-file scan globs for
+    When _god_files measures the code lines of every candidate file
+    Then it is recorded as unread rather than published as zero percent of files over a thousand lines under the healthy band, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: band maps one measured number onto a named threshold band
     Given a measured value, the healthy and slop thresholds for its indicator, and which direction is better
     When band compares the value against those two thresholds

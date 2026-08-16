@@ -3,6 +3,21 @@ Feature: thread_surface — the concurrency audit surface, every site where a la
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today one file that parses with no match returns clean, and files_parsed
+  # discloses how much source was read but never how much of that language's concurrency the
+  # row has a rule for.
+  @undecidable @not-implemented
+  Scenario: undecidable a concurrency shape the language's own row has no rule for
+    Given a Java repository whose shared mutable state is a non-final instance field of a single shared object, when the Java row names only non-final static collection fields
+    When scan reads the file
+    Then it is recorded as unread rather than counted clean off a rule set that never looked for that shape, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _text reads the source text a parse node covers
     Given a node, or nothing at all
     When _text is asked for its text

@@ -3,6 +3,22 @@ Feature: coverage_gates — the deterministic retention gates that separate a pr
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. This module is honest in its atoms - _atom_truth answers unknown rather
+  # than false, and _eval_cfg carries that unknown upward - but not in its buckets. classify_failure
+  # always returns one of four, and attribution answers incidental when it has nothing to compare,
+  # so a run the gates could not attribute is spelled exactly like a run they attributed to noise.
+  @undecidable @not-implemented
+  Scenario: undecidable a failing test whose body carries no string for the panic to be matched against
+    Given a generated test whose assertion was written with no message, so assertion_message finds no literal and there is nothing to compare the observed panic to
+    When classify_failure asks attribution about that run and attribution answers without comparing anything
+    Then it is recorded as unread rather than bucketed as an incidental panic, so a retained bucket means the gates decided and never that they could not
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _string_literals lists every string a generated test carries
     Given the body of a generated Rust test
     When _string_literals wraps it in a throwaway function, parses it, and walks the tree

@@ -3,6 +3,22 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today _refine_incidental has two branches for a two-way question and files
+  # everything else under one of them: a permuted re-run whose bucket is anything other than
+  # incidental_panic is returned as invalid_fixture, a divergence included, so a proof the
+  # permutation itself surfaced is discarded as the tool's own noise and never reaches the card.
+  @undecidable @not-implemented
+  Scenario: undecidable a permuted re-run that failed in a way the permutation check has no branch for
+    Given an incidental panic whose re-run with a valid aligned scalar fails again, but now on the test's own assertion rather than outside it
+    When _refine_incidental reads the re-run's bucket and finds it is neither a pass nor another incidental panic
+    Then it is recorded as unread rather than filed as an invalid fixture, so a discarded proof means the fixture was proven at fault and never that the refiner had no rule
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: model_available says whether a proposal can be asked for at all
     Given the process environment
     When model_available reads the API-key variable

@@ -3,6 +3,21 @@ Feature: pytest_trace — running a Python repository's own test suite to measur
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today this harness takes coverage.py's branch totals whole and never asks
+  # what they left out, so a decision coverage.py does not enumerate is absent from both halves
+  # of the fraction and raises the percentage instead of lowering it.
+  @undecidable @not-implemented
+  Scenario: undecidable a decision coverage.py never enumerated as a branch
+    Given a repository whose decisions include constructs coverage.py counts in neither its covered branches nor its branch total
+    When decision_space_coverage divides the covered branches by the total coverage.py reported
+    Then it is recorded as unread rather than dropped out of a percentage it silently raises, so a share means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _run_untrusted runs a target repository's command in its own process group
     Given a command, a working directory, extra environment settings and a hard time limit
     When _run_untrusted starts the command in a fresh session and waits for it to finish

@@ -3,6 +3,21 @@ Feature: python_facets — locating the Python decision branches no test ever re
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the branch walk names six constructs and passes through every other
+  # one, so an except handler, a with body, a conditional expression and a comprehension guard
+  # never enter the branch list, and uncovered_gaps therefore reports no gap where they sit.
+  @undecidable @not-implemented
+  Scenario: undecidable a decision the branch walk has no rule for
+    Given a function whose only untested decision is an except handler, a with body, a conditional expression or a comprehension guard
+    When _branches walks the body looking for an if, an elif, an else, a for, a while or a match case
+    Then it is recorded as unread rather than left out of the branch list, where uncovered_gaps then yields no gap at all, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _text reads the module source a node covers
     Given the module source as bytes and a node that may be absent
     When _text slices the source between the node's start and end

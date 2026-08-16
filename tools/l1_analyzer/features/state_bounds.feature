@@ -3,6 +3,21 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today this module already states the case: _flow's total row returns
+  # unmeasured carrying the two node types, so the verdict is withheld and named, and the only
+  # missing half here is the offer to collect the shape.
+  @undecidable @not-implemented
+  Scenario: undecidable a value carried through a construct no dispatch row covers
+    Given a value derived from the state standing on the right of an assignment, inside a binary operator, or as a decorator, none of which _flow has a row for
+    When _flow works down its rows and every one of them declines
+    Then it is recorded as unread rather than handed to output, which would call it compositional and cost no tests, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _sub_named lists the named parts of an indexing expression
     Given a subscript node
     When _sub_named keeps only its named children

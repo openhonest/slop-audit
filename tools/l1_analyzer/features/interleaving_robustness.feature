@@ -3,6 +3,21 @@ Feature: interleaving_robustness — which of the flagged concurrency surface no
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today classify has no third answer: one word search files the file under
+  # modeled-elsewhere when the stem hits and under unmodeled when it misses, and both go out
+  # as a verdict.
+  @undecidable @not-implemented
+  Scenario: undecidable exposed surface whose module name the word search can neither confirm nor deny
+    Given an exposed-surface file whose module stem is an ordinary Rust word such as state or mod, so a mention of it in the modelled text says nothing about whether a model drives that file
+    When analyze compares the surface against the modelled text
+    Then it is recorded as unread rather than filed under modeled-elsewhere or unmodeled, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _module_stem gives the module name a Rust file defines
     Given a path relative to the repository, such as storage/shared_wal_coordination.rs
     When _module_stem strips the directories and the extension

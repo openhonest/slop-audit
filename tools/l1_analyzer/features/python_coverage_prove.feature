@@ -3,6 +3,23 @@ Feature: python_coverage_prove — the pytest coverage-gap prove loop, where an 
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today _import_path takes repo and never reads it, so nothing bounds the
+  # upward walk at the repository root. A module outside the package tree resolves to a dotted
+  # name the repository does not own, the generated test imports whatever that name reaches on
+  # the target's path, and the run reports the result as a setup error rather than as a path
+  # the module could not resolve.
+  @undecidable @not-implemented
+  Scenario: undecidable a module whose dotted import path the repository root does not bound
+    Given a module under test in a namespace package or a directory tree whose __init__.py files run past the repository root
+    When _import_path walks upward without consulting the repo it was handed, and _prove_module hands the resulting name to the generated test
+    Then it is recorded as unread rather than resolved to a name the repository does not own, so a setup error means the test was wrong and never that the import path was unresolvable
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   # The repo argument is accepted and never read. The walk stops at the first directory
   # without an __init__.py, wherever that lands, so the repository root does not bound it.
   Scenario: _import_path works out the dotted path a generated test will import

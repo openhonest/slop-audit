@@ -3,6 +3,21 @@ Feature: rust_facets — turning a Rust coverage run into named, provable decisi
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today _branches names five constructs, so the early return a question-mark
+  # operator carries and the diverging arm of a let-else binding are enumerated nowhere, and an
+  # uncovered line belonging to one of them matches no branch and yields no gap to prove.
+  @undecidable @not-implemented
+  Scenario: undecidable a Rust decision the branch walk names no rule for
+    Given a function whose decisions include the early return of a question-mark operator or the diverging arm of a let-else binding
+    When module_functions walks the body and _branches records only conditionals, else arms, match arms, while loops and for loops
+    Then it is recorded as unread rather than left out of the branch list, where uncovered_gaps returns no gap for it, so an empty gap list means read-and-proved and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _cfg_inner reads the predicate out of a conditional-compilation attribute
     Given the text of one attribute
     When _cfg_inner finds the conditional marker and counts brackets until they balance

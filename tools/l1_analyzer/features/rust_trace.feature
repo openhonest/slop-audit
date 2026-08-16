@@ -3,6 +3,21 @@ Feature: rust_trace — running a Rust crate's own test suite to measure coverag
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the test count is read from the default harness's own summary line, so
+  # a target that supplies its own harness and prints its own report totals zero tests, and the
+  # first run refuses by naming a suite that collected nothing when the suite ran in full.
+  @undecidable @not-implemented
+  Scenario: undecidable a test target that supplies its own harness
+    Given a crate whose manifest turns the default harness off for a test target, so that binary prints a report of its own and never the summary line this module reads
+    When test_determinism runs the suite and _tests_run looks for that summary line in the output
+    Then it is recorded as unread rather than refused as a suite that collected no tests, so a refusal names what was not read and never a suite that never ran
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _cargo finds the Rust build tool
     Given whatever is on the search path
     When _cargo looks for cargo

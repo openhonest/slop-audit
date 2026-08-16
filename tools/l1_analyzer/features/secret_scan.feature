@@ -3,6 +3,21 @@ Feature: secret_scan — counting the distinct credentials committed to a reposi
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the parse result is used without anyone asking whether it parsed:
+  # _string_spans collects the string nodes that survived, the generic rule fires only inside
+  # them, and the file is still counted in the denominator this module says was read end to end.
+  @undecidable @not-implemented
+  Scenario: undecidable a file in a supported language that the grammar could not parse
+    Given a file whose suffix names one of the nine grammars but whose syntax that grammar rejects, so the parse yields error nodes where the string literals should be
+    When analyze reads the file and _string_spans collects whatever string nodes survived
+    Then it is recorded as unread rather than counted among the files scanned, so a count of zero secrets means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _rule assembles one credential pattern with the evidence standard it is judged by
     Given a rule name, a pattern, the number of the capture holding the credential, and a mode
     When _rule compiles the pattern and packages the four together

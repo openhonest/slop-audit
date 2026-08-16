@@ -3,6 +3,22 @@ Feature: state_census — the second, independent count of declaration sites, th
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today a construct no extractor emits a site for has no kind, so no
+  # capability entry can record it unreadable, unread_kinds stays empty and the refusal it feeds
+  # never fires: the slot simply leaves the declared total and every coverage fraction measured
+  # against that total comes out higher for it.
+  @undecidable @not-implemented
+  Scenario: undecidable a declaration none of the census extractors emit a site for
+    Given a file declaring state through a construct no extractor here reaches, such as a module-scope binding made under a conditional
+    When count walks the repository and tallies the sites
+    Then it is recorded as unread rather than dropped from the declared total, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _of_type collects every node of the wanted kinds
     Given a parse tree and the node kinds wanted
     When _of_type walks the whole tree from that point down

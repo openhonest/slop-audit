@@ -3,6 +3,21 @@ Feature: ruby_trace — running a Ruby repository's own suite to measure branch 
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the coverage result is looked for at one fixed path, and its absence
+  # there is reported as the coverage gem never having been started in the suite's helper, which
+  # prescribes to a repository the very thing it already did.
+  @undecidable @not-implemented
+  Scenario: undecidable a coverage result the suite wrote somewhere other than the one path checked
+    Given a repository that starts the coverage gem but sets its own coverage directory, or writes its result under a per-suite command name
+    When decision_space_coverage runs the suite and looks only in the default coverage directory for the default result file
+    Then it is recorded as unread rather than reported as a suite that never started the coverage gem, so a not-applicable names what was not read and never a remedy already applied
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _ruby finds the Ruby interpreter on the search path
     Given the current search path
     When _ruby looks for the ruby program on it

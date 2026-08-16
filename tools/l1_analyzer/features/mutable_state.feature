@@ -3,6 +3,21 @@ Feature: mutable_state — L1.18, the share of functions that reference unbounde
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the candidate walk reads a root child and one level below it, so a
+  # binding made inside a function body never becomes a name, and the closure that mutates it
+  # is counted in the denominator as a function that touched no state at all.
+  @undecidable @not-implemented
+  Scenario: undecidable a mutable binding declared inside a function and captured by a closure
+    Given a file whose only mutable state is a function-local accumulator that a nested closure rebinds, holds captured, or carries as a default argument
+    When analyze_mutable_state parses the file and looks for its module mutable names
+    Then it is recorded as unread rather than scored zero percent under the healthy band, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _py_is_type_expression recognises a right-hand side that is nothing but a type
     Given the right-hand side of a Python module-level binding
     When _py_is_type_expression asks whether it names a type and nothing else

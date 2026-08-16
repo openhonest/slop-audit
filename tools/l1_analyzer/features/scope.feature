@@ -3,6 +3,21 @@ Feature: scope — deciding which files are the code under audit and which are s
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today _bucket_reason returns nothing both for a file it examined and kept
+  # and for a directory whose test convention no marker names, so a JavaScript __tests__ tree or
+  # a Ruby spec tree is measured as production code and the disclosure records no judgment at all.
+  @undecidable @not-implemented
+  Scenario: undecidable a test-directory convention no marker in the scope names
+    Given a repository whose tests sit in a directory named by a convention outside the two markers, such as a JavaScript __tests__ tree, a Ruby spec tree, or a Cucumber features tree
+    When _bucket_reason tests that path against the vendored list, the scope's markers, the docs directory, the tooling names and the loose-root-script rule
+    Then it is recorded as unread rather than as the same nothing a file that was examined and kept receives, so a scope disclosure means read-and-kept and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: excluded_dirs gives a named scope the directory names it removes from a measurement
     Given the name of a scope
     When excluded_dirs looks that name up in the scope table

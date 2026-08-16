@@ -3,6 +3,21 @@ Feature: record_state — the state a record declares inside itself, which no re
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the Python rule reads only an assignment whose left side is a bare
+  # identifier, so a binding spelled any other way yields neither a slot nor a visit, and the
+  # census coverage ratio it never entered reports the file fully read.
+  @undecidable @not-implemented
+  Scenario: undecidable a class-body binding whose left side is not a bare identifier
+    Given a class body binding its state by tuple unpacking, by a subscript or attribute target, or by a statement that is not an assignment
+    When _py_class_body_bindings reads the body's own statements looking for an assignment with an identifier on the left
+    Then it is recorded as unread rather than passed over into neither the slots nor the visited list, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _descend collects the descendants of a node without entering a nested record
     Given a node, the node types worth collecting, and the node types that end the walk
     When _descend walks the node's whole subtree

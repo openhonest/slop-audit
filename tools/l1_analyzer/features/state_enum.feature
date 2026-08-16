@@ -3,6 +3,21 @@ Feature: state_enum — which declarations the classifier's reader walks, and wh
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today every module rule here enumerates from the same closed list of
+  # top-level declaration kinds, so a name bound inside a function body yields no site at all,
+  # neither keyed nor declined, and this walk cannot tell it apart from a file that declares nothing.
+  @undecidable @not-implemented
+  Scenario: undecidable a name bound inside a function body
+    Given a parsed file whose state is bound below the top level, inside a function body the candidate list never descends into
+    When module_cands runs that language's module rule over the candidates
+    Then it is recorded as unread rather than left absent from the site map, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: _put records one site the walk reached, keeping position and the stronger answer
     Given the map being built, one declaration site and the key that site yields
     When _put records the visit

@@ -17,6 +17,7 @@ featdir="$root/tools/l1_analyzer/features"
 fail=0
 tot_f=0
 tot_s=0
+nound=0
 printf '%-26s %9s %9s   %s\n' module functions scenarios status
 for src in "$pkg"/*.py; do
   m=$(basename "$src" .py)
@@ -35,12 +36,21 @@ for src in "$pkg"/*.py; do
     continue
   fi
 
-  scen=$(grep -hE '^  Scenario:' "$feat" | sed -E 's/^  Scenario: ([A-Za-z_][A-Za-z0-9_]*).*/\1/' | sort)
+  all_scen=$(grep -hE '^  Scenario:' "$feat" | sed -E 's/^  Scenario: ([A-Za-z_][A-Za-z0-9_]*).*/\1/' | sort)
+  nu=$(printf '%s\n' "$all_scen" | grep -cx 'undecidable')
+  scen=$(printf '%s\n' "$all_scen" | grep -vx 'undecidable' | sort)
   ns=$(printf '%s\n' "$scen" | grep -c .)
   tot_f=$((tot_f + nf))
   tot_s=$((tot_s + ns))
   missing=$(comm -23 <(printf '%s\n' "$funcs" | uniq) <(printf '%s\n' "$scen" | uniq))
   extra=$(comm -13 <(printf '%s\n' "$funcs" | uniq) <(printf '%s\n' "$scen" | uniq))
+
+  if [ "$nu" -ne 1 ]; then
+    fail=1
+    nound=$((nound + 1))
+    printf '%-26s %9d %9d   %s\n' "$m" "$nf" "$ns" "NO UNDECIDABLE SCENARIO"
+    continue
+  fi
 
   if [ "$nf" != "$ns" ] || [ -n "$missing" ] || [ -n "$extra" ]; then
     fail=1
@@ -56,5 +66,6 @@ echo ""
 if [ "$tot_f" -gt 0 ]; then
   printf 'TOTAL %d functions, %d scenarios, %d%% covered\n' "$tot_f" "$tot_s" $(( tot_s * 100 / tot_f ))
 fi
-[ "$fail" -eq 0 ] && echo "every module holds one scenario per function" || echo "coverage is incomplete; see the rows above"
+[ "$nound" -gt 0 ] && echo "$nound module(s) state no undecidable case"
+[ "$fail" -eq 0 ] && echo "every module holds one scenario per function and one undecidable scenario" || echo "coverage is incomplete; see the rows above"
 exit "$fail"

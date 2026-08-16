@@ -3,6 +3,21 @@ Feature: prove — turning a located concurrency hazard into a demonstrated one
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
+  # and is NOT built. Today the loop is already honest per hazard: a hazard nothing was generated
+  # for is not-generated and one no toolchain ran is not-run, neither of them not-demonstrated.
+  # What collapses them is retention, which drops all three alike and leaves an empty proof list.
+  @undecidable @not-implemented
+  Scenario: undecidable a hazard nothing was generated for and nothing was run against
+    Given a sweep whose outcomes are all not-generated or not-run, so no hazard was ever put under contention
+    When retained filters those outcomes for the report
+    Then it is recorded as unread rather than returned as the empty proof list a fully run sweep returns, so a zero means read-and-clean and never not-looked-at
+    And the parse-tree shape around it is offered for collection: node types and nesting, every leaf value stripped
+    And the operator opts in for that run only, after the whole payload is printed rather than summarised
+    But nothing leaves the machine when the operator declines, and the run says nothing further about it
+
   Scenario: proof_request packages one located hazard with the code around it
     Given a thread-surface finding naming a kind, a file, a line and a symbol, plus the source window that surrounds it
     When proof_request copies those five fields across
