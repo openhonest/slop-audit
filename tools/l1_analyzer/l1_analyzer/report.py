@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from l1_analyzer import state_census, state_partition
+from l1_analyzer import incomplete, state_census, state_partition
 
 _HYGIENE_WEIGHTS = {"L1.17": 3, "L1.15": 3, "L1.10": 2, "L1.11": 1, "L1.9": 1, "L1.16": 1}
 _BAND_POINTS = {"Healthy": 1.0, "Not Healthy": 0.5, "Slop": 0.0}
@@ -129,7 +129,15 @@ def silence_fraction(counts: dict) -> float:
     second key, so the number that suppresses a grade and the number that sets it can
     never disagree about the same repository."""
     total = sum(counts.values())
-    return (counts.get("unresolved", 0) / total) if total else 0.0
+    # Zero recognised states gives 0.0 here, which reads as "nothing undecided" and so can
+    # never trip the above-half rule that withholds a grade. That is one of the two doors the
+    # "100% finitely testable" defect came through. It stays 0.0 rather than refusing, because
+    # a package that genuinely holds no mutable state has genuinely nothing silent, and
+    # refusing here would fail that package too. The door is shut in `grade_summary` instead,
+    # where L1.18 and the census are both in scope and can contradict a classifier that
+    # recognised nothing: this function cannot tell "no rule existed" from "every rule said
+    # no", and the check belongs where the evidence to tell them apart exists.
+    return (counts["unresolved"] / total) if total else 0.0
 
 
 def census_unread(census: object) -> bool:
@@ -298,8 +306,37 @@ def grade_summary(results: dict, unordered_class_bound: int | None) -> GradeSumm
     # The denominator is DECIDED state, not all state. Undecided state is no longer held
     # against the grade, so holding it against the published percentage would put the same
     # blind spot back through a second door.
-    decided = counts.get("neutral", 0) + counts.get("promiscuous", 0)
-    pct = None if status == "na" else (100 if decided == 0 else round(counts.get("neutral", 0) / decided * 100))
+    decided = counts["neutral"] + counts["promiscuous"]
+    # `100 if decided == 0` stood here until the 2026-08-16 sweep, and it printed "100% of its
+    # state is finitely testable" over a 14-line Ruby file whose whole state was an unbounded
+    # @@cache and an unbounded $seen that the classifier had no rule for.
+    #
+    # The refusal cannot key on `decided == 0` alone. This file's own census tests draw the
+    # line: zero decided means either NO RULE EXISTED or EVERY RULE SAID NO, and refusing on
+    # the second reports a limit that does not exist. A package built from TypedDicts and
+    # immutable constants genuinely holds no mutable state, and it must be graded.
+    #
+    # So the two independent measures have to agree. L1.18 walks for functions touching
+    # unbounded external state and the census walks for state-bearing declarations; either
+    # finding something the classifier recognised nothing of means a rule is missing, not that
+    # the code is clean. Disagreement between two measures of the same thing is INCOMPLETE
+    # CODE, and it is the one signal available here that the Ruby case trips and the
+    # stateless case does not: L1.18 read that file as 1/2 functions, 50.0, Slop.
+    # The census cannot serve as the second measure. Its `declared` counts candidates, and
+    # `judged: 0` over `declared: n` is the ordinary result for code that genuinely holds no
+    # mutable state: the stateless-by-design fixture reads 3 declared and 0 judged, and this
+    # analyzer's own package reads 532 and 0. Both are correct outcomes, so that pair proves
+    # nothing. L1.18 is the one genuinely independent reading, because it walks for functions
+    # touching unbounded external state rather than for declarations that might be state.
+    l18_found = isinstance(l18.get("value"), (int, float)) and l18["value"] > 0
+    if status != "na" and decided == 0 and l18_found:
+        raise incomplete.refuse(
+            "finitely-testable share",
+            f"the classifier decided nothing about this repository's state, while L1.18 read "
+            f"{l18['value']} ({l18.get('details', 'no detail')}). Two measures of the same code "
+            f"disagree, so a rule is missing rather than the code being clean")
+    pct = None if status == "na" else (100 if decided == 0 else
+                                       round(counts["neutral"] / decided * 100))
     hygiene = _hygiene(results)
     return {"status": status, "basis": basis, "counts": counts, "testable_pct": pct,
             "hygiene": hygiene, "grade": _grade(status, pct, hygiene),

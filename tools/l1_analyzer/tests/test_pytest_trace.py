@@ -24,7 +24,6 @@ import sys
 
 from l1_analyzer import pytest_trace
 
-
 # --- the refusals that need no fake -------------------------------------------
 
 def test_l19_is_na_without_a_python_target(tmp_path):

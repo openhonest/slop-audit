@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from l1_analyzer.incomplete import IncompleteCode
 from l1_analyzer.indicators import LANG_CFG, _get_parser
 from l1_analyzer.mutable_state import _find_module_mutable_names, analyze_mutable_state
 
@@ -212,8 +214,18 @@ def test_every_language_declares_its_own_module_scan(tmp_path):
             assert "const_keywords" in cfg, f"{lang} text-scans with no immutability vocabulary"
 
 
-def test_malformed_source_does_not_crash(tmp_path):
+def test_malformed_source_refuses_in_every_language_rather_than_crashing(tmp_path):
+    """Three grammars, three refusals, each naming L1.18 and the language it read.
+
+    The old body asserted `value != "n/a"`, which required a number off a parse that
+    recovered nothing. That is the defect this measure was corrected for, one language at a
+    time: a file the parser could not read yielded no function, and 0/0 was published as a
+    share. The refusal is not a crash - the parser still survives all three files - and the
+    `match` pins which measure declined, so a refusal raised somewhere else could not pass
+    this test by accident.
+    """
     for name, src in (("m.py", "def ("), ("Counter.java", "class {{{"), ("m.ts", "let = ;")):
         (tmp_path / name).write_text(src)
     for lang in ("python", "java", "typescript"):
-        assert analyze_mutable_state(tmp_path, lang)["value"] != "n/a"
+        with pytest.raises(IncompleteCode, match=f"L1.18 unbounded mutable state.*in {lang}"):
+            analyze_mutable_state(tmp_path, lang)

@@ -5,7 +5,9 @@ assertions against a temp repo, no mocks."""
 import pathlib
 import tempfile
 
+import pytest
 from l1_analyzer import absolute_paths
+from l1_analyzer.incomplete import IncompleteCode
 
 
 def _scan(files: dict[str, str]) -> dict:
@@ -55,8 +57,19 @@ def test_does_not_flag_a_relative_path_or_xpath():
 
 
 def test_ignores_non_source_files():
-    r = _scan({"README.md": "see /home/adam/notes for details\n"})
-    assert r["value"] == 0   # docs are not scanned; only source extensions are
+    """Docs are not scanned; only source extensions are. The tree carries one source file so
+    the scan really runs, which is what makes the zero a reading of the code rather than a
+    reading of nothing. The README-only tree, which used to prove this, proved instead that
+    an unscanned repository and a clean one give the same answer - see the test below."""
+    r = _scan({"README.md": "see /home/adam/notes for details\n", "a.py": "x = 1\n"})
+    assert r["value"] == 0 and r["verdict"] == "clean"
+
+
+def test_refuses_when_no_file_carried_a_scanned_extension():
+    """A count of zero over zero files read is not a clean bill, it is no reading at all.
+    The refusal names the scan, so a reader can tell which measure declined and why."""
+    with pytest.raises(IncompleteCode, match="absolute-path scan"):
+        _scan({"README.md": "see /home/adam/notes for details\n"})
 
 
 def test_does_not_flag_an_escape_sequence_as_a_windows_path():

@@ -28,6 +28,7 @@ the check really did read would be a second lie in the other direction.
 
 import contextlib
 import pathlib
+import re
 import subprocess
 import tempfile
 
@@ -38,6 +39,7 @@ from l1_analyzer import (
     secret_scan,
     thread_surface,
 )
+from l1_analyzer.incomplete import IncompleteCode
 
 # The three states a test tree can be in, written out so the partition is three and every
 # call site names the one it depends on. Two booleans had a fourth cell, stage-without-git,
@@ -215,18 +217,34 @@ def test_interleaving_robustness_still_reports_a_read_clean():
 
 # --- the survey, pinned so the next reader does not have to re-derive it ---------------
 
-@pytest.mark.parametrize("check", ["L1.16", "L1.17", "absolute_paths"])
-def test_the_remaining_empty_denominator_claims_are_recorded(check):
-    """These three still assert a positive property over an empty set, and this test
-    records that rather than hiding it. It is written to pass on today's behaviour, so it
-    fails the day one of them is fixed - at which point the fix moves the assertion here
-    and the survey stays true instead of going stale.
+# The survey, keyed by check and carrying the measure name each refusal must print. The
+# key is what the parametrisation reads by subscript, so a check with no entry raises here
+# rather than being surveyed under whichever lambda the dict happened to list first.
+_SURVEYED = {
+    "L1.16": "L1.16 trailing whitespace",
+    "L1.17": "L1.17 god-file concentration",
+    "absolute_paths": "absolute-path scan",
+}
 
-    It was four until 2026-08-15. L1.15 left the list that day, and the assertion moved
-    down to the test below rather than being deleted, which is the protocol this docstring
-    promised. L1.16 and L1.17 divide by a file count and substitute 0.0 when there is no
-    file; `absolute_paths` reads `count == 0` as clean, which is the same number whether it
-    read a thousand files or none. All three are the same shape and none is fixed here.
+
+@pytest.mark.parametrize("check", sorted(_SURVEYED))
+def test_the_remaining_empty_denominator_claims_are_recorded(check):
+    """These three published a positive property over an empty set until 2026-08-16, and
+    now each refuses. The survey did the job it was written for: it was set to pass on the
+    behaviour of its day so that it would fail the day someone repaired one of them, and
+    all three tripped it at once. The assertions moved here rather than being deleted,
+    which is the protocol the old docstring promised.
+
+    It was four until 2026-08-15, when L1.15 left the list the same way; its assertion sits
+    in the test below. L1.16 and L1.17 divided by a file count and substituted 0.0 when
+    there was no file, and both now route the division through `incomplete.ratio`, which
+    has no expression that yields a number over an empty denominator. `absolute_paths` read
+    `count == 0` as clean, the same number whether it read a thousand files or none, and it
+    now refuses before counting.
+
+    `match` pins the measure, not merely the refusal. Three measures raising one exception
+    type would otherwise let any one of them stand in for the other two, and the reader who
+    has to act on an n/a needs to know which measure went quiet.
     """
     from l1_analyzer import indicators
     with _tree({"README.md": "nothing here\n"}, NO_GIT) as empty:
@@ -235,7 +253,31 @@ def test_the_remaining_empty_denominator_claims_are_recorded(check):
             "L1.17": lambda: indicators._god_files(empty),
             "absolute_paths": lambda: absolute_paths.scan(empty, "python"),
         }
-        assert known[check]()["band"] == "Healthy"
+        with pytest.raises(IncompleteCode, match=re.escape(_SURVEYED[check])):
+            known[check]()
+
+
+def test_a_fourth_measure_that_grew_the_defect_would_be_caught_here():
+    """The self-maintaining half, and the reason the survey above is not the whole test.
+
+    A list of three names goes stale the moment a fourth measure is written, and nobody
+    adds their own defect to a ledger. This assertion needs no ledger: over a repository
+    holding no file at all, NOTHING was read, so no source indicator may publish a band.
+    Every one of them has to come back n/a. A measure added tomorrow that substitutes a
+    constant for an empty denominator fails here on the day it lands, whatever it is called
+    and whichever module it lives in.
+
+    `lang` is the one entry with no band to check - it reports the detected language, not a
+    measurement - so the assertion runs over the results that publish one.
+    """
+    from l1_analyzer import indicators
+    with _tree({}, NO_GIT) as nothing:
+        results = indicators.compute_source_indicators(nothing, "python", False, 5.0)
+    banded = {key: r["band"] for key, r in results.items() if isinstance(r, dict)}
+    assert banded, "the sweep read no indicator, so it proves nothing"
+    assert set(banded.values()) == {"n/a"}, (
+        f"a band over a repository with no file in it: "
+        f"{ {k: v for k, v in banded.items() if v != 'n/a'} }")
 
 
 def test_l1_15_no_longer_manufactures_a_band_from_an_empty_denominator():

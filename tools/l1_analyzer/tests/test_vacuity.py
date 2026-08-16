@@ -269,16 +269,51 @@ def test_the_refused_languages_are_named_rather_than_skipped(lang):
 
 # --- the labelled set, pinned so a regression is visible ------------------------------
 
-def test_it_finds_the_three_paths_this_package_still_carries():
-    """The live labelled set from test_read_nothing.py. The rule was written from the
-    shape and finds these without being told where they are; this test records that it
-    still does, and names them only here, in the test, never in the rule."""
+def test_two_of_the_three_labelled_paths_are_gone_and_the_third_is_a_reach_limit():
+    """The live labelled set from test_read_nothing.py, after the 2026-08-16 repair.
+
+    L1.16 and L1.17 are gone, and the checker is what says so. Both divided by a file count
+    and substituted 0.0; both now hand the division to `incomplete.ratio`, which leaves no
+    branch for an empty input to take, so the rule finds no path rather than being told
+    there is none. L1.18's path in `mutable_state.analyze_mutable_state` left the same way
+    on the same day, and it is asserted absent here beside the other two.
+
+    `absolute_paths.scan` is still found, and it is the more useful of the two results
+    because the reason is a limit of this rule and not of the repair. The repair spells its
+    refusal `raise incomplete.refuse(...)`, and `_refuses` reads only `ast.Return`, so the
+    raise does not cut the path and the `count == 0` guard below it still reads as
+    reachable on an empty input. The finding is therefore a false one today. It is asserted
+    rather than excused, so that teaching `_refuses` to read a raise fails this test and
+    makes someone move the name out of the survivor list.
+    """
     result = vacuity.check(PKG)
     hit = {(pathlib.Path(f["file"]).name, f["function"]) for f in result["findings"]}
-    for want in (("indicators.py", "_trailing_whitespace"),       # L1.16
+    for gone in (("indicators.py", "_trailing_whitespace"),       # L1.16
                  ("indicators.py", "_god_files"),                 # L1.17
-                 ("absolute_paths.py", "scan")):
-        assert want in hit, f"the rule stopped finding {want}"
+                 ("mutable_state.py", "analyze_mutable_state")):  # L1.18
+        assert gone not in hit, f"the rule still finds {gone}, so the repair did not cut it"
+    assert ("absolute_paths.py", "scan") in hit, (
+        "the raise-shaped refusal now cuts this path, so move it out of the survivor list")
+
+
+def test_the_rule_does_not_yet_read_a_raise_as_a_refusal():
+    """The reason `absolute_paths.scan` survives above, stated as behaviour rather than as
+    a comment. `_refuses` accepts a returned refusal and not a raised one, so the same
+    repair spelled two ways gets two answers. The `return` spelling is the control: it cuts
+    the path, which is what makes this a gap in the rule rather than a fact about the
+    guard below it."""
+    raised = _scan(
+        "def f(files):\n"
+        "    if not files:\n"
+        "        raise Incomplete('nothing was read')\n"
+        "    return {'band': 'Healthy' if len(files) == 0 else 'Slop'}\n")
+    returned = _scan(
+        "def f(files):\n"
+        "    if not files:\n"
+        "        return {'band': 'n/a'}\n"
+        "    return {'band': 'Healthy' if len(files) == 0 else 'Slop'}\n")
+    assert returned == []
+    assert len(raised) == 1, "the rule learned to read a raise; fix the survivor list above"
 
 
 def test_the_l1_15_path_is_gone_and_the_checker_is_what_says_so():

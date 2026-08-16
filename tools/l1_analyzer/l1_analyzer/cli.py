@@ -20,6 +20,7 @@ from l1_analyzer import (
     report,
     thread_surface,
 )
+from l1_analyzer.incomplete import IncompleteCode
 from l1_analyzer.scope import PRODUCTION
 
 
@@ -441,7 +442,17 @@ def main(argv: list[str] | None = None) -> int:
     # determinism, and a footer that says the tests were run). --no-exec flips it back.
     slug = args.repo.name or str(args.repo)
     ran_tests = not args.no_exec
-    model = card.build_card(slug, str(results.get("lang", args.lang)), results, ran_tests=ran_tests)
+    # The card is the last boundary, and a refusal has to reach the reader as a refusal. It
+    # must not become a grade, a percentage or a headline, because the whole reason the
+    # measures raise is that every earlier attempt to render "we read nothing" ended up
+    # rendering it as "we read everything and it was clean". Exit 2: not a crash, not a pass.
+    try:
+        model = card.build_card(slug, str(results.get("lang", args.lang)), results, ran_tests=ran_tests)
+    except IncompleteCode as refusal:
+        print(f"\n{refusal}\n\nNo grade is issued. The analyzer has no rule for what this repository "
+              f"contains, so any letter it printed would be about its own blind spot rather than "
+              f"about the code.", file=sys.stderr)
+        return 2
 
     if args.report is not None:
         out_dir = Path(args.report)

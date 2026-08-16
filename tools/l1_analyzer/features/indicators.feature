@@ -117,6 +117,13 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     Then it returns the reason the file is out of scope, or nothing at all when the file counts
     And the generated-code test lives here rather than in the shared scope rule, so excluding a machine-written file moves the god-file number and no other
 
+  Scenario: _measure runs one measure and turns its refusal to answer into a named n/a
+    Given a measure that may raise IncompleteCode rather than publish a value it has no basis for
+    When _measure runs it
+    Then the measure's result is returned unchanged when it answers
+    And a refusal becomes value n/a, band n/a, and details carrying the INCOMPLETE CODE message
+    But it is never a band or a number, because the reason the measure raises is that unmeasured must not be spellable as clean
+
   Scenario: _god_files measures how concentrated the repository is in oversized files
     Given every file carrying one of the large-file extensions
     When _god_files measures each in-scope file's code lines and counts the ones over a thousand

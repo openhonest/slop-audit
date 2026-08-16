@@ -9,6 +9,7 @@ import subprocess
 
 import pytest
 from l1_analyzer import indicators, pytest_trace, scope
+from l1_analyzer.incomplete import IncompleteCode
 from l1_analyzer.indicators import (
     analyze_mutable_state,
     band,
@@ -385,10 +386,28 @@ def test_l1_18_counts_mutable_module_global_but_not_constant(tmp_path):
     assert res["value"] == pytest.approx(33.3, abs=0.1)
 
 
-def test_l1_18_malformed_source_does_not_crash(tmp_path):
+def test_l1_18_refuses_on_malformed_source_rather_than_crashing_or_banding(tmp_path):
+    """Malformed source enumerates no function, and L1.18 now refuses instead of banding.
+
+    The old name said "does not crash" and the old body proved it by requiring a band, which
+    made a crash and a fabricated verdict the only two outcomes on offer. There is a third,
+    and it is the correct one: the parser survives the file, no function comes back, and a
+    share of zero functions is absent rather than zero. The refusal names the measure, so a
+    reader can tell L1.18's ignorance from any other module's.
+    """
     (tmp_path / "broken.py").write_bytes(b"\xff\xfe def f( : : :\n\x00 ??? (((")
-    res = analyze_mutable_state(tmp_path, "python")
-    assert res["band"] in ("Healthy", "Not Healthy", "Slop")
+    with pytest.raises(IncompleteCode, match="L1.18 unbounded mutable state"):
+        analyze_mutable_state(tmp_path, "python")
+
+
+def test_l1_18_refusal_still_does_not_crash_the_boundary(tmp_path):
+    """The half of the old name that was worth keeping. A refusal is not a crash: the one
+    handler turns it into n/a with the basis printed, and nothing above it sees an
+    exception."""
+    (tmp_path / "broken.py").write_bytes(b"\xff\xfe def f( : : :\n\x00 ??? (((")
+    res = indicators._measure("L1.18", analyze_mutable_state, tmp_path, "python")
+    assert res["value"] == "n/a" and res["band"] == "n/a"
+    assert "L1.18 unbounded mutable state" in res["details"]
 
 
 # --- L1.1-L1.7 git band logic on a crafted history --------------------------

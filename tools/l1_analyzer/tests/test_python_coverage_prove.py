@@ -91,4 +91,3 @@ def test_classify_pass_and_collection_error_and_timeout():
     assert pcp._classify("1 passed in 0.01s", 0) == "pass"
     assert pcp._classify("ERROR test_l1_coverage_proof.py - ImportError: no module\n", 2) == "incidental"
     assert pcp._classify("", 124) == "error"
-

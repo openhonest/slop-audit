@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import pytest
 from l1_analyzer import card, report, state_bounds, state_census
+from l1_analyzer.incomplete import IncompleteCode
 from l1_analyzer.indicators import LANG_CFG, L1Result
 
 # The same unbounded cache, spelled twice. `cache[k]` with a variable key is an unbounded
@@ -197,13 +198,37 @@ PY_CLASS_BODY_CACHE = (
 def test_a_codebase_with_no_mutable_state_by_design_is_graded_not_refused(tmp_path):
     """The defect this test was written for: every kind here is one the enumerator can
     match, it matched none of them because none of them is mutable state, and the report
-    called that insufficient basis."""
+    called that insufficient basis.
+
+    The panel carries L1.18 at 0.0 rather than the helper's 1.0, and the difference is now
+    part of the test. `render` touches no external mutable state, so zero is the walker's
+    honest reading of this fixture, and zero beside a classifier that decided nothing is two
+    measures agreeing. The helper's 1.0 says a function here does touch unbounded state,
+    which nothing in the fixture does; `grade_summary` reads that as the two measures
+    disagreeing and refuses, correctly. The fixture was contradicting itself.
+    """
     result = _classify(tmp_path, "m.py", NO_MUTABLE_STATE_BY_DESIGN, "python")
     assert result["census"]["admitted"] == 0
     assert result["census"]["declared"] > 0
-    g = report.grade_summary(_results(result), None)
+    g = report.grade_summary(_results(result) | {"L1.18": {"value": 0.0, "band": "Healthy"}}, None)
     assert g["basis"] == report.MEASURED, "the enumerator looked and was right; that is a reading"
     assert g["grade"] is not None
+
+
+def test_a_classifier_that_decided_nothing_beside_a_non_zero_l1_18_refuses(tmp_path):
+    """The other side of the same line, and the case the refusal was written for. A 14-line
+    Ruby file whose whole state is an unbounded class variable and a global was graded C on
+    "100% of its state is finitely testable" while L1.18 read 50.0 on the same file. One of
+    the two is wrong and the report cannot tell which, so it publishes neither.
+
+    The fixture above is what stops this rule from firing on every clean repository: zero
+    decided states means either no rule matched or every rule said no, and only a second
+    measure that found something separates them.
+    """
+    result = _classify(tmp_path, "m.py", NO_MUTABLE_STATE_BY_DESIGN, "python")
+    panel = _results(result) | {"L1.18": {"value": 50.0, "band": "Slop"}}
+    with pytest.raises(IncompleteCode, match="finitely-testable share"):
+        report.grade_summary(panel, None)
 
 
 @pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")

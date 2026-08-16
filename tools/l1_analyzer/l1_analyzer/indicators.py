@@ -42,6 +42,7 @@ from l1_analyzer import (
     c_trace,
     csharp_trace,
     go_trace,
+    incomplete,
     java_trace,
     js_trace,
     pytest_trace,
@@ -508,6 +509,24 @@ def _run_external(cmd: list[str], cwd: Path) -> ExternalRun:
         return {"ran": False, "status": -1, "output": ""}
     return {"ran": True, "status": done.returncode, "output": done.stdout}
 
+def _measure(key: str, fn, *args) -> L1Result:
+    """Run one measure, and turn its refusal to answer into an n/a naming the reason.
+
+    THE ONLY handler for IncompleteCode in the package. A measure raises rather than deciding
+    what to do about its own ignorance, and this is the single place that decides. What it
+    decides is n/a with the basis printed, never a band and never a number: the whole point of
+    the exception is that unmeasured must not be spellable as clean.
+
+    Do not add a second handler. Two handlers mean two policies, and the reason this exception
+    exists is that four measures each invented their own and all four chose to publish zero.
+    """
+    from l1_analyzer.incomplete import IncompleteCode
+    try:
+        return fn(*args)
+    except IncompleteCode as refusal:
+        return {"value": "n/a", "band": "n/a", "details": str(refusal)}
+
+
 def compute_source_indicators(
     repo: Path,
     lang: str,
@@ -534,9 +553,9 @@ def compute_source_indicators(
         lang = detect_primary_language(repo)
 
     results: dict[str, L1Result] = {"lang": lang}
-    results["L1.16"] = _trailing_whitespace(repo)
-    results["L1.17"] = _god_files(repo)
-    results["L1.18"] = analyze_mutable_state(repo, lang)
+    results["L1.16"] = _measure("L1.16", _trailing_whitespace, repo)
+    results["L1.17"] = _measure("L1.17", _god_files, repo)
+    results["L1.18"] = _measure("L1.18", analyze_mutable_state, repo, lang)
     results["L1.15"] = _compute_type_escapes(repo, lang)
     results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds, python_executable)
     # L1.12 and L1.14, native on tree-sitter. Both were external-tool delegations that
@@ -545,22 +564,22 @@ def compute_source_indicators(
     from l1_analyzer import dead_code, secret_scan
     # Both return dict[str, object], the same shape state_bounds.classify returns for
     # L1.18b: value/band/details plus the finding lists that make the number readable.
-    results["L1.12"] = dead_code.analyze(repo, lang)
-    results["L1.14"] = secret_scan.analyze(repo, lang)
+    results["L1.12"] = _measure("L1.12", dead_code.analyze, repo, lang)
+    results["L1.14"] = _measure("L1.14", secret_scan.analyze, repo, lang)
     results.update(_compute_external_indicators(repo, lang))
     results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds, python_executable)
     if classify_state_bounds:
         from l1_analyzer import state_bounds
-        results["L1.18b"] = state_bounds.classify(repo, lang)
+        results["L1.18b"] = _measure("L1.18b", state_bounds.classify, repo, lang)
         from l1_analyzer import path_cover
-        results["path_cover"] = path_cover.cover_paths(repo, lang)
+        results["path_cover"] = _measure("path_cover", path_cover.cover_paths, repo, lang)
         # Additive, gated with the other refinements so frozen/pre-registered runs
         # (classify_state_bounds=False) keep exactly the L1.18 set. Measures the
         # concurrency audit surface, never a race verdict.
         from l1_analyzer import thread_surface
-        results["thread_surface"] = thread_surface.scan(repo, lang)
+        results["thread_surface"] = _measure("thread_surface", thread_surface.scan, repo, lang)
         from l1_analyzer import absolute_paths
-        results["absolute_paths"] = absolute_paths.scan(repo, lang)
+        results["absolute_paths"] = _measure("absolute_paths", absolute_paths.scan, repo, lang)
     return results
 
 _WHITESPACE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"})
@@ -574,7 +593,8 @@ def _trailing_whitespace(repo: Path) -> L1Result:
         lines = text.splitlines()
         total += len(lines)
         count += sum(1 for ln in lines if ln.rstrip() != ln and ln.strip())
-    ws_pct = (count / total * 100) if total > 0 else 0.0
+    ws_pct = incomplete.ratio(count, total, "L1.16 trailing whitespace",
+                              "no lines were read, so a rate over them is not zero, it is absent")
     return {"value": round(ws_pct, 2), "band": band(ws_pct, 0.5, 3, higher_is_better=False), "details": _with_skipped(f"{count} lines with trailing ws", skipped)}
 
 # A file that is large because it holds a big data table is not the god-file smell:
@@ -666,7 +686,8 @@ def _god_files(repo: Path) -> L1Result:
                 god_files += 1
             if code > 4000:
                 big_files += 1
-    god_pct = (god_files / prod_files * 100) if prod_files > 0 else 0.0
+    god_pct = incomplete.ratio(god_files, prod_files, "L1.17 god-file concentration",
+                               f"no production file carried a known extension, so 0/0 is not 0% ({sorted(_GOD_FILE_EXTS)})")
     band_value = "Slop" if big_files > 0 else band(god_pct, 0.5, 2, higher_is_better=False)
     note = f"{god_files}/{prod_files} files >1k LOC, {big_files} >4k LOC"
     if scoped_by_reason:
