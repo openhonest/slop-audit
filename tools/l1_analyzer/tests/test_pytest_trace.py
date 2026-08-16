@@ -1,75 +1,38 @@
-"""L1.19 decision-space coverage must report n/a when the suite did not actually run,
-never a 0.0 that reads as real-but-terrible coverage. A silent failure is a lie, and this
-is the honesty tool auditing its own honesty. Pure assertions, the run boundary stubbed."""
+"""The Python runtime harness (L1.19 decision-space coverage, L1.20 seed determinism),
+tested at the points where it is a pure function of its input or a real function of the real
+filesystem.
 
-import subprocess
+What this file used to contain, and why it does not: six tests that replaced `_run_untrusted`
+with `lambda *a, **k: CompletedProcess([], rc, stdout, "")` and asserted the band that came
+back. Because the fake ignored its arguments, the harness could have invoked pytest with the
+wrong flags, against the wrong interpreter, in the wrong directory, and every one of them
+would still have passed. A seventh replaced `subprocess.run` outright to assert which
+executable was passed, which checks the call rather than the result, and restated a fact
+`test_interpreter_selects_the_named_python_over_the_default` already proves without a fake.
+
+The claim those tests were written to defend is real and important: exit codes 2, 3, 4, 5 and
+124 must produce n/a with a reason, never a 0.0 that reads as measured-and-terrible coverage.
+The claim is now proved by nothing. The reason is module shape: `decision_space_coverage`
+runs the suite, opens a temp directory, shells out a second time for `coverage json`, reads
+the report and decides the band inside one function, so the exit-code table can only be
+reached through a fake. Extracting
+`_coverage_verdict(returncode: int, totals: dict, provenance: str) -> L1Result` turns all six
+into `assert f(input) == expected`. That extraction is filed as separate work.
+"""
+
+import sys
 
 from l1_analyzer import pytest_trace
 
 
-def _fake_run(returncode, stdout=""):
-    return lambda *a, **k: subprocess.CompletedProcess([], returncode, stdout, "")
-
-
-def test_l19_is_na_when_the_suite_did_not_complete_a_valid_run(monkeypatch, tmp_path):
-    # pytest exit 2 (interrupted), 3 (internal), 4 (usage/collection), 5 (no tests) are not
-    # valid test runs -> n/a with the reason, never a coverage figure.
-    monkeypatch.setattr(pytest_trace, "_module_available", lambda m, exe=None: True)
-    for rc in (2, 3, 4, 5):
-        monkeypatch.setattr(pytest_trace, "_run_untrusted", _fake_run(rc))
-        result = pytest_trace.decision_space_coverage(tmp_path, "python", 5)
-        assert result["band"] == "n/a", f"exit {rc} must be n/a, not a number"
-        assert result["value"] == "n/a"
-        assert "did not complete a valid run" in result["details"]
-
-
-def test_l19_no_tests_collected_names_the_reason(monkeypatch, tmp_path):
-    monkeypatch.setattr(pytest_trace, "_module_available", lambda m, exe=None: True)
-    monkeypatch.setattr(pytest_trace, "_run_untrusted", _fake_run(5))
-    result = pytest_trace.decision_space_coverage(tmp_path, "python", 5)
-    assert result["band"] == "n/a" and "collected no tests" in result["details"]
-
-
-def test_l19_timeout_is_na(monkeypatch, tmp_path):
-    monkeypatch.setattr(pytest_trace, "_module_available", lambda m, exe=None: True)
-    monkeypatch.setattr(pytest_trace, "_run_untrusted", _fake_run(124))
-    result = pytest_trace.decision_space_coverage(tmp_path, "python", 5)
-    assert result["band"] == "n/a" and "timed out" in result["details"]
-
+# --- the refusals that need no fake -------------------------------------------
 
 def test_l19_is_na_without_a_python_target(tmp_path):
     result = pytest_trace.decision_space_coverage(tmp_path, "rust", 5)
     assert result["band"] == "n/a"
 
 
-# --- L1.20 determinism: not-run guard, per-seed reasons, interpreter ----------
-
-def test_l20_na_when_a_seed_does_not_complete_a_valid_run(monkeypatch, tmp_path):
-    # exit 4 (collection/usage error) means the suite did not run, not that it is flaky.
-    # It must be n/a with the reason, never a misleading 0/5 that reads as non-determinism.
-    monkeypatch.setattr(pytest_trace, "_module_available", lambda m, exe=None: True)
-    monkeypatch.setattr(pytest_trace, "_run_untrusted", _fake_run(4))
-    result = pytest_trace.test_determinism(tmp_path, "python", 5, 5)
-    assert result["band"] == "n/a" and result["value"] == "n/a"
-    assert "did not complete a valid run" in result["details"]
-
-
-def test_l20_surfaces_the_failing_seed_counts_not_a_bare_score(monkeypatch, tmp_path):
-    # The suite runs but a test fails every seed (exit 1). 0/5 is correct, but a bare 0/5 reads
-    # as flakiness; the details must name why (the failure counts), so it is not a silent 0/5.
-    monkeypatch.setattr(pytest_trace, "_module_available", lambda m, exe=None: True)
-    monkeypatch.setattr(pytest_trace, "_run_untrusted", _fake_run(1, "3 failed, 1219 passed in 10.0s\n"))
-    result = pytest_trace.test_determinism(tmp_path, "python", 5, 5)
-    assert result["value"] == "0/5" and result["band"] == "Slop"
-    assert "3 failed, 1219 passed" in result["details"] and "seed 1" in result["details"]
-
-
-def test_l20_all_green_is_healthy(monkeypatch, tmp_path):
-    monkeypatch.setattr(pytest_trace, "_module_available", lambda m, exe=None: True)
-    monkeypatch.setattr(pytest_trace, "_run_untrusted", _fake_run(0, "1222 passed in 10.0s\n"))
-    result = pytest_trace.test_determinism(tmp_path, "python", 5, 5)
-    assert result["value"] == "5/5" and result["band"] == "Healthy"
-
+# --- pure parsing -------------------------------------------------------------
 
 def test_pytest_summary_reads_the_last_counts_line():
     out = "collected 1222 items\n....\n3 failed, 1219 passed in 10.0s\n"
@@ -77,24 +40,13 @@ def test_pytest_summary_reads_the_last_counts_line():
     assert pytest_trace._pytest_summary("no counts here") == "no summary line"
 
 
-def test_interpreter_selects_the_named_python_over_the_default(monkeypatch):
+def test_interpreter_selects_the_named_python_over_the_default():
     # None (the named Nothing) resolves to the analyzer's own interpreter; a path is used verbatim.
-    import sys
     assert pytest_trace._interpreter(None) == sys.executable
     assert pytest_trace._interpreter("/opt/persistum/.venv/bin/python") == "/opt/persistum/.venv/bin/python"
 
 
-def test_module_available_probes_the_named_interpreter(monkeypatch):
-    seen = {}
-    def fake(cmd, **k):
-        seen["exe"] = cmd[0]
-        return subprocess.CompletedProcess(cmd, 0, "", "")
-    monkeypatch.setattr(subprocess, "run", fake)
-    pytest_trace._module_available("pytest", "/tgt/venv/bin/python")
-    assert seen["exe"] == "/tgt/venv/bin/python"
-
-
-# --- directory-insensitive interpreter detection ------------------------------
+# --- directory-insensitive interpreter detection, against a real filesystem ----
 
 def test_detect_target_interpreter_finds_a_repo_venv(tmp_path):
     assert pytest_trace.detect_target_interpreter(tmp_path) is None
@@ -105,7 +57,6 @@ def test_detect_target_interpreter_finds_a_repo_venv(tmp_path):
 
 
 def test_resolve_interpreter_precedence(tmp_path):
-    import sys
     # 1. an explicit override wins over everything.
     exe, prov = pytest_trace.resolve_interpreter(tmp_path, "/x/py")
     assert exe == "/x/py" and "--python" in prov
@@ -120,18 +71,12 @@ def test_resolve_interpreter_precedence(tmp_path):
     assert exe == sys.executable and "analyzer" in prov
 
 
-# --- explicit shim resolution (defeats PATH-shadowing for ruby/java) ----------
-
-def test_resolve_via_shim_uses_the_manager_that_resolves(monkeypatch, tmp_path):
-    real = tmp_path / "ruby"
-    real.write_text("")
-    monkeypatch.setattr(pytest_trace.shutil, "which", lambda m: "/opt/rbenv" if m == "rbenv" else None)
-    monkeypatch.setattr(pytest_trace, "_run_untrusted",
-                        lambda cmd, **k: subprocess.CompletedProcess(cmd, 0, str(real), ""))
-    path, note = pytest_trace.resolve_via_shim(tmp_path, "ruby", 5)
-    assert path == str(real) and note == "rbenv which ruby"
-
+# --- explicit shim resolution -------------------------------------------------
 
 def test_resolve_via_shim_none_when_no_manager(monkeypatch, tmp_path):
-    monkeypatch.setattr(pytest_trace.shutil, "which", lambda m: None)
+    # An empty PATH is a real machine state, not a fake: shutil.which genuinely finds no
+    # version manager, so every shim is genuinely skipped and the ambient fallback is the
+    # real answer. The previous version of this test replaced shutil.which itself, which
+    # proved only that the module calls the function the test had just written.
+    monkeypatch.setenv("PATH", "")
     assert pytest_trace.resolve_via_shim(tmp_path, "ruby", 5) == (None, "")

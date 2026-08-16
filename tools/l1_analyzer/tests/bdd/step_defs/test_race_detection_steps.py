@@ -1,10 +1,13 @@
 """Behavioural spec for the runtime thread-safety harness, wired to the REAL
-race_harness. The parser scenarios feed genuine ThreadSanitizer output (modelled on
-the turso free-threaded WAL race); the verdict/n-a scenarios call the real functions.
-State threads through a per-scenario `ctx` fixture, not module globals.
+race_harness. The parser scenarios feed genuine ThreadSanitizer output (modelled on the
+turso free-threaded WAL race); the verdict/n-a scenarios call the real functions. Each
+step returns its one output as a named fixture, so a missing producer is an error rather
+than a KeyError midway through a scenario.
 """
 
-import pytest
+from pathlib import Path
+from typing import TypedDict
+
 from l1_analyzer import race_harness
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -47,111 +50,118 @@ SUMMARY: ThreadSanitizer: data race src/storage/page_cache.rs:210:12 in turso_co
 _CLEAN = "running 812 tests\ntest result: ok. 812 passed; 0 failed; 0 ignored\n"
 
 
-@pytest.fixture
-def ctx():
-    return {}
+class Tree(TypedDict):
+    """A repository the harness is pointed at, and the language it is told it is."""
+    repo: Path
+    lang: str
+
+
+class Verdict(TypedDict):
+    """The three things race_harness._verdict returns, named."""
+    verdict: str
+    band: str
+    value: str
 
 
 # --- parser scenarios -------------------------------------------------------
 
-@given("ThreadSanitizer output reporting a data race in publish_backfill")
-def given_one_race(ctx):
-    ctx["output"] = _ONE_RACE
+@given("ThreadSanitizer output reporting a data race in publish_backfill", target_fixture="output")
+def given_one_race():
+    return _ONE_RACE
 
 
-@given("ThreadSanitizer output reporting two data races")
-def given_two_races(ctx):
-    ctx["output"] = _ONE_RACE + _SECOND_RACE
+@given("ThreadSanitizer output reporting two data races", target_fixture="output")
+def given_two_races():
+    return _ONE_RACE + _SECOND_RACE
 
 
-@when("I parse the ThreadSanitizer report")
-def when_parse(ctx):
-    ctx["findings"] = race_harness.parse_tsan(ctx["output"])
+@when("I parse the ThreadSanitizer report", target_fixture="findings")
+def when_parse(output):
+    return race_harness.parse_tsan(output)
 
 
 @then("one data race is surfaced")
-def then_one(ctx):
-    assert len(ctx["findings"]) == 1
+def then_one(findings):
+    assert len(findings) == 1
 
 
 @then("two data races are surfaced")
-def then_two(ctx):
-    assert len(ctx["findings"]) == 2
+def then_two(findings):
+    assert len(findings) == 2
 
 
 @then(parsers.parse('the race points at "{fname}" line {line:d}'))
-def then_location(ctx, fname, line):
-    f = ctx["findings"][0]
+def then_location(findings, fname, line):
+    f = findings[0]
     assert f["file"].endswith(fname), f["file"]
     assert f["line"] == line
 
 
 @then("both conflicting access sites are recorded")
-def then_accesses(ctx):
+def then_accesses(findings):
     # The write (shared_wal_coordination.rs:1386) and the read (wal.rs:3498).
-    accesses = ctx["findings"][0]["accesses"]
+    accesses = findings[0]["accesses"]
     assert ("src/storage/shared_wal_coordination.rs", 1386) in accesses
     assert ("src/storage/wal.rs", 3498) in accesses
 
 
 # --- verdict / n-a scenarios ------------------------------------------------
 
-@given("a suite that ran under ThreadSanitizer with no race reported")
-def given_clean(ctx):
-    ctx["findings"] = race_harness.parse_tsan(_CLEAN)
+@given("a suite that ran under ThreadSanitizer with no race reported", target_fixture="findings")
+def given_clean():
+    return race_harness.parse_tsan(_CLEAN)
 
 
-@when("I read the verdict")
-def when_verdict(ctx):
-    verdict, band, value = race_harness._verdict(ctx["findings"])
-    ctx["verdict"], ctx["band"], ctx["value"] = verdict, band, value
+@when("I read the verdict", target_fixture="reading")
+def when_verdict(findings) -> Verdict:
+    verdict, band, value = race_harness._verdict(findings)
+    return {"verdict": verdict, "band": band, "value": value}
 
 
 @then("the verdict is no-race-in-tests")
-def then_no_race(ctx):
-    assert ctx["verdict"] == race_harness.NO_RACE_IN_TESTS
+def then_no_race(reading):
+    assert reading["verdict"] == race_harness.NO_RACE_IN_TESTS
 
 
 @then("the details disclose that the result is bounded by the test suite")
-def then_bounded(ctx):
-    assert "bounded by the test suite" in ctx["value"]
+def then_bounded(reading):
+    assert "bounded by the test suite" in reading["value"]
 
 
-@given("a repository whose language the race harness does not support")
-def given_unsupported(ctx, tmp_path):
-    ctx["repo"], ctx["lang"] = tmp_path, "java"
+@given("a repository whose language the race harness does not support", target_fixture="tree")
+def given_unsupported(tmp_path) -> Tree:
+    return {"repo": tmp_path, "lang": "java"}
 
 
-@when("I run the race harness")
-def when_run(ctx):
-    ctx["result"] = race_harness.detect_races(ctx["repo"], ctx["lang"], 5.0)
+@when("I run the race harness", target_fixture="result")
+def when_run(tree):
+    return race_harness.detect_races(tree["repo"], tree["lang"], 5.0)
 
 
 @then("the verdict is n/a")
-def then_na(ctx):
-    assert ctx["result"]["verdict"] == race_harness.NA
+def then_na(result):
+    assert result["verdict"] == race_harness.NA
 
 
 @then("no race is claimed either way")
-def then_no_claim(ctx):
-    assert ctx["result"]["findings"] == []
-    assert ctx["result"]["band"] == "n/a"
+def then_no_claim(result):
+    assert result["findings"] == []
+    assert result["band"] == "n/a"
 
 
 # --- cross-reference scenario ----------------------------------------------
 
-@given(parsers.parse('the static surface meter flagged "{path}"'))
-def given_flagged(ctx, path):
-    ctx["surface_files"] = {path}
+@given(parsers.parse('the static surface meter flagged "{path}"'), target_fixture="surface_files")
+def given_flagged(path):
+    return {path}
 
 
-@when("I cross-reference the observed races against the flagged surface")
-def when_xref(ctx):
-    findings = race_harness.parse_tsan(ctx["output"])
-    ctx["confirmed"] = race_harness.confirmed_surface(findings, ctx["surface_files"])
+@when("I cross-reference the observed races against the flagged surface", target_fixture="confirmed")
+def when_xref(output, surface_files):
+    return race_harness.confirmed_surface(race_harness.parse_tsan(output), surface_files)
 
 
 @then("the race is confirmed against the flagged surface")
-def then_confirmed(ctx):
-    assert len(ctx["confirmed"]) == 1
-    assert ctx["confirmed"][0]["file"].endswith("shared_wal_coordination.rs")
+def then_confirmed(confirmed):
+    assert len(confirmed) == 1
+    assert confirmed[0]["file"].endswith("shared_wal_coordination.rs")

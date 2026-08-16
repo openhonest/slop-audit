@@ -4,11 +4,16 @@ wired to the REAL analyzer.
 External indicators (L1.12-L1.14) run real stub binaries on a controlled PATH: a
 genuine executable at the process boundary, the way the analyzer invokes the tool,
 not a mock of the analyzer. Text indicators (L1.15-L1.17) build real files and call
-the real scanners. No formula is reimplemented in the test. State is threaded
-through a per-scenario `ctx` fixture, not module globals.
+the real scanners. No formula is reimplemented in the test.
+
+Each Given returns the `Codebase` it built, naming the language the scenario is about
+instead of leaving the When to assume one. The When dispatches on the indicator number
+through a table and returns `result`.
 """
 
 import os
+from pathlib import Path
+from typing import TypedDict
 
 import pytest
 from l1_analyzer import dead_code, indicators, secret_scan
@@ -18,9 +23,10 @@ scenarios("../features/l1_external.feature")
 scenarios("../features/l1_text.feature")
 
 
-@pytest.fixture
-def ctx():
-    return {}
+class Codebase(TypedDict):
+    """The codebase a scenario builds, and the language it is written in."""
+    repo: Path
+    lang: str
 
 
 def _stub(bindir, name, body):
@@ -36,101 +42,104 @@ def _on_path(monkeypatch, bindir):
 
 # --- L1.12-L1.14: real stub binaries on PATH --------------------------------
 
-@given(parsers.parse("vulture reports {n:d} unreachable symbols"))
-def given_vulture(ctx, n, tmp_path, monkeypatch):
+@given(parsers.parse("vulture reports {n:d} unreachable symbols"), target_fixture="codebase")
+def given_vulture(n, tmp_path, monkeypatch) -> Codebase:
     (tmp_path / "a.py").write_text("x = 1\n")
     _stub(tmp_path / "bin", "vulture", "".join("echo 'a.py:1: unused'\n" for _ in range(n)))
     _on_path(monkeypatch, tmp_path / "bin")
-    ctx["repo"] = tmp_path
+    return {"repo": tmp_path, "lang": "python"}
 
 
-@given(parsers.parse("the clone detector reports {pct:f}% duplication"))
-def given_clones(ctx, pct, tmp_path, monkeypatch):
+@given(parsers.parse("the clone detector reports {pct:f}% duplication"), target_fixture="codebase")
+def given_clones(pct, tmp_path, monkeypatch) -> Codebase:
     (tmp_path / "a.py").write_text("x = 1\n")
     _stub(tmp_path / "bin", "jscpd", f"echo 'Total duplication: {pct} %'")
     _on_path(monkeypatch, tmp_path / "bin")
-    ctx["repo"] = tmp_path
+    return {"repo": tmp_path, "lang": "python"}
 
 
-@given(parsers.parse("gitleaks reports {n:d} secret findings"))
-def given_secrets(ctx, n, tmp_path, monkeypatch):
+@given(parsers.parse("gitleaks reports {n:d} secret findings"), target_fixture="codebase")
+def given_secrets(n, tmp_path, monkeypatch) -> Codebase:
     (tmp_path / "a.py").write_text("x = 1\n")
     _stub(tmp_path / "bin", "gitleaks", "".join("echo '{\"RuleID\":\"x\"}'\n" for _ in range(n)))
     _on_path(monkeypatch, tmp_path / "bin")
-    ctx["repo"] = tmp_path
+    return {"repo": tmp_path, "lang": "python"}
 
 
 # --- L1.15-L1.17: real files, real scanners ---------------------------------
 
-@given(parsers.parse("a {total:d} LOC TS codebase with {esc:d} `# type: ignore` or `any`"))
-def given_escapes(ctx, total, esc, tmp_path):
+@given(
+    parsers.parse("a {total:d} LOC TS codebase with {esc:d} `# type: ignore` or `any`"),
+    target_fixture="codebase",
+)
+def given_escapes(total, esc, tmp_path) -> Codebase:
     body = "let x: any = 1;\n" * esc + "const y = 2;\n" * (total - esc)
     (tmp_path / "a.ts").write_text(body)
-    ctx["repo"], ctx["lang"] = tmp_path, "typescript"
+    return {"repo": tmp_path, "lang": "typescript"}
 
 
-@given(parsers.parse("a codebase where {ws:d} of {total:d} production lines end with spaces"))
-def given_ws(ctx, ws, total, tmp_path):
+@given(
+    parsers.parse("a codebase where {ws:d} of {total:d} production lines end with spaces"),
+    target_fixture="codebase",
+)
+def given_ws(ws, total, tmp_path) -> Codebase:
     body = "x = 1  \n" * ws + "y = 2\n" * (total - ws)
     (tmp_path / "a.py").write_text(body)
-    ctx["repo"] = tmp_path
+    return {"repo": tmp_path, "lang": "python"}
 
 
-@given(parsers.parse("{god:d} of {total:d} production files are >1000 LOC"))
-def given_god(ctx, god, total, tmp_path):
+@given(parsers.parse("{god:d} of {total:d} production files are >1000 LOC"), target_fixture="codebase")
+def given_god(god, total, tmp_path) -> Codebase:
     for i in range(god):
         (tmp_path / f"big{i}.py").write_text("x = 1\n" * 1001)
     for i in range(total - god):
         (tmp_path / f"small{i}.py").write_text("x = 1\n" * 10)
-    ctx["repo"] = tmp_path
+    return {"repo": tmp_path, "lang": "python"}
 
 
-@given(parsers.parse("one {size:d} LOC file in a {tree:d} LOC tree"))
-def given_one_god(ctx, size, tree, tmp_path):
+@given(parsers.parse("one {size:d} LOC file in a {tree:d} LOC tree"), target_fixture="codebase")
+def given_one_god(size, tree, tmp_path) -> Codebase:
     (tmp_path / "huge.py").write_text("x = 1\n" * size)
     remaining = max(tree - size, 0)
     per_file = 50
     for i in range(remaining // per_file):
         (tmp_path / f"s{i}.py").write_text("x = 1\n" * per_file)
-    ctx["repo"] = tmp_path
+    return {"repo": tmp_path, "lang": "python"}
 
 
 # --- when / then ------------------------------------------------------------
 
-@when(parsers.parse("I compute L1.{num:d}"))
-def when_compute(ctx, num):
-    repo = ctx["repo"]
-    # L1.12 and L1.14 are produced by their own modules, exactly as indicators.py:548-549
-    # calls them; only L1.13 is left inside _compute_external_indicators. Calling that
-    # function for all three is what this step used to do, and it went unnoticed because
-    # this suite lived outside CI.
-    if num == 12:
-        ctx["result"] = dead_code.analyze(repo, "python")
-    elif num == 14:
-        ctx["result"] = secret_scan.analyze(repo, "python")
-    elif num == 13:
-        ctx["result"] = indicators._compute_external_indicators(repo, "python")["L1.13"]
-    elif num == 15:
-        ctx["result"] = indicators._compute_type_escapes(repo, ctx["lang"])
-    elif num == 16:
-        ctx["result"] = indicators._trailing_whitespace(repo)
-    elif num == 17:
-        ctx["result"] = indicators._god_files(repo)
-    else:
+# L1.12 and L1.14 are produced by their own modules, exactly as indicators.py:548-549
+# calls them; only L1.13 is left inside _compute_external_indicators. Calling that
+# function for all three is what this step used to do, and it went unnoticed because
+# this suite lived outside CI.
+_COMPUTE = {
+    12: lambda repo, lang: dead_code.analyze(repo, lang),
+    13: lambda repo, lang: indicators._compute_external_indicators(repo, lang)["L1.13"],
+    14: lambda repo, lang: secret_scan.analyze(repo, lang),
+    15: lambda repo, lang: indicators._compute_type_escapes(repo, lang),
+    16: lambda repo, lang: indicators._trailing_whitespace(repo),
+    17: lambda repo, lang: indicators._god_files(repo),
+}
+
+
+@when(parsers.parse("I compute L1.{num:d}"), target_fixture="result")
+def when_compute(codebase, num):
+    if num not in _COMPUTE:
         raise AssertionError(f"no L1.{num} wiring in this suite")
-    ctx["num"] = num
+    return _COMPUTE[num](codebase["repo"], codebase["lang"])
 
 
 @then(parsers.parse("L1.{num:d} is {val:f} per KLOC"))
-def then_val_kloc(ctx, num, val):
-    assert ctx["result"]["value"] == pytest.approx(val, abs=0.05)
+def then_val_kloc(result, val):
+    assert result["value"] == pytest.approx(val, abs=0.05)
 
 
 @then(parsers.parse("L1.{num:d} is {val:f}"))
-def then_val(ctx, num, val):
-    assert ctx["result"]["value"] == pytest.approx(val, abs=0.05)
+def then_val(result, val):
+    assert result["value"] == pytest.approx(val, abs=0.05)
 
 
 @then(parsers.parse("the band is {band}"))
-def then_band(ctx, band):
-    assert ctx["result"]["band"] == band
+def then_band(result, band):
+    assert result["band"] == band

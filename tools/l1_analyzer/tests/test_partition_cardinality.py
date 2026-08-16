@@ -26,8 +26,11 @@ Pure assertions over fixtures written to tmp_path, no mocks (Honest Code Rule 10
 from __future__ import annotations
 
 from l1_analyzer import card, report, state_bounds
+from l1_analyzer.indicators import L1Result
 
-_HEALTHY = {k: {"band": "Healthy"} for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")}
+_HEALTHY: dict[str, L1Result] = {
+    k: {"band": "Healthy"} for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")
+}
 
 # The shipped configuration carries NO bound: measured over the pinned corpus and nine
 # supplementary trees, the widest unordered partition in real code was 14 classes and there
@@ -46,7 +49,7 @@ def _partition(result: dict, state: str) -> dict:
     return next(f["partition"] for f in result["findings"] if f["state"] == state)
 
 
-def _panel(l18b: dict) -> dict:
+def _panel(l18b: dict) -> dict[str, L1Result]:
     return {"L1.18": {"band": "Healthy"}, "L1.18b": l18b, **_HEALTHY}
 
 

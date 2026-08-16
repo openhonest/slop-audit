@@ -21,11 +21,6 @@ CLAUDE.md
 *-DRAFT.md
 
 # Vendored reference snapshot for the honest-framework reference test: a local,
-# regenerable copy of honest-framework/python/app.py. Not committed, to avoid a
-# confusing duplicate of another repo's file; the test falls back to the sibling
-# honest-framework checkout and skips if neither is present.
-tools/l1_analyzer/tests/reference/honest_framework_app.txt
-
 # Local Paper A v2 run scratch (results, logs, summary). An experimental arm, so it
 # lives under research/arms/ rather than inside the implementation it happens to drive.
 research/arms/paper-a-v2/

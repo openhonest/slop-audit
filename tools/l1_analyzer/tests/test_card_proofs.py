@@ -10,7 +10,9 @@ _BASE = {
 }
 
 
-def _concurrency(verdict, test="fn t() { assert!(raced); }"):
+def _concurrency(verdict, test):
+    """One concurrency outcome. `test` is required: the card must carry the source each
+    proof was produced with, so every call site names its own rather than sharing one."""
     return {"proofs": {"outcomes": [
         {"file": "wal.rs", "line": 699, "symbol": "Coord", "verdict": verdict,
          "detail": "fired a race", "generated_test": test},
@@ -18,7 +20,8 @@ def _concurrency(verdict, test="fn t() { assert!(raced); }"):
 
 
 def test_demonstrated_concurrency_proof_is_exposed_with_its_test_source():
-    c = card.build_card("o/r", "rust", {**_BASE, **_concurrency("demonstrated")})
+    c = card.build_card("o/r", "rust", {
+        **_BASE, **_concurrency("demonstrated", "fn t() { assert!(raced); }")})
     assert len(c["proofs"]) == 1
     p = c["proofs"][0]
     assert p["layer"] == "concurrency" and p["target"] == "Coord" and p["location"] == "wal.rs:699"
@@ -27,7 +30,8 @@ def test_demonstrated_concurrency_proof_is_exposed_with_its_test_source():
 
 def test_non_demonstrated_concurrency_proof_is_not_exposed():
     # A clean run (no race fired) is not a proof and must never surface as an adoptable test.
-    c = card.build_card("o/r", "rust", {**_BASE, **_concurrency("not-demonstrated")})
+    c = card.build_card("o/r", "rust", {
+        **_BASE, **_concurrency("not-demonstrated", "fn t() { assert!(never_fired); }")})
     assert c["proofs"] == []
 
 
@@ -49,7 +53,7 @@ def test_coverage_proof_is_exposed_with_language_and_source():
 
 
 def test_both_producers_feed_one_surface_and_render():
-    results = {**_BASE, **_concurrency("demonstrated"),
+    results = {**_BASE, **_concurrency("demonstrated", "fn t() { assert!(both_layers); }"),
                "coverage_proofs": {"retained": [
                    {"function": "f", "language": "rust", "location": "a.rs:1",
                     "explanation": "gap", "test_source": "#[test] fn t() {}"}]}}

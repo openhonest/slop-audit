@@ -25,20 +25,29 @@ def _scan(tmp_path, src):
     return thread_surface.scan(tmp_path, "python")
 
 
+_ABSENT = "absent"
+
+
 def _find(result, kind, symbol):
+    """The one finding of this kind for this symbol, or the named miss `"absent"`.
+
+    `findings` is subscripted: a scan that read a file and found nothing still carries the
+    key with an empty list, so a missing key is the meter's defect and must raise here
+    rather than be read as "found nothing". The miss is a string no finding can equal.
+    """
     return next(
-        (f for f in result.get("findings", []) if f["kind"] == kind and f["symbol"] == symbol),
-        None,
+        (f for f in result["findings"] if f["kind"] == kind and f["symbol"] == symbol),
+        _ABSENT,
     )
 
 
 def test_mutable_default_arg_is_review(tmp_path):
     result = _scan(tmp_path, "def f(items=[]):\n    return items\n")
     f = _find(result, "mutable_default_arg", "items")
-    assert f is not None, "mutable default arg not surfaced"
+    assert f != _ABSENT, "mutable default arg not surfaced"
     assert f["severity"] == "review"
     result2 = _scan(tmp_path, "def g(cfg: dict = {}):\n    return cfg\n")
-    assert _find(result2, "mutable_default_arg", "cfg") is not None
+    assert _find(result2, "mutable_default_arg", "cfg") != _ABSENT
 
 
 def test_immutable_default_is_clean(tmp_path):
@@ -57,7 +66,7 @@ def test_shared_container_with_threads_no_lock_is_exposed(tmp_path):
         "threading.Thread(target=worker, args=(1, 2)).start()\n",
     )
     f = _find(result, "unguarded_shared_state", "CACHE")
-    assert f is not None, "shared module container under threads not surfaced"
+    assert f != _ABSENT, "shared module container under threads not surfaced"
     assert f["severity"] == "exposed"
     assert result["verdict"] == "exposed"
 
@@ -75,7 +84,7 @@ def test_shared_container_with_lock_present_is_review(tmp_path):
         "        CACHE[k] = v\n",
     )
     f = _find(result, "possibly_unguarded_shared_state", "CACHE")
-    assert f is not None, "shared container with a lock present not surfaced as review"
+    assert f != _ABSENT, "shared container with a lock present not surfaced as review"
     assert f["severity"] == "review"
     assert result["verdict"] == "review"
 

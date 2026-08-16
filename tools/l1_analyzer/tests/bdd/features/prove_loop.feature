@@ -21,6 +21,7 @@ Feature: Concurrency prove loop (locate then demonstrate)
 
   Scenario: With no model available the hazard is not generated, never falsely claimed
     Given a located hazard and no model available
+    And no test is generated, so the runner is never reached
     When I run the prove loop
     Then the hazard is not generated
     And the proof is not retained

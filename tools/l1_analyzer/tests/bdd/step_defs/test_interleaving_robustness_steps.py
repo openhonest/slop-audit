@@ -1,10 +1,15 @@
 """Behavioural spec for the interleaving-robustness meter (concurrency anti-coverage),
 wired to the REAL interleaving_robustness module. Steps build tiny Rust repos on disk
-and run the meter, or exercise the pure classifier directly. State threads through a
-`ctx` fixture.
+and run the meter, or exercise the pure classifier directly.
+
+Every scenario names the language it is about in its own Given. The meter is never
+called with an assumed default, so a scenario that forgets to state its language fails
+instead of quietly being measured as Rust.
 """
 
-import pytest
+from pathlib import Path
+from typing import TypedDict
+
 from l1_analyzer import interleaving_robustness
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -17,26 +22,29 @@ _SURFACE = (
 )
 
 
-@pytest.fixture
-def ctx():
-    return {}
+class Tree(TypedDict):
+    """The repository a scenario builds, and the language it is written in."""
+    repo: Path
+    lang: str
 
 
-@given("a Rust file that hand-asserts Sync on a shared struct")
-def given_surface(ctx, tmp_path):
+@given("a Rust file that hand-asserts Sync on a shared struct", target_fixture="tree")
+def given_surface(tmp_path) -> Tree:
     (tmp_path / "coord.rs").write_text(_SURFACE)
-    ctx["repo"] = tmp_path
+    return {"repo": tmp_path, "lang": "rust"}
 
 
 @given("no loom or shuttle model exists in the repository")
-def given_no_model(ctx):
-    pass  # the repo built above has none
+def given_no_model(tree):
+    # State the precondition as a check on the repository just built, not as a comment.
+    text = "".join(p.read_text() for p in tree["repo"].rglob("*.rs"))
+    assert "loom" not in text and "shuttle" not in text
 
 
 @given("that same file drives the struct under a loom model")
-def given_model_in_file(ctx):
+def given_model_in_file(tree):
     # Append a loom model to the same file that carries the surface.
-    (ctx["repo"] / "coord.rs").write_text(
+    (tree["repo"] / "coord.rs").write_text(
         _SURFACE
         + "#[cfg(loom)]\n"
         "mod model {\n"
@@ -46,60 +54,63 @@ def given_model_in_file(ctx):
     )
 
 
-@given("a Rust file with only an ordinary trait impl and safe atomics")
-def given_clean(ctx, tmp_path):
+@given("a Rust file with only an ordinary trait impl and safe atomics", target_fixture="tree")
+def given_clean(tmp_path) -> Tree:
     (tmp_path / "ok.rs").write_text(
         "struct Bar { n: u64 }\n"
         "impl Clone for Bar { fn clone(&self) -> Bar { Bar { n: self.n } } }\n"
     )
-    ctx["repo"] = tmp_path
+    return {"repo": tmp_path, "lang": "rust"}
 
 
-@given("a repository whose language the interleaving-robustness meter does not support")
-def given_unsupported(ctx, tmp_path):
-    ctx["repo"], ctx["lang"] = tmp_path, "java"
+@given("a repository whose language the interleaving-robustness meter does not support", target_fixture="tree")
+def given_unsupported(tmp_path) -> Tree:
+    return {"repo": tmp_path, "lang": "java"}
 
 
-@when("I run the interleaving-robustness meter")
-def when_run(ctx):
-    ctx["result"] = interleaving_robustness.analyze(ctx["repo"], ctx.get("lang", "rust"))
+@when("I run the interleaving-robustness meter", target_fixture="result")
+def when_run(tree):
+    return interleaving_robustness.analyze(tree["repo"], tree["lang"])
 
 
 @then(parsers.parse("the verdict is {verdict}"))
-def then_verdict(ctx, verdict):
-    assert ctx["result"]["verdict"] == verdict
+def then_verdict(result, verdict):
+    assert result["verdict"] == verdict
 
 
 @then("that file is listed as unmodeled")
-def then_unmodeled(ctx):
-    assert any(f.endswith("coord.rs") for f in ctx["result"]["unmodeled"])
+def then_unmodeled(result):
+    assert any(f.endswith("coord.rs") for f in result["unmodeled"])
 
 
 @then("that file is not listed as unmodeled")
-def then_not_unmodeled(ctx):
-    assert not any(f.endswith("coord.rs") for f in ctx["result"]["unmodeled"])
+def then_not_unmodeled(result):
+    assert not any(f.endswith("coord.rs") for f in result["unmodeled"])
 
 
 # --- pure classifier scenario ----------------------------------------------
 
-@given(parsers.parse('flagged surface in "{path}"'))
-def given_flagged(ctx, path):
-    ctx["surface_files"] = {path}
+@given(parsers.parse('flagged surface in "{path}"'), target_fixture="surface_files")
+def given_flagged(path):
+    return {path}
 
 
-@given(parsers.parse('a model file that names the "{module}" module without clearly exercising it'))
-def given_names_module(ctx, module):
+@given(
+    parsers.parse('a model file that names the "{module}" module without clearly exercising it'),
+    target_fixture="modeled_text",
+)
+def given_names_module(module):
     # A model that mentions the module by name but is not that file, and does not
     # exercise the racy interleaving: the weaker "modeled-elsewhere" signal.
-    ctx["modeled_text"] = f"use crate::storage::{module};\nloom::model(|| {{}});\n"
+    return f"use crate::storage::{module};\nloom::model(|| {{}});\n"
 
 
-@when("I classify the surface against the models")
-def when_classify(ctx):
-    ctx["split"] = interleaving_robustness.classify(ctx["surface_files"], set(), ctx["modeled_text"])
+@when("I classify the surface against the models", target_fixture="split")
+def when_classify(surface_files, modeled_text):
+    return interleaving_robustness.classify(surface_files, set(), modeled_text)
 
 
 @then(parsers.parse('"{path}" is modeled-elsewhere, not unmodeled'))
-def then_elsewhere(ctx, path):
-    assert path in ctx["split"]["modeled_elsewhere"]
-    assert path not in ctx["split"]["unmodeled"]
+def then_elsewhere(split, path):
+    assert path in split["modeled_elsewhere"]
+    assert path not in split["unmodeled"]

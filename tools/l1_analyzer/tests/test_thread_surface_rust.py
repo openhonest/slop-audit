@@ -29,10 +29,19 @@ def _scan(tmp_path, src):
     return thread_surface.scan(tmp_path, "rust")
 
 
+_ABSENT = "absent"
+
+
 def _find(result, kind, symbol):
+    """The one finding of this kind for this symbol, or the named miss `"absent"`.
+
+    `findings` is subscripted: a scan that read a file and found nothing still carries the
+    key with an empty list, so a missing key is the meter's defect and must raise here
+    rather than be read as "found nothing". The miss is a string no finding can equal.
+    """
     return next(
-        (f for f in result.get("findings", []) if f["kind"] == kind and f["symbol"] == symbol),
-        None,
+        (f for f in result["findings"] if f["kind"] == kind and f["symbol"] == symbol),
+        _ABSENT,
     )
 
 
@@ -46,8 +55,8 @@ def test_unsafe_impl_sync_is_exposed(tmp_path):
     )
     send = _find(result, "unsafe_impl_send", "MappedSharedWalCoordination")
     sync = _find(result, "unsafe_impl_sync", "MappedSharedWalCoordination")
-    assert send is not None, "unsafe impl Send not surfaced"
-    assert sync is not None, "unsafe impl Sync not surfaced"
+    assert send != _ABSENT, "unsafe impl Send not surfaced"
+    assert sync != _ABSENT, "unsafe impl Sync not surfaced"
     assert send["severity"] == "exposed"
     assert sync["severity"] == "exposed"
     assert sync["line"] == 3
@@ -61,7 +70,7 @@ def test_static_mut_is_exposed(tmp_path):
         "fn tick() { unsafe { COUNT += 1; } }\n",
     )
     f = _find(result, "static_mut", "COUNT")
-    assert f is not None, "static mut not surfaced"
+    assert f != _ABSENT, "static mut not surfaced"
     assert f["severity"] == "exposed"
     assert result["verdict"] == "exposed"
 
@@ -75,7 +84,7 @@ def test_plain_relaxed_is_candidate(tmp_path):
         "fn bump(x: &AtomicU64) { x.store(1, Ordering::Relaxed); }\n",
     )
     f = _find(result, "relaxed_ordering", "x")
-    assert f is not None, "Relaxed store not surfaced"
+    assert f != _ABSENT, "Relaxed store not surfaced"
     assert f["severity"] == "candidate"
     assert result["verdict"] == "candidate"
 
@@ -89,7 +98,7 @@ def test_relaxed_load_gating_a_branch_is_review(tmp_path):
         "fn poll(x: &AtomicBool) { if x.load(Ordering::Relaxed) { return; } }\n",
     )
     g = _find(result, "relaxed_guard", "x")
-    assert g is not None, "relaxed_guard not surfaced"
+    assert g != _ABSENT, "relaxed_guard not surfaced"
     assert g["severity"] == "review"
     assert result["verdict"] == "review"
 

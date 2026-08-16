@@ -26,6 +26,7 @@ Honest zero is the control in every case below. A refusal that also fired on a r
 the check really did read would be a second lie in the other direction.
 """
 
+import contextlib
 import pathlib
 import subprocess
 import tempfile
@@ -38,45 +39,81 @@ from l1_analyzer import (
     thread_surface,
 )
 
+# The three states a test tree can be in, written out so the partition is three and every
+# call site names the one it depends on. Two booleans had a fourth cell, stage-without-git,
+# which cannot exist and which the old body ignored in silence.
+NO_GIT = "no-git"
+GIT_EMPTY_INDEX = "git-empty-index"
+GIT_STAGED = "git-staged"
 
-def _tree(files: dict[str, str], git: bool = False, add: bool = False) -> pathlib.Path:
-    """A temp repository. `git` inits a working tree; `add` stages the files.
 
-    git-without-add is the read-nothing case for L1.14 and not a contrivance: it is a
+def _leave_alone(root: pathlib.Path) -> None:
+    """No git. The scanners walk the filesystem, so every file written is a file read."""
+
+
+def _git_init(root: pathlib.Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+
+
+def _git_init_and_stage(root: pathlib.Path) -> None:
+    _git_init(root)
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+
+
+_PREPARE = {
+    NO_GIT: _leave_alone,
+    GIT_EMPTY_INDEX: _git_init,
+    GIT_STAGED: _git_init_and_stage,
+}
+
+
+@contextlib.contextmanager
+def _tree(files: dict[str, str], state: str):
+    """A temp repository in one of the three states above, released on exit.
+
+    GIT_EMPTY_INDEX is the read-nothing case for L1.14 and not a contrivance: it is a
     fresh checkout before the first commit, and a repository whose tracked paths all sit
     under an ignored directory reaches it too. The scanner reads the index rather than the
     filesystem, so an empty index means it opens no file at all.
+
+    `state` is required and read by subscript, so an unnamed state raises here instead of
+    being filed under whichever tree the helper happened to build by default.
     """
-    root = pathlib.Path(tempfile.mkdtemp())
-    for name, text in files.items():
-        (root / name).parent.mkdir(parents=True, exist_ok=True)
-        (root / name).write_text(text)
-    if git:
-        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-        if add:
-            subprocess.run(["git", "add", "-A"], cwd=root, check=True)
-    return root
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        for name, text in files.items():
+            (root / name).parent.mkdir(parents=True, exist_ok=True)
+            (root / name).write_text(text)
+        _PREPARE[state](root)
+        yield root
 
 
 # --- L1.14: a clean bill on a tree it never opened -----------------------------------
 
 def test_l1_14_refuses_when_it_opened_no_file():
     """The defect: every file excluded by the index, and the band still says Healthy."""
-    r = secret_scan.analyze(_tree({"app.py": "x = 1\n"}, git=True), "python")
+    with _tree({"app.py": "x = 1\n"}, GIT_EMPTY_INDEX) as root:
+        r = secret_scan.analyze(root, "python")
     assert r["files_scanned"] == 0
     assert r["value"] == "n/a", "a count over no file is not a count"
     assert r["band"] == "n/a", "Healthy here is a clean bill on a repository it never read"
 
 
 def test_l1_14_refusal_says_why_in_the_details():
-    r = secret_scan.analyze(_tree({"app.py": "x = 1\n"}, git=True), "python")
+    with _tree({"app.py": "x = 1\n"}, GIT_EMPTY_INDEX) as root:
+        r = secret_scan.analyze(root, "python")
     assert "no file" in r["details"]
 
 
 def test_l1_14_still_reports_an_honest_zero():
     """The control. A repository it DID read, with no credential in it, stays Healthy:
-    the refusal must separate 'read nothing' from 'read the code and found nothing'."""
-    r = secret_scan.analyze(_tree({"app.py": "TOKEN = os.environ['TOKEN']\n"}), "python")
+    the refusal must separate 'read nothing' from 'read the code and found nothing'.
+
+    NO_GIT is the point of the test and not incidental: the scanner reads the index when
+    one exists, so `files_scanned == 1` holds only because this tree is not a working copy.
+    """
+    with _tree({"app.py": "TOKEN = os.environ['TOKEN']\n"}, NO_GIT) as root:
+        r = secret_scan.analyze(root, "python")
     assert r["files_scanned"] == 1
     assert r["value"] == 0 and r["band"] == "Healthy"
 
@@ -88,7 +125,8 @@ def test_l1_14_still_finds_a_credential_in_a_tracked_tree():
     # screens placeholder words, so the sample every reader reaches for is the one value
     # that cannot prove the scanner works.
     key = "AKIA" + "Q7RJ4M2XN5VDPL3B"
-    r = secret_scan.analyze(_tree({"app.py": f'AWS = "{key}"\n'}, git=True, add=True), "python")
+    with _tree({"app.py": f'AWS = "{key}"\n'}, GIT_STAGED) as root:
+        r = secret_scan.analyze(root, "python")
     assert r["files_scanned"] == 1 and r["value"] == 1 and r["band"] == "Not Healthy"
 
 
@@ -96,7 +134,8 @@ def test_l1_14_still_finds_a_credential_in_a_tracked_tree():
 
 def test_thread_surface_refuses_when_no_file_was_in_scope():
     """The defect: the whole tree bucketed out as tests, and the verdict still says clean."""
-    ts = thread_surface.scan(_tree({"tests/test_a.py": "def test_a():\n    assert True\n"}), "python")
+    with _tree({"tests/test_a.py": "def test_a():\n    assert True\n"}, NO_GIT) as root:
+        ts = thread_surface.scan(root, "python")
     assert ts["bucketed"]["counts"] == {"tests": 1}
     assert ts["verdict"] != thread_surface.CLEAN
     assert ts["verdict"] == thread_surface.UNREAD
@@ -106,7 +145,8 @@ def test_thread_surface_refuses_when_the_parser_could_not_read_the_source():
     """The second arm, and the reason this check needs a denominator L1.14 does not.
     The file is opened, decoded and counted, and every node query over it comes back
     empty because the tree is an error. A file count cannot see that; the parse can."""
-    ts = thread_surface.scan(_tree({"app.py": "def broken(:\n  ???\n"}), "python")
+    with _tree({"app.py": "def broken(:\n  ???\n"}, NO_GIT) as root:
+        ts = thread_surface.scan(root, "python")
     assert ts["files_read"] == 1, "the file was opened"
     assert ts["files_parsed"] == 0, "and the parser could not read it"
     assert ts["verdict"] == thread_surface.UNREAD
@@ -116,15 +156,18 @@ def test_thread_surface_refusal_is_not_the_no_scanner_refusal():
     """Three facts, three answers. 'No scanner for this language' and 'a scanner that
     read nothing' send the reader to different places, and n/a for both sent them to
     neither."""
-    unread = thread_surface.scan(_tree({"tests/test_a.py": "x = 1\n"}), "python")
-    no_scanner = thread_surface.scan(_tree({"main.c": "int main(void){return 0;}\n"}), "c")
+    with _tree({"tests/test_a.py": "x = 1\n"}, NO_GIT) as root:
+        unread = thread_surface.scan(root, "python")
+    with _tree({"main.c": "int main(void){return 0;}\n"}, NO_GIT) as root:
+        no_scanner = thread_surface.scan(root, "c")
     assert no_scanner["verdict"] == "n/a"
     assert unread["verdict"] != no_scanner["verdict"]
 
 
 def test_thread_surface_still_reports_an_honest_clean():
     """The control: a production file that parses and holds no concurrency surface."""
-    ts = thread_surface.scan(_tree({"app.py": "def add(a, b):\n    return a + b\n"}), "python")
+    with _tree({"app.py": "def add(a, b):\n    return a + b\n"}, NO_GIT) as root:
+        ts = thread_surface.scan(root, "python")
     assert ts["files_read"] == 1 and ts["files_parsed"] == 1
     assert ts["verdict"] == thread_surface.CLEAN
 
@@ -133,9 +176,9 @@ def test_thread_surface_one_readable_file_is_enough_to_grade():
     """A partial reading is not the same fact as no reading, which is the rule the state
     census settled: umbra admits 0.7% of its declared state and is still graded. One file
     the parser could read carries the verdict, and the counts disclose how thin it was."""
-    ts = thread_surface.scan(
-        _tree({"ok.py": "def add(a, b):\n    return a + b\n", "bad.py": "def broken(:\n  ???\n"}),
-        "python")
+    files = {"ok.py": "def add(a, b):\n    return a + b\n", "bad.py": "def broken(:\n  ???\n"}
+    with _tree(files, NO_GIT) as root:
+        ts = thread_surface.scan(root, "python")
     assert ts["files_read"] == 2 and ts["files_parsed"] == 1
     assert ts["verdict"] == thread_surface.CLEAN
 
@@ -145,7 +188,8 @@ def test_thread_surface_findings_are_kept_from_a_file_that_did_not_parse():
     from an error-bearing file is still a hazard, and dropping it to keep the two numbers
     tidy would trade a false clean for a missed finding."""
     src = "import threading\nCACHE = {}\n\ndef broken(:\n  ???\n"
-    ts = thread_surface.scan(_tree({"app.py": src}), "python")
+    with _tree({"app.py": src}, NO_GIT) as root:
+        ts = thread_surface.scan(root, "python")
     assert ts["files_parsed"] == 0
     assert any(f["kind"] == "unguarded_shared_state" for f in ts["findings"])
     assert ts["verdict"] == thread_surface.EXPOSED, "a finding outranks the refusal"
@@ -157,13 +201,15 @@ def test_interleaving_robustness_does_not_inherit_a_manufactured_clean():
     """It reads thread_surface's findings and calls an empty list 'no exposed surface to
     model'. Over an unread scan that is the same fabricated clean one module downstream,
     which is where a fixed defect comes back."""
-    ir = interleaving_robustness.analyze(_tree({"src/lib.rs": "pub fn ((( -> {{ ???\n"}), "rust")
+    with _tree({"src/lib.rs": "pub fn ((( -> {{ ???\n"}, NO_GIT) as root:
+        ir = interleaving_robustness.analyze(root, "rust")
     assert ir["verdict"] != interleaving_robustness.CLEAN
     assert ir["verdict"] == interleaving_robustness.NA
 
 
 def test_interleaving_robustness_still_reports_a_read_clean():
-    ir = interleaving_robustness.analyze(_tree({"src/lib.rs": "pub fn add() -> i32 { 1 }\n"}), "rust")
+    with _tree({"src/lib.rs": "pub fn add() -> i32 { 1 }\n"}, NO_GIT) as root:
+        ir = interleaving_robustness.analyze(root, "rust")
     assert ir["verdict"] == interleaving_robustness.CLEAN
 
 
@@ -183,13 +229,13 @@ def test_the_remaining_empty_denominator_claims_are_recorded(check):
     read a thousand files or none. All three are the same shape and none is fixed here.
     """
     from l1_analyzer import indicators
-    empty = _tree({"README.md": "nothing here\n"})
-    known = {
-        "L1.16": lambda: indicators._trailing_whitespace(empty),
-        "L1.17": lambda: indicators._god_files(empty),
-        "absolute_paths": lambda: absolute_paths.scan(empty, "python"),
-    }
-    assert known[check]()["band"] == "Healthy"
+    with _tree({"README.md": "nothing here\n"}, NO_GIT) as empty:
+        known = {
+            "L1.16": lambda: indicators._trailing_whitespace(empty),
+            "L1.17": lambda: indicators._god_files(empty),
+            "absolute_paths": lambda: absolute_paths.scan(empty, "python"),
+        }
+        assert known[check]()["band"] == "Healthy"
 
 
 def test_l1_15_no_longer_manufactures_a_band_from_an_empty_denominator():
@@ -204,13 +250,13 @@ def test_l1_15_no_longer_manufactures_a_band_from_an_empty_denominator():
     refuses, and lines are divided by however few there are.
     """
     from l1_analyzer import indicators
-    empty = _tree({"README.md": "nothing here\n"})
-    assert indicators._compute_type_escapes(empty, "python")["band"] == "n/a"
+    with _tree({"README.md": "nothing here\n"}, NO_GIT) as empty:
+        assert indicators._compute_type_escapes(empty, "python")["band"] == "n/a"
 
-    small = _tree({"a.py": "v: Any = 1\n" * 20})
-    measured = indicators._compute_type_escapes(small, "python")
+    with _tree({"a.py": "v: Any = 1\n" * 20}, NO_GIT) as small:
+        measured = indicators._compute_type_escapes(small, "python")
     assert measured["value"] == 1000.0 and measured["band"] == "Slop"
 
     # Honest zero is the control: a small tree really read and really clean keeps Healthy.
-    clean = _tree({"a.py": "def f(x: int) -> int:\n    return x\n" * 20})
-    assert indicators._compute_type_escapes(clean, "python")["band"] == "Healthy"
+    with _tree({"a.py": "def f(x: int) -> int:\n    return x\n" * 20}, NO_GIT) as clean:
+        assert indicators._compute_type_escapes(clean, "python")["band"] == "Healthy"

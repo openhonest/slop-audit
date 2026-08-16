@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import pytest
 from l1_analyzer import card, report, state_bounds, state_census
+from l1_analyzer.indicators import LANG_CFG, L1Result
 
 # The same unbounded cache, spelled twice. `cache[k]` with a variable key is an unbounded
 # lookup either way; only where the array is declared differs.
@@ -43,7 +44,7 @@ def _classify(tmp_path, name: str, src: str, lang: str) -> dict:
     return state_bounds.classify(tmp_path, lang)
 
 
-def _results(l18b: dict) -> dict:
+def _results(l18b: dict) -> dict[str, L1Result]:
     """A panel with a healthy L1.18 and a path-cover figure, which is what the card needs
     to manufacture the false claim: the other indicators are fine, so only the state
     classifier can withhold the grade."""
@@ -268,15 +269,32 @@ def test_the_recorded_capability_is_what_the_classifier_actually_does(tmp_path, 
         f"{lang}/{kind}: recorded admitted={probe['admitted']}, measured {admitted} findings")
 
 
-@pytest.mark.parametrize("lang,name,src,least", [
-    ("rust", "m.rs", "struct S { a: u32, b: u32 }\nstatic mut G: u32 = 0;\n", 3),
-    ("go", "m.go", "package p\ntype S struct {\n a int\n b int\n}\nvar g int\n", 3),
-    ("java", "M.java", "class M { private int a; private String b; }\n", 2),
-    ("csharp", "M.cs", "class M { private int a; private string b; }\n", 2),
-    ("ruby", "m.rb", "class M\n def initialize\n  @a = 1\n  @b = 2\n end\nend\n", 2),
-    ("javascript", "m.js", "class M { constructor() { this.a = 1; this.b = 2; } }\n", 2),
-    ("typescript", "m.ts", "class M { private a: number = 1; private b: number = 2; }\n", 2),
-])
-def test_every_supported_language_counts_its_own_state_declarations(tmp_path, lang, name, src, least):
+# One sample per language, keyed by the production language table's own key. The samples
+# are hand-written because only a person can write source in nine grammars; the SET of
+# languages they have to cover is not, so it is checked against LANG_CFG below.
+_DECLARATION_SAMPLES: dict[str, tuple[str, str, int]] = {
+    "rust": ("m.rs", "struct S { a: u32, b: u32 }\nstatic mut G: u32 = 0;\n", 3),
+    "go": ("m.go", "package p\ntype S struct {\n a int\n b int\n}\nvar g int\n", 3),
+    "java": ("M.java", "class M { private int a; private String b; }\n", 2),
+    "csharp": ("M.cs", "class M { private int a; private string b; }\n", 2),
+    "ruby": ("m.rb", "class M\n def initialize\n  @a = 1\n  @b = 2\n end\nend\n", 2),
+    "javascript": ("m.js", "class M { constructor() { this.a = 1; this.b = 2; } }\n", 2),
+    "typescript": ("m.ts", "class M { private a: number = 1; private b: number = 2; }\n", 2),
+}
+# c and python are counted by the two dedicated tests at the top of this file, which assert
+# an exact count rather than a floor. They are named here, not omitted, so the closure test
+# below can see that every LANG_CFG language is accounted for somewhere.
+_COUNTED_BY_A_DEDICATED_TEST = frozenset({"c", "python"})
+
+
+def test_the_sample_set_covers_every_language_the_analyzer_declares():
+    """The tenth language. Without this, adding a row to LANG_CFG leaves its census
+    uncounted and every test in this file still passes."""
+    assert set(_DECLARATION_SAMPLES) | _COUNTED_BY_A_DEDICATED_TEST == set(LANG_CFG)
+
+
+@pytest.mark.parametrize("lang", sorted(_DECLARATION_SAMPLES))
+def test_every_supported_language_counts_its_own_state_declarations(tmp_path, lang):
+    name, src, least = _DECLARATION_SAMPLES[lang]
     (tmp_path / name).write_text(src)
     assert state_census.count(tmp_path, lang)["declared"] >= least

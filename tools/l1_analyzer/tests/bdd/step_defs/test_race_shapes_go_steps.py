@@ -1,6 +1,10 @@
-"""Behavioural spec for Go goroutine captured-write races, wired to thread_surface."""
+"""Behavioural spec for Go goroutine captured-write races, wired to thread_surface.
 
-import pytest
+Each Given returns the source under test as the `src` fixture; the When writes it and
+returns the scan as `result`. No state is threaded by mutation, so every step declares
+in its own signature exactly what it consumes and produces.
+"""
+
 from l1_analyzer import thread_surface
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -12,14 +16,9 @@ def _scan(tmp_path, src):
     return thread_surface.scan(tmp_path, "go")
 
 
-@pytest.fixture
-def ctx():
-    return {}
-
-
-@given("a Go function that spawns a goroutine writing captured `total` and `m`")
-def given_captured(ctx, tmp_path):
-    ctx["result"] = _scan(tmp_path,
+@given("a Go function that spawns a goroutine writing captured `total` and `m`", target_fixture="src")
+def given_captured():
+    return (
         "package main\n"
         "func run() {\n"
         "    total := 0\n"
@@ -28,12 +27,13 @@ def given_captured(ctx, tmp_path):
         "        total += 1\n"
         "        m[\"k\"] = 1\n"
         "    }()\n"
-        "}\n")
+        "}\n"
+    )
 
 
-@given("a Go function whose goroutine writes only variables it declares")
-def given_locals(ctx, tmp_path):
-    ctx["result"] = _scan(tmp_path,
+@given("a Go function whose goroutine writes only variables it declares", target_fixture="src")
+def given_locals():
+    return (
         "package main\n"
         "func run() {\n"
         "    go func() {\n"
@@ -41,12 +41,13 @@ def given_locals(ctx, tmp_path):
         "        local += 1\n"
         "        _ = local\n"
         "    }()\n"
-        "}\n")
+        "}\n"
+    )
 
 
-@given("a Go function whose goroutine locks a mutex before writing captured state")
-def given_locked(ctx, tmp_path):
-    ctx["result"] = _scan(tmp_path,
+@given("a Go function whose goroutine locks a mutex before writing captured state", target_fixture="src")
+def given_locked():
+    return (
         "package main\n"
         "import \"sync\"\n"
         "func run(mu *sync.Mutex) {\n"
@@ -56,12 +57,13 @@ def given_locked(ctx, tmp_path):
         "        total += 1\n"
         "        mu.Unlock()\n"
         "    }()\n"
-        "}\n")
+        "}\n"
+    )
 
 
-@when("I scan the Go file for race shapes")
-def when_scan(ctx):
-    pass
+@when("I scan the Go file for race shapes", target_fixture="result")
+def when_scan(tmp_path, src):
+    return _scan(tmp_path, src)
 
 
 def _gsw(result):
@@ -69,16 +71,16 @@ def _gsw(result):
 
 
 @then(parsers.parse('a goroutine shared write is reported on "{name}"'))
-def then_gsw(ctx, name):
-    assert any(f["symbol"] == name for f in _gsw(ctx["result"])), [f["symbol"] for f in _gsw(ctx["result"])]
+def then_gsw(result, name):
+    assert any(f["symbol"] == name for f in _gsw(result)), [f["symbol"] for f in _gsw(result)]
 
 
 @then("no goroutine shared write is reported")
-def then_no_gsw(ctx):
-    assert _gsw(ctx["result"]) == []
+def then_no_gsw(result):
+    assert _gsw(result) == []
 
 
 @then("the goroutine shared write is a candidate")
-def then_candidate(ctx):
-    hits = _gsw(ctx["result"])
+def then_candidate(result):
+    hits = _gsw(result)
     assert hits and all(f["severity"] == "candidate" for f in hits), hits

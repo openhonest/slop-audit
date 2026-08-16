@@ -1,6 +1,11 @@
-"""Behavioural spec for JS/TS async TOCTOU, wired to the REAL thread_surface scanner."""
+"""Behavioural spec for JS/TS async TOCTOU, wired to the REAL thread_surface scanner.
 
-import pytest
+The language differs per scenario, so the Given returns a `Case` with its three fields
+named. The When writes the file and returns the scan as `result`.
+"""
+
+from typing import TypedDict
+
 from l1_analyzer import thread_surface
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -29,34 +34,36 @@ _NO_AWAIT = (
 )
 
 
-@pytest.fixture
-def ctx():
-    return {}
+class Case(TypedDict):
+    """The three things a scenario states: the source, its language, its extension."""
+    src: str
+    lang: str
+    ext: str
 
 
-def _scan(tmp_path, src, lang, ext):
-    (tmp_path / f"case.{ext}").write_text(src)
-    return thread_surface.scan(tmp_path, lang)
+def _scan(tmp_path, case: Case):
+    (tmp_path / f"case.{case['ext']}").write_text(case["src"])
+    return thread_surface.scan(tmp_path, case["lang"])
 
 
-@given("a TypeScript method that checks this.store, awaits, then writes this.store")
-def given_ts_await(ctx, tmp_path):
-    ctx["result"] = _scan(tmp_path, _AWAIT, "typescript", "ts")
+@given("a TypeScript method that checks this.store, awaits, then writes this.store", target_fixture="case")
+def given_ts_await() -> Case:
+    return {"src": _AWAIT, "lang": "typescript", "ext": "ts"}
 
 
-@given("a TypeScript method that checks this.store then writes it with no await")
-def given_ts_noawait(ctx, tmp_path):
-    ctx["result"] = _scan(tmp_path, _NO_AWAIT, "typescript", "ts")
+@given("a TypeScript method that checks this.store then writes it with no await", target_fixture="case")
+def given_ts_noawait() -> Case:
+    return {"src": _NO_AWAIT, "lang": "typescript", "ext": "ts"}
 
 
-@given("a JavaScript method that checks this.store, awaits, then writes this.store")
-def given_js_await(ctx, tmp_path):
-    ctx["result"] = _scan(tmp_path, _AWAIT, "javascript", "js")
+@given("a JavaScript method that checks this.store, awaits, then writes this.store", target_fixture="case")
+def given_js_await() -> Case:
+    return {"src": _AWAIT, "lang": "javascript", "ext": "js"}
 
 
-@when("I scan for async TOCTOU")
-def when_scan(ctx):
-    pass  # scan happened in the given step (language differs per scenario)
+@when("I scan for async TOCTOU", target_fixture="result")
+def when_scan(tmp_path, case: Case):
+    return _scan(tmp_path, case)
 
 
 def _toctou(result):
@@ -64,12 +71,12 @@ def _toctou(result):
 
 
 @then(parsers.parse('an async TOCTOU is reported on "{recv}"'))
-def then_toctou(ctx, recv):
-    hits = _toctou(ctx["result"])
+def then_toctou(result, recv):
+    hits = _toctou(result)
     assert any(f["symbol"] == recv for f in hits), [f["symbol"] for f in hits]
     assert all(f["severity"] == "review" for f in hits)
 
 
 @then("no async TOCTOU is reported")
-def then_no_toctou(ctx):
-    assert _toctou(ctx["result"]) == []
+def then_no_toctou(result):
+    assert _toctou(result) == []

@@ -580,7 +580,7 @@ def _verdict_of(tmp_path, lang: str, shape: dict) -> str:
     (work / _FILENAME[lang]).write_text(shape["src"][lang])
     result = state_bounds.classify(work, lang)
     key = _KEY[lang].format(shape["attr"])
-    return next((f["verdict"] for f in result.get("findings", []) if f["state"] == key), "absent")
+    return next((f["verdict"] for f in result["findings"] if f["state"] == key), "absent")
 
 
 def _verdicts(tmp_path, shape: dict) -> dict[str, str]:

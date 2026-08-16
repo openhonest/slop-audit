@@ -1,125 +1,57 @@
 """The Java runtime harness (L1.19 JaCoCo branch coverage, L1.20 Surefire random-order
-determinism). The live harness needs Maven and a JDK, so here the run boundary is stubbed
-and the deterministic pieces are asserted: BRANCH-counter parsing, the not-run guard, the
-coverage-missing n/a, per-seed failure reasons, and n/a with a reason rather than a guessed
-number. Pure assertions, no mocks of business logic."""
+determinism), tested at the two points where it is a pure function of its input.
 
-import subprocess
+What this file used to contain, and why it does not: eight tests that stubbed `_maven` and
+`_run_untrusted`, fed `decision_space_coverage` and `test_determinism` a JaCoCo report and a
+Surefire summary the test itself had written, and asserted the numbers back out. They proved
+that the module returns what the test handed it. If Maven changed its output wording or
+JaCoCo changed its report layout, every one of them stayed green while the harness broke in
+the field. One of them, a `_maven` stub in the Gradle case, was verified dead: the module
+returns the Gradle refusal before `_maven` is ever called.
 
+The cause is module shape, not test care. `decision_space_coverage` probes the JDK, runs
+`mvn test jacoco:report`, locates the report, parses it and decides the band inside one
+function, so there is no value to assert against and a fake is the only way in. Extracting
+`_coverage_result(covered, missed, returncode, jdk) -> L1Result` and
+`_determinism_result(per_seed, jdk) -> L1Result` is what makes those tests honest, and it is
+filed as separate work. Until then the bands, the not-run guard, the coverage-missing n/a and
+the per-seed failure reason are proved by nothing.
+"""
+
+import pytest
 from l1_analyzer import java_trace
 
 
-def _cp(rc, stdout="", stderr=""):
-    return subprocess.CompletedProcess([], rc, stdout, stderr)
-
-
-_JAVA_VERSION = 'openjdk version "26.0.1" 2026-04-21'
-
-
-def _branch_xml(covered, missed):
+def _branch_xml(covered: int, missed: int) -> str:
+    """A JaCoCo report carrying an INSTRUCTION counter and a BRANCH counter. Real report
+    layout, so ElementTree parses it the way it parses Maven's own output."""
     return (f'<report name="x"><counter type="INSTRUCTION" missed="1" covered="9"/>'
             f'<counter type="BRANCH" missed="{missed}" covered="{covered}"/></report>')
 
 
-def _cover_run(monkeypatch, tmp_path, *, covered=12, missed=7, test_rc=0, write_report=True):
-    """Stub java -version + `mvn test jacoco:report` (writes jacoco.xml if asked)."""
-    (tmp_path / "pom.xml").write_text("<project/>")
+# --- JaCoCo BRANCH-counter parsing --------------------------------------------
 
-    def fake(cmd, cwd, env, timeout_seconds):
-        if "-version" in cmd:
-            return _cp(0, stderr=_JAVA_VERSION)
-        if write_report:
-            site = tmp_path / "target" / "site" / "jacoco"
-            site.mkdir(parents=True, exist_ok=True)
-            (site / "jacoco.xml").write_text(_branch_xml(covered, missed))
-        return _cp(test_rc, "BUILD SUCCESS" if test_rc == 0 else "BUILD FAILURE")
-
-    monkeypatch.setattr(java_trace, "_maven", lambda repo: "/usr/bin/mvn")
-    monkeypatch.setattr(java_trace, "_run_untrusted", fake)
+@pytest.mark.parametrize("covered,missed", [(12, 7), (95, 5), (40, 60), (0, 0)])
+def test_branch_totals_reads_the_report_level_branch_counter(covered, missed):
+    assert java_trace._branch_totals(_branch_xml(covered, missed)) == (covered, missed)
 
 
-# --- L1.19 JaCoCo branch coverage ---------------------------------------------
-
-def test_l19_reports_branch_coverage_and_names_the_jdk(monkeypatch, tmp_path):
-    _cover_run(monkeypatch, tmp_path, covered=12, missed=7)  # 12/19 = 63.2%
-    r = java_trace.decision_space_coverage(tmp_path, 30)
-    assert r["value"] == 63.2 and r["band"] == "Not Healthy"
-    assert "decision branches" in r["details"] and "26.0.1" in r["details"]
+def test_branch_totals_ignores_the_instruction_counter():
+    # The INSTRUCTION counter in the sample carries 9 covered and 1 missed. Reading the first
+    # counter rather than the BRANCH one would return those numbers instead.
+    assert java_trace._branch_totals(_branch_xml(12, 7)) == (12, 7)
 
 
-def test_l19_na_for_gradle(monkeypatch, tmp_path):
-    # build.gradle without pom.xml: named as not-yet-supported, never a guessed number.
-    (tmp_path / "build.gradle").write_text("")
-    monkeypatch.setattr(java_trace, "_maven", lambda repo: "/usr/bin/mvn")
-    r = java_trace.decision_space_coverage(tmp_path, 30)
-    assert r["band"] == "n/a" and "Gradle" in r["details"]
+def test_branch_totals_returns_zeroes_when_the_report_has_no_branch_counter():
+    # A project with no branches to cover, and a report whose BRANCH counter never appeared,
+    # produce the same (0, 0). The module cannot tell them apart, and neither can a reader of
+    # the number. Recorded here because the conflation is real, not because it is right.
+    xml = '<report name="x"><counter type="INSTRUCTION" missed="1" covered="9"/></report>'
+    assert java_trace._branch_totals(xml) == (0, 0)
 
 
-def test_l19_na_when_jacoco_report_is_missing(monkeypatch, tmp_path):
-    # the JaCoCo plugin is not wired in, so no jacoco.xml: n/a with the reason, never a 0.0.
-    _cover_run(monkeypatch, tmp_path, write_report=False, test_rc=1)
-    r = java_trace.decision_space_coverage(tmp_path, 30)
-    assert r["band"] == "n/a" and "jacoco.xml not produced" in r["details"]
-
-
-def test_l19_bands_follow_the_spec(monkeypatch, tmp_path):
-    _cover_run(monkeypatch, tmp_path, covered=95, missed=5)   # 95%
-    assert java_trace.decision_space_coverage(tmp_path, 30)["band"] == "Healthy"
-    _cover_run(monkeypatch, tmp_path, covered=40, missed=60)  # 40%
-    assert java_trace.decision_space_coverage(tmp_path, 30)["band"] == "Slop"
-
-
-# --- L1.20 Surefire random-order determinism ----------------------------------
-
-def _det_run(monkeypatch, tmp_path, test_output, test_rc):
-    (tmp_path / "pom.xml").write_text("<project/>")
-    monkeypatch.setattr(java_trace, "_maven", lambda repo: "/usr/bin/mvn")
-
-    def fake(cmd, cwd, env, timeout_seconds):
-        if "-version" in cmd:
-            return _cp(0, stderr=_JAVA_VERSION)
-        return _cp(test_rc, test_output)
-
-    monkeypatch.setattr(java_trace, "_run_untrusted", fake)
-
-
-def test_l20_all_green_is_healthy(monkeypatch, tmp_path):
-    _det_run(monkeypatch, tmp_path, "Tests run: 12, Failures: 0, Errors: 0, Skipped: 0", 0)
-    r = java_trace.test_determinism(tmp_path, 5, 30)
-    assert r["value"] == "5/5" and r["band"] == "Healthy" and "26.0.1" in r["details"]
-
-
-def test_l20_na_when_nothing_ran(monkeypatch, tmp_path):
-    # no "Tests run:" marker means a compile error or no tests: n/a, not 0/5.
-    _det_run(monkeypatch, tmp_path, "[ERROR] COMPILATION ERROR\nBUILD FAILURE", 1)
-    r = java_trace.test_determinism(tmp_path, 5, 30)
-    assert r["band"] == "n/a" and "did not run" in r["details"]
-
-
-def test_l20_surfaces_failing_seed_not_a_bare_score(monkeypatch, tmp_path):
-    _det_run(monkeypatch, tmp_path, "Tests run: 12, Failures: 2, Errors: 0, Skipped: 0\nBUILD FAILURE", 1)
-    r = java_trace.test_determinism(tmp_path, 5, 30)
-    assert r["value"] == "0/5" and r["band"] == "Slop"
-    assert "seed 1" in r["details"] and "Failures: 2" in r["details"]
-
+# --- the not-run guard --------------------------------------------------------
 
 def test_ran_tests_detects_execution():
     assert java_trace._ran_tests("Tests run: 5, Failures: 0, Errors: 0")
     assert not java_trace._ran_tests("[ERROR] COMPILATION ERROR : cannot find symbol")
-
-
-# --- explicit-shim JDK pinning ------------------------------------------------
-
-def test_pin_jdk_sets_java_home_from_the_resolved_jdk(monkeypatch, tmp_path):
-    jbin = tmp_path / "jdk" / "bin"
-    jbin.mkdir(parents=True)
-    (jbin / "java").write_text("")
-    monkeypatch.setattr(java_trace, "resolve_via_shim", lambda repo, tool, t: (str(jbin / "java"), "jenv which java"))
-    env, prov = java_trace._pin_jdk(tmp_path, 5)
-    assert env["JAVA_HOME"] == str(tmp_path / "jdk") and env["PATH"].startswith(str(jbin))
-    assert "jenv which java" in prov
-
-
-def test_pin_jdk_ambient_without_a_manager(monkeypatch, tmp_path):
-    monkeypatch.setattr(java_trace, "resolve_via_shim", lambda *a: (None, ""))
-    assert java_trace._pin_jdk(tmp_path, 5) == ({}, "")

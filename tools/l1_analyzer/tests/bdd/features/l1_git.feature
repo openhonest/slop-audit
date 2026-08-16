@@ -13,13 +13,13 @@ Feature: L1.1-L1.8 Git-history indicators (doc/code discipline, delete disciplin
       | code | 8     |
     When I compute L1.1
     Then L1.1 is 20.0
-    And the band is Healthy
+    And L1.1 band is Healthy
 
   Scenario: 0% doc-only is Slop
     Given a git history with only code commits
     When I compute L1.1
     Then L1.1 is 0.0
-    And the band is Slop
+    And L1.1 band is Slop
 
   # L1.2 Code-only commit ratio
   Scenario: 60% code-only is Healthy
@@ -29,7 +29,7 @@ Feature: L1.1-L1.8 Git-history indicators (doc/code discipline, delete disciplin
       | doc  | 4     |
     When I compute L1.2
     Then L1.2 is 60.0
-    And the band is Healthy
+    And L1.2 band is Healthy
 
   # L1.3 Mixed commit ratio
   Scenario: 15% mixed commits is Healthy
@@ -39,7 +39,7 @@ Feature: L1.1-L1.8 Git-history indicators (doc/code discipline, delete disciplin
       | code  | 17    |
     When I compute L1.3
     Then L1.3 is 15.0
-    And the band is Healthy
+    And L1.3 band is Healthy
 
   # L1.4 Doc lines as % of total added
   Scenario: 30% doc lines added is Healthy
@@ -49,7 +49,7 @@ Feature: L1.1-L1.8 Git-history indicators (doc/code discipline, delete disciplin
       | code | 700   |
     When I compute L1.4
     Then L1.4 is 30.0
-    And the band is Healthy
+    And L1.4 band is Healthy
 
   # L1.5 Code delete/add ratio
   Scenario: 70% delete/add is Healthy (aggressive cleanup)
@@ -58,7 +58,7 @@ Feature: L1.1-L1.8 Git-history indicators (doc/code discipline, delete disciplin
       | 100   | 70      |
     When I compute L1.5
     Then L1.5 is 70.0
-    And the band is Healthy
+    And L1.5 band is Healthy
 
   # L1.6 Net-negative commit ratio
   Scenario: 20% net-negative commits is Healthy
@@ -68,7 +68,7 @@ Feature: L1.1-L1.8 Git-history indicators (doc/code discipline, delete disciplin
       | positive     | 8     |
     When I compute L1.6
     Then L1.6 is 20.0
-    And the band is Healthy
+    And L1.6 band is Healthy
 
   # L1.7 High-delete-ratio commit ratio
   Scenario: 25% high-delete commits is Healthy
@@ -78,17 +78,17 @@ Feature: L1.1-L1.8 Git-history indicators (doc/code discipline, delete disciplin
       | <40%         | 15    |
     When I compute L1.7
     Then L1.7 is 25.0
-    And the band is Healthy
+    And L1.7 band is Healthy
 
   # L1.8 Test-to-production code ratio
   Scenario: 0.5 test/prod LOC is Healthy
     Given a repo with 1000 prod LOC and 500 test LOC
     When I compute L1.8
     Then L1.8 is 0.5
-    And the band is Healthy
+    And L1.8 band is Healthy
 
   Scenario: 0.05 test/prod is Slop (no tests written for AI code)
     Given a repo with 1000 prod LOC and 50 test LOC
     When I compute L1.8
     Then L1.8 is 0.05
-    And the band is Slop
+    And L1.8 band is Slop

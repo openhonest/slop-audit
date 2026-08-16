@@ -5,8 +5,9 @@ is no in-memory simulation and no substring ladder: if the analyzer cannot be
 imported the suite fails loudly at import time, because a suite that stays green
 without the system under test is a lie (Honest Code applies to tests too).
 
-State is threaded through a per-scenario `ctx` fixture, not module globals, so no
-mutable state is shared between scenarios (which is exactly what L1.20 measures).
+Each Given returns the `Tree` it built and the When returns the `Analysis` of it, so
+every step names its inputs and its output in its own signature. Nothing is shared
+between scenarios (which is exactly what L1.20 measures).
 
 Rewiring these steps to real code once surfaced two contradictions the old fabricated
 steps hid. Both are now resolved rather than tolerated:
@@ -18,6 +19,7 @@ steps hid. Both are now resolved rather than tolerated:
 
 import textwrap
 from pathlib import Path
+from typing import TypedDict
 
 import l1_analyzer
 import pytest
@@ -40,16 +42,17 @@ _IO_BOUNDARY = {
 }
 
 
-@pytest.fixture
-def ctx():
-    return {}
+class Tree(TypedDict):
+    """The source tree a scenario states, and the language it is written in."""
+    repo: Path
+    lang: str
 
 
-def _run(ctx):
-    repo, lang = ctx["repo"], ctx["lang"]
-    ctx["result"] = analyze_mutable_state(repo, lang)
-    ctx["names"] = mutable_function_names(repo, lang)
-    ctx["module_mutables"] = module_mutable_names(repo, lang)
+class Analysis(TypedDict):
+    """The three real analyzer readings a scenario asserts against."""
+    result: dict
+    names: list[str]
+    module_mutables: list[str]
 
 
 # --- given ------------------------------------------------------------------
@@ -60,67 +63,76 @@ def given_available():
     assert analyze_mutable_state is not None
 
 
-@given(parsers.parse("a {lang} source file with:"))
-def given_source(ctx, lang, docstring, tmp_path):
+@given(parsers.parse("a {lang} source file with:"), target_fixture="tree")
+def given_source(lang, docstring, tmp_path) -> Tree:
     lang = lang.lower()
     (tmp_path / f"m.{_EXT[lang]}").write_text(textwrap.dedent(docstring).strip() + "\n")
-    ctx["repo"], ctx["lang"] = tmp_path, lang
+    return {"repo": tmp_path, "lang": lang}
 
 
-@given(parsers.parse("a {lang} source file containing an IO boundary function that also touches global state"))
-def given_io_boundary(ctx, lang, tmp_path):
+@given(
+    parsers.parse("a {lang} source file containing an IO boundary function that also touches global state"),
+    target_fixture="tree",
+)
+def given_io_boundary(lang, tmp_path) -> Tree:
     lang = lang.lower()
     (tmp_path / f"m.{_EXT[lang]}").write_text(_IO_BOUNDARY[lang])
-    ctx["repo"], ctx["lang"] = tmp_path, lang
+    return {"repo": tmp_path, "lang": lang}
 
 
-@given("the L1.18 analyzer source itself")
-def given_analyzer_source(ctx):
-    ctx["repo"], ctx["lang"] = ANALYZER_SRC, "python"
+@given("the L1.18 analyzer source itself", target_fixture="tree")
+def given_analyzer_source() -> Tree:
+    return {"repo": ANALYZER_SRC, "lang": "python"}
 
 
 # --- when (all three phrasings run the real analyzer; "amended" is the default
 #     bound-literal behaviour, so it is the same call) --------------------------
 
-@when("I run L1.18 analysis on it")
-@when("I run L1.18 analysis in amended mode")
-@when("I run L1.18 analysis in amended mode on it")
-def when_run(ctx):
-    _run(ctx)
+@when("I run L1.18 analysis on it", target_fixture="analysis")
+@when("I run L1.18 analysis in amended mode", target_fixture="analysis")
+@when("I run L1.18 analysis in amended mode on it", target_fixture="analysis")
+def when_run(tree) -> Analysis:
+    repo, lang = tree["repo"], tree["lang"]
+    return {
+        "result": analyze_mutable_state(repo, lang),
+        "names": mutable_function_names(repo, lang),
+        "module_mutables": module_mutable_names(repo, lang),
+    }
 
 
 # --- then -------------------------------------------------------------------
 
 @then(parsers.parse("the mutable state ratio is {ratio:f}"))
-def then_ratio(ctx, ratio):
+def then_ratio(analysis, ratio):
     # The feature states a 0..1 ratio; the analyzer reports a 0..100 percentage.
-    assert ctx["result"]["value"] == pytest.approx(ratio * 100, abs=0.05)
+    assert analysis["result"]["value"] == pytest.approx(ratio * 100, abs=0.05)
 
 
 @then("no functions are flagged as mutable")
-def then_no_flags(ctx):
-    assert ctx["names"] == []
+def then_no_flags(analysis):
+    assert analysis["names"] == []
 
 
 @then(parsers.parse('the function "{name}" is flagged'))
-def then_function_flagged(ctx, name):
-    assert name in ctx["names"], f"{name!r} not in {ctx['names']}"
+def then_function_flagged(analysis, name):
+    assert name in analysis["names"], f"{name!r} not in {analysis['names']}"
 
 
 @then(parsers.parse('the method "{name}" is flagged'))
-def then_method_flagged(ctx, name):
-    assert name in ctx["names"], f"{name!r} not in {ctx['names']}"
+def then_method_flagged(analysis, name):
+    assert name in analysis["names"], f"{name!r} not in {analysis['names']}"
 
 
 @then(parsers.parse('the binding "{name}" is recognized as a bound literal'))
-def then_bound_literal(ctx, name):
+def then_bound_literal(analysis, name):
     # A binding is a bound literal exactly when the analyzer excludes it from
     # module mutable state.
-    assert name not in ctx["module_mutables"], f"{name!r} counted as mutable: {ctx['module_mutables']}"
+    assert name not in analysis["module_mutables"], \
+        f"{name!r} counted as mutable: {analysis['module_mutables']}"
 
 
 @then("the IO boundary function is counted like any other function")
-def then_io_counted(ctx):
+def then_io_counted(analysis):
     # The claim was dropped, so the marked function is counted. Each fixture holds
     # exactly one function and it touches unbounded global state, so the ratio is 100.
-    assert ctx["result"]["value"] == 100.0
+    assert analysis["result"]["value"] == 100.0

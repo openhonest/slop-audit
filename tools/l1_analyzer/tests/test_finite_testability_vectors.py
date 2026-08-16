@@ -389,7 +389,7 @@ def _classify(tmp_path, src):
 
 
 def _finding(result, state):
-    return next((f for f in result.get("findings", []) if f.get("state") == state), None)
+    return next((f for f in result["findings"] if f["state"] == state), None)
 
 
 @pytest.mark.parametrize("case", VECTORS, ids=[c["id"] for c in VECTORS])
@@ -403,12 +403,16 @@ def test_conformance_vector(tmp_path, case):
 
 # --- structural contract (spec sections 3 and 7) ----------------------------
 
+# The three vectors the structural contract below is built from, named so that renaming a
+# vector id breaks the selection loudly instead of silently returning a two-state repo.
+_MIXED_IDS = ("raw-int-vs-constant", "value-indexed-cache", "pass-to-unknown-callee")
+
+
 def _one_of_each(tmp_path):
     """A repo holding one neutral, one promiscuous, and one unresolved state."""
     src = "".join(
-        c["src"] + "\n\n"
-        for c in VECTORS
-        if c["id"] in ("raw-int-vs-constant", "value-indexed-cache", "pass-to-unknown-callee")
+        next(c for c in VECTORS if c["id"] == wanted)["src"] + "\n\n"
+        for wanted in _MIXED_IDS
     )
     (tmp_path / "mixed.py").write_text(src)
     return state_bounds.classify(tmp_path, "python")

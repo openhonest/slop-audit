@@ -1,7 +1,9 @@
-"""The Python coverage-gap prove loop. The live loop needs a model + a pytest environment, so
-here the deterministic pieces are tested: branch location, gap selection, import-path derivation,
-proof rendering, the assertion-vs-setup-error classification, and the repair loop. Pure
-assertions, the run boundary stubbed."""
+"""The Python coverage-gap prove loop. Only the pure pieces are tested here: branch location,
+gap selection, import-path derivation, proof rendering, and the assertion-vs-setup-error
+classification. Real source in, verdict out. No fixture, no stub, no monkeypatch.
+
+The repair loop (_prove_one) is proved by nothing. Its old tests replaced propose, repair and
+_run with canned answers, so they proved wiring against the test's own strings."""
 
 from l1_analyzer import python_coverage_prove as pcp
 from l1_analyzer import python_facets
@@ -90,32 +92,3 @@ def test_classify_pass_and_collection_error_and_timeout():
     assert pcp._classify("ERROR test_l1_coverage_proof.py - ImportError: no module\n", 2) == "incidental"
     assert pcp._classify("", 124) == "error"
 
-
-# --- the repair loop ----------------------------------------------------------
-
-_GAP = {"function": "f", "kind": "else", "line": 4, "function_source": "def f(): ...",
-        "parameters": [{"name": "n", "annotation": "int"}], "is_method": False}
-
-
-def test_prove_one_retains_an_assertion_divergence(monkeypatch, tmp_path):
-    monkeypatch.setattr(pcp, "propose", lambda gap, ip: {"body": "result = 1\nassert result == 2, 'no'", "explanation": "e"})
-    monkeypatch.setattr(pcp, "_run", lambda *a: (1, "FAILED x::proof_0 - AssertionError: no"))
-    bucket, proposal, _src = pcp._prove_one(tmp_path, "/py", _GAP, "m", 3, 5)
-    assert bucket == "divergence" and proposal["explanation"] == "e"
-
-
-def test_prove_one_repairs_a_setup_error_then_reclassifies(monkeypatch, tmp_path):
-    # first run errors on setup (TypeError), repair fixes it, the fixed test then diverges.
-    monkeypatch.setattr(pcp, "propose", lambda gap, ip: {"body": "bad", "explanation": "e0"})
-    monkeypatch.setattr(pcp, "repair", lambda gap, ip, src, err: {"body": "good", "explanation": "e1"})
-    runs = iter([(1, "FAILED x::proof_0 - TypeError: bad"), (1, "FAILED x::proof_0 - AssertionError: good")])
-    monkeypatch.setattr(pcp, "_run", lambda *a: next(runs))
-    bucket, proposal, _src = pcp._prove_one(tmp_path, "/py", _GAP, "m", 3, 5)
-    assert bucket == "divergence" and proposal["explanation"] == "e1"
-
-
-def test_prove_one_pass_is_not_retained(monkeypatch, tmp_path):
-    monkeypatch.setattr(pcp, "propose", lambda gap, ip: {"body": "result=2\nassert result==2,'ok'", "explanation": "e"})
-    monkeypatch.setattr(pcp, "_run", lambda *a: (0, "1 passed in 0.01s"))
-    bucket, _p, _s = pcp._prove_one(tmp_path, "/py", _GAP, "m", 3, 5)
-    assert bucket == "pass"

@@ -458,16 +458,9 @@ def test_l1_19_l1_20_pass_on_a_clean_fixture(tmp_path):
     assert det["value"] == "5/5" and det["band"] == "Healthy"
 
 
-# --- L1.12/13/14 external tools: real stub binaries on a controlled PATH -----
-# Not mocks - genuine executables at the process boundary, the way the real
-# tools are invoked. PATH is set to a dir we own so presence is deterministic.
-
-def _stub(bin_dir, name, body):
-    bin_dir.mkdir(parents=True, exist_ok=True)
-    f = bin_dir / name
-    f.write_text("#!/bin/sh\n" + body + "\n")
-    f.chmod(0o755)
-
+# --- L1.12/13/14 external tools: absence proved by an emptied PATH ----------
+# Setting PATH to a directory we own removes the tool from the environment and
+# reaches the real refusal path. Nothing here answers for a tool.
 
 def test_external_tools_absent_are_na(tmp_path, monkeypatch):
     bind = tmp_path / "bin"
@@ -475,22 +468,6 @@ def test_external_tools_absent_are_na(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(bind))  # no jscpd on PATH
     res = indicators._compute_external_indicators(tmp_path, "python")
     assert res["L1.13"]["band"] == "n/a"
-
-
-def test_a_tool_that_exits_non_zero_still_yields_its_output(tmp_path):
-    """Regression: a scanner's non-zero exit IS its finding.
-
-    `_run_external` used to be `check_output` under `except CalledProcessError: return ""`.
-    gitleaks exits 1 when it finds leaks and vulture exits 3 when it finds dead code, so
-    the finding case was swallowed to an empty string and L1.14 reported 0 hits and a
-    Healthy band on a repository holding live credentials. The old tests stubbed both
-    tools with scripts that exit 0, which is why only the clean path was ever run.
-    """
-    bind = tmp_path / "bin"
-    _stub(bind, "noisyfail", "printf 'FOUND: two leaks\\n'; exit 1")
-    run = indicators._run_external([str(bind / "noisyfail")], tmp_path)
-    assert run["ran"] is True and run["status"] == 1
-    assert "FOUND: two leaks" in run["output"]
 
 
 def test_a_tool_that_is_absent_is_distinguishable_from_one_that_failed(tmp_path):
@@ -506,15 +483,6 @@ def test_l1_12_and_l1_14_are_native_and_need_no_tool_on_path(tmp_path, monkeypat
         tmp_path, lang="auto", exec_tests=False, timeout_seconds=5, classify_state_bounds=False)
     assert res["L1.12"]["band"] != "n/a" and res["L1.12"]["value"] > 0
     assert res["L1.14"]["value"] == 1 and res["L1.14"]["band"] == "Not Healthy"
-
-
-def test_l1_13_jscpd_present_parseable_and_not(tmp_path, monkeypatch):
-    bind = tmp_path / "bin"
-    _stub(bind, "jscpd", "echo 'Total duplication: 4.5 %'")
-    monkeypatch.setenv("PATH", str(bind))
-    assert indicators._compute_external_indicators(tmp_path, "python")["L1.13"]["value"] == 4.5
-    _stub(bind, "jscpd", "echo 'no percentage in this output'")
-    assert indicators._compute_external_indicators(tmp_path, "python")["L1.13"]["band"] == "n/a"
 
 
 # --- L1.8 / L1.15 / L1.19 remaining branches --------------------------------

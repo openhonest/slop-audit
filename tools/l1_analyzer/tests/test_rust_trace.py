@@ -3,6 +3,10 @@
 The output-parsing (`_tests_run`) is pure and always tested. The execution paths
 run real `cargo`, so they are integration tests skipped when no toolchain is
 present (e.g. a CI runner without Rust). Pure assertions, no mocks.
+
+decision_space_coverage's no-toolchain refusal is proved by nothing. Its old test
+replaced rust_trace._cargo with a lambda returning None. Reaching that path
+honestly means emptying PATH, the way test_basic.py does.
 """
 
 import shutil
@@ -71,10 +75,3 @@ def test_determinism_is_na_when_no_tests(tmp_path):
     result = rust_trace.test_determinism(tmp_path, runs=5, timeout_seconds=120)
     assert result["band"] == "n/a"
     assert "no tests" in result["details"]
-
-
-def test_coverage_without_cargo_is_na(monkeypatch, tmp_path):
-    # The not-measured contract: no toolchain -> explicit reason, never a guessed number.
-    monkeypatch.setattr(rust_trace, "_cargo", lambda: None)
-    result = rust_trace.decision_space_coverage(tmp_path, timeout_seconds=10)
-    assert result == {"value": "n/a", "band": "n/a", "details": "needs a Rust toolchain (cargo) in PATH"}

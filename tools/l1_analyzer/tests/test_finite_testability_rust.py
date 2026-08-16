@@ -114,7 +114,7 @@ def _classify(tmp_path, src):
 
 
 def _finding(result, state):
-    return next((f for f in result.get("findings", []) if f.get("state") == state), None)
+    return next((f for f in result["findings"] if f["state"] == state), None)
 
 
 @pytest.mark.parametrize("case", VECTORS, ids=[c["id"] for c in VECTORS])

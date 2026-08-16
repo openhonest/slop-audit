@@ -1,7 +1,8 @@
 """Behavioural spec for Python race-condition shapes (B2 check-then-act), wired to the
-REAL thread_surface scanner. State threads through a `ctx` fixture."""
+REAL thread_surface scanner. Each Given returns the module source as `src`; the When
+writes it and returns the scan as `result`.
+"""
 
-import pytest
 from l1_analyzer import thread_surface
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -13,14 +14,9 @@ def _scan(tmp_path, src):
     return thread_surface.scan(tmp_path, "python")
 
 
-@pytest.fixture
-def ctx():
-    return {}
-
-
-@given("a threaded module that checks then writes a shared dict")
-def given_threaded_shared(ctx, tmp_path):
-    ctx["src"] = (
+@given("a threaded module that checks then writes a shared dict", target_fixture="src")
+def given_threaded_shared():
+    return (
         "import threading\n"
         "CACHE = {}\n"
         "def get(k):\n"
@@ -29,24 +25,22 @@ def given_threaded_shared(ctx, tmp_path):
         "    return CACHE[k]\n"
         "threading.Thread(target=get, args=(1,)).start()\n"
     )
-    ctx["repo"] = tmp_path
 
 
-@given("a single-threaded module that checks then writes a shared dict")
-def given_singlethreaded_shared(ctx, tmp_path):
-    ctx["src"] = (
+@given("a single-threaded module that checks then writes a shared dict", target_fixture="src")
+def given_singlethreaded_shared():
+    return (
         "CACHE = {}\n"
         "def get(k):\n"
         "    if k not in CACHE:\n"
         "        CACHE[k] = compute(k)\n"
         "    return CACHE[k]\n"
     )
-    ctx["repo"] = tmp_path
 
 
-@given("a threaded module that checks then writes a local dict")
-def given_threaded_local(ctx, tmp_path):
-    ctx["src"] = (
+@given("a threaded module that checks then writes a local dict", target_fixture="src")
+def given_threaded_local():
+    return (
         "import threading\n"
         "def get(k):\n"
         "    local = {}\n"
@@ -55,12 +49,11 @@ def given_threaded_local(ctx, tmp_path):
         "    return local[k]\n"
         "threading.Thread(target=get, args=(1,)).start()\n"
     )
-    ctx["repo"] = tmp_path
 
 
-@given("a threaded module that does COUNTER += 1 on a global")
-def given_global_rmw(ctx, tmp_path):
-    ctx["src"] = (
+@given("a threaded module that does COUNTER += 1 on a global", target_fixture="src")
+def given_global_rmw():
+    return (
         "import threading\n"
         "COUNTER = 0\n"
         "def bump():\n"
@@ -68,12 +61,11 @@ def given_global_rmw(ctx, tmp_path):
         "    COUNTER += 1\n"
         "threading.Thread(target=bump).start()\n"
     )
-    ctx["repo"] = tmp_path
 
 
-@given("a threaded module that increments a local counter")
-def given_local_rmw(ctx, tmp_path):
-    ctx["src"] = (
+@given("a threaded module that increments a local counter", target_fixture="src")
+def given_local_rmw():
+    return (
         "import threading\n"
         "def work():\n"
         "    c = 0\n"
@@ -81,12 +73,11 @@ def given_local_rmw(ctx, tmp_path):
         "    return c\n"
         "threading.Thread(target=work).start()\n"
     )
-    ctx["repo"] = tmp_path
 
 
-@when("I scan the Python file for race shapes")
-def when_scan(ctx):
-    ctx["result"] = _scan(ctx["repo"], ctx["src"])
+@when("I scan the Python file for race shapes", target_fixture="result")
+def when_scan(tmp_path, src):
+    return _scan(tmp_path, src)
 
 
 def _rmw(result):
@@ -94,13 +85,13 @@ def _rmw(result):
 
 
 @then(parsers.parse('a non-atomic read-modify-write is reported on "{name}"'))
-def then_rmw(ctx, name):
-    assert any(f["symbol"] == name for f in _rmw(ctx["result"])), [f["symbol"] for f in _rmw(ctx["result"])]
+def then_rmw(result, name):
+    assert any(f["symbol"] == name for f in _rmw(result)), [f["symbol"] for f in _rmw(result)]
 
 
 @then("no non-atomic read-modify-write is reported")
-def then_no_rmw(ctx):
-    assert _rmw(ctx["result"]) == []
+def then_no_rmw(result):
+    assert _rmw(result) == []
 
 
 def _cta(result):
@@ -108,12 +99,12 @@ def _cta(result):
 
 
 @then(parsers.parse('a check-then-act is reported on "{name}"'))
-def then_cta(ctx, name):
-    hits = _cta(ctx["result"])
+def then_cta(result, name):
+    hits = _cta(result)
     assert any(f["symbol"] == name for f in hits), [f["symbol"] for f in hits]
     assert all(f["severity"] == "review" for f in hits)
 
 
 @then("no check-then-act is reported")
-def then_no_cta(ctx):
-    assert _cta(ctx["result"]) == []
+def then_no_cta(result):
+    assert _cta(result) == []
