@@ -11,7 +11,7 @@ through a per-scenario `ctx` fixture, not module globals.
 import os
 
 import pytest
-from l1_analyzer import indicators
+from l1_analyzer import dead_code, indicators, secret_scan
 from pytest_bdd import given, parsers, scenarios, then, when
 
 scenarios("../features/l1_external.feature")
@@ -100,8 +100,16 @@ def given_one_god(ctx, size, tree, tmp_path):
 @when(parsers.parse("I compute L1.{num:d}"))
 def when_compute(ctx, num):
     repo = ctx["repo"]
-    if num in (12, 13, 14):
-        ctx["result"] = indicators._compute_external_indicators(repo, "python")[f"L1.{num}"]
+    # L1.12 and L1.14 are produced by their own modules, exactly as indicators.py:548-549
+    # calls them; only L1.13 is left inside _compute_external_indicators. Calling that
+    # function for all three is what this step used to do, and it went unnoticed because
+    # this suite lived outside CI.
+    if num == 12:
+        ctx["result"] = dead_code.analyze(repo, "python")
+    elif num == 14:
+        ctx["result"] = secret_scan.analyze(repo, "python")
+    elif num == 13:
+        ctx["result"] = indicators._compute_external_indicators(repo, "python")["L1.13"]
     elif num == 15:
         ctx["result"] = indicators._compute_type_escapes(repo, ctx["lang"])
     elif num == 16:
