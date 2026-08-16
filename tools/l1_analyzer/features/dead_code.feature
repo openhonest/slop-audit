@@ -50,7 +50,7 @@ Feature: dead_code — finding unreachable statements and unreferenced definitio
     Given a parsed tree and its language
     When _unreachable_statements walks every block, stops at the first terminator, and records each statement after it
     Then it returns the start and end line of each such statement, at full confidence, since no reference, type or framework knowledge is involved
-    And scanning of a block stops at the first node that stays reachable after a terminator, meaning a jump target such as a switch case or a label, or a hoisted declaration
+    And scanning of a block stops at the first node that stays reachable after a terminator: a hoisted declaration in any language, a label only where a goto can jump forward into it, and a switch case only in C, the one grammar that spells a switch body with the same node it uses for every other block
     But a block a preprocessor cuts across is skipped entirely, and comments are passed over
 
   Scenario: _is_identifier_leaf recognises a name used as a name

@@ -39,6 +39,26 @@ C_STRUCT_FIELD = (
     "int get(struct Store *s, int k) { return s->cache[k]; }\n"
 )
 
+# The declaration nothing looked at, which is what the refusal is for. Rust and Go enumerate
+# struct fields from USAGE and from nothing else, so a field no method in the file touches was
+# never reached by any rule - not read and declined, not looked at. The census has named this
+# case since it was written, and until 2026-08-16 nothing could act on it, because capability
+# was recorded per declaration KIND against one fixture and the kind's fixture uses its field.
+RUST_UNVISITED_FIELD = (
+    "pub struct Store { pub cache: Vec<i32> }\n"
+    "\n"
+    "pub fn make() -> Store { Store { cache: Vec::new() } }\n"
+)
+# One declaration the reader reached and one it did not, which is the residual blind spot: a
+# single visited site is enough to grade the repository, so the rest has to be disclosed.
+RUST_ONE_VISITED_ONE_NOT = (
+    "static mut COUNTER: i32 = 0;\n"
+    "\n"
+    "pub struct Store { pub cache: Vec<i32> }\n"
+    "\n"
+    "pub fn bump() { unsafe { COUNTER += 1; } }\n"
+)
+
 
 def _classify(tmp_path, name: str, src: str, lang: str) -> dict:
     (tmp_path / name).write_text(src)
@@ -84,13 +104,16 @@ def test_a_language_with_no_census_spec_declares_nothing_rather_than_zero(tmp_pa
 # The classifier reports the gap beside its own counts.
 # --------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_classifier_publishes_the_census_beside_what_it_admitted(tmp_path):
-    result = _classify(tmp_path, "case.c", C_STRUCT_FIELD, "c")
+    """Rebuilt 2026-08-16 on the fixture the refusal is actually about. The C struct field it
+    used to run on is read now, and its third assertion was on `admitted_fraction`, which was
+    findings over declarations - two counts of different things - and is deleted rather than
+    repaired. `visited` is the number that replaced it, and it is a count of the same unit."""
+    result = _classify(tmp_path, "m.rs", RUST_UNVISITED_FIELD, "rust")
     census = result["census"]
     assert census["admitted"] == 0
-    assert census["declared"] >= 2
-    assert census["admitted_fraction"] == 0.0
+    assert census["declared"] >= 1
+    assert census["visited"] == 0, "nothing in this file's reading looked at the field"
 
 
 # --------------------------------------------------------------------------
@@ -110,9 +133,8 @@ def test_the_two_spellings_of_one_unbounded_cache_reach_the_same_honest_outcome(
     assert by_field["grade"] in ("F", None)
 
 
-@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_a_repository_the_classifier_never_read_gets_no_grade(tmp_path):
-    result = _classify(tmp_path, "case.c", C_STRUCT_FIELD, "c")
+    result = _classify(tmp_path, "m.rs", RUST_UNVISITED_FIELD, "rust")
     g = report.grade_summary(_results(result), None)
     assert g["status"] == "na"
     assert g["grade"] is None
@@ -123,10 +145,9 @@ def test_a_repository_the_classifier_never_read_gets_no_grade(tmp_path):
 # The renderer: no grade sentence, no capability claim, no path-cover figure.
 # --------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_the_card_makes_no_capability_claim_when_the_classifier_admitted_nothing(tmp_path):
-    result = _classify(tmp_path, "case.c", C_STRUCT_FIELD, "c")
-    model = card.build_card("o/r", "c", _results(result))
+    result = _classify(tmp_path, "m.rs", RUST_UNVISITED_FIELD, "rust")
+    model = card.build_card("o/r", "rust", _results(result))
     md = card.card_markdown(model)
     assert model["grade"] is None
     assert "**Grade:" not in md
@@ -135,10 +156,9 @@ def test_the_card_makes_no_capability_claim_when_the_classifier_admitted_nothing
     assert "1,080" not in md, "a path-cover figure is coverage of state nobody enumerated"
 
 
-@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_the_card_says_what_it_could_not_read(tmp_path):
-    result = _classify(tmp_path, "case.c", C_STRUCT_FIELD, "c")
-    md = card.card_markdown(card.build_card("o/r", "c", _results(result)))
+    result = _classify(tmp_path, "m.rs", RUST_UNVISITED_FIELD, "rust")
+    md = card.card_markdown(card.build_card("o/r", "rust", _results(result)))
     assert "insufficient basis" in md.lower()
 
 
@@ -159,14 +179,19 @@ def test_a_classifier_that_read_the_code_still_grades(tmp_path):
 
 
 # --------------------------------------------------------------------------
-# The refusal has to separate "no rule existed" from "every rule said no".
+# The refusal has to separate "nothing reached it" from "every rule said no".
 #
-# Both produce zero admitted, and a count comparison cannot tell them apart. The C struct
-# field is the first: `field_decl_types` is empty for C, so the enumerator COULD NOT have
-# admitted it and refusing is right. A codebase built out of TypedDict shapes and immutable
-# module constants is the second: the enumerator has a rule for every kind it declares, it
-# ran that rule over each one, and it declined them on the merits. Refusing there reports a
-# limit that does not exist, and it refused this repository's own analyzer package.
+# Both produce zero admitted, and a count of findings cannot tell them apart. A Rust struct
+# field with no impl in the file is the first: nothing in this file's reading looked at it, so
+# refusing is right. A codebase built out of TypedDict shapes and immutable module constants
+# is the second: the enumerator walked every declaration it spells and declined them on the
+# merits. Refusing there reports a limit that does not exist, and it refused this repository's
+# own analyzer package.
+#
+# The visit record is what separates them, and it has to be the READER'S own. Between
+# 2026-08-15 and 2026-08-16 the middle clause was answered per (language, declaration kind)
+# from a fixture, which cannot see either fact: a kind is readable in one repository and not
+# in the next, and every pair measured readable, so the refusal was dead.
 # --------------------------------------------------------------------------
 
 NO_MUTABLE_STATE_BY_DESIGN = (
@@ -184,8 +209,8 @@ NO_MUTABLE_STATE_BY_DESIGN = (
     "def render(row: Row) -> str:\n"
     "    return f\"{row['name']}={row['count']}\"\n"
 )
-# The Python spelling of the C struct: a class-body binding is state the enumerator has no
-# rule for, exactly as a struct field is in C.
+# A class-body binding, which the Python enumerator had no rule for until `record_state`.
+# It is read now, which is why the test below that turns on it stays skipped.
 PY_CLASS_BODY_CACHE = (
     "class Store:\n"
     "    cache = {}\n"
@@ -231,7 +256,7 @@ def test_a_classifier_that_decided_nothing_beside_a_non_zero_l1_18_refuses(tmp_p
         report.grade_summary(panel, None)
 
 
-@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
+@pytest.mark.skip(reason="2026-08-16: no Python fixture can reach the refusal, and the reason changed. The 2026-08-15 note said the refusal itself could not fire; it can, and the four tests above it now do, on a Rust struct field nothing visits. This one asks for the same thing in PYTHON, and Python has no such declaration: measured over every kind the census counts for it, and over 557 declarations in this repository, the enumerator visits every site it declares. The class-body binding this fixture was written for is read by record_state. REBUILD, do not delete: the day a Python construct is found that no rule reaches, this is its test. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_python_state_the_enumerator_has_no_rule_for_refuses_like_the_c_struct(tmp_path):
     """The other half. A class-body binding is invisible to the Python enumerator the way a
     struct field is invisible to the C one, so a repository holding nothing else has been
@@ -242,16 +267,30 @@ def test_python_state_the_enumerator_has_no_rule_for_refuses_like_the_c_struct(t
     assert g["grade"] is None
 
 
-@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
 def test_the_census_publishes_the_denominator_its_reader_can_actually_reach(tmp_path):
+    """Rebuilt 2026-08-16. It used to read `count`, which walks the parse trees and never runs
+    the classifier, so it could not know where the reader went; it answered from a per-kind
+    capability table instead, and that table said every kind was readable. The denominator is
+    now the reader's own visit record, and only `classify` has it."""
+    result = _classify(tmp_path, "m.rs", RUST_ONE_VISITED_ONE_NOT, "rust")
+    census = result["census"]
+    assert census["declared"] == 2
+    assert census["visited"] == 1, "the static is read; nothing reaches the field"
+    assert census["unread_kinds"] == [state_census.FIELD_DECLARATION]
+
+
+def test_the_census_alone_refuses_to_say_what_its_reader_reached(tmp_path):
+    """`count` runs no classifier, so it answers None and not zero. Zero is the claim the
+    refusal is taken on - the reader reached none of this - and a walk that never asked the
+    reader anything must not be able to make it."""
     (tmp_path / "m.py").write_text(NO_MUTABLE_STATE_BY_DESIGN)
     census = state_census.count(tmp_path, "python")
-    assert census["reachable"] == 1, "HEADERS is a module binding, a kind the enumerator reads"
-    assert census["unread_kinds"] == [state_census.CLASS_BODY_BINDING]
+    assert census["declared"] == 3
+    assert census["visited"] is None and census["unread_kinds"] is None
+    assert not report.census_unread(census), "an uncounted visit record can never withhold a grade"
 
 
-@pytest.mark.skip(reason="2026-08-15: the refusal branch these exercise cannot fire. Teaching the classifier Python class bodies, C struct fields and C# properties left no declaration kind unreadable, so `reachable` equals `declared` everywhere and no fixture can reach the refusal. REBUILD, do not delete: the replacement measure is per-site visit tracking, and these become tests for 'the enumerator did not visit this declaration'. Skipped rather than deleted so the gap stays visible with a date on it.")
-def test_one_reachable_declaration_carries_a_hundred_unreachable_ones_and_the_report_says_so(tmp_path):
+def test_one_visited_declaration_carries_the_unvisited_ones_and_the_report_says_so(tmp_path):
     """The residual blind spot, pinned rather than left implicit.
 
     The refusal fires only when NOTHING declared here is of a readable kind, so a single
@@ -266,15 +305,15 @@ def test_one_reachable_declaration_carries_a_hundred_unreachable_ones_and_the_re
     suite, so it passed green while the disclosure reached no reader at all. That renderer is
     now deleted; a test against an orphaned one proves a string exists, not that anyone is
     shown it."""
-    (tmp_path / "m.py").write_text("counter = 0\n\n\n" + PY_CLASS_BODY_CACHE)
-    result = state_bounds.classify(tmp_path, "python")
+    (tmp_path / "m.rs").write_text(RUST_ONE_VISITED_ONE_NOT)
+    result = state_bounds.classify(tmp_path, "rust")
     g = report.grade_summary(_results(result), None)
     assert g["basis"] == report.MEASURED
-    model = card.build_card("o/r", "python", _results(result))
+    model = card.build_card("o/r", "rust", _results(result))
     assert model["grade"] is not None, "the disclosure belongs on a card that GRADED"
     for rendered in (card.card_markdown(model), card.card_html(model)):
-        assert "a name bound in a class body" in rendered
-        assert "no rule for" in rendered
+        assert "a field declared inside a record type" in rendered
+        assert "never reached" in rendered
 
 
 # --------------------------------------------------------------------------

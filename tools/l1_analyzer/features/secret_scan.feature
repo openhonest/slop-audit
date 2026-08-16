@@ -62,6 +62,13 @@ Feature: secret_scan — counting the distinct credentials committed to a reposi
     Then it returns the one-based line number
     And every finding is located this way, so a reader can go straight to the line without the report ever quoting it
 
+  Scenario: _byte_offset restates a character position in the bytes the parser counted
+    Given a file's text and a position in it that the regular-expression engine reported
+    When _byte_offset re-encodes the text before that position
+    Then it returns the byte position tree-sitter would have given the same place, so the string-literal narrowing compares two offsets of one kind rather than one of each
+    And an ASCII file is answered from a cached flag without re-encoding anything, because there the two counts are already the same number
+    But the equality rests on the caller handing over the bytes of that same text, which is why analyze re-encodes what it decoded rather than passing on the bytes it read off disk
+
   Scenario: _string_spans finds where the string literals sit in a source file
     Given a file's bytes and its suffix
     When _string_spans parses the file with the grammar for that suffix and collects the span of every string literal, including heredocs and raw strings
@@ -72,7 +79,7 @@ Feature: secret_scan — counting the distinct credentials committed to a reposi
   Scenario: _scan_text finds every credential in one file's text and says which rule caught it
     Given a file's text, its bytes, and its name
     When _scan_text runs each issuer-prefixed rule, then the private-key rule, then the generic rule inside the string literals, adding the unquoted variant only when the file's syntax is settings
-    Then it returns the rule name, the line and the credential for each hit, with a hit already claimed at that line and value never counted twice
+    Then it returns the rule name, the line and the credential for each hit, with a hit already claimed at that line and value never counted twice, save the private-key hit, which claims nothing because its header always carries a space and no other rule will accept a value containing one
     And it is pure, touching no file system and no network, which is what makes the whole matching core testable without a repository
     But the private-key rule requires the encoded body to follow the header, so a document that merely warns against committing a key is not charged as a leak
 

@@ -44,7 +44,7 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     When _run_gate computes the source indicators and checks the bright lines: no production god-file, no promiscuous state, and neither ratchet exceeded
     Then it prints every problem it found with the remedy and exits non-zero
     And on a clean run it prints a pass line that reports what it CHECKED rather than a property inferred from an empty count: "finitely testable" only when the classifier reached a verdict, and otherwise "no proven unbounded state, but the state classifier reached no verdict", naming how many declarations it had no rule for
-    And the thread-safety half of that line says "thread-safety surface not measured" when the meter read no source, and a count against the baseline only when it read some, so the downward arm never demands the baseline be lowered on a reading that never happened
+    And the thread-safety half of that line says "thread-safety surface not measured", naming which of the three ways of not reading applied, and a count against the baseline only when the meter did read source, so the downward arm never demands the baseline be lowered on a reading that never happened
     But the same pass line always opens with "0 production god-files", which is asserted whether or not the indicator read any production source at all
 
   Scenario: _hazard_context assembles the only code the generator gets to see

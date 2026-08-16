@@ -71,6 +71,17 @@ def _verdict_of(result: object) -> str:
     return str(result["verdict"]) if isinstance(result, dict) and "verdict" in result else "n/a"
 
 
+# Why the thread-safety meter has no reading, by the verdict it returned instead of one. A
+# dict rather than a chain of ifs, and one entry per way of not reading, so a new way added to
+# the meter shows up here as a missing key rather than as a plausible sentence about a
+# measurement that did not happen.
+_UNMEASURED_THREAD_SURFACE = {
+    thread_surface.UNREAD: "the meter read no source",
+    thread_surface.NO_SCANNER: "no scanner for this language",
+}
+_UNMEASURED_UNKNOWN = "the meter returned no verdict"
+
+
 def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_exposed: int | None) -> int:
     """Dogfood gate for a pre-commit hook: run the source indicators against the repo
     and fail the commit if the tool would flag its own code. Bright-line invariants:
@@ -115,23 +126,30 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
     # static mut) must not exceed the baseline. Like the type-escape ratchet, this is a
     # bright line at the current number, not a density band: a NEW override fails the
     # commit unless the baseline is raised deliberately. It is a fact about surface, not
-    # a race claim - the meter never says "safe". n/a for a language with no scanner
-    # (so it is a no-op on a Python repo until the Python scanner lands).
+    # a race claim - the meter never says "safe". Python, Rust, Go, Java, Ruby, TypeScript
+    # and JavaScript have a scanner; C, C# and any language the detector does not recognise
+    # have none, and there the meter reads nothing at all.
     #
     # The ratchet is skipped, not passed, when the meter read nothing. Zero overrides over
     # no source is not zero overrides, and worse, the downward arm below would then demand
     # the baseline be lowered to 0 on the strength of a reading that never happened - the
     # ratchet would ratchet itself open. `thread_ratchet` records which of the two the pass
     # line is reporting, so it says "not measured" rather than "0/N".
+    #
+    # `thread_surface.measured` is asked, rather than the verdict compared against UNREAD.
+    # That comparison named ONE of the three ways of not reading and let the other two
+    # through: until 2026-08-16 a C repository printed "0/0 thread-safety overrides", and at
+    # a baseline of 4 it failed the commit demanding the baseline be lowered to zero.
     exposed: int | None = None
     thread_ratchet = ""
     if max_thread_exposed is not None:
         ts = results.get("thread_surface") or thread_surface.scan(repo, audited_lang)
-        if _verdict_of(ts) == thread_surface.UNREAD:
-            thread_ratchet = ", thread-safety surface not measured (the meter read no source)"
-        else:
+        if thread_surface.measured(ts):
             exposed = ts["counts"].get(thread_surface.EXPOSED, 0)
             thread_ratchet = f", {exposed}/{max_thread_exposed} thread-safety overrides"
+        else:
+            why = _UNMEASURED_THREAD_SURFACE.get(_verdict_of(ts), _UNMEASURED_UNKNOWN)
+            thread_ratchet = f", thread-safety surface not measured ({why})"
         if exposed is not None and exposed > max_thread_exposed:
             problems.append(
                 f"thread-safety surface: {exposed} hand-overrides of the thread-safety guarantee "
@@ -164,8 +182,8 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
         state = (f"no proven unbounded state, but the state classifier reached no verdict "
                  f"({'the' if one else 'all'} {declared} "
                  f"{'declaration' if one else 'declarations'} here "
-                 f"{'is' if one else 'are'} {report.unread_kinds_phrase(census)}, which it has "
-                 f"no rule for), so finite testability is unmeasured")
+                 f"{'is' if one else 'are'} {report.unread_kinds_phrase(census)}, and it reached "
+                 f"none of them), so finite testability is unmeasured")
     else:
         state = "finitely testable"
     print(f"Slop audit gate passed: 0 production god-files, {state}{ratchet}.")

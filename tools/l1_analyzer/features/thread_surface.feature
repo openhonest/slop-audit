@@ -232,6 +232,13 @@ Feature: thread_surface — the concurrency audit surface, every site where a la
     Then it reports a compound assignment whose target is a class variable as a review-severity read-modify-write, because that update is several bytecodes and the interpreter lock does not span them
     But a file that never mentions Thread returns nothing at all, without any of its class variables being read
 
+  Scenario: measured answers whether this meter reached a verdict about source it read
+    Given a result from this meter, or whatever shape the panel is holding in its place
+    When measured looks at the verdict it carries
+    Then it answers yes only for a verdict reached over source that was read, and no for every one of the three ways of not reading: no scanner for the language, a scanner with nothing readable in scope, and a refusal that never became a result and so carries no verdict at all
+    And the caller therefore never has to enumerate those three, which is what the gate did wrong when it named only the second and printed the empty counts of the first as a count of overrides
+    But it narrows an unknown shape rather than widening the declared type, because either of the easier fixes is a thing this repository's own type-escape ratchet counts against it
+
   Scenario: _na builds the answer for a language this meter has no scanner for
     Given the language name
     When _na assembles the result

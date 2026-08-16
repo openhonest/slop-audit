@@ -34,12 +34,12 @@ Feature: report — the published grade, the verifiability verdict, and the evid
 
   Scenario: census_unread decides whether the reading ever started
     Given the independent census of declarations, counted straight from the parse tree
-    When census_unread compares what the repository declares against what the classifier's rules can reach
-    Then it reports unread only when the parser found declarations, none of them of a kind any rule can match, and the classifier produced no finding whatever
-    And the denominator is the declarations whose kind a rule is capable of matching, not every declaration, so a codebase whose state a rule read and declined on the merits is not refused a grade
-    But a census that carries no capability answer reads here as not counted rather than as a capability, so a missing measurement can never be mistaken for a passing one
+    When census_unread compares what the repository declares against the declarations the classifier's own walk reached
+    Then it reports unread only when the parser found declarations, the enumerator reached none of them, and the classifier produced no finding whatever
+    And the denominator is the reader's per-site visit record on this repository, not every declaration and not a per-kind capability answer taken off a fixture, so a codebase whose state a rule walked and declined on the merits is not refused a grade
+    But a census that carries no visit record reads here as not counted rather than as a visit, so a missing measurement can never be mistaken for a passing one
 
-  Scenario: unread_kinds_phrase names the declaration kinds no rule can reach
+  Scenario: unread_kinds_phrase names the declaration kinds the reader reached nothing of
     Given the census for one repository
     When unread_kinds_phrase reads the recorded unread kinds and asks for them in prose
     Then it returns a readable phrase naming those kinds, for the sentence that tells a reader why no grade was issued

@@ -6,10 +6,10 @@ Feature: state_census — the second, independent count of declaration sites, th
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
-  # and is NOT built. Today a construct no extractor emits a site for has no kind, so no
-  # capability entry can record it unreadable, unread_kinds stays empty and the refusal it feeds
-  # never fires: the slot simply leaves the declared total and every coverage fraction measured
-  # against that total comes out higher for it.
+  # and is NOT built. Today a construct no extractor emits a site for has no kind, so it never
+  # enters the declared total, nothing can record it unread, and the refusal cannot fire on it:
+  # the slot simply leaves the denominator and every coverage fraction measured against that
+  # total comes out higher for it.
   @undecidable @not-implemented
   Scenario: undecidable a declaration none of the census extractors emit a site for
     Given a file declaring state through a construct no extractor here reaches, such as a module-scope binding made under a conditional
@@ -139,29 +139,29 @@ Feature: state_census — the second, independent count of declaration sites, th
     Then it returns every count as not-recorded rather than zero, which withholds the gap check instead of faking it
     And a confident zero is the exact failure this module exists to stop, because an unread repository would otherwise report a full denominator and pass
 
-  # Every pair in the capability table is currently recorded readable, so the unread-kinds list is always empty and the refusal it feeds can no longer fire.
-  Scenario: _tally rolls the per-file sites up into the counts a census reports
+  Scenario: _tally rolls the per-file sites up into the declarations one walk can count alone
     Given the sites of every file and the language
     When _tally counts the sites by kind against the seeded capability list
-    Then it returns the total declared, the per-kind counts, the file count, the reachable subset whose kind the classifier has a rule for, and the kinds declared here that it has no rule for
+    Then it returns the total declared, the per-kind counts and the file count, and nothing at all about whether anything read them
     And a kind the extractors emit with no capability entry raises, rather than going quietly missing from the denominator
-    But no pair in the table is recorded unreadable today, so the reachable count equals the declared count for every language and the refusal is unexercised rather than wrong
+    But this walk never runs the classifier, so a reachable count taken from the per-kind capability table used to be published here and reported the declared total on every repository
 
-  Scenario: count publishes the census over one repository
+  Scenario: count publishes the declaration count over one repository
     Given a repository and a language
     When count walks the repository in the classifier's scope and tallies the sites
-    Then it returns the declaration-site census for that language
+    Then it returns the declaration-site count for that language, with the visit record and the unread kinds recorded as not-counted rather than zero
     But a language with no field table, or no grammar, gets a not-recorded census carrying fewer keys than the refusal built for the comparison, so the two refusals are not the same shape
 
-  Scenario: _hit counts how many declared sites the classifier's walk reached
+  Scenario: _hit_by_kind counts how many declared sites the classifier's walk reached, kind by kind
     Given the declared sites per file and the sites the classifier's own walk reached
-    When _hit intersects the two, file by file
-    Then it returns how many declared sites were actually reached
+    When _hit_by_kind intersects the two, file by file, and tallies the matches under each declaration kind
+    Then it returns the per-kind counts the totals and the unread-kind list are both derived from, so the count that withholds a grade and the kinds printed beside it cannot disagree
     And a file the classifier never opened contributes nothing rather than raising, which errs towards a lower coverage figure and never a higher one
 
   Scenario: compare publishes the two coverage fractions in one unit
     Given a repository, a language, the classifier's finding count, and the sites its walk visited and judged
     When compare tallies the census and intersects it with each of those two sets
     Then it returns the census plus the visited and judged counts and their two fractions, every term of which is the same unit, the declaration site
+    And the visited count is the denominator the refusal is taken on, and the kinds nothing reached are named beside it so a card can say which construct went unread
     And the old admitted fraction, which divided conclusions by declarations and was quoted as coverage on every card, is deleted rather than repaired
     But each fraction is not-recorded when its denominator is empty, since nothing declared is not the same claim as nothing read

@@ -227,3 +227,43 @@ def test_a_non_git_directory_is_scanned_whole_and_says_so():
     r = _scan({"app.py": f'GH = "{GH_TOKEN}"\n'})
     assert r["value"] == 1
     assert "not a git working copy" in r["details"]
+
+
+# --- the two offset systems that meet in the scanner --------------------------------
+
+# Assembled from parts, like every other planted credential here: no committed file in
+# this repository contains a literal that matches a rule.
+GENERIC_VALUE = "Zq7Z" + "vN2pX" + "4bT9wR1kD6yG3mJ8sL0hC5f"
+ACCENTED_COMMENT = "# Coût de la connexion, déjà vérifié en préproduction\n"
+
+
+def test_a_credential_under_an_accented_comment_is_still_found():
+    """`re` counts characters and tree-sitter counts bytes. The generic rule is narrowed to
+    string literals located by tree-sitter, and the narrowing compared the regex's character
+    offset against those byte offsets directly. One accented word above the credential put
+    them out of step, and the credential was dropped in silence - the worst answer this
+    scanner can give, on a file it did read.
+
+    Two comment lines, so the drift (12 non-ASCII bytes) exceeds the length of the accented
+    text itself and the misfire cannot land back inside the right span by luck."""
+    plain = _scan({"settings.py": f'API_TOKEN = "{GENERIC_VALUE}"\n'})
+    accented = _scan({"settings.py": ACCENTED_COMMENT * 2 + f'API_TOKEN = "{GENERIC_VALUE}"\n'})
+    assert _rules(plain) == {"generic-credential"}
+    assert _rules(accented) == {"generic-credential"}, (
+        "the credential vanished when a non-ASCII comment was placed above it")
+    assert accented["findings"][0]["line"] == 3
+
+
+def test_the_narrowing_still_excludes_a_name_outside_a_string_literal():
+    """The other direction of the same fix: correcting the offsets must not widen the rule.
+    A credential-shaped identifier read from a vault is not a committed credential, accented
+    comment above it or not."""
+    r = _scan({"settings.py": ACCENTED_COMMENT * 2
+                              + "auth_token = resolve_token_from_vault_service\n"})
+    assert r["value"] == 0
+
+
+def test_a_byte_offset_equals_the_character_offset_only_while_the_text_is_ascii():
+    text = "# é\nAPI = 1\n"
+    assert secret_scan._byte_offset("# x\nAPI = 1\n", 4) == 4
+    assert secret_scan._byte_offset(text, 4) == 5

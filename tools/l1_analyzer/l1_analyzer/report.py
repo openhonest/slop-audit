@@ -60,13 +60,21 @@ SILENCE_FLOOR = 0.50
 # admitted. Same two numbers, opposite facts. Four repositories were refused a grade on the
 # second reading, this tool's own package among them.
 #
-# The denominator is therefore `reachable`, the declarations whose KIND the enumerator has a
-# rule capable of matching, and the census measures capability with a fixture per (language,
-# kind) run through the real classifier. Three pairs come back with no rule at all: a C
-# struct field, a C# auto-property, and a name bound in a Python class body. Narrowing
+# The denominator is therefore `visited`, the declarations the classifier's own walk reached,
+# recorded by the enumerators as they go and matched to the census site by site. Narrowing
 # `declared` instead was tried and measured - raw, minus TypedDict shapes, minus immutables,
 # over ten Python trees - and it moves nothing, because shrinking a denominator never turns
 # an admitted count of zero into anything else.
+#
+# It was `reachable` until 2026-08-16, a count of declarations whose KIND the enumerator had
+# a rule for, taken from one fixture per (language, kind). Three pairs came back with no rule
+# - a C struct field, a C# auto-property, a name bound in a Python class body - and then
+# `record_state` taught the classifier all three, every pair measured readable, `reachable`
+# equalled `declared` on every repository, and this branch became dead code. A kind is not a
+# property of a repository: a C struct used in the file that declares it is read and the same
+# kind in a header is not, and a Rust or Go field no method touches was never looked at at
+# all. Measured over the sixteen trees below, `visited` reaches zero on none of them, so the
+# correction refuses nothing that used to grade.
 #
 # admitted/declared over the same seventeen trees the silence floor
 # was measured on (the six pinned corpus repositories, this repository, the analyzer package,
@@ -83,12 +91,12 @@ SILENCE_FLOOR = 0.50
 # code, which is the same argument that rejected a 0.10 silence floor. A bound at 0.10 refuses
 # eight of seventeen on the same grounds. Any number in that range would be invented here.
 #
-# An empty reachable denominator is not a small fraction, it is a different fact: nothing
-# here is written in a form any rule can reach, so the reading never started and the report
-# has no evidence to grade. That boundary is where the defect lives and it needs no number.
+# An empty visited denominator is not a small fraction, it is a different fact: no rule
+# reached anything this code declares, so the reading never started and the report has no
+# evidence to grade. That boundary is where the defect lives and it needs no number.
 # The residual blind spot is named rather than closed: a repository that declares one
-# reachable site and a hundred unreachable ones is graded on the one, and only teaching the
-# enumerator the missing kind fixes that. What would settle a fractional bound is a
+# visited site and a hundred nothing reached is graded on the one, and only teaching the
+# enumerator the missing construct fixes that. What would settle a fractional bound is a
 # labelled set - repositories where a human has enumerated the state by hand - so the ratio
 # could be scored against a known truth instead of against itself. Until that exists, a thin
 # reading and a thorough one are told apart only at zero, and the census publishes the ratio
@@ -141,38 +149,42 @@ def silence_fraction(counts: dict) -> float:
 
 
 def census_unread(census: object) -> bool:
-    """True when the parser found state-bearing declarations, NONE of them of a kind the
-    classifier's enumerator has a rule capable of matching, and the classifier produced no
-    finding whatever. The two counts come from different readings on purpose: a shared
-    enumerator would make them agree by construction and this gap could never open.
+    """True when the parser found state-bearing declarations, the classifier's enumerator
+    reached NONE of them, and it produced no finding whatever. The two counts come from
+    different readings on purpose: a shared enumerator would make them agree by construction
+    and this gap could never open.
 
-    `reachable` rather than `declared` is the denominator, and that correction is the whole
-    of this function's history. The first version asked whether `admitted` was zero against
-    `declared`, which conflates two opposite facts: no rule existed, and every rule said no.
-    A C struct field is the first, so refusing is right. A codebase whose state is TypedDict
-    shapes and all-caps constants is the second - every kind it declares is one the
-    enumerator reads, it read them and declined them on the merits - and refusing there
-    reported a limit of ours that was not there. It refused this repository's own analyzer
-    package, and three more.
+    THE DENOMINATOR IS `visited`, AND THE TWO CORRECTIONS THAT GOT IT THERE ARE THIS
+    FUNCTION'S WHOLE HISTORY. The first version asked whether `admitted` was zero against
+    `declared`, which conflates two opposite facts: no rule reached it, and every rule read it
+    and said no. A C struct field was the first, so refusing is right. A codebase whose state
+    is TypedDict shapes and all-caps constants is the second - the enumerator walked every one
+    of them and declined them on the merits - and refusing there reported a limit of ours that
+    was not there. It refused this repository's own analyzer package, and three more.
+
+    `reachable` replaced `declared` and answered the middle clause from a capability table
+    keyed by (language, declaration kind), one fixture each. Then the record rules taught the
+    classifier the three kinds it had no rule for, every pair measured readable, `reachable`
+    equalled `declared` on every repository, and this function could not return True at all.
+    A kind is not a property of a repository. `visited` is the classifier's own record of the
+    declarations it reached, on the repository being audited, so it separates read-and-declined
+    from never-looked-at where the difference actually lives.
 
     `admitted == 0` stays in the conjunction for the invariant `_basis` relies on: a
-    repository with any finding at all, a promiscuous proof included, is never UNREAD. It
-    also makes the change a one-way relaxation, so no repository can move from graded to
-    refused by this rule.
+    repository with any finding at all, a promiscuous proof included, is never UNREAD.
 
-    A census without `reachable` is not a census, and reads here as "not counted", the same
-    as `declared` of None. Nothing downstream may treat a missing capability answer as a
-    capability."""
+    A census without `visited` is not a census, and reads here as "not counted", the same as
+    `declared` of None. Nothing downstream may treat a missing visit record as a visit."""
     if not isinstance(census, dict):
         return False
-    declared, reachable = census.get("declared"), census.get("reachable")
+    declared, visited = census.get("declared"), census.get("visited")
     return (isinstance(declared, int) and declared > 0
-            and isinstance(reachable, int) and reachable == 0
+            and isinstance(visited, int) and visited == 0
             and census.get("admitted") == 0)
 
 
 def unread_kinds_phrase(census: object) -> str:
-    """The declaration kinds this repository spells and the enumerator cannot match, in
+    """The declaration kinds this repository spells that the enumerator reached nothing of, in
     prose. Read from the census rather than re-derived, so the sentence a reader acts on and
     the count that withheld the grade come from one measurement."""
     kinds = census.get("unread_kinds") if isinstance(census, dict) else None

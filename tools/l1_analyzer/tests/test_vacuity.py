@@ -293,15 +293,15 @@ def test_two_of_the_three_labelled_paths_are_gone_and_the_third_is_a_reach_limit
                  ("mutable_state.py", "analyze_mutable_state")):  # L1.18
         assert gone not in hit, f"the rule still finds {gone}, so the repair did not cut it"
     assert ("absolute_paths.py", "scan") in hit, (
-        "the raise-shaped refusal now cuts this path, so move it out of the survivor list")
+        "still convicted, but no longer for the raise: see the next two tests")
 
 
-def test_the_rule_does_not_yet_read_a_raise_as_a_refusal():
-    """The reason `absolute_paths.scan` survives above, stated as behaviour rather than as
-    a comment. `_refuses` accepts a returned refusal and not a raised one, so the same
-    repair spelled two ways gets two answers. The `return` spelling is the control: it cuts
-    the path, which is what makes this a gap in the rule rather than a fact about the
-    guard below it."""
+def test_the_rule_reads_a_raise_as_a_refusal_the_same_as_a_return():
+    """`_refuses` accepted a returned refusal and not a raised one until 2026-08-16, so the
+    same repair spelled two ways got two answers. That mattered the moment the sanctioned
+    refusal in this package became `raise incomplete.refuse(...)`, spelled as a raise
+    precisely so a caller cannot ignore it. Both spellings now cut the path, and the return
+    spelling stays here as the control."""
     raised = _scan(
         "def f(files):\n"
         "    if not files:\n"
@@ -313,7 +313,42 @@ def test_the_rule_does_not_yet_read_a_raise_as_a_refusal():
         "        return {'band': 'n/a'}\n"
         "    return {'band': 'Healthy' if len(files) == 0 else 'Slop'}\n")
     assert returned == []
-    assert len(raised) == 1, "the rule learned to read a raise; fix the survivor list above"
+    assert raised == []
+
+
+def test_absolute_paths_survives_for_a_reason_the_raise_fix_does_not_touch():
+    """Why the survivor above is still a survivor, stated as behaviour.
+
+    It is not the raise. Bisected on 2026-08-16: the same function shape with the guard
+    spelled as a `return` is convicted identically, so the spelling is not what decides it.
+    The rule loses the derivation somewhere between the guarded quantity and the ternary
+    that reads a count derived from it, and it loses it only in the fuller shape: a
+    comprehension alone does not lose it, and a tuple unpack alone does not lose it.
+
+    Asserted rather than excused, so whoever finds the missing link has to move the name."""
+    convicted_with_raise = _scan(
+        "def scan(repo):\n"
+        "    files, _skipped = read(repo)\n"
+        "    if not files:\n"
+        "        raise Incomplete('nothing was read')\n"
+        "    findings = [{'file': p} for p, t in files]\n"
+        "    count = len(findings)\n"
+        "    hit = len({f['file'] for f in findings})\n"
+        "    band = 'Healthy' if count == 0 else 'Slop'\n"
+        "    return {'verdict': 'clean' if count == 0 else 'flagged', 'band': band, 'n': hit}\n")
+    convicted_with_return = _scan(
+        "def scan(repo):\n"
+        "    files, _skipped = read(repo)\n"
+        "    if not files:\n"
+        "        return {'verdict': 'n/a', 'band': 'n/a', 'n': 0}\n"
+        "    findings = [{'file': p} for p, t in files]\n"
+        "    count = len(findings)\n"
+        "    hit = len({f['file'] for f in findings})\n"
+        "    band = 'Healthy' if count == 0 else 'Slop'\n"
+        "    return {'verdict': 'clean' if count == 0 else 'flagged', 'band': band, 'n': hit}\n")
+    assert len(convicted_with_raise) == len(convicted_with_return) == 2, (
+        "both spellings are convicted equally, so the survivor is a derivation gap and not "
+        "a refusal-spelling gap")
 
 
 def test_the_l1_15_path_is_gone_and_the_checker_is_what_says_so():

@@ -35,14 +35,16 @@ finder reports nothing for it rather than inventing a verdict over zero referenc
 real limit and it is not small in C, where the header/source split is the normal shape; it is
 recorded here rather than left for a reader to discover from a suspiciously clean report.
 
-WHAT THESE RULES COST THE CENSUS, said plainly because nothing else says it. Capability is
-recorded per (language, declaration kind), and a kind is now readable if ONE fixture of that
-kind can be read. Every one of libuv's 1,002 field declarations therefore counts as
-`reachable`, while only 367 of them reach a finding, because the rest are declared in a header
-this file-at-a-time reading never joins to their uses. The refusal the census can issue - no
-grade when nothing declared here is of a readable kind - is correspondingly weaker for C than
-it was. A finer kind, splitting a field declared and used in one translation unit from one
-that is not, is the fix; it is not made here, and until it is, `reachable` overstates C.
+WHAT THESE RULES COST THE CENSUS, said plainly because nothing else says it. Capability used
+to be recorded per (language, declaration kind), with a kind counted readable if ONE fixture
+of it could be read, and it decided the denominator the census refuses on. Every one of
+libuv's 1,002 field declarations therefore counted as reachable while only 367 reached a
+finding, and once these three rules landed no kind was unreadable at all, so the refusal died.
+It is now taken on the classifier's own per-site visit record instead, measured on the
+repository being audited: this walk visits every field declaration it reaches and the census
+matches those visits site by site, so a field declared in a header and used in another
+translation unit reads as visited-but-unjudged and libuv's 1.0 visited beside 0.366 judged is
+the honest shape of that gap rather than a refusal.
 
 What discloses the gap in the meantime is the census's `judged_fraction`, and reading it needs
 one distinction this module is the reason for. Every finder here reports TWO things: the slots

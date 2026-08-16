@@ -73,9 +73,9 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
     And the basis is read rather than re-derived from the counts, because zero-zero-zero is what an unread repository and a clean one have in common
     But a can card with no path-cover figure asks the reader to run the CLI instead of printing a number it does not have
 
-  Scenario: _census_note discloses, on a card that DID grade, what the reader had no rule for
-    Given the census of declared and reachable state on a graded card
-    When _census_note compares declared against reachable
+  Scenario: _census_note discloses, on a card that DID grade, what the reader never reached
+    Given the census of declared and visited state on a graded card
+    When _census_note compares declared against visited
     Then it names how many declared places went unread and in which spellings, in the card's own voice but from the measurement's numbers
     But it returns nothing when the two counts are equal or either is missing, so the note appears only where something really was unread
 

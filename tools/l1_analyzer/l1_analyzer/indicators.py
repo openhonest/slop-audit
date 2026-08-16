@@ -295,6 +295,8 @@ class LangCfg(TypedDict, total=False):
     function_types: tuple[str, ...]
     class_types: tuple[str, ...]
     member_access: str
+    member_op: str
+    receiver_scan: str
     this_ident: frozenset[str]
     module_level_assign: tuple[str, ...]
     type_escape_patterns: tuple[str, ...]
@@ -315,6 +317,15 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_definition",),
         "class_types": ("class_definition",),
         "member_access": "attribute",
+        # Every language names BOTH the node its member access is spelled with and the
+        # operator that joins receiver to member, and names how its receiver is found. Both
+        # keys were previously absent and both were assumed: the walk hard-coded `.` and
+        # `_receiver_names` fell through to an empty set for any language with no `this`
+        # keyword and no Go method receiver. C spells the access `s->cache` and has neither,
+        # so it matched on the operator and on the receiver, and its member arm ran on no
+        # repository ever audited. See mutable_state._RECEIVER_SCANS.
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "this_ident": {"self"},
         "module_level_assign": ("assignment", "augmented_assignment"),
         "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
@@ -328,6 +339,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_item",),
         "class_types": ("struct_item", "enum_item", "trait_item"),
         "member_access": "field_expression",
+        "member_op": ".",
+        "receiver_scan": "fixed",
         # A Rust method is a `function_item` carrying a `self_parameter`; `self.field`
         # is a `field_expression` reading "self.<field>". Treating `self` as the
         # receiver counts that access exactly as Python's does. Free functions have
@@ -350,6 +363,13 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_definition",),
         "class_types": ("struct_specifier", "union_specifier"),
         "member_access": "field_expression",
+        # C reaches a caller's record through a pointer parameter, and spells the reach
+        # `s->cache`, not `s.cache`. Both halves of that sentence were missing, so the member
+        # arm of _count_mutable_refs could not fire on any C source: a struct field mutated
+        # through a pointer read as no external state at all, and L1.18 answered 0.0 Healthy
+        # over it.
+        "member_op": "->",
+        "receiver_scan": "c_pointer_params",
         "this_ident": set(),
         "module_level_assign": ("declaration", "init_declarator"),
         "type_escape_patterns": (),
@@ -364,6 +384,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("method_declaration", "constructor_declaration"),
         "class_types": ("class_declaration", "interface_declaration", "enum_declaration", "record_declaration"),
         "member_access": "field_access",
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_variable_declaration"),
         "type_escape_patterns": ("Object",),  # raw types, etc.
@@ -384,6 +406,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_declaration", "method_definition", "arrow_function"),
         "class_types": ("class_declaration", "interface_declaration", "enum_declaration"),
         "member_access": "member_expression",
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": ("any", "unknown"),  # plus // @ts-ignore
@@ -400,6 +424,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("method_declaration", "constructor_declaration"),
         "class_types": ("class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"),
         "member_access": "member_access_expression",
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_declaration_statement"),
         "type_escape_patterns": ("object", "dynamic"),
@@ -413,6 +439,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_declaration", "function_expression", "generator_function_declaration", "method_definition", "arrow_function"),
         "class_types": ("class_declaration", "class"),
         "member_access": "member_expression",
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": (),  # untyped
@@ -426,6 +454,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("method", "singleton_method"),
         "class_types": ("class", "module", "singleton_class"),
         "member_access": "call",
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "this_ident": {"self"},
         # Ruby signals external mutable state through @instance and $global variables,
         # not a `self.`-prefixed member access.
@@ -444,7 +474,9 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_declaration", "method_declaration"),
         "class_types": ("type_declaration",),
         "member_access": "selector_expression",
+        "member_op": ".",
         # Go has no fixed receiver keyword; the receiver name is parsed per method.
+        "receiver_scan": "go_method_receiver",
         "this_ident": set(),
         "module_level_assign": ("var_declaration",),
         "type_escape_patterns": ("any",),  # Go's `any` alias for interface{}
