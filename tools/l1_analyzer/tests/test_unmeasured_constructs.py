@@ -29,7 +29,6 @@ Pure assertions over fixtures written to tmp_path, no mocks (Honest Code Rule 10
 from __future__ import annotations
 
 import pytest
-
 from l1_analyzer import state_bounds, state_partition
 
 # Four constructs the table has no row for, each holding one piece of instance state that
