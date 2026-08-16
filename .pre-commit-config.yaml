@@ -26,6 +26,18 @@ repos:
   # Python changes; audits the whole repo, so pass_filenames is off.
   - repo: local
     hooks:
+      # The function-point invariant: every module-level function carries exactly one gherkin
+      # scenario named after it. Ported from honest-framework/python/feature-gate.sh. The
+      # framework holds 96% one-scenario-per-function because that gate refuses the next
+      # commit; this analyzer sat at 16% because nothing ever asked. Affected-only: it checks
+      # the modules whose source or feature file is staged.
+      - id: feature-gate
+        name: feature gate (one gherkin scenario per function)
+        entry: tools/l1_analyzer/feature-gate.sh
+        language: system
+        pass_filenames: false
+        files: ^tools/l1_analyzer/(l1_analyzer/.*\.py|features/.*\.feature)$
+
       - id: slop-audit-self
         name: slop audit (dogfood - god-files + finite-testability + type-escape ratchet)
         # --max-type-escapes is the Any / # type: ignore baseline: a new escape fails
