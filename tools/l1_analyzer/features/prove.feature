@@ -1,0 +1,57 @@
+Feature: prove — turning a located concurrency hazard into a demonstrated one
+  One scenario per function. The scenario names the single behaviour the function
+  stands on, so the count of scenarios is this module's directly-counted
+  function-point size (honest-gherkin section 9).
+
+  Scenario: proof_request packages one located hazard with the code around it
+    Given a thread-surface finding naming a kind, a file, a line and a symbol, plus the source window that surrounds it
+    When proof_request copies those five fields across
+    Then it returns the one hazard the generator is allowed to see
+    But it reads nothing else from the finding, so the model never learns what else the repository contains
+
+  Scenario: prove claims a hazard only when a generated test genuinely fired a race
+    Given one proof request, a way to ask a model for a test, and a way to run that test under contention
+    When prove asks for the test and, if it got one, runs it
+    Then it returns demonstrated only when the runner reports an observed race, and carries the generated test with it
+    And a run that finished clean returns not-demonstrated, worded as bounded by the run rather than as proof of safety
+    But a model that returned nothing returns not-generated with no test attached, and any other runner verdict returns not-run, so a hazard nobody demonstrated is never claimed
+
+  Scenario: retained keeps only the demonstrated proofs for the report
+    Given the outcomes of every hazard the loop attempted
+    When retained filters them
+    Then it returns only the outcomes whose verdict is demonstrated
+    But not-demonstrated, not-generated and not-run outcomes are dropped, so nothing reaches the report that was not run and seen to fire
+
+  Scenario: model_available says whether a generation model can be called at all
+    Given the environment the analyzer is running in
+    When model_available looks for an Anthropic key
+    Then it answers yes when the key is set and no when it is missing or empty
+    But it never contacts the vendor, so a key that is present and invalid still reads as available here and fails later at generation
+
+  Scenario: _strip_fences removes the markdown fencing a model wraps code in
+    Given the text a model returned, which may open with a fence line and close with another
+    When _strip_fences trims the text and deletes the fence markers
+    Then it returns the bare source the compiler can accept
+    But an unfenced answer passes through unchanged apart from surrounding whitespace
+
+  Scenario: generate asks the model for one failing race reproduction, or gives up quietly
+    Given a proof request carrying the hazard's code context
+    When generate checks for a key, imports the vendor package, and asks the model for a single self-contained Rust test that fails only because of the race
+    Then it returns the fenced-out source of that test
+    And a missing key, a missing vendor package, or any error during the call returns nothing at all, which the loop reports as not-generated
+    But it never inspects the answer for correctness, because the execution gate, not this call, decides whether the proof stands
+
+  Scenario: write_crate_and_stress builds the generated test into a throwaway crate and runs it under contention
+    Given the generated test source, a working directory, a run count and a timeout
+    When write_crate_and_stress writes a fresh manifest and library file into that directory and hands the crate to the stress runner
+    Then it returns the runner's verdict together with the runner's own detail text
+    And the manifest pins the small set of concurrency crates the reproduction may reach for, so the build is stable
+    But an absent build toolchain returns the runner's not-applicable verdict, which the loop reads as not-run, never as a clean result
+
+  # The docstring says "retain iff it fires"; the body returns one outcome of any of the four
+  # verdicts and does no retaining. Retention is the separate job of `retained`.
+  Scenario: prove_hazard runs the whole production loop for one hazard with real defaults
+    Given a located hazard, a working directory, and optional overrides for the model call and the runner
+    When prove_hazard picks the real generator and the real stress runner unless an override was supplied, then runs the loop
+    Then it returns the single outcome for that hazard, carrying the same four verdicts the loop can reach
+    And both the generation and the execution stay injectable, so the honesty property is testable without a key and without a build
