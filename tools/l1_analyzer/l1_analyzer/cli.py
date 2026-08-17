@@ -22,6 +22,23 @@ from l1_analyzer import (
 )
 from l1_analyzer.scope import PRODUCTION
 
+# Why the thread-safety meter has no reading, by the verdict it returned instead of one. A
+# dict rather than a chain of ifs, and one entry per way of not reading, so a new way added to
+# the meter shows up here as a missing key.
+#
+# READ BY SUBSCRIPT, and the first version of this was not. It used `.get(verdict, "the meter
+# returned no verdict")` while its own comment promised a missing key would show up, which is
+# the opposite of what a default does: a new verdict would have been filed under a plausible
+# sentence about a measurement that did not happen. The default was dead as well as wrong,
+# because `_verdict_of` returns "n/a" when a panel entry carries no verdict at all and
+# NO_SCANNER is "n/a", so the two cases arrive here as one string and the third branch could
+# never fire. That collision is real and is filed separately; it is not repaired by a default
+# that hides it.
+_UNMEASURED_THREAD_SURFACE = {
+    thread_surface.UNREAD: "the meter read no source",
+    thread_surface.NO_SCANNER: "no scanner for this language",
+}
+
 
 def _count_type_escapes(repo: Path, lang: str) -> int:
     """Count the analyzer's own type-escape hatches (the Any token, # type: ignore
@@ -126,11 +143,30 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
     thread_ratchet = ""
     if max_thread_exposed is not None:
         ts = results.get("thread_surface") or thread_surface.scan(repo, audited_lang)
-        if _verdict_of(ts) == thread_surface.UNREAD:
-            thread_ratchet = ", thread-safety surface not measured (the meter read no source)"
-        else:
+    # a race claim - the meter never says "safe". Python, Rust, Go, Java, Ruby, TypeScript
+    # and JavaScript have a scanner; C, C# and any language the detector does not recognise
+    # have none, and there the meter reads nothing at all.
+    #
+    # The ratchet is skipped, not passed, when the meter read nothing. Zero overrides over
+    # no source is not zero overrides, and worse, the downward arm below would then demand
+    # the baseline be lowered to 0 on the strength of a reading that never happened - the
+    # ratchet would ratchet itself open. `thread_ratchet` records which of the two the pass
+    # line is reporting, so it says "not measured" rather than "0/N".
+    #
+    # `thread_surface.measured` is asked, rather than the verdict compared against UNREAD.
+    # That comparison named ONE of the three ways of not reading and let the other two
+    # through: until 2026-08-16 a C repository printed "0/0 thread-safety overrides", and at
+    # a baseline of 4 it failed the commit demanding the baseline be lowered to zero.
+    exposed: int | None = None
+    thread_ratchet = ""
+    if max_thread_exposed is not None:
+        ts = results.get("thread_surface") or thread_surface.scan(repo, audited_lang)
+        if thread_surface.measured(ts):
             exposed = ts["counts"].get(thread_surface.EXPOSED, 0)
             thread_ratchet = f", {exposed}/{max_thread_exposed} thread-safety overrides"
+        else:
+            why = _UNMEASURED_THREAD_SURFACE[_verdict_of(ts)]
+            thread_ratchet = f", thread-safety surface not measured ({why})"
         if exposed is not None and exposed > max_thread_exposed:
             problems.append(
                 f"thread-safety surface: {exposed} hand-overrides of the thread-safety guarantee "

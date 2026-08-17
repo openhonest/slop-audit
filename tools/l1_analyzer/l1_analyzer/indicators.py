@@ -20,12 +20,11 @@ Honest Code shape (enforced, not aspirational):
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import re
 import shutil
 import subprocess
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
@@ -40,7 +39,6 @@ import tree_sitter_rust
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
-from l1_analyzer.incomplete import IncompleteCode, ratio
 from l1_analyzer import (
     c_trace,
     csharp_trace,
@@ -51,6 +49,7 @@ from l1_analyzer import (
     ruby_trace,
     rust_trace,
 )
+from l1_analyzer.incomplete import IncompleteCode, ratio
 from l1_analyzer.scope import (  # noqa: F401
     _IGNORE_DIRS,
     _TEST_DIR_MARKERS,

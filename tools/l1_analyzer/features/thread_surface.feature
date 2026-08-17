@@ -232,7 +232,6 @@ Feature: thread_surface — the concurrency audit surface, every site where a la
     Then it reports a compound assignment whose target is a class variable as a review-severity read-modify-write, because that update is several bytecodes and the interpreter lock does not span them
     But a file that never mentions Thread returns nothing at all, without any of its class variables being read
 
-  @pending
   Scenario: measured answers whether this meter reached a verdict about source it read
     Given a result from this meter, or whatever shape the panel is holding in its place
     When measured looks at the verdict it carries
