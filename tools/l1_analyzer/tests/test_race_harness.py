@@ -10,7 +10,6 @@ so they are pinned here on values, with no process started and nothing patched.
 import pytest
 from l1_analyzer.race_harness import _first_error, _rust_tsan_command
 
-
 # --- the command ------------------------------------------------------------
 
 def test_the_tsan_command_is_the_whole_invocation():

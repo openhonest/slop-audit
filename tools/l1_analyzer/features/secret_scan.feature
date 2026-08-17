@@ -89,6 +89,14 @@ Feature: secret_scan — counting the distinct credentials committed to a reposi
     Then it returns Healthy at zero, Not Healthy at one or two, and Slop at three or more
     But this is only the count arm of the canon's Slop band; the other arm, a credential confirmed live with its issuer, is never evaluated here and the result says so in words
 
+  Scenario: _read_text_bytes returns a file's bytes, or nothing when it cannot be scanned
+    Given a path and the size beyond which a file is not scanned
+    When _read_text_bytes opens it
+    Then it returns the bytes of a text file
+    And it returns nothing for a binary file, deciding from the first chunk rather than from the whole file
+    And it returns nothing for a file past the size limit, and for one it cannot open
+    But a NUL byte beyond the probe window is not seen, which is the same window git uses and the same limit
+
   Scenario: _scannable rejects files whose content is machine-generated digests or third-party code
     Given a path
     When _scannable checks its name against the dependency lock files and its ending against the minified, source-map, vector and font suffixes

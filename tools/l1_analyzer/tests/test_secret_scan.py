@@ -267,3 +267,115 @@ def test_a_byte_offset_equals_the_character_offset_only_while_the_text_is_ascii(
     text = "# é\nAPI = 1\n"
     assert secret_scan._byte_offset("# x\nAPI = 1\n", 4) == 4
     assert secret_scan._byte_offset(text, 4) == 5
+
+
+# --- reading only as much as the decision needs ---------------------------------
+#
+# The binary test used to run AFTER path.read_bytes(), so every binary file was read in
+# full and then discarded on the NUL check. A repository carrying 45,303 committed PNGs
+# across 1.0 GB did not finish scanning in ten minutes. The decision is made from the first
+# chunk now, which is content-based and needs no extension whitelist to keep up with formats.
+
+def test_a_text_file_comes_back_whole(tmp_path):
+    f = tmp_path / "a.py"
+    f.write_text("KEY = 'x'\n" * 100)
+    assert secret_scan._read_text_bytes(f, 4_194_304) == f.read_bytes()
+
+
+def test_a_binary_file_is_declined(tmp_path):
+    f = tmp_path / "logo.png"
+    f.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\xff" * 500)
+    assert secret_scan._read_text_bytes(f, 4_194_304) is None
+
+
+def test_the_binary_decision_is_made_from_the_head_not_the_whole_file(tmp_path):
+    """A binary far larger than the size limit is still declined for being binary.
+
+    This is what proves the NUL test runs before the file is read whole: under the old
+    order the size check came first and this file would have been declined for its size,
+    which is a different reason and a different code path.
+    """
+    f = tmp_path / "big.bin"
+    f.write_bytes(b"\x00" + b"\xff" * (5 * 1024 * 1024))
+    assert secret_scan._read_text_bytes(f, 4_194_304) is None
+
+
+def test_a_file_past_the_size_limit_is_declined(tmp_path):
+    f = tmp_path / "big.txt"
+    f.write_text("a" * 2048)
+    assert secret_scan._read_text_bytes(f, 1024) is None
+    assert secret_scan._read_text_bytes(f, 4096) == f.read_bytes()
+
+
+def test_a_file_that_cannot_be_opened_is_declined(tmp_path):
+    assert secret_scan._read_text_bytes(tmp_path / "absent.py", 4_194_304) is None
+
+
+def test_a_nul_beyond_the_probe_window_is_not_seen(tmp_path):
+    """The documented limit, asserted rather than left to be discovered.
+
+    git decides the same way and from the same window, so a file that hides its first NUL
+    past 8 KB reads as text here exactly as it does there.
+    """
+    f = tmp_path / "late.bin"
+    f.write_bytes(b"a" * 9000 + b"\x00" + b"b" * 10)
+    assert secret_scan._read_text_bytes(f, 4_194_304) is not None
+
+
+# --- the pathological line ------------------------------------------------------
+#
+# Found 2026-08-17 by pointing the scanner at a real repository. `_GENERIC` opened with an
+# unbounded character class, then an alternation, then a second unbounded class over the same
+# characters. On a bundled CSS file whose longest line is 285,769 characters the engine
+# explored that ambiguity exponentially and the scan never finished: three files in one
+# repository each took longer than every other file in it put together.
+#
+# The leading class never contributed to whether a match exists, only to where the match
+# started, and the reported value is capture group 1, which sits after the `[:=]`. Removing it
+# changes no finding and removes the ambiguity.
+
+def _under_time_limit(seconds, fn):
+    """Run `fn`, failing rather than hanging if it exceeds `seconds`."""
+    import signal
+
+    def bail(*_a):
+        raise TimeoutError(f"did not finish within {seconds}s")
+
+    old = signal.signal(signal.SIGALRM, bail)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        return fn()
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, old)
+
+
+def test_a_very_long_single_line_does_not_hang_the_generic_rule():
+    """The reproduction, reduced from the repository that found it.
+
+    A run of near-misses is what does it: text that repeatedly enters the keyword
+    alternation and then fails, so the engine backtracks into the unbounded class in front of
+    it. A long line with no keyword at all is fine, and so is one where the keyword is
+    followed by a real `:`; it is the near-miss that costs.
+    """
+    line = "".join(f"a_token_{i}_x." for i in range(20000))
+    assert len(line) > 250_000
+    hits = _under_time_limit(5.0, lambda: secret_scan._scan_text(line, line.encode("utf8"), "index.css"))
+    assert hits == []
+
+
+def test_the_generic_rule_still_finds_a_quoted_credential_after_a_prefix():
+    # The leading class was there for `MY_API_KEY`. Dropping it must not lose that shape.
+    # The value is assembled from parts, as the rest of this suite does, so no committed
+    # literal here matches a provider pattern on our own tree.
+    value = "Kp7mQx2v" + "Rt9wLz4b" + "Nc6eYh1j" + "Fs8dGa3u"
+    src = f'MY_API_KEY = "{value}"\n'
+    rules = {r for r, _line, _v in secret_scan._scan_text(src, src.encode("utf8"), "a.py")}
+    assert "generic-credential" in rules
+
+
+def test_the_generic_rule_still_finds_a_credential_with_a_suffixed_name():
+    value = "Kp7mQx2v" + "Rt9wLz4b" + "Nc6eYh1j" + "Fs8dGa3u"
+    src = f'API_KEY_PROD = "{value}"\n'
+    rules = {r for r, _line, _v in secret_scan._scan_text(src, src.encode("utf8"), "a.py")}
+    assert "generic-credential" in rules

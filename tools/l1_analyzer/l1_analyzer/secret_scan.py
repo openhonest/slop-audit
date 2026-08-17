@@ -127,10 +127,25 @@ _PRIVATE_KEY = re.compile(
 # A credential-shaped binding name, then a quoted literal. The name may carry the
 # keyword anywhere (`API_SECRET`, `dbPassword`, `settings.auth_token`), so the keyword is
 # not anchored to the start of the identifier.
+# NO LEADING CHARACTER CLASS, and its absence is the fix rather than an oversight. This
+# opened with `[A-Za-z0-9_.\[\]$-]*` before the alternation, over the same characters the
+# alternation itself matches, so every near-miss made the engine backtrack through an
+# unbounded prefix. On a bundled stylesheet whose longest line is 285,769 characters the scan
+# never finished; a run of `a_token_0_x.a_token_1_x.` reproduces it in 250,000.
+#
+# The prefix never decided whether a match exists, only where one started, and the reported
+# value is group 1, which sits after the `[:=]`. `MY_API_KEY = "..."` still matches, because
+# `finditer` reaches the keyword from the scan position without needing to consume `MY_`.
+#
+# The TRAILING class is bounded for the same reason, and removing the leading one alone did
+# not fix it. Unbounded, `token` in `a_token_0_x.a_token_1_x.` consumed the whole remaining
+# line looking for a `:` or `=`, then gave a character back and tried again, once per start
+# position: quadratic in the line length. 64 is well past any real name suffix -
+# `API_KEY_PROD` uses five - and turns the inner scan into a constant.
 _GENERIC = re.compile(
-    r"(?i)[A-Za-z0-9_.\[\]$-]*"
+    r"(?i)"
     r"(?:api[_-]?key|apikey|secret|password|passwd|pwd|token|credential|access[_-]?key|auth[_-]?key|private[_-]?key)"
-    r"[A-Za-z0-9_.\[\]$-]*\s*[:=]\s*[\"']([^\"'\n]{12,120})[\"']")
+    r"[A-Za-z0-9_.\[\]$-]{0,64}\s*[:=]\s*[\"']([^\"'\n]{12,120})[\"']")
 # The same binding, unquoted, in dotenv / shell / CI syntax. A `.env` that is actually
 # tracked is where real credentials sit, and they are never quoted there. cardz commits
 # `AUTH0_CLIENT_SECRET=xGLoLZGEXF_...`; gitleaks reports it and the quoted-only rule above
@@ -332,6 +347,39 @@ def _band_for(hits: int) -> str:
     return band(hits, 1, 3, higher_is_better=False)
 
 
+# The window the binary test reads. git decides the same way and from the same window, so a
+# file that hides its first NUL past this point reads as text here exactly as it does there.
+_BINARY_PROBE_BYTES = 8192
+
+
+def _read_text_bytes(path: Path, max_bytes: int) -> bytes | None:
+    """The file's bytes, or None when it is binary, too large, or unreadable.
+
+    THE ORDER IS THE POINT. The binary test used to run after `path.read_bytes()`, so every
+    binary file in the tree was read in full and then discarded on the same NUL check. That
+    cost is invisible on a source repository and ruinous on one carrying assets: 45,303
+    committed PNGs across 1.0 GB did not finish scanning in ten minutes, where two ordinary
+    repositories took seconds.
+
+    Deciding from the first chunk is content-based, which is why there is no extension list
+    here. A skip-list of `.png`, `.jpg`, `.pdf` is a whitelist that every new format re-opens,
+    and the one already in `_SKIP_SUFFIXES` had let images through for exactly that reason.
+
+    Returns None rather than raising on an unreadable path, because a file that vanished
+    between the walk and the open is a fact about the tree and not about this function.
+    """
+    try:
+        with path.open("rb") as handle:
+            head = handle.read(_BINARY_PROBE_BYTES)
+            if b"\0" in head:
+                return None
+            rest = handle.read(max_bytes - len(head) + 1) if len(head) == _BINARY_PROBE_BYTES else b""
+    except OSError:
+        return None
+    raw = head + rest
+    return None if len(raw) > max_bytes else raw
+
+
 def _scannable(path: Path) -> bool:
     return path.name not in _SKIP_NAMES and not path.name.endswith(_SKIP_SUFFIXES)
 
@@ -372,15 +420,9 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
         relpath = str(path.relative_to(repo)) if repo in path.parents else path.name
         if tracked is not None and relpath not in tracked:
             continue
-        try:
-            if path.stat().st_size > _MAX_BYTES:
-                skipped += 1
-                continue
-            raw = path.read_bytes()
-        except OSError:
+        raw = _read_text_bytes(path, _MAX_BYTES)
+        if raw is None:
             skipped += 1
-            continue
-        if b"\0" in raw[:8192]:
             continue
         scanned += 1
         in_tests = _bucket_reason(path, repo, has_packages, PRODUCTION) in ("tests", "test")
