@@ -44,16 +44,17 @@ from __future__ import annotations
 
 from tree_sitter import Node
 
-from l1_analyzer.lang_spec import LANG_SPEC
+from l1_analyzer.lang_spec import _PY_MUTATING, LANG_SPEC
 
 _PY = LANG_SPEC["python"]
 _FUNCTION_TYPES = frozenset({"function_definition", "lambda"})
-# Method names that mutate a container in place (a superset of the classifier's, stated
-# here so the filter's plain-store rule is self-contained).
-_IN_PLACE = frozenset({
-    "append", "extend", "insert", "pop", "remove", "clear", "sort", "reverse",
-    "update", "setdefault", "popitem", "add", "discard",
-    "intersection_update", "difference_update", "symmetric_difference_update",
+# Method names that mutate a container in place. The docstring used to CLAIM this was a
+# superset of the classifier's set and a hand-written list sat underneath, which drifted:
+# `appendleft` was in _PY_MUTATING and not here, so a deque assigned once and then grown
+# cleared as write-once. The claim is now the construction, so the two cannot part again,
+# and the extras below are only the names the classifier does not carry.
+_IN_PLACE = _PY_MUTATING | frozenset({
+    "reverse", "intersection_update", "difference_update", "symmetric_difference_update",
 })
 # Container reads that a memoization cache may use and that do not inspect a value's shape.
 _CACHE_READS = frozenset({"pop", "clear", "get", "keys", "values", "items", "setdefault"})
@@ -116,6 +117,17 @@ def _drives_no_decision(refs: list[Node]) -> bool:
 
 # --- Rule: write-once, receiver-aware --------------------------------------------
 
+def _attribute_targets(left: Node | None) -> list[Node]:
+    """Every `<recv>.attr` node an assignment target binds, unwrapping tuple and list
+    patterns. A plain target yields itself; a pattern yields one node per element.
+    """
+    if left is None:
+        return []
+    if left.type == "attribute":
+        return [left]
+    return [n for n in left.children if n.type == "attribute"]
+
+
 def _member_writes(cls: Node, attr: str) -> list[Node]:
     """Every assignment target `<recv>.attr` inside the class, through ANY receiver. A
     builder writes the attribute through another instance (new._q = self._q.f()), so a
@@ -125,8 +137,11 @@ def _member_writes(cls: Node, attr: str) -> list[Node]:
     def walk(n: Node) -> None:
         if n.type == "assignment":
             left = n.child_by_field_name("left")
-            if left is not None and left.type == "attribute" and _text(left.child_by_field_name("attribute")) == attr:
-                writes.append(left)
+            # Every attribute IN the target, not the target itself. `self.a, self.b = m, m`
+            # puts a pattern_list here, and reading only `left.type == "attribute"` counted
+            # neither write, so an attribute written twice could still read as write-once.
+            writes.extend(t for t in _attribute_targets(left)
+                          if _text(t.child_by_field_name("attribute")) == attr)
         for c in n.children:
             walk(c)
 
@@ -176,6 +191,26 @@ _SAFE_ARG_BUILTINS = frozenset({
 })
 
 
+# Nodes Python inserts between a reference and the argument list holding it. Reading only
+# `argument_list` meant `f(*self.a)`, `f(**self.a)` and `f(rows=self.a)` each handed the bare
+# container to an unmodelled callee without the walk seeing it leave. Written out as a table
+# so a fourth spelling is a missing row here rather than a silent escape.
+_ARGUMENT_WRAPPERS = frozenset({"list_splat", "dictionary_splat", "keyword_argument"})
+
+
+def _argument_list_above(parent: Node) -> Node | None:
+    """The argument list this reference is an argument of, through any wrapper, or None.
+
+    Returns the node rather than a bool so the caller can still reach the callee, and None
+    rather than raising because a reference that is not an argument is the ordinary case.
+    """
+    if parent.type == "argument_list":
+        return parent
+    if parent.type in _ARGUMENT_WRAPPERS and parent.parent is not None:
+        return parent.parent if parent.parent.type == "argument_list" else None
+    return None
+
+
 def _escapes(refs: list[Node]) -> bool:
     """The attribute is invoked as a callable (dynamic dispatch) or passed as a bare
     argument to a callee that is not a known read-only builtin. Either lets an unbounded or
@@ -186,8 +221,9 @@ def _escapes(refs: list[Node]) -> bool:
             continue
         if parent.type == "call" and parent.child_by_field_name("function") == ref:
             return True                               # self.attr(...) : dynamic dispatch
-        if parent.type == "argument_list":
-            call = parent.parent
+        arglist = _argument_list_above(parent)
+        if arglist is not None:
+            call = arglist.parent
             callee = call.child_by_field_name("function") if call is not None else None
             if _text(callee) not in _SAFE_ARG_BUILTINS:
                 return True                           # passed to an unknown callee

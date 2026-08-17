@@ -6,6 +6,7 @@ wrongly clear, so a regression here is a silent loss of a real finding. Pure ass
 import pathlib
 import tempfile
 
+import pytest
 from l1_analyzer import state_bounds
 
 
@@ -15,6 +16,15 @@ def _verdict(src: str, attr: str) -> str:
         (p / "m.py").write_text(src)
         r = state_bounds.classify(p, "python")
         return next((f["verdict"] for f in r["findings"] if f["state"] == attr), "absent")
+
+
+def _construct(src: str, attr: str) -> str:
+    """The syntax shape the classifier could not decide, empty on every decided finding."""
+    with tempfile.TemporaryDirectory() as d:
+        p = pathlib.Path(d)
+        (p / "m.py").write_text(src)
+        r = state_bounds.classify(p, "python")
+        return next((f["construct"] for f in r["findings"] if f["state"] == attr), "absent")
 
 
 # --- CLEAR: provable false positives, suppressed to neutral ---------------------
@@ -292,3 +302,51 @@ def test_passed_to_unknown_callee_keeps_write_once_but_escapes():
     src = ("class P:\n    def __init__(self, buf):\n        self._b = buf\n"
            "    def run(self):\n        helper(self._b)\n")
     assert _verdict(src, "self._b") == "unresolved"
+
+
+# --- slop-audit-qb5, corrected -------------------------------------------------
+#
+# These were written to prove three live false-NEUTRAL verdicts. Measured before and after
+# the fix, all four fixtures give the identical verdict, so the claim was wrong: the
+# classifier fails closed on list_splat, keyword_argument and pattern_list before the filter
+# is ever asked, and a filter gap behind a fail-closed classifier cannot clear anything.
+#
+# What the fixes are worth keeping for is drift, not verdicts. What the tests below are worth
+# keeping for is the fail-closed behaviour that made the gaps unreachable, which nothing else
+# pinned, and which is the only reason the wrong answer never shipped.
+
+
+@pytest.mark.parametrize("call,construct", [
+    ("unknown(*self._a)", "list_splat"),
+    ("unknown(rows=self._a)", "keyword_argument"),
+])
+def test_a_container_handed_out_through_a_wrapper_is_unresolved_not_cleared(call, construct):
+    """A splat and a keyword argument each put a node between the reference and the argument
+    list. The classifier has no row for either, so it fails closed and names the construct
+    rather than deciding. That refusal is what stands in front of `_escapes`, which reads
+    only `argument_list` and would not have seen the value leave."""
+    src = ("class Q:\n    def __init__(self):\n        self._a = {}\n"
+           "    def put(self, k, v):\n        self._a[k] = v\n"
+           f"    def send(self):\n        return {call}\n")
+    assert _verdict(src, "self._a") == "unresolved"
+    assert _construct(src, "self._a") == f"attribute in {construct}"
+
+
+def test_a_tuple_assignment_target_is_unresolved_not_cleared():
+    """`self._a, self._b = m, m` puts a pattern_list in the target. The classifier has no row
+    for it and says so, which is why `_member_writes` counting neither write could not turn
+    into a write-once clear."""
+    src = ("class Q:\n    def __init__(self):\n        self._a = {}\n        self._b = {}\n"
+           "    def reset(self, m):\n        self._a, self._b = m, m\n"
+           "    def take(self, k):\n        return self._a[k]\n")
+    assert _verdict(src, "self._a") == "unresolved"
+    assert _construct(src, "self._a") == "attribute in pattern_list"
+
+
+def test_the_in_place_set_is_a_superset_of_the_classifier_by_construction():
+    """The docstring claimed this and a hand-written list sat underneath, which drifted:
+    `appendleft` was in the classifier's set and not in the filter's. The claim is now the
+    construction, so this test fails only if someone replaces the derivation with a literal."""
+    from l1_analyzer.lang_spec import _PY_MUTATING
+    from l1_analyzer.state_bounds_filters import _IN_PLACE
+    assert _PY_MUTATING <= _IN_PLACE

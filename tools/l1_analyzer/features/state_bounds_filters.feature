@@ -72,6 +72,19 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     Then it is true when the caller receives the object itself and can then mutate it
     But a slice or a copy is a different node above the reference, so returning one of those does not count
 
+  Scenario: _argument_list_above finds the argument list a reference is an argument of
+    Given a reference whose parent may be an argument list or a wrapper around one
+    When _argument_list_above reads it
+    Then it returns the argument list, through a splat or a keyword argument
+    And it returns None when the reference is not an argument at all, which is the ordinary case
+    But a fourth wrapper spelling is a missing row in the table rather than a silent escape
+
+  Scenario: _attribute_targets lists every attribute an assignment target binds
+    Given an assignment target that is a plain attribute or a destructuring pattern
+    When _attribute_targets reads it
+    Then a plain target yields itself and a pattern yields one node per element
+    But it yields nothing for a target that binds no attribute, so a local name is not a member write
+
   Scenario: _escapes recognises the attribute reaching somewhere that could act on it
     Given every reference to one attribute
     When _escapes checks whether any reference is invoked, or passed bare into a call
