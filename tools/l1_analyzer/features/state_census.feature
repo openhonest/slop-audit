@@ -152,7 +152,7 @@ Feature: state_census — the second, independent count of declaration sites, th
     Then it returns the declaration-site count for that language, with the visit record and the unread kinds recorded as not-counted rather than zero
     But a language with no field table, or no grammar, gets a not-recorded census carrying fewer keys than the refusal built for the comparison, so the two refusals are not the same shape
 
-  Scenario: _hit counts how many declared sites the classifier's walk reached, kind by kind
+  Scenario: _hit_by_kind counts how many declared sites the classifier's walk reached, kind by kind
     Given the declared sites per file and the sites the classifier's own walk reached
     When _hit_by_kind intersects the two, file by file, and tallies the matches under each declaration kind
     Then it returns the per-kind counts the totals and the unread-kind list are both derived from, so the count that withholds a grade and the kinds printed beside it cannot disagree

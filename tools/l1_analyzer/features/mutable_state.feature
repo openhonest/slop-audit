@@ -137,35 +137,30 @@ Feature: mutable_state — L1.18, the share of functions that reference unbounde
     And state called neutral only because nothing branches on it is excluded, its partition being empty rather than finite
     But Go and C key their state by the record's own name while this walk sees the receiver or the pointer, so no Go or C reference is ever recognised as bounded and both keep their uncorrected, higher reading
 
-  @pending
   Scenario: _c_function_declarator finds the declarator a C function hangs its name and parameters off
     Given one C function definition node
     When _c_function_declarator walks the declarator chain past every pointer wrapper the return type puts in front of it
     Then it returns the function declarator, so the name reader and the parameter reader agree on which function they are reading
     But a definition whose chain reaches no function declarator returns nothing, and both readers then read nothing rather than guessing
 
-  @pending
   Scenario: _function_name reads the declared name of a function in any of the nine languages
     Given one function node
     When _function_name reads the name field, and falls back to the identifier at the end of a C declarator chain when there is none
     Then it returns the declared name, so the culprit listing names a C function as readily as a Python one
     But an anonymous function has no name to read and returns the empty string, which the culprit listing drops
 
-  @pending
   Scenario: _fixed_receivers returns the receiver keyword a language fixes for every function
     Given one function node and the configuration of a language that spells its receiver with a keyword
     When _fixed_receivers reads that keyword set off the configuration
     Then it returns self or this, the same set in every function of that language
     But the keyword is returned whether or not this function actually has a receiver, so a module-level function is read as though it could reach instance state
 
-  @pending
   Scenario: _go_method_receivers parses the receiver a Go method names for itself
     Given one Go function node and its language configuration
     When _go_method_receivers reads the identifiers out of the first parameter list, which is the receiver list
     Then it returns the receiver name, through which that method reaches its type's fields
     But a Go plain function is not a method declaration and gets an empty set, so nothing inside it can be read as instance access
 
-  @pending
   Scenario: _c_pointer_receivers treats a C function's pointer parameters as its receivers
     Given one C function definition node and its language configuration
     When _c_pointer_receivers reads the parameter list off the function declarator and keeps the identifier behind each pointer declarator

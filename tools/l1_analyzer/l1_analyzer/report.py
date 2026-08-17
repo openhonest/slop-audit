@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from l1_analyzer import state_census, state_partition
+from l1_analyzer import incomplete, state_census, state_partition
 
 _HYGIENE_WEIGHTS = {"L1.17": 3, "L1.15": 3, "L1.10": 2, "L1.11": 1, "L1.9": 1, "L1.16": 1}
 _BAND_POINTS = {"Healthy": 1.0, "Not Healthy": 0.5, "Slop": 0.0}
@@ -60,13 +60,21 @@ SILENCE_FLOOR = 0.50
 # admitted. Same two numbers, opposite facts. Four repositories were refused a grade on the
 # second reading, this tool's own package among them.
 #
-# The denominator is therefore `reachable`, the declarations whose KIND the enumerator has a
-# rule capable of matching, and the census measures capability with a fixture per (language,
-# kind) run through the real classifier. Three pairs come back with no rule at all: a C
-# struct field, a C# auto-property, and a name bound in a Python class body. Narrowing
+# The denominator is therefore `visited`, the declarations the classifier's own walk reached,
+# recorded by the enumerators as they go and matched to the census site by site. Narrowing
 # `declared` instead was tried and measured - raw, minus TypedDict shapes, minus immutables,
 # over ten Python trees - and it moves nothing, because shrinking a denominator never turns
 # an admitted count of zero into anything else.
+#
+# It was `reachable` until 2026-08-16, a count of declarations whose KIND the enumerator had
+# a rule for, taken from one fixture per (language, kind). Three pairs came back with no rule
+# - a C struct field, a C# auto-property, a name bound in a Python class body - and then
+# `record_state` taught the classifier all three, every pair measured readable, `reachable`
+# equalled `declared` on every repository, and this branch became dead code. A kind is not a
+# property of a repository: a C struct used in the file that declares it is read and the same
+# kind in a header is not, and a Rust or Go field no method touches was never looked at at
+# all. Measured over the sixteen trees below, `visited` reaches zero on none of them, so the
+# correction refuses nothing that used to grade.
 #
 # admitted/declared over the same seventeen trees the silence floor
 # was measured on (the six pinned corpus repositories, this repository, the analyzer package,
@@ -83,12 +91,12 @@ SILENCE_FLOOR = 0.50
 # code, which is the same argument that rejected a 0.10 silence floor. A bound at 0.10 refuses
 # eight of seventeen on the same grounds. Any number in that range would be invented here.
 #
-# An empty reachable denominator is not a small fraction, it is a different fact: nothing
-# here is written in a form any rule can reach, so the reading never started and the report
-# has no evidence to grade. That boundary is where the defect lives and it needs no number.
+# An empty visited denominator is not a small fraction, it is a different fact: no rule
+# reached anything this code declares, so the reading never started and the report has no
+# evidence to grade. That boundary is where the defect lives and it needs no number.
 # The residual blind spot is named rather than closed: a repository that declares one
-# reachable site and a hundred unreachable ones is graded on the one, and only teaching the
-# enumerator the missing kind fixes that. What would settle a fractional bound is a
+# visited site and a hundred nothing reached is graded on the one, and only teaching the
+# enumerator the missing construct fixes that. What would settle a fractional bound is a
 # labelled set - repositories where a human has enumerated the state by hand - so the ratio
 # could be scored against a known truth instead of against itself. Until that exists, a thin
 # reading and a thorough one are told apart only at zero, and the census publishes the ratio
@@ -129,42 +137,54 @@ def silence_fraction(counts: dict) -> float:
     second key, so the number that suppresses a grade and the number that sets it can
     never disagree about the same repository."""
     total = sum(counts.values())
-    return (counts.get("unresolved", 0) / total) if total else 0.0
+    # Zero recognised states gives 0.0 here, which reads as "nothing undecided" and so can
+    # never trip the above-half rule that withholds a grade. That is one of the two doors the
+    # "100% finitely testable" defect came through. It stays 0.0 rather than refusing, because
+    # a package that genuinely holds no mutable state has genuinely nothing silent, and
+    # refusing here would fail that package too. The door is shut in `grade_summary` instead,
+    # where L1.18 and the census are both in scope and can contradict a classifier that
+    # recognised nothing: this function cannot tell "no rule existed" from "every rule said
+    # no", and the check belongs where the evidence to tell them apart exists.
+    return (counts["unresolved"] / total) if total else 0.0
 
 
 def census_unread(census: object) -> bool:
-    """True when the parser found state-bearing declarations, NONE of them of a kind the
-    classifier's enumerator has a rule capable of matching, and the classifier produced no
-    finding whatever. The two counts come from different readings on purpose: a shared
-    enumerator would make them agree by construction and this gap could never open.
+    """True when the parser found state-bearing declarations, the classifier's enumerator
+    reached NONE of them, and it produced no finding whatever. The two counts come from
+    different readings on purpose: a shared enumerator would make them agree by construction
+    and this gap could never open.
 
-    `reachable` rather than `declared` is the denominator, and that correction is the whole
-    of this function's history. The first version asked whether `admitted` was zero against
-    `declared`, which conflates two opposite facts: no rule existed, and every rule said no.
-    A C struct field is the first, so refusing is right. A codebase whose state is TypedDict
-    shapes and all-caps constants is the second - every kind it declares is one the
-    enumerator reads, it read them and declined them on the merits - and refusing there
-    reported a limit of ours that was not there. It refused this repository's own analyzer
-    package, and three more.
+    THE DENOMINATOR IS `visited`, AND THE TWO CORRECTIONS THAT GOT IT THERE ARE THIS
+    FUNCTION'S WHOLE HISTORY. The first version asked whether `admitted` was zero against
+    `declared`, which conflates two opposite facts: no rule reached it, and every rule read it
+    and said no. A C struct field was the first, so refusing is right. A codebase whose state
+    is TypedDict shapes and all-caps constants is the second - the enumerator walked every one
+    of them and declined them on the merits - and refusing there reported a limit of ours that
+    was not there. It refused this repository's own analyzer package, and three more.
+
+    `reachable` replaced `declared` and answered the middle clause from a capability table
+    keyed by (language, declaration kind), one fixture each. Then the record rules taught the
+    classifier the three kinds it had no rule for, every pair measured readable, `reachable`
+    equalled `declared` on every repository, and this function could not return True at all.
+    A kind is not a property of a repository. `visited` is the classifier's own record of the
+    declarations it reached, on the repository being audited, so it separates read-and-declined
+    from never-looked-at where the difference actually lives.
 
     `admitted == 0` stays in the conjunction for the invariant `_basis` relies on: a
-    repository with any finding at all, a promiscuous proof included, is never UNREAD. It
-    also makes the change a one-way relaxation, so no repository can move from graded to
-    refused by this rule.
+    repository with any finding at all, a promiscuous proof included, is never UNREAD.
 
-    A census without `reachable` is not a census, and reads here as "not counted", the same
-    as `declared` of None. Nothing downstream may treat a missing capability answer as a
-    capability."""
+    A census without `visited` is not a census, and reads here as "not counted", the same as
+    `declared` of None. Nothing downstream may treat a missing visit record as a visit."""
     if not isinstance(census, dict):
         return False
-    declared, reachable = census.get("declared"), census.get("reachable")
+    declared, visited = census.get("declared"), census.get("visited")
     return (isinstance(declared, int) and declared > 0
-            and isinstance(reachable, int) and reachable == 0
+            and isinstance(visited, int) and visited == 0
             and census.get("admitted") == 0)
 
 
 def unread_kinds_phrase(census: object) -> str:
-    """The declaration kinds this repository spells and the enumerator cannot match, in
+    """The declaration kinds this repository spells that the enumerator reached nothing of, in
     prose. Read from the census rather than re-derived, so the sentence a reader acts on and
     the count that withheld the grade come from one measurement."""
     kinds = census.get("unread_kinds") if isinstance(census, dict) else None
@@ -298,8 +318,37 @@ def grade_summary(results: dict, unordered_class_bound: int | None) -> GradeSumm
     # The denominator is DECIDED state, not all state. Undecided state is no longer held
     # against the grade, so holding it against the published percentage would put the same
     # blind spot back through a second door.
-    decided = counts.get("neutral", 0) + counts.get("promiscuous", 0)
-    pct = None if status == "na" else (100 if decided == 0 else round(counts.get("neutral", 0) / decided * 100))
+    decided = counts["neutral"] + counts["promiscuous"]
+    # `100 if decided == 0` stood here until the 2026-08-16 sweep, and it printed "100% of its
+    # state is finitely testable" over a 14-line Ruby file whose whole state was an unbounded
+    # @@cache and an unbounded $seen that the classifier had no rule for.
+    #
+    # The refusal cannot key on `decided == 0` alone. This file's own census tests draw the
+    # line: zero decided means either NO RULE EXISTED or EVERY RULE SAID NO, and refusing on
+    # the second reports a limit that does not exist. A package built from TypedDicts and
+    # immutable constants genuinely holds no mutable state, and it must be graded.
+    #
+    # So the two independent measures have to agree. L1.18 walks for functions touching
+    # unbounded external state and the census walks for state-bearing declarations; either
+    # finding something the classifier recognised nothing of means a rule is missing, not that
+    # the code is clean. Disagreement between two measures of the same thing is INCOMPLETE
+    # CODE, and it is the one signal available here that the Ruby case trips and the
+    # stateless case does not: L1.18 read that file as 1/2 functions, 50.0, Slop.
+    # The census cannot serve as the second measure. Its `declared` counts candidates, and
+    # `judged: 0` over `declared: n` is the ordinary result for code that genuinely holds no
+    # mutable state: the stateless-by-design fixture reads 3 declared and 0 judged, and this
+    # analyzer's own package reads 532 and 0. Both are correct outcomes, so that pair proves
+    # nothing. L1.18 is the one genuinely independent reading, because it walks for functions
+    # touching unbounded external state rather than for declarations that might be state.
+    l18_found = isinstance(l18.get("value"), (int, float)) and l18["value"] > 0
+    if status != "na" and decided == 0 and l18_found:
+        raise incomplete.refuse(
+            "finitely-testable share",
+            f"the classifier decided nothing about this repository's state, while L1.18 read "
+            f"{l18['value']} ({l18.get('details', 'no detail')}). Two measures of the same code "
+            f"disagree, so a rule is missing rather than the code being clean")
+    pct = None if status == "na" else (100 if decided == 0 else
+                                       round(counts["neutral"] / decided * 100))
     hygiene = _hygiene(results)
     return {"status": status, "basis": basis, "counts": counts, "testable_pct": pct,
             "hygiene": hygiene, "grade": _grade(status, pct, hygiene),

@@ -301,7 +301,9 @@ class LangCfg(TypedDict, total=False):
     type_escape_patterns: tuple[str, ...]
     annotation_escape_nodes: tuple[str, ...]
     annotation_escape_names: tuple[str, ...]
+    member_op: str
     module_scan: str
+    receiver_scan: str
     const_keywords: tuple[str, ...]
     field_decl_types: tuple[str, ...]
     immutable_modifiers: frozenset[str]
@@ -321,6 +323,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
         # Read the binding name from the assignment's `left` field, not by text-
         # splitting the node. See ../../../research/amendments/amendment-2026-08-01-l1-18-module-global.md.
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "module_scan": "python_fields",
     },
     "rust": {
@@ -339,6 +343,8 @@ LANG_CFG: dict[str, LangCfg] = {
         # (`static mut NAME: TYPE`). The name is the declaration's identifier child;
         # the legacy text split grabbed the type (`i32`) instead, so no global was
         # ever recognized. See ../../../research/amendments/amendment-2026-08-02-rust-receiver-and-static.md.
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "module_scan": "mutable_specifier",
         "type_escape_patterns": (),
         # Retained per ../../../research/amendments/amendment-2026-07-31-rust-raw-pattern-scope.md; structural
@@ -354,6 +360,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": set(),
         "module_level_assign": ("declaration", "init_declarator"),
         "type_escape_patterns": (),
+        "member_op": "->",
+        "receiver_scan": "c_pointer_params",
         "module_scan": "c_declarations",
         # C's only immutability keyword. It used to inherit a shared default carrying
         # `let `, `val ` and `readonly `, none of which are C.
@@ -375,6 +383,8 @@ LANG_CFG: dict[str, LangCfg] = {
         # A Java field is state wherever it sits in the class body, and it is reached
         # by bare name, not through `this.`. See
         # ../../../research/amendments/amendment-2026-08-15-l1-18-corrected-ratio.md.
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "module_scan": "class_fields",
         "field_decl_types": ("field_declaration",),
         "immutable_modifiers": frozenset({"final"}),
@@ -388,6 +398,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": ("any", "unknown"),  # plus // @ts-ignore
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "module_scan": "text",
         # `const` is the only immutable module binding; `let` and `var` are mutable
         # state. TypeScript inherited a shared default containing `let `, so every
@@ -404,6 +416,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_declaration_statement"),
         "type_escape_patterns": ("object", "dynamic"),
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "module_scan": "class_fields",
         "field_decl_types": ("field_declaration",),
         "immutable_modifiers": frozenset({"readonly", "const"}),
@@ -417,6 +431,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": (),  # untyped
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "module_scan": "text",
         # `const` bindings are immutable; `let`/`var` are mutable module state
         "const_keywords": ("const ",),
@@ -433,6 +449,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "instance_field_types": ("instance_variable", "global_variable"),
         "module_level_assign": ("assignment", "operator_assignment"),
         "type_escape_patterns": (),  # untyped
+        "member_op": ".",
+        "receiver_scan": "fixed",
         "module_scan": "text",
         # Ruby has no immutability keyword: a constant is spelled in capitals, which
         # the scan already honours. The empty tuple says so; it used to inherit a
@@ -449,6 +467,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": set(),
         "module_level_assign": ("var_declaration",),
         "type_escape_patterns": ("any",),  # Go's `any` alias for interface{}
+        "member_op": ".",
+        "receiver_scan": "go_method_receiver",
         "module_scan": "text",
         "const_keywords": ("const ",),
     },
