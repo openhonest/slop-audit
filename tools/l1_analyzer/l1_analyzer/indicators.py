@@ -373,7 +373,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": set(),
         "module_level_assign": ("declaration", "init_declarator"),
         "type_escape_patterns": (),
-        "module_scan": "text",
+        "module_scan": "c_declarations",
         # C's only immutability keyword. It used to inherit a shared default carrying
         # `let `, `val ` and `readonly `, none of which are C.
         "const_keywords": ("const ",),

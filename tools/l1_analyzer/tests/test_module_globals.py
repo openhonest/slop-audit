@@ -96,3 +96,71 @@ def test_empty_cache_accumulator_flags_its_readers(tmp_path):
         "def get(k):\n    return CACHE[k]\n"
     )
     assert analyze_mutable_state(tmp_path, "python")["details"].startswith("2/2")
+
+
+# --- C file-scope declarations, read structurally rather than from line text ----
+#
+# C used the text heuristic, which needs an `=` on the line, so `static int cache[256];`
+# declared no state at all and L1.18 read 0.0 Healthy over a file whose only state was that
+# array. The classifier read the same file and called `cache` promiscuous. Two measures of
+# one file disagreeing about what is even a candidate is the defect these pin.
+
+_C_FILE_SCOPE = (
+    "static int cache[256];\n"
+    "int counter = 0;\n"
+    "const int MAX = 10;\n"
+    "static const char *NAME = \"x\";\n"
+    "char *buf;\n"
+    "void proto(int k);\n"
+)
+
+
+def _c_module_names(src: str) -> set[str]:
+    from l1_analyzer.indicators import LANG_CFG
+    from l1_analyzer.mutable_state import _find_module_mutable_names
+    from l1_analyzer.state_bounds import _get_parser
+    root = _get_parser("c").parse(src.encode()).root_node
+    return _find_module_mutable_names(root, LANG_CFG["c"])
+
+
+def test_a_c_array_with_no_initialiser_is_still_a_declaration():
+    # The regression. No `=` on the line, so the text heuristic saw nothing.
+    assert "cache" in _c_module_names(_C_FILE_SCOPE)
+
+
+def test_every_non_const_c_file_scope_declarator_form_is_read():
+    # array, initialiser and pointer forms all bind a name.
+    assert _c_module_names(_C_FILE_SCOPE) == {"cache", "counter", "buf"}
+
+
+def test_a_c_prototype_declares_no_state():
+    assert _c_module_names("void proto(int k);\n") == set()
+
+
+def test_a_c_function_pointer_is_state_because_it_is_rebindable():
+    assert _c_module_names("void (*handler)(int);\n") == {"handler"}
+
+
+def test_the_two_measures_agree_that_the_c_array_is_state():
+    """The point of the fix: L1.18 and the classifier stop contradicting each other.
+
+    Before, L1.18 read 0.0 Healthy over this file while the classifier called `cache`
+    promiscuous. The write alone is not what makes it promiscuous: with only `put`, the
+    classifier says neutral, because state nothing branches on is compositional. `get` reads
+    it into a return, and that is the read that decides. I asserted promiscuous against the
+    write-only fixture when writing this test and had to be corrected by the classifier.
+    """
+    import tempfile
+    from pathlib import Path
+
+    from l1_analyzer import mutable_state, state_bounds
+    src = ("static int cache[256];\n\n"
+           "void put(int k, int v) { cache[k] = v; }\n\n"
+           "int get(int k) { return cache[k]; }\n")
+    with tempfile.TemporaryDirectory() as d:
+        Path(d, "a.c").write_text(src)
+        counted = mutable_state.analyze_mutable_state(Path(d), "c")
+        classified = state_bounds.classify(Path(d), "c")
+    assert counted["value"] == 100.0, "both functions reach the array, so both count"
+    assert any(f["state"] == "cache" and f["verdict"] == "promiscuous"
+               for f in classified["findings"])

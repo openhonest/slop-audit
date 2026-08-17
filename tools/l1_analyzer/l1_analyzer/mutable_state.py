@@ -251,6 +251,73 @@ def _module_mutables_specifier_scan(root: Node, cfg: LangCfg) -> set[str]:
     return _module_mutables_by_specifier(shallow_candidates(root, cfg["module_level_assign"]))
 
 
+def _module_mutables_c_scan(root: Node, cfg: LangCfg) -> set[str]:
+    """File-scope declarations in C, read from the parse tree rather than from line text.
+
+    C used the text heuristic, which needs an `=` on the line, so `static int cache[256];`
+    declared no state as far as L1.18 was concerned. On the fixture in
+    tests/test_module_globals.py the text scan found `counter` and missed `cache`, `buf`,
+    `NAME` and `MAX`, while the classifier enumerated all five. Two measures of one file
+    disagreeing about what is even a candidate is the defect; the array was the instance.
+
+    A prototype is not state and a function pointer is; `_c_declared_name` tells them apart,
+    because the grammar puts `function_declarator` on top of both.
+
+    Known limit, kept deliberately: a declaration carrying a `const` qualifier is excluded
+    whole, which is right for `const int MAX = 10` and wrong for `const char *NAME`, where
+    const qualifies the pointee and the pointer is still rebindable. That is the same call the
+    text heuristic made when it screened the line for `const `, so this change fixes the
+    missing-declaration bug without moving the const boundary at the same time.
+    """
+    const_keywords = tuple(kw.strip() for kw in cfg["const_keywords"])
+    names: set[str] = set()
+    for node in root.children:
+        if node.type != "declaration":
+            continue
+        if any(c.type == "type_qualifier" and _text(c) in const_keywords for c in node.children):
+            continue
+        for child in node.children:
+            if child.type in _C_DECLARATORS:
+                name = _c_declared_name(child)
+                if name is not None:
+                    names.add(name)
+                break
+    return names
+
+
+# The declarator forms a C file-scope declaration can carry. Written out rather than probed
+# at runtime, so a form nobody listed is a missing row here and not a silent omission.
+_C_DECLARATORS = ("identifier", "init_declarator", "array_declarator", "pointer_declarator",
+                  "function_declarator")
+
+
+def _c_declared_name(declarator: Node) -> str | None:
+    """The identifier a C declarator binds, or None when it binds no state.
+
+    A prototype binds none: `void proto(int)` is a `function_declarator` whose own declarator
+    is a bare identifier. A function POINTER does bind state, and the grammar makes the two
+    easy to confuse, because it puts `function_declarator` on top of both. `void
+    (*handler)(int)` reaches its name through a `parenthesized_declarator` holding a
+    `pointer_declarator`, and a rebindable pointer is state whatever it points at. I asserted
+    the opposite when writing this, that a pointer sat on top, and the grammar said otherwise.
+
+    Returns None rather than raising when no identifier is reachable, because a declaration
+    the grammar could not resolve is a fact about the source and not about this table.
+    """
+    node: Node | None = declarator
+    while node is not None and node.type != "identifier":
+        if node.type == "function_declarator":
+            inner = node.child_by_field_name("declarator")
+            if inner is None or inner.type != "parenthesized_declarator":
+                return None                      # a prototype, not a variable
+            node = next((c for c in inner.children if c.type == "pointer_declarator"), None)
+            continue
+        nxt = node.child_by_field_name("declarator")
+        node = nxt if nxt is not None else next(
+            (c for c in node.children if c.type in _C_DECLARATORS), None)
+    return _text(node) if node is not None else None
+
+
 def shallow_candidates(root: Node, assign_types: tuple[str, ...]) -> list[Node]:
     """Top-level assignments, allowing one wrapper: Python nests `x = 0` inside an
     `expression_statement`, so the `assignment` node is a child of a root child.
@@ -280,6 +347,7 @@ _MODULE_SCANS: dict[str, Callable[[Node, LangCfg], set[str]]] = {
     "python_fields": _module_mutables_python_scan,
     "mutable_specifier": _module_mutables_specifier_scan,
     "class_fields": _module_mutables_class_fields,
+    "c_declarations": _module_mutables_c_scan,
     "text": _module_mutables_text,
 }
 
