@@ -36,6 +36,8 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer import incomplete
+
 
 class L1Result(TypedDict, total=False):
     value: float | int | str
@@ -191,7 +193,12 @@ def _coverage_verdict(returncode: int, totals: dict, provenance: str) -> L1Resul
     num_branches = int(totals.get("num_branches", 0))
     covered = int(totals.get("covered_branches", 0))
     if num_branches == 0:
-        return _na("no enumerable decision branches found in the measured tree")
+        # Raised rather than returned, now that the boundary covers this measure. A share of
+        # no branches is absent and not zero, and `incomplete` exists so that the absence
+        # cannot be spelled as a value by a caller who forgets to check one.
+        raise incomplete.refuse(
+            "L1.19 decision-space coverage",
+            "no enumerable decision branches found in the measured tree")
     pct = covered / num_branches * 100
     suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
     return {

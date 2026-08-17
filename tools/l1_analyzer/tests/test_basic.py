@@ -535,8 +535,12 @@ def test_l1_19_no_tests_is_na(tmp_path):
 def test_l1_19_no_branches_is_na(tmp_path):
     (tmp_path / "m.py").write_text("def f():\n    return 1\n")  # straight-line, no branches
     (tmp_path / "test_m.py").write_text("from m import f\ndef test_f():\n    assert f() == 1\n")
-    res = pytest_trace.decision_space_coverage(tmp_path, "python", 60.0)
-    assert res["band"] == "n/a" and "no enumerable decision branches" in res["details"]
+    # The contract moved on 2026-08-17: this refuses rather than returning n/a, now that
+    # L1.19 routes through `indicators._measure` like every other measure. The reason text is
+    # unchanged, and a reader of the report still sees n/a; what changed is that a caller who
+    # forgets to check can no longer spell the absence as a value.
+    with pytest.raises(IncompleteCode, match="no enumerable decision branches"):
+        pytest_trace.decision_space_coverage(tmp_path, "python", 60.0)
 
 
 def test_l1_19_timeout_is_na(tmp_path):

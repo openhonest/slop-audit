@@ -755,14 +755,22 @@ def _runtime_coverage(repo: Path, lang: str, timeout_seconds: float, python_exec
     harness = _COVERAGE_HARNESS.get(lang)
     if harness is None:
         return {"value": "n/a", "band": "n/a", "details": f"runtime decision-coverage harness not implemented for {lang}"}
-    return harness(repo, timeout_seconds, python_executable)
+    # Routed through _measure, like every other measure. These two were the only ones that
+    # were not, so a raise from a runtime harness escaped compute_source_indicators entirely
+    # and aborted the audit. Three separate extractions of the seven harnesses each wanted to
+    # refuse here and each had to return _na instead, which is how the gap was found.
+    return _measure(harness, repo, timeout_seconds, python_executable)
 
 def _runtime_determinism(repo: Path, lang: str, timeout_seconds: float, python_executable: str | None) -> L1Result:
     """Dispatch to the language's runtime determinism harness (the seam above), or n/a."""
     harness = _DETERMINISM_HARNESS.get(lang)
     if harness is None:
         return {"value": "n/a", "band": "n/a", "details": f"runtime determinism harness not implemented for {lang}"}
-    return harness(repo, timeout_seconds, python_executable)
+    # Routed through _measure, like every other measure. These two were the only ones that
+    # were not, so a raise from a runtime harness escaped compute_source_indicators entirely
+    # and aborted the audit. Three separate extractions of the seven harnesses each wanted to
+    # refuse here and each had to return _na instead, which is how the gap was found.
+    return _measure(harness, repo, timeout_seconds, python_executable)
 
 def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float,
                         python_executable: str | None = None) -> L1Result:

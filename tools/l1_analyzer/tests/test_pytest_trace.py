@@ -133,5 +133,10 @@ def test_an_unrecognised_exit_code_reports_the_code_rather_than_another_rows_rea
 
 
 def test_zero_enumerable_branches_is_absent_not_zero_percent():
-    r = pytest_trace._coverage_verdict(0, {"num_branches": 0, "covered_branches": 0}, "p")
-    assert r["band"] == "n/a" and r["value"] == "n/a"
+    # It refuses rather than returning n/a. Both reach the reader as n/a, because
+    # `indicators._measure` turns the refusal into one; the difference is that the absence
+    # cannot be handed on as a value by a caller who forgets to look at the band.
+    import pytest as _pytest
+    from l1_analyzer.incomplete import IncompleteCode
+    with _pytest.raises(IncompleteCode, match="no enumerable decision branches"):
+        pytest_trace._coverage_verdict(0, {"num_branches": 0, "covered_branches": 0}, "p")

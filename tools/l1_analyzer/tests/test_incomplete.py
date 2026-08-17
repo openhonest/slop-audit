@@ -44,3 +44,47 @@ def test_ratio_refuses_a_zero_denominator_rather_than_returning_zero():
 def test_ratio_names_the_basis_so_the_boundary_can_print_it():
     with pytest.raises(IncompleteCode, match="no function was enumerated"):
         incomplete.ratio(3, 0, "L1.18 unbounded mutable state", "no function was enumerated")
+
+
+# --- the boundary must cover every measure, not seven of nine -------------------
+#
+# L1.19 and L1.20 were the only measures in compute_source_indicators that did not pass
+# through `_measure`, so a raise from a runtime harness would have aborted the audit instead
+# of becoming an n/a. Three separate agents extracting the seven harnesses hit that wall and
+# each returned `_na` rather than crash the analyzer. These pin the routing, end to end, on a
+# real repository: no fake, no stub, and no patched module.
+
+def _repo_with_no_branches(tmp_path):
+    """A real package whose suite runs and whose code contains no decision at all.
+
+    This is what makes the test honest. coverage.py really runs, really reports, and really
+    finds num_branches == 0, so the refusal is reached the way a user would reach it rather
+    than by handing the module a value it would never see.
+    """
+    (tmp_path / "m.py").write_text("def add(a, b):\n    return a + b\n")
+    (tmp_path / "test_m.py").write_text("from m import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n")
+    return tmp_path
+
+
+def test_a_verdict_with_no_branches_to_measure_raises_rather_than_returning_na():
+    from l1_analyzer import pytest_trace
+    with pytest.raises(IncompleteCode, match="L1.19 decision-space coverage"):
+        pytest_trace._coverage_verdict(0, {"num_branches": 0, "covered_branches": 0}, "p")
+
+
+def test_a_harness_refusal_reaches_the_report_as_an_n_a_and_not_as_a_traceback(tmp_path):
+    """The routing, proved on a real run. Before this, `_runtime_coverage` called the harness
+    directly and the raise would have escaped `compute_source_indicators` entirely."""
+    from l1_analyzer import indicators
+    repo = _repo_with_no_branches(tmp_path)
+    result = indicators._decision_space_l19(repo, "python", True, 120)
+    assert "INCOMPLETE CODE" in result["details"]
+    assert "no enumerable decision branches" in result["details"]
+
+
+def test_the_determinism_dispatch_is_routed_through_the_same_boundary(tmp_path):
+    """`_runtime_determinism` is the second of the two, and it is routed by the same call.
+    An unsupported language is the reachable half of its contract and must stay an n/a."""
+    from l1_analyzer import indicators
+    result = indicators._runtime_determinism(tmp_path, "klingon", 5, None)
+    assert result["band"] == "n/a" and "not implemented" in result["details"]
