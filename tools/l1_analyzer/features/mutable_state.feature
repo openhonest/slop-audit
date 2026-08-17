@@ -77,7 +77,6 @@ Feature: mutable_state — L1.18, the share of functions that reference unbounde
     But the walk never covers the wider assignment vocabulary, which is what keeps method locals out, and it never reaches a C# property, so state written with accessors is not counted at all
 
   # A declaration with no initialiser is invisible: the line must contain an equals sign, so an uninitialised package-level variable never enters the set.
-  @pending
   Scenario: _module_mutables_c_scan reads C file-scope declarations from the parse tree
     Given a C translation unit holding file-scope declarations
     When _module_mutables_c_scan walks the root's children
@@ -85,7 +84,6 @@ Feature: mutable_state — L1.18, the share of functions that reference unbounde
     And a function prototype contributes no name, while a function pointer does
     But a declaration carrying a const type qualifier is skipped whole, which is the same boundary the text heuristic drew
 
-  @pending
   Scenario: _c_declared_name unwraps a C declarator to the identifier it binds
     Given a declarator that may be an identifier, an initialiser, an array or a pointer form
     When _c_declared_name descends it

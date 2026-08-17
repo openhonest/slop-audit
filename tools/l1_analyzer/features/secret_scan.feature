@@ -62,7 +62,6 @@ Feature: secret_scan — counting the distinct credentials committed to a reposi
     Then it returns the one-based line number
     And every finding is located this way, so a reader can go straight to the line without the report ever quoting it
 
-  @pending
   Scenario: _byte_offset restates a character position in the bytes the parser counted
     Given a file's text and a position in it that the regular-expression engine reported
     When _byte_offset re-encodes the text before that position
