@@ -43,7 +43,11 @@ GOLDEN = Path(__file__).parent / "golden" / "py_repo.json"
 # The golden's own content, pinned. Without this a re-capture is invisible: the diff that
 # would have shown a behaviour change is committed as the new expectation and nothing is red.
 # Update it deliberately, in the same commit as the re-capture, with the reason in the message.
-_GOLDEN_SHA256 = "0d01775c86105b60e5e6dc33971726c3d7339e15317cb29e1936c3d1160c81af"
+# Re-captured 2026-08-17 for one field only: L1.19 moved from 2 to 1. The fixture holds a
+# single `if self.enabled:`, and the old shared node set matched both the if_statement and
+# the unnamed `if` keyword token inside it, so every `if` counted twice. 1 is the number a
+# reader gives. Nothing else in the golden moved.
+_GOLDEN_SHA256 = "8b628f6e0facff829001770cd361535def7d6e9b1900377064d5a50f2fdb0a23"
 
 # A deliberately-sloppy sample: pure function + reads of dict/list/str/int/bool
 # state, plus one bounded projection (len). Written to tmp_path per test. Kept

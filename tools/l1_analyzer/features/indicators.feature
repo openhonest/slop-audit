@@ -176,10 +176,16 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     And there is no minimum denominator, so a twenty-line file of nothing but escapes reports the density it earned instead of a fabricated clean zero
     But a language with no configured escape vocabulary returns n/a, and so does a scan that found no production lines at all
 
+  # A decision point is a construct at which control can take more than one path. An if, an
+  # elif, an unless and a ternary count one each; an else counts nothing, because it is the
+  # other path of the if that already counted. Each arm of a switch or match counts one,
+  # including the default arm, and the container counts nothing.
   Scenario: _compute_decision_space enumerates the decision points without scoring them
     Given a repository and a language
-    When _compute_decision_space walks the production source for control-flow nodes
+    When _compute_decision_space walks the production source for the node types that language declares a decision
     Then it returns the count of decision points under the n/a band, because a count is not a score
+    And it walks named children only, so an unnamed keyword token sitting inside the node that already matched can never be counted a second time
+    And it reads the language's declaration by subscript, so a supported language that declares nothing raises instead of enumerating zero
     And it names how many files it read, so the count can be recomputed
     But its detail line always asserts that no execution trace was run, which is true of this function alone, since the caller replaces the whole result when the suite does run
 

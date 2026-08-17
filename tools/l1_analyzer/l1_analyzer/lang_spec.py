@@ -247,6 +247,74 @@ _GO_LITERALS = frozenset({
 # spec, never a hard-coded string, so one implementation serves every language.
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# Decision points, per grammar (L1.19, static half).
+#
+# THE RULE, stated so a reader can check the published number:
+#
+#   A decision point is a construct at which control can take more than one path.
+#
+#   - An `if`, an `elif`/`elsif`, an `unless`, a ternary or conditional expression:
+#     one each. An `else` is NOT a decision; it is the other path of the `if` that
+#     already counted.
+#   - Each ARM of a switch or match, including the default or wildcard arm: one
+#     each. The switch or match CONTAINER is not counted separately, because its
+#     arms are where the choosing happens.
+#
+# Declared per language rather than shared, because the same string means different
+# things in different grammars. Ruby's `if`, `unless`, `case` and `when` are NAMED
+# node types; Python's `if` is an unnamed keyword token sitting inside the
+# if_statement that already matched. One shared frozenset cannot tell those apart,
+# which is how the double-count survived: every `if` in all nine languages counted
+# twice, while seven real constructs went unseen. Read by subscript, so a language
+# that declares nothing raises rather than reaching a default.
+#
+# Every type below was probed against the grammar on 2026-08-17 and is NAMED; the
+# enumerator walks named children only, so an unnamed keyword token can never match.
+#
+# Two grammar-specific readings that a reader would otherwise have to derive:
+#
+#   java  -- `switch_label` is the arm. Both the classic form (`case 1:`) and the
+#            arrow form (`case 1 ->`) emit one label per arm, so the single type
+#            covers both. `switch_block_statement_group` would count only the
+#            classic form, and counting both would double every classic arm.
+#   ruby  -- Ruby spells a `case`'s default arm with the same `else` node it uses
+#            for an `if`'s else, so no node type can tell the two apart. A Ruby
+#            `case ... else` therefore counts its `when` arms only. This is a known
+#            asymmetry with the seven grammars whose default arm has a type of its
+#            own and does count; it is named here rather than left to be found.
+DECISION_NODE_TYPES: dict[str, frozenset[str]] = {
+    "python": frozenset({
+        "if_statement", "elif_clause", "conditional_expression", "case_clause",
+    }),
+    "ruby": frozenset({
+        "if", "unless", "elsif", "if_modifier", "unless_modifier",
+        "conditional", "when", "in_clause",
+    }),
+    "c": frozenset({
+        "if_statement", "conditional_expression", "case_statement",
+    }),
+    "java": frozenset({
+        "if_statement", "ternary_expression", "switch_label",
+    }),
+    "csharp": frozenset({
+        "if_statement", "conditional_expression", "switch_section", "switch_expression_arm",
+    }),
+    "rust": frozenset({
+        "if_expression", "match_arm",
+    }),
+    "go": frozenset({
+        "if_statement", "expression_case", "type_case", "default_case", "communication_case",
+    }),
+    "javascript": frozenset({
+        "if_statement", "ternary_expression", "switch_case", "switch_default",
+    }),
+    "typescript": frozenset({
+        "if_statement", "ternary_expression", "switch_case", "switch_default",
+    }),
+}
+
+
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
         "class_types": ("class_definition",),

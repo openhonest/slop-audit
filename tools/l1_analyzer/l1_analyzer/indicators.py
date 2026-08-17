@@ -50,6 +50,7 @@ from l1_analyzer import (
     rust_trace,
 )
 from l1_analyzer.incomplete import IncompleteCode, ratio
+from l1_analyzer.lang_spec import DECISION_NODE_TYPES
 from l1_analyzer.scope import (  # noqa: F401
     _IGNORE_DIRS,
     _TEST_DIR_MARKERS,
@@ -930,37 +931,36 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
     density = escape_count / (total_loc / 1000)
     return {"value": round(density, 2), "band": band(density, 1, 5, higher_is_better=False), "details": _with_skipped(f"{escape_count} escapes in {total_loc} production LOC", skipped)}
 
-# Control-flow branch node types across the supported grammars. Exact-type
-# matches (not substring) so short Ruby types like "if"/"case"/"when" are safe.
-_DECISION_NODE_TYPES = frozenset({
-    "if_statement", "if_expression", "if", "elif_clause", "else_if_clause",
-    "conditional_expression", "ternary_expression",
-    "switch_statement", "switch_expression", "switch_section", "switch_case",
-    "expression_switch_statement", "type_switch_statement", "expression_case",
-    "type_case", "default_case", "communication_case", "select_statement",
-    "match_expression", "match_statement", "match_arm", "case_clause",
-    "case", "when", "case_match", "in_clause",  # ruby
-})
-
 def _compute_decision_space(repo: Path, lang: str) -> L1Result:
     """L1.19, static half: enumerate the finite decision points via tree-sitter.
-    The exercised-coverage fraction requires a runtime trace (see
-    pytest_trace.decision_space_coverage); when the suite cannot be run this is
-    reported as not-measured rather than fabricated."""
+    A decision point is a construct at which control can take more than one path; the
+    full rule, and the node types each grammar spells it with, live beside the
+    DECISION_NODE_TYPES table in lang_spec.py, because the number is published and a
+    reader is owed the definition. The exercised-coverage fraction requires a runtime
+    trace (see pytest_trace.decision_space_coverage); when the suite cannot be run this
+    is reported as not-measured rather than fabricated."""
     if lang not in LANG_CFG:
         return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
     parser = _get_parser(lang)
+    # Subscript, not .get(): a supported language that declares no decision vocabulary
+    # is a gap in the table, and a gap must raise rather than enumerate zero.
+    decision_types = DECISION_NODE_TYPES[lang]
     files, skipped = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], scope=PRODUCTION)
 
     decision_points = 0
     for _path, src in files:
         root = parser.parse(src).root_node
 
+        # named_children, never children. An unnamed keyword token (`if`, `case`,
+        # `switch`) sits inside the very node that already matched, and in Ruby it
+        # carries the SAME type string as the node, so walking every child counted
+        # every `if` twice in all nine languages. Anonymous tokens are leaves, so
+        # skipping them loses no descendant.
         def walk(n: Node):
             nonlocal decision_points
-            if n.type in _DECISION_NODE_TYPES:
+            if n.type in decision_types:
                 decision_points += 1
-            for c in n.children:
+            for c in n.named_children:
                 walk(c)
         walk(root)
 

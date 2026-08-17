@@ -71,8 +71,8 @@
   },
   "L1.19": {
     "band": "n/a",
-    "details": "2 finite decision points enumerated across 1 files; exercised-coverage fraction requires a test-execution trace (not run by this reference implementation); coverage not measured (test execution disabled)",
-    "value": 2
+    "details": "1 finite decision points enumerated across 1 files; exercised-coverage fraction requires a test-execution trace (not run by this reference implementation); coverage not measured (test execution disabled)",
+    "value": 1
   },
   "L1.20": {
     "band": "n/a",

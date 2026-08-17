@@ -158,9 +158,11 @@ L1.11     containerization         present      Healthy
 L1.15     type-escapes             0.0          Healthy      0 escapes in ~9kLOC
 L1.16     trailing-whitespace      0.0          Healthy      0 lines with trailing ws
 L1.17     god-files                0.0          Healthy      0/48 files >1k LOC, 0 >4k LOC
-L1.19     decision-space           2017         n/a          2017 finite decision points across 37 files
+L1.19     decision-space           1499         n/a          1499 finite decision points across 53 files
 abs-paths absolute-paths           0            Healthy      no hardcoded machine-specific absolute paths
 ```
+
+The L1.19 row was re-measured on 2026-08-17, after the decision-space enumerator was corrected; the rows around it are from the earlier run. The old enumerator counted the unnamed `if` keyword token alongside the `if_statement` node that contains it, so every `if` counted twice, and it missed most switch and match arms. On this tree the old rule gives 3042 and the corrected rule gives 1499. A decision point is now defined as a construct at which control can take more than one path: an `if`, an `elif`, an `unless` or a ternary counts one; an `else` counts nothing, being the other path of the `if` that already counted; each arm of a switch or match counts one, including the default arm, and the container counts nothing.
 
 ### Five bands come back short of Healthy, and they stay
 
