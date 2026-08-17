@@ -228,25 +228,6 @@ def _line_of(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
-def _byte_offset(text: str, char_offset: int) -> int:
-    """A character offset into `text`, expressed in the bytes tree-sitter counts in.
-
-    `re` counts characters and tree-sitter counts bytes, and the two agree only while the file
-    is ASCII. One accented word above a credential is one byte of drift, and the drift is
-    silent: the string-literal narrowing below then tests the credential's position against the
-    wrong span, so the finding is attributed to another literal or - the case that matters -
-    dropped without a word. A scanner whose whole job is finding committed credentials failed
-    open on any file carrying a comment in French, German or Japanese.
-
-    Exact rather than approximate, because the caller's contract makes it so: `_scan_text` is
-    handed the bytes of `text` itself, so re-encoding a prefix reproduces the byte offset the
-    parser saw. `str.isascii` is a cached flag on the string, so the common file costs nothing.
-    """
-    if text.isascii():
-        return char_offset
-    return len(text[:char_offset].encode("utf8"))
-
-
 def _string_spans(raw: bytes, suffix: str) -> list[tuple[int, int]] | None:
     """Byte spans of every string literal in a source file, or None when the file is not
     one of the nine supported languages. The generic rule fires only inside these, which
@@ -274,13 +255,7 @@ def _scan_text(text: str, raw: bytes, name: str) -> list[tuple[str, int, str]]:
     """(rule id, line, credential) for one file. Pure: no file system, no network.
 
     `name` is the file NAME, not a path: it selects the grammar (by suffix) and decides
-    whether the file's syntax is `KEY=value`.
-
-    `raw` MUST be `text.encode("utf8")`. Two offset systems meet in this function - `re`
-    counts characters and tree-sitter counts bytes - and `_byte_offset` converts between them
-    on the strength of that equality. `analyze` guarantees it by handing the parser the bytes
-    of the decoded text rather than the bytes it read off disk, so a file with a byte that is
-    not valid UTF-8 cannot put the two out of step either."""
+    whether the file's syntax is `KEY=value`."""
     hits: list[tuple[str, int, str]] = []
     claimed: set[tuple[int, str]] = set()
 
@@ -296,13 +271,9 @@ def _scan_text(text: str, raw: bytes, name: str) -> list[tuple[str, int, str]]:
             hits.append((rule["id"], line, value))
 
     for match in _PRIVATE_KEY.finditer(text):
-        # No `claimed.add` here, and it is not an omission. Group 1 is the PEM header, which
-        # always contains a space ("BEGIN PRIVATE KEY"), and the only reader of `claimed`
-        # below is the generic rule, whose `_is_generic_secret` rejects any value containing a
-        # space. The two sets can therefore never intersect, so the de-duplication the add
-        # performed could not fire on any input. The provider loop above cannot see it either,
-        # having already run.
-        hits.append(("private-key", _line_of(text, match.start(1)), match.group(1)))
+        line = _line_of(text, match.start(1))
+        claimed.add((line, match.group(1)))
+        hits.append(("private-key", line, match.group(1)))
 
     spans = _string_spans(raw, Path(name).suffix.lower())
     patterns = (_GENERIC, _GENERIC_ENV) if _has_env_syntax(name) else (_GENERIC,)
@@ -310,10 +281,7 @@ def _scan_text(text: str, raw: bytes, name: str) -> list[tuple[str, int, str]]:
         for match in pattern.finditer(text):
             value = match.group(1)
             start = match.start(1)
-            # The narrowing runs in tree-sitter's units, not the regex module's. Comparing the
-            # two directly is how a credential under an accented comment went unreported.
-            if spans is not None and not any(
-                    lo <= _byte_offset(text, start) < hi for lo, hi in spans):
+            if spans is not None and not any(lo <= start < hi for lo, hi in spans):
                 continue
             if not _is_generic_secret(value):
                 continue
@@ -385,13 +353,8 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
         scanned += 1
         in_tests = _bucket_reason(path, repo, has_packages, PRODUCTION) in ("tests", "test")
         text = raw.decode("utf8", errors="ignore")
-        # The parser is handed the bytes of the decoded text, not the bytes read off disk.
-        # The two differ only for a file carrying something that is not valid UTF-8, where the
-        # decode drops it - and then every span tree-sitter returned would be shifted by the
-        # dropped bytes against the offsets the regexes below report. Re-encoding costs one
-        # pass and makes `_byte_offset` exact by construction rather than by assumption.
         raw_hits.extend((rule_id, value, relpath, line, in_tests)
-                        for rule_id, line, value in _scan_text(text, text.encode("utf8"), path.name))
+                        for rule_id, line, value in _scan_text(text, raw, path.name))
 
     grouped: dict[tuple[str, str], list[tuple[str, int, bool]]] = {}
     for rule_id, value, relpath, line, in_tests in raw_hits:

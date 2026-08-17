@@ -34,8 +34,8 @@ CARD_COPY: dict[str, str] = {
     "detail.coarse": "Every piece of data here has a limited set of cases, so a fixed number of tests would cover it. The trouble is how many, and that they have no order. When cases are ordered, such as numbers against a limit, you test each side of the limit and you are done, however wide the range. The cases below are names, and one name is not next to another, so there is no shortcut: covering them means one test each. Cut the number of distinct cases, or give them an order, and the count comes down.",
     "detail.cannot": "{n} {plural} of data here can be almost anything, and the code makes decisions based on it. Because it can be anything, there is always one more case to check, so no fixed number of tests can ever cover them all. Writing more tests will not fix this. The only fix is to limit what that data can be, or stop letting other parts of the code change it.",
     "detail.na": "Point it at a public repository with code in a language the analyzer reads: Python, TypeScript, JavaScript, Java, C#, Rust, Ruby, Go, or C.",
-    "detail.na_unread": "Insufficient basis. No grade, and no claim either way about whether this code can be tested. Reading the source directly, we found {declared} {places} where it declares data it keeps, and our reader reached none of them: every one is spelled as {kinds}, and nothing our reader does found its way to them here, so it reached a verdict on none of them. That is a limit of our reading, not a finding about your code: it means we never got far enough to have an opinion. Every other number we publish is worked out over the data we did recognise, so on this repository they are all worked out over nothing, and we will not turn that into a good grade. Send us the repository and we will teach our reader the construct.",
-    "census.unread": "{unread} of the {declared} places where this code declares data it keeps {verb} spelled as {kinds}, and our reader never reached {verb2}. Nothing above is a verdict about them. That is our gap to close, not yours: send us the repository and we will teach the reader the construct.",
+    "detail.na_unread": "Insufficient basis. No grade, and no claim either way about whether this code can be tested. Reading the source directly, we found {declared} {places} where it declares data it keeps, and every one of them is spelled as {kinds}, which our reader has no rule for, so it reached a verdict on none of them. That is a limit of our reading, not a finding about your code: it means we never got far enough to have an opinion. Every other number we publish is worked out over the data we did recognise, so on this repository they are all worked out over nothing, and we will not turn that into a good grade. Send us the repository and we will teach our reader the construct.",
+    "census.unread": "{unread} of the {declared} places where this code declares data it keeps {verb} spelled as {kinds}, which our reader has no rule for. Nothing above is a verdict about them. That is our gap to close, not yours: send us the repository and we will teach the reader the construct.",
     "detail.na_silent": "No grade. We could not work out what {silent} of the {total} pieces of data here are used for, and that is more than half of them. Most often the data is handed to a library we cannot see inside. We will not hand out a good grade on the part we happened to be able to read, because that would reward code that shows us the least. The list below is every place we stopped, so you can see exactly what we could not follow.",
     "culprits.heading.coarse": "What costs too many tests",
     "culprits.heading.cannot": "What makes it impossible",
@@ -246,23 +246,23 @@ def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts
 
 
 def _census_note(census: dict) -> str:
-    """What this repository declares that the reader never reached, on a card that GRADED.
+    """What this repository declares that the reader has no rule for, on a card that GRADED.
 
     The refusal used to fire whenever nothing was admitted, which caught this case by
-    accident; it now fires only when the enumerator reached NOTHING this repository declares,
-    so a repository with one visited binding and two hundred nothing looked at is graded.
-    Those two hundred have to be said out loud on the card a reader actually gets, or relaxing
-    the refusal simply deletes the disclosure.
+    accident; it now fires only when NO declaration here is of a readable kind, so a
+    repository with one readable binding and two hundred unreadable ones is graded. Those two
+    hundred have to be said out loud on the card a reader actually gets, or relaxing the
+    refusal simply deletes the disclosure.
 
     The counts and the kind vocabulary come from the census and from
     report.unread_kinds_phrase, so this module keeps its own voice without being able to
     disagree with the measurement."""
-    declared, visited = census.get("declared"), census.get("visited")
-    if not isinstance(declared, int) or not isinstance(visited, int) or declared == visited:
+    declared, reachable = census.get("declared"), census.get("reachable")
+    if not isinstance(declared, int) or not isinstance(reachable, int) or declared == reachable:
         return ""
-    unread = declared - visited
+    unread = declared - reachable
     return _t("census.unread", unread=unread, declared=declared,
-              verb="is" if unread == 1 else "are", verb2="it" if unread == 1 else "them",
+              verb="is" if unread == 1 else "are",
               kinds=report.unread_kinds_phrase(census))
 
 

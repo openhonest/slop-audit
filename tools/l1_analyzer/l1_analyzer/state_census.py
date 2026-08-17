@@ -43,43 +43,39 @@ the classifier struct fields. Three of these entries have flipped from unreadabl
 readable that way, which is what the table is for: it is measured, so it moved on its own
 when the rule landed.
 
-So the denominator is the declaration sites THE CLASSIFIER'S OWN WALK REACHED, published as
-`visited`, and the refusal is that it reached none of them. `declared` stays beside it,
-because the wider count is the more conservative disclosure of how thin a reading was.
+So the denominator is declaration sites of a KIND THE ENUMERATOR HAS A RULE CAPABLE OF
+MATCHING, published as `reachable`, and the refusal is that nothing declared here is of
+such a kind. `declared` stays beside it, because the wider count is the more conservative
+disclosure of how thin a reading was.
 
-THE DENOMINATOR IS MEASURED PER SITE, ON THE REPOSITORY IN FRONT OF IT. It used to be
-measured per (language, declaration KIND), against a fixture, by the `CAPABILITY` table
-below, and that granularity is the defect this module carried from 2026-08-15 to
-2026-08-16. A kind was recorded readable when ONE fixture of that kind could be read, the
-three record rules made every one of the nineteen pairs readable, `reachable` therefore
-equalled `declared` on every repository, and the refusal could not fire at all. Everything
-hanging off it went with it: `report.census_unread`, `card._census_note`, the "Insufficient
-basis" wording and the cli line that reads it were all unreachable in production, and seven
-tests were skipped with the reason written on them.
-
-What makes the site-level denominator right is that a kind is not a property of a
-repository. `struct Store { int cache[256]; }` used in the same file is read; the same
-declaration in a header, used in another translation unit, is not; both are one kind. A Rust
-or Go struct field is starker still - those two languages enumerate fields from usage and
-from nothing else, so a field no method touches was never looked at, while the kind's fixture
-says the kind is readable. Measured on sixteen real trees (the six pinned corpus
-repositories and ten local ones) `visited` runs from 323/373 to 1,002/1,002 and reaches zero
-on none of them, so this is a one-way tightening that refuses nothing that used to grade,
-and it fires on the case the docstring above has named since the module was written.
-
-`CAPABILITY` survives, and its job is now the one it can do. It no longer decides any
-denominator. It is the regression test that a rule the classifier HAS is not silently lost:
-each entry carries a fixture and `tests/test_state_census.py` runs every one through the real
-classifier, so removing a rule turns a test red instead of quietly shrinking what gets read.
-It also fixes the kind vocabulary, so a construct the extractors emit with no capability entry
-is a KeyError rather than a site missing from the count.
+Capability is MEASURED, in `CAPABILITY` below, never asserted. A hand-maintained table of
+which language handles which declaration kind rots into exactly the blind spot this module
+exists to detect: it would keep claiming a rule after the rule was removed, and stay silent
+about a kind nobody taught it. Each entry carries a fixture - one declaration of that kind,
+holding obviously mutable state, referenced so the classifier has something to read - and
+`tests/test_state_census.py` runs every one of them through the real classifier and fails
+when the recorded answer and the measured answer disagree. That is why the table is asserted
+at test time rather than computed on every audit: the measurement needs a temporary tree per
+fixture, and an audit should not write files to learn what its own reader can do.
 
 Per-language limits are recorded against each extractor below, and the limits are real:
 a language whose state hides somewhere the census does not look will report a small
 denominator and let a thin analysis pass. The census narrows the blind spot; it does not
-close it. The largest one left is that a single visited site is enough to grade a repository
-whose other declarations nothing reached; `unread_kinds` names those kinds on the card so the
-gap is disclosed rather than closed on paper.
+close it.
+
+AND AS OF THE THREE RECORD RULES, NO PAIR IN `CAPABILITY` IS UNREADABLE. That is the good
+news and the bad news in one sentence. `reachable` now equals `declared` for every language
+in the table, so the refusal this module exists to issue - no grade, because nothing declared
+here is of a kind the reader has a rule for - can no longer fire on any of them. The check is
+not wrong, it is unexercised, and an unexercised check is one nobody will notice rotting.
+
+The blind spot did not go away with it; it moved somewhere this table's granularity cannot
+see. A kind is recorded readable when ONE fixture of that kind can be read, and a C struct
+field declared in a header and used in another translation unit is a field declaration the
+classifier still cannot reach. libuv declares 1,002 of them, all counted `reachable`, and
+367 reach a finding. Splitting the kind - a field declared and used in one translation unit
+against one that is not - would put the gap back where the refusal can act on it, and it is
+not done here.
 
 WHAT DISCLOSES THAT GAP NOW, and what used to pretend to. `admitted_fraction` divided
 `len(findings)` by `declared`: conclusions over declarations, two counts of different things.
@@ -436,14 +432,6 @@ def _file_sites(root: Node, lang: str) -> set[Site]:
 # The capability matrix: for each (language, declaration kind) the census can count, can
 # the CLASSIFIER'S enumerator match one at all?
 #
-# WHAT THIS TABLE DOES AND NO LONGER DOES. It is a regression test on the classifier's rules
-# and it fixes the kind vocabulary. It does NOT decide `visited`, and until 2026-08-16 it
-# decided the denominator the refusal was taken on, under the name `reachable`. That was the
-# wrong unit: a kind is readable here when ONE fixture of it can be read, while readability
-# varies site by site within a kind, and once the three record rules landed every pair
-# measured readable and the refusal could not fire on any repository. The denominator is now
-# the classifier's own per-site visit record, measured on the repository being audited.
-#
 # Every `source` below declares exactly one site of its kind, holds an obviously mutable
 # value, and references that value somewhere, because the classifier drops a state with no
 # references and an unreferenced fixture would measure that rule instead of this one. The
@@ -455,10 +443,7 @@ def _file_sites(root: Node, lang: str) -> set[Site]:
 # `admitted` is the MEASURED answer, checked against the real classifier by
 # test_the_recorded_capability_is_what_the_classifier_actually_does. Editing a value here
 # without changing the classifier turns that test red, which is the property a table
-# maintained by hand does not have. All nineteen read True on 2026-08-16, at site
-# granularity: for each one the classifier's judged-site record contains the very site the
-# census counted, not merely some finding elsewhere in the fixture. A False here would mean a
-# rule was removed.
+# maintained by hand does not have.
 # --------------------------------------------------------------------------
 
 class Probe(TypedDict):
@@ -614,20 +599,18 @@ def uncounted(admitted: int) -> dict[str, object]:
     A confident zero is exactly the failure this module exists to stop: it would let an
     unread repository report a full denominator and pass. None says "not counted here",
     which withholds the gap check rather than faking it."""
-    return {"declared": None, "by_kind": {}, "files": 0, "unread_kinds": None,
+    return {"declared": None, "by_kind": {}, "files": 0, "reachable": None, "unread_kinds": [],
             "admitted": admitted, "visited": None, "visited_fraction": None,
             "judged": None, "judged_fraction": None}
 
 
 def _tally(by_file: dict[str, set[Site]], lang: str) -> dict[str, object]:
-    """The counts one walk of the parse trees can produce on its own, rolled up per file.
+    """The counts a census reports, rolled up from the per-file sites.
 
-    Declarations only. Nothing here says whether anything READ them, because this walk has no
-    access to the classifier's; `compare` joins the two and publishes `visited`, which is the
-    denominator the refusal is decided on. A `reachable` count used to be computed here from
-    the capability table, and it could not be: capability is recorded per kind while
-    readability varies per site, so it reported `declared` on every repository and the refusal
-    it fed never fired."""
+    `reachable` is the subset of `declared` whose kind the classifier's enumerator has a rule
+    capable of matching, and it is the denominator the refusal is decided on. `unread_kinds`
+    names the kinds that were declared here and have no such rule, so a refusal can say what
+    it could not read instead of quoting a bare count."""
     # Seeded from the capability matrix, so every kind this language can spell appears with
     # its count even at zero, and a kind the extractors emit without a capability entry is a
     # KeyError below rather than a site quietly missing from the denominator.
@@ -637,40 +620,27 @@ def _tally(by_file: dict[str, set[Site]], lang: str) -> dict[str, object]:
         for kind, _owner_of, _name in sites:
             by_kind[kind] += 1
             declared += 1
-    return {"declared": declared, "by_kind": by_kind, "files": len(by_file)}
+    reachable = sum(n for kind, n in by_kind.items() if CAPABILITY[(lang, kind)]["admitted"])
+    unread_kinds = [kind for kind, n in by_kind.items() if n and not CAPABILITY[(lang, kind)]["admitted"]]
+    return {"declared": declared, "by_kind": by_kind, "files": len(by_file),
+            "reachable": reachable, "unread_kinds": unread_kinds}
 
 
 def count(repo: Path, lang: str) -> dict[str, object]:
-    """The declaration count over a repository, in the same scope the classifier uses.
-
-    `visited` and `unread_kinds` are None here rather than zero and empty, because this
-    function never runs the classifier and cannot know where it went. Zero would assert "the
-    reader reached none of this", which is the exact claim the refusal is taken on and nobody
-    has measured at this point. Only `compare`, which is handed the classifier's own visit
-    record, may answer it."""
+    """The census over a repository, in the same scope the classifier uses."""
     if lang not in _FIELDS or lang not in LANG_CFG:
-        return {"declared": None, "by_kind": {}, "files": 0, "visited": None, "unread_kinds": None}
-    return {**_tally(_walk(repo, lang), lang), "visited": None, "unread_kinds": None}
+        return {"declared": None, "by_kind": {}, "files": 0, "reachable": None, "unread_kinds": []}
+    return _tally(_walk(repo, lang), lang)
 
 
-def _hit_by_kind(by_file: dict[str, set[Site]], reached: dict[str, set[Site]]) -> dict[str, int]:
-    """Declared sites that the classifier's walk also named, counted per declaration kind.
+def _hit(by_file: dict[str, set[Site]], reached: dict[str, set[Site]]) -> int:
+    """Declared sites that the classifier's walk reached, counted file by file.
 
-    Per kind rather than as one total, because a refusal owes a reader the name of what went
-    unread and a bare number cannot give it. The totals are sums of this, so the count that
-    withholds a grade and the kinds the card prints beside it come from one pass and cannot
-    disagree about the same repository.
-
-    Matched file by file, since a site name is unique only within a file. A file the classifier
-    never opened contributes nothing rather than raising: the two walks read the same directory
-    with the same scope and should agree on the file list, and if they ever do not, the honest
-    reading of the difference is that those declarations went unread. The error direction is
-    the safe one - a file missing here lowers coverage, never raises it."""
-    out: dict[str, int] = {}
-    for rel, sites in by_file.items():
-        for kind, _owner_of, _name in sites & reached.get(rel, set()):
-            out[kind] = out.get(kind, 0) + 1
-    return out
+    A file the classifier never opened contributes nothing rather than raising: the two walks
+    read the same directory with the same scope and should agree on the file list, and if they
+    ever do not, the honest reading of the difference is that those declarations went unread.
+    The error direction is the safe one - a file missing here lowers coverage, never raises it."""
+    return sum(len(sites & reached[rel]) for rel, sites in by_file.items() if rel in reached)
 
 
 def compare(repo: Path, lang: str, admitted: int,
@@ -702,25 +672,14 @@ def compare(repo: Path, lang: str, admitted: int,
     `visited` and `judged` come from the enumerators' own walk, handed down through
     `_analyze_file`. Nothing here re-derives where the classifier went: a second traversal
     written to work out where the first one probably looked is a guess with a measurement's
-    name, which is the class of defect this number replaced.
-
-    `visited` IS ALSO THE REFUSAL'S DENOMINATOR, and it is the only count in this module
-    entitled to be. The refusal - no grade, because the reading never started - is
-    `report.census_unread`, and it asks for declarations here, none of them reached, and no
-    finding produced. A separate `reachable` count answered the middle clause from the
-    capability table until 2026-08-16, one answer per (language, kind) taken off a fixture,
-    which reported `declared` on every repository and left the refusal dead. There is one
-    number now, measured on the repository in front of it, and `unread_kinds` names the kinds
-    it found nothing reached so a card can say which construct went unread."""
+    name, which is the class of defect this number replaced."""
     if lang not in _FIELDS or lang not in LANG_CFG:
         return uncounted(admitted)
     by_file = _walk(repo, lang)
     census = _tally(by_file, lang)
-    declared, by_kind = census["declared"], census["by_kind"]
-    seen_by_kind, decided_by_kind = _hit_by_kind(by_file, visited), _hit_by_kind(by_file, judged)
-    seen, decided = sum(seen_by_kind.values()), sum(decided_by_kind.values())
+    declared = census["declared"]
+    seen, decided = _hit(by_file, visited), _hit(by_file, judged)
     return {**census, "admitted": admitted, "visited": seen, "judged": decided,
-            "unread_kinds": [kind for kind, n in by_kind.items() if n and not seen_by_kind.get(kind)],
             # None, not 0.0, when there is no denominator. Nothing declared is not "we read
             # none of it", and nothing reached is not "we judged none of what we reached".
             "visited_fraction": round(seen / declared, 3) if isinstance(declared, int) and declared else None,

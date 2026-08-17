@@ -91,12 +91,6 @@ CLEAN = "clean"
 # us and "we could not read your source" sends them to their scope rules or their syntax,
 # and one label for both sent them to neither.
 UNREAD = "unread"
-# no scanner for the language at all. Spelled here rather than as a bare "n/a" literal inside
-# `_na`, because a caller that has to ask whether a reading happened must be able to name both
-# ways of not happening. The gate asked `verdict == UNREAD` and got False on every C, C# and
-# unknown-language repository, then reported the meter's empty counts as "0/N overrides" and
-# told the adopter to lower their baseline to zero. See `measured` below.
-NO_SCANNER = "n/a"
 
 
 class Finding(TypedDict):
@@ -752,29 +746,9 @@ _SCANNERS: dict[str, Callable[[Node, str], list[Finding]]] = {
 }
 
 
-def measured(result: object) -> bool:
-    """True only when this meter reached a verdict about source it actually read.
-
-    THE POINT IS THAT THERE IS MORE THAN ONE WAY NOT TO READ, and a caller must not have to
-    enumerate them. There are three: no scanner for the language (`_na`), a scanner with
-    nothing readable in scope (`_unread`), and a refusal that never became a SurfaceResult at
-    all, which reaches the panel as an n/a dict carrying no verdict. The gate tested for the
-    second one alone, so a C, C# or unknown-language repository - the first case - passed the
-    test for "measured" and had its empty counts printed as `0/N thread-safety overrides`,
-    and the ratchet's downward arm then told the adopter to lower their baseline to 0 on the
-    strength of a reading that never happened.
-
-    Reading through `object` rather than SurfaceResult is deliberate: the panel is typed
-    `dict[str, L1Result]` and the richer results are read across that gap, so a caller hands
-    over whatever it has and this narrows it.
-    """
-    return (isinstance(result, dict)
-            and result.get("verdict") not in (None, UNREAD, NO_SCANNER))
-
-
 def _na(lang: str) -> SurfaceResult:
     return {
-        "verdict": NO_SCANNER,
+        "verdict": "n/a",
         "value": "n/a",
         "band": "n/a",
         "counts": {EXPOSED: 0, REVIEW: 0, CANDIDATE: 0},

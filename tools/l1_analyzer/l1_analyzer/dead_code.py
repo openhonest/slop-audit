@@ -143,65 +143,32 @@ _TERMINATORS: dict[str, frozenset[str]] = {
 # Node types that remain reachable after a terminator, so scanning of that block stops
 # at the first one rather than charging everything below it.
 #
-# EVERY TYPE BELOW WAS OBSERVED IN THAT POSITION, and the test that says so is
-# tests/test_dead_code_reachable_after.py: for each language it parses a fixture, finds the
-# siblings that actually follow a terminator inside one of that language's _BLOCK_TYPES nodes,
-# and fails on any row entry that never turns up. A type that cannot occupy the position
-# cannot spare anything, and a row of such types reads as protection while doing nothing.
-# Fifteen of the sixteen jump-target names here did exactly that until 2026-08-16, under a
-# justification (libuv, below) that describes one language.
+# Three things are reachable after a terminator and all three were found by reading the
+# flagged sites on real repositories, not by reasoning:
 #
-# WHY THE JUMP-TARGET NAMES WENT. A `case` below a `return` is entered from the switch, not
-# from the statement above, so it must be spared - but only C spells a switch body with the
-# same node it uses for every other block, `compound_statement`. libuv's `uv__close` has a
-# `#if`-guarded `return` followed by `break`, and without C's row every remaining `case` in
-# that switch, four of them, read as dead code. Every other grammar gives the arms a body node
-# of their own: `switch_body` (javascript, typescript, C#), `switch_block` (java), `match_block`
-# (rust), the `case` node itself (ruby), the switch statement itself (go), and in python a
-# `block` whose only children are `case_clause`s. None of those can hold a terminator as a
-# sibling of an arm, so the arm is never reached by the scan and never needs sparing. The rows
-# naming `case_clause`, `match_arm`, `switch_label`, `switch_block_statement_group`,
-# `switch_rule`, `switch_case`, `switch_default`, `switch_section`, `when`, `in_clause`,
-# `expression_case`, `default_case`, `type_case` and `communication_case` are therefore gone.
-# C's `case_statement` is the one that had to stay.
-#
-# WHAT A LABEL IS WORTH depends on whether the language has a `goto` that can jump forward
-# into it. C, Go and C# do, so a label below a terminator there is a real entry point. Java,
-# JavaScript and TypeScript label only for `break label` and `continue label`, both reached
-# from INSIDE the labeled statement, so a label below a terminator in those three is genuinely
-# dead and is now charged rather than spared.
-#
-# The rest are reachable for reasons of their own:
+#  - A JUMP TARGET. A `case`, a `default` and a label are entered from the switch or the
+#    goto, not from the statement above. libuv's `uv__close` has a `#if`-guarded `return`
+#    followed by `break`, and without this every remaining `case` in that switch, four of
+#    them, read as dead code.
 #  - A HOISTED DECLARATION. A JavaScript function declaration below a return is still
-#    callable; a Rust item is in scope for the whole block whatever precedes it; a C
-#    declaration still allocates and a label below it can reach it.
-#  - A TYPE-ONLY DECLARATION. A TypeScript `interface` or `type` is erased before anything
-#    runs, so it is never executable code and cannot be unreachable code.
-#  - RUBY'S rescue / else / ensure, which are siblings of the return inside the method's own
-#    `body_statement`. `ensure` runs precisely BECAUSE the return happened.
+#    callable; a C declaration still allocates.
 #  - A PREPROCESSOR DIRECTIVE, handled by the prefix rule below rather than by name.
 #    Newtonsoft.Json writes `return default;` between a `#pragma warning disable` and its
 #    matching `restore`, and the restore counted as unreachable code 28 times.
 _REACHABLE_AFTER: dict[str, frozenset[str]] = {
-    # Empty, and deliberately. Python has no goto, no hoisting and no arm the scan can reach:
-    # a `def` or a `class` below a `return` never executes, so its name is never bound, and it
-    # is dead by the same rule as any other statement. The row that named `case_clause` here
-    # could not fire, so nothing in this table protected any Python code.
-    "python": frozenset(),
-    # Every item form, because a Rust item is scoped to the whole block and usable from above
-    # its own position.
-    "rust": frozenset({"function_item", "macro_definition", "struct_item", "enum_item",
-                       "union_item", "const_item", "static_item", "type_item",
-                       "use_declaration", "mod_item", "trait_item", "impl_item",
-                       "foreign_mod_item"}),
+    "python": frozenset({"case_clause"}),
+    "rust": frozenset({"function_item", "macro_definition", "match_arm"}),
     "c": frozenset({"labeled_statement", "declaration", "case_statement"}),
-    "java": frozenset({"local_variable_declaration"}),
+    "java": frozenset({"labeled_statement", "local_variable_declaration", "switch_label",
+                       "switch_block_statement_group", "switch_rule"}),
     "typescript": frozenset({"function_declaration", "class_declaration", "generator_function_declaration",
-                             "interface_declaration", "type_alias_declaration"}),
-    "javascript": frozenset({"function_declaration", "class_declaration", "generator_function_declaration"}),
-    "csharp": frozenset({"labeled_statement", "local_function_statement"}),
-    "ruby": frozenset({"method", "class", "module", "else", "rescue", "ensure"}),
-    "go": frozenset({"labeled_statement"}),
+                             "labeled_statement", "switch_case", "switch_default"}),
+    "javascript": frozenset({"function_declaration", "class_declaration", "generator_function_declaration",
+                             "labeled_statement", "switch_case", "switch_default"}),
+    "csharp": frozenset({"labeled_statement", "local_function_statement", "switch_section"}),
+    "ruby": frozenset({"method", "class", "module", "when", "in_clause", "else", "rescue", "ensure"}),
+    "go": frozenset({"labeled_statement", "expression_case", "default_case", "type_case",
+                     "communication_case"}),
 }
 
 # A preprocessor directive is not executable, so it is never unreachable CODE. Worse, a

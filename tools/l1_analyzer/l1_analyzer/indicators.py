@@ -42,7 +42,6 @@ from l1_analyzer import (
     c_trace,
     csharp_trace,
     go_trace,
-    incomplete,
     java_trace,
     js_trace,
     pytest_trace,
@@ -295,8 +294,6 @@ class LangCfg(TypedDict, total=False):
     function_types: tuple[str, ...]
     class_types: tuple[str, ...]
     member_access: str
-    member_op: str
-    receiver_scan: str
     this_ident: frozenset[str]
     module_level_assign: tuple[str, ...]
     type_escape_patterns: tuple[str, ...]
@@ -317,15 +314,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_definition",),
         "class_types": ("class_definition",),
         "member_access": "attribute",
-        # Every language names BOTH the node its member access is spelled with and the
-        # operator that joins receiver to member, and names how its receiver is found. Both
-        # keys were previously absent and both were assumed: the walk hard-coded `.` and
-        # `_receiver_names` fell through to an empty set for any language with no `this`
-        # keyword and no Go method receiver. C spells the access `s->cache` and has neither,
-        # so it matched on the operator and on the receiver, and its member arm ran on no
-        # repository ever audited. See mutable_state._RECEIVER_SCANS.
-        "member_op": ".",
-        "receiver_scan": "fixed",
         "this_ident": {"self"},
         "module_level_assign": ("assignment", "augmented_assignment"),
         "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
@@ -339,8 +327,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_item",),
         "class_types": ("struct_item", "enum_item", "trait_item"),
         "member_access": "field_expression",
-        "member_op": ".",
-        "receiver_scan": "fixed",
         # A Rust method is a `function_item` carrying a `self_parameter`; `self.field`
         # is a `field_expression` reading "self.<field>". Treating `self` as the
         # receiver counts that access exactly as Python's does. Free functions have
@@ -363,17 +349,10 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_definition",),
         "class_types": ("struct_specifier", "union_specifier"),
         "member_access": "field_expression",
-        # C reaches a caller's record through a pointer parameter, and spells the reach
-        # `s->cache`, not `s.cache`. Both halves of that sentence were missing, so the member
-        # arm of _count_mutable_refs could not fire on any C source: a struct field mutated
-        # through a pointer read as no external state at all, and L1.18 answered 0.0 Healthy
-        # over it.
-        "member_op": "->",
-        "receiver_scan": "c_pointer_params",
         "this_ident": set(),
         "module_level_assign": ("declaration", "init_declarator"),
         "type_escape_patterns": (),
-        "module_scan": "c_declarations",
+        "module_scan": "text",
         # C's only immutability keyword. It used to inherit a shared default carrying
         # `let `, `val ` and `readonly `, none of which are C.
         "const_keywords": ("const ",),
@@ -384,8 +363,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("method_declaration", "constructor_declaration"),
         "class_types": ("class_declaration", "interface_declaration", "enum_declaration", "record_declaration"),
         "member_access": "field_access",
-        "member_op": ".",
-        "receiver_scan": "fixed",
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_variable_declaration"),
         "type_escape_patterns": ("Object",),  # raw types, etc.
@@ -406,8 +383,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_declaration", "method_definition", "arrow_function"),
         "class_types": ("class_declaration", "interface_declaration", "enum_declaration"),
         "member_access": "member_expression",
-        "member_op": ".",
-        "receiver_scan": "fixed",
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": ("any", "unknown"),  # plus // @ts-ignore
@@ -424,8 +399,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("method_declaration", "constructor_declaration"),
         "class_types": ("class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"),
         "member_access": "member_access_expression",
-        "member_op": ".",
-        "receiver_scan": "fixed",
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_declaration_statement"),
         "type_escape_patterns": ("object", "dynamic"),
@@ -439,8 +412,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_declaration", "function_expression", "generator_function_declaration", "method_definition", "arrow_function"),
         "class_types": ("class_declaration", "class"),
         "member_access": "member_expression",
-        "member_op": ".",
-        "receiver_scan": "fixed",
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": (),  # untyped
@@ -454,8 +425,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("method", "singleton_method"),
         "class_types": ("class", "module", "singleton_class"),
         "member_access": "call",
-        "member_op": ".",
-        "receiver_scan": "fixed",
         "this_ident": {"self"},
         # Ruby signals external mutable state through @instance and $global variables,
         # not a `self.`-prefixed member access.
@@ -474,9 +443,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_declaration", "method_declaration"),
         "class_types": ("type_declaration",),
         "member_access": "selector_expression",
-        "member_op": ".",
         # Go has no fixed receiver keyword; the receiver name is parsed per method.
-        "receiver_scan": "go_method_receiver",
         "this_ident": set(),
         "module_level_assign": ("var_declaration",),
         "type_escape_patterns": ("any",),  # Go's `any` alias for interface{}
@@ -541,24 +508,6 @@ def _run_external(cmd: list[str], cwd: Path) -> ExternalRun:
         return {"ran": False, "status": -1, "output": ""}
     return {"ran": True, "status": done.returncode, "output": done.stdout}
 
-def _measure(key: str, fn, *args) -> L1Result:
-    """Run one measure, and turn its refusal to answer into an n/a naming the reason.
-
-    THE ONLY handler for IncompleteCode in the package. A measure raises rather than deciding
-    what to do about its own ignorance, and this is the single place that decides. What it
-    decides is n/a with the basis printed, never a band and never a number: the whole point of
-    the exception is that unmeasured must not be spellable as clean.
-
-    Do not add a second handler. Two handlers mean two policies, and the reason this exception
-    exists is that four measures each invented their own and all four chose to publish zero.
-    """
-    from l1_analyzer.incomplete import IncompleteCode
-    try:
-        return fn(*args)
-    except IncompleteCode as refusal:
-        return {"value": "n/a", "band": "n/a", "details": str(refusal)}
-
-
 def compute_source_indicators(
     repo: Path,
     lang: str,
@@ -585,9 +534,9 @@ def compute_source_indicators(
         lang = detect_primary_language(repo)
 
     results: dict[str, L1Result] = {"lang": lang}
-    results["L1.16"] = _measure("L1.16", _trailing_whitespace, repo)
-    results["L1.17"] = _measure("L1.17", _god_files, repo)
-    results["L1.18"] = _measure("L1.18", analyze_mutable_state, repo, lang)
+    results["L1.16"] = _trailing_whitespace(repo)
+    results["L1.17"] = _god_files(repo)
+    results["L1.18"] = analyze_mutable_state(repo, lang)
     results["L1.15"] = _compute_type_escapes(repo, lang)
     results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds, python_executable)
     # L1.12 and L1.14, native on tree-sitter. Both were external-tool delegations that
@@ -596,22 +545,22 @@ def compute_source_indicators(
     from l1_analyzer import dead_code, secret_scan
     # Both return dict[str, object], the same shape state_bounds.classify returns for
     # L1.18b: value/band/details plus the finding lists that make the number readable.
-    results["L1.12"] = _measure("L1.12", dead_code.analyze, repo, lang)
-    results["L1.14"] = _measure("L1.14", secret_scan.analyze, repo, lang)
+    results["L1.12"] = dead_code.analyze(repo, lang)
+    results["L1.14"] = secret_scan.analyze(repo, lang)
     results.update(_compute_external_indicators(repo, lang))
     results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds, python_executable)
     if classify_state_bounds:
         from l1_analyzer import state_bounds
-        results["L1.18b"] = _measure("L1.18b", state_bounds.classify, repo, lang)
+        results["L1.18b"] = state_bounds.classify(repo, lang)
         from l1_analyzer import path_cover
-        results["path_cover"] = _measure("path_cover", path_cover.cover_paths, repo, lang)
+        results["path_cover"] = path_cover.cover_paths(repo, lang)
         # Additive, gated with the other refinements so frozen/pre-registered runs
         # (classify_state_bounds=False) keep exactly the L1.18 set. Measures the
         # concurrency audit surface, never a race verdict.
         from l1_analyzer import thread_surface
-        results["thread_surface"] = _measure("thread_surface", thread_surface.scan, repo, lang)
+        results["thread_surface"] = thread_surface.scan(repo, lang)
         from l1_analyzer import absolute_paths
-        results["absolute_paths"] = _measure("absolute_paths", absolute_paths.scan, repo, lang)
+        results["absolute_paths"] = absolute_paths.scan(repo, lang)
     return results
 
 _WHITESPACE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"})
@@ -625,8 +574,7 @@ def _trailing_whitespace(repo: Path) -> L1Result:
         lines = text.splitlines()
         total += len(lines)
         count += sum(1 for ln in lines if ln.rstrip() != ln and ln.strip())
-    ws_pct = incomplete.ratio(count, total, "L1.16 trailing whitespace",
-                              "no lines were read, so a rate over them is not zero, it is absent")
+    ws_pct = (count / total * 100) if total > 0 else 0.0
     return {"value": round(ws_pct, 2), "band": band(ws_pct, 0.5, 3, higher_is_better=False), "details": _with_skipped(f"{count} lines with trailing ws", skipped)}
 
 # A file that is large because it holds a big data table is not the god-file smell:
@@ -718,8 +666,7 @@ def _god_files(repo: Path) -> L1Result:
                 god_files += 1
             if code > 4000:
                 big_files += 1
-    god_pct = incomplete.ratio(god_files, prod_files, "L1.17 god-file concentration",
-                               f"no production file carried a known extension, so 0/0 is not 0% ({sorted(_GOD_FILE_EXTS)})")
+    god_pct = (god_files / prod_files * 100) if prod_files > 0 else 0.0
     band_value = "Slop" if big_files > 0 else band(god_pct, 0.5, 2, higher_is_better=False)
     note = f"{god_files}/{prod_files} files >1k LOC, {big_files} >4k LOC"
     if scoped_by_reason:

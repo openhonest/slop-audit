@@ -27,22 +27,6 @@ the measured movement. In brief, and each is commented at its site below:
 4. The ratio is bound-aware. State whose reaching-set the finite-testability
    classifier could bound no longer counts, because a literal-keyed read against a
    closed set is exhaustively testable and an unbounded accumulator is not.
-
-Corrected again on 2026-08-16, one defect, and it is the same shape as the third above.
-C reached the member-access arm through two assumptions nobody made for it: the arm
-hard-coded `.` as the operator, and `_receiver_names` fell through to an empty set for a
-language with no `this` keyword and no Go method receiver. C spells the reach `s->cache`
-and has neither, so the arm was dead code and a struct field mutated through a pointer
-read as no external state at all. Both are now declared per language, `member_op` and
-`receiver_scan`, and a language that names no receiver scan raises. json-c moves from 1.7
-Healthy to 34.9 Not Healthy and libuv from 6.1 Healthy to 50.7 Slop, which is the size of
-what the arm was not seeing.
-
-STILL WRONG, and stated here rather than left for a reader to find: C's module scan is the
-text heuristic, which needs an `=` on the line, so `static int cache[256];` at file scope -
-the ordinary C global cache - never enters `module_mutables` and L1.18 reads 0.0 Healthy
-over a file whose only state is one. It is the same architectural cause as the receiver gap:
-C reached the text scan by omission rather than by decision. Filed as slop-audit-3ti.
 """
 
 from __future__ import annotations
@@ -52,7 +36,6 @@ from pathlib import Path
 
 from tree_sitter import Node
 
-from l1_analyzer import incomplete
 from l1_analyzer.indicators import (
     _BODY_NODE_TYPES,
     LANG_CFG,
@@ -251,73 +234,6 @@ def _module_mutables_specifier_scan(root: Node, cfg: LangCfg) -> set[str]:
     return _module_mutables_by_specifier(shallow_candidates(root, cfg["module_level_assign"]))
 
 
-def _module_mutables_c_scan(root: Node, cfg: LangCfg) -> set[str]:
-    """File-scope declarations in C, read from the parse tree rather than from line text.
-
-    C used the text heuristic, which needs an `=` on the line, so `static int cache[256];`
-    declared no state as far as L1.18 was concerned. On the fixture in
-    tests/test_module_globals.py the text scan found `counter` and missed `cache`, `buf`,
-    `NAME` and `MAX`, while the classifier enumerated all five. Two measures of one file
-    disagreeing about what is even a candidate is the defect; the array was the instance.
-
-    A prototype is not state and a function pointer is; `_c_declared_name` tells them apart,
-    because the grammar puts `function_declarator` on top of both.
-
-    Known limit, kept deliberately: a declaration carrying a `const` qualifier is excluded
-    whole, which is right for `const int MAX = 10` and wrong for `const char *NAME`, where
-    const qualifies the pointee and the pointer is still rebindable. That is the same call the
-    text heuristic made when it screened the line for `const `, so this change fixes the
-    missing-declaration bug without moving the const boundary at the same time.
-    """
-    const_keywords = tuple(kw.strip() for kw in cfg["const_keywords"])
-    names: set[str] = set()
-    for node in root.children:
-        if node.type != "declaration":
-            continue
-        if any(c.type == "type_qualifier" and _text(c) in const_keywords for c in node.children):
-            continue
-        for child in node.children:
-            if child.type in _C_DECLARATORS:
-                name = _c_declared_name(child)
-                if name is not None:
-                    names.add(name)
-                break
-    return names
-
-
-# The declarator forms a C file-scope declaration can carry. Written out rather than probed
-# at runtime, so a form nobody listed is a missing row here and not a silent omission.
-_C_DECLARATORS = ("identifier", "init_declarator", "array_declarator", "pointer_declarator",
-                  "function_declarator")
-
-
-def _c_declared_name(declarator: Node) -> str | None:
-    """The identifier a C declarator binds, or None when it binds no state.
-
-    A prototype binds none: `void proto(int)` is a `function_declarator` whose own declarator
-    is a bare identifier. A function POINTER does bind state, and the grammar makes the two
-    easy to confuse, because it puts `function_declarator` on top of both. `void
-    (*handler)(int)` reaches its name through a `parenthesized_declarator` holding a
-    `pointer_declarator`, and a rebindable pointer is state whatever it points at. I asserted
-    the opposite when writing this, that a pointer sat on top, and the grammar said otherwise.
-
-    Returns None rather than raising when no identifier is reachable, because a declaration
-    the grammar could not resolve is a fact about the source and not about this table.
-    """
-    node: Node | None = declarator
-    while node is not None and node.type != "identifier":
-        if node.type == "function_declarator":
-            inner = node.child_by_field_name("declarator")
-            if inner is None or inner.type != "parenthesized_declarator":
-                return None                      # a prototype, not a variable
-            node = next((c for c in inner.children if c.type == "pointer_declarator"), None)
-            continue
-        nxt = node.child_by_field_name("declarator")
-        node = nxt if nxt is not None else next(
-            (c for c in node.children if c.type in _C_DECLARATORS), None)
-    return _text(node) if node is not None else None
-
-
 def shallow_candidates(root: Node, assign_types: tuple[str, ...]) -> list[Node]:
     """Top-level assignments, allowing one wrapper: Python nests `x = 0` inside an
     `expression_statement`, so the `assignment` node is a child of a root child.
@@ -347,7 +263,6 @@ _MODULE_SCANS: dict[str, Callable[[Node, LangCfg], set[str]]] = {
     "python_fields": _module_mutables_python_scan,
     "mutable_specifier": _module_mutables_specifier_scan,
     "class_fields": _module_mutables_class_fields,
-    "c_declarations": _module_mutables_c_scan,
     "text": _module_mutables_text,
 }
 
@@ -378,22 +293,16 @@ def _count_mutable_refs(
     fact about testability, and the classifier printed on the same panel already told
     them apart while the ratio did not.
 
-    The operator joining receiver to member is read from the language's own config rather
-    than assumed. It used to be a hard-coded `.`, which is right in eight of the nine
-    languages and wrong in C, where a caller's record is reached as `s->cache`. Together
-    with the receiver gap recorded on `_RECEIVER_SCANS` that made this arm dead code for C.
-
     The classifier keys instance state by the same text this walk sees - `self.x`,
     `this.x`, `@ivar`, and the bare field name in Java and C# - so the two vocabularies
-    line up without translation. Go and C are the exceptions: Go keys by `<Type>.<field>`
-    and C by `<struct tag>.<field>`, while this walk sees `<receiver>.<field>` and
-    `<pointer>-><field>`, so no Go or C reference is ever matched as bounded and both keep
-    their uncorrected reading on this axis. A key the classifier never enumerated is absent
-    from `bounded` and therefore counts, so every gap reads high, never falsely clean.
+    line up without translation. Go is the exception: it keys by `<Type>.<field>` while
+    this walk sees `<receiver>.<field>`, so no Go reference is ever matched as bounded
+    and Go keeps its uncorrected reading on this axis. A key the classifier never
+    enumerated is absent from `bounded` and therefore counts, so every gap reads high,
+    never falsely clean.
     """
     count = 0
     member_type = cfg["member_access"]
-    member_op = cfg["member_op"]
     instance_field_types = cfg.get("instance_field_types", ())
     raw_mut_patterns = cfg.get("raw_mut_patterns", ())
 
@@ -401,7 +310,7 @@ def _count_mutable_refs(
         nonlocal count
         text = _text(n)
         if (n.type == member_type and receiver_names
-                and any(text.startswith(r + member_op) for r in receiver_names) and text not in bounded):
+                and any(text.startswith(r + ".") for r in receiver_names) and text not in bounded):
             count += 1
         if n.type in instance_field_types and text not in bounded:
             count += 1
@@ -445,117 +354,24 @@ def _bounded_state_keys(root: Node, rel: str, lang: str, cfg: LangCfg, immutable
         if f["verdict"] == state_bounds.NEUTRAL and f["drives_decision"] and f["partition"]["counted"]
     }
 
-def _c_function_declarator(func_node: Node) -> Node | None:
-    """The `function_declarator` of a C function definition.
-
-    C hangs the name and the parameter list off a declarator chain rather than off the
-    definition, and a function returning a pointer wraps that chain in one or more
-    `pointer_declarator`s (`struct Store *get(struct Store *s)`). Walking the chain is what
-    lets the two readers below agree on which parameters and which name belong to one
-    function."""
-    declarator = func_node.child_by_field_name("declarator")
-    while declarator is not None and declarator.type != "function_declarator":
-        declarator = declarator.child_by_field_name("declarator")
-    return declarator
-
-
-def _function_name(node: Node) -> str:
-    """The declared name of a function node, in any of the nine languages.
-
-    Eight of them put it on a `name` field. C does not, and reading `name` alone returned
-    nothing for every C function - harmless while no C function was ever counted, and a
-    silent contract break the moment one was. `mutable_function_names` promises a name for
-    every function `analyze_mutable_state` counts, and a C repository would have reported
-    two counted functions and zero culprits."""
-    named = node.child_by_field_name("name")
-    if named is not None:
-        return _text(named)
-    declarator = _c_function_declarator(node)
-    inner = declarator.child_by_field_name("declarator") if declarator is not None else None
-    while inner is not None and inner.type != "identifier":
-        inner = inner.child_by_field_name("declarator")
-    return _text(inner) if inner is not None else ""
-
-
-def _fixed_receivers(func_node: Node, cfg: LangCfg) -> set[str]:
-    """The receiver keyword the language fixes for every function: `self` or `this`."""
-    return set(cfg["this_ident"])
-
-
-def _go_method_receivers(func_node: Node, cfg: LangCfg) -> set[str]:
-    """Go names its receiver per method: `func (r *Foo) Bar(...)`. The first parameter_list
-    is the receiver list, and a plain function has none, so nothing inside one is read as
-    instance access."""
-    names: set[str] = set()
-    if func_node.type != "method_declaration":
-        return names
-    for child in func_node.children:
-        if child.type == "parameter_list":
-            for decl in child.children:
-                if decl.type == "parameter_declaration":
-                    names.update(_text(part) for part in decl.children if part.type == "identifier")
-            break  # first parameter_list is the receiver
-    return names
-
-
-def _c_pointer_receivers(func_node: Node, cfg: LangCfg) -> set[str]:
-    """C's receivers: the pointer parameters of this function.
-
-    C has no receiver keyword and no receiver declaration, and that absence is why this
-    arm was dead. A C function reaches state it does not own by being handed a pointer to
-    the record that holds it, so the pointer parameters are the names through which a
-    caller's state is read and written, and `s->cache` inside `void put(struct Store *s,
-    ...)` is the same fact about testability as `self.cache` inside a Python method.
-
-    Parameters only, never a local pointer. A pointer a function mallocs and fills is state
-    that function owns for its own lifetime, and counting it would read local work as
-    external state. A `const` pointer parameter is counted with the rest, because every
-    other language counts a READ of outside state as a reference too.
-
-    The limit worth naming: this counts the reach, not what is on the other end of it. A
-    pointer to a caller's stack struct and a pointer to a process-wide singleton are one
-    node type here, and separating them needs the points-to analysis this reader does not
-    do. So C reads high on this axis rather than clean, which is the direction a measure
-    that cannot see is allowed to be wrong in."""
-    declarator = _c_function_declarator(func_node)
-    if declarator is None:
-        return set()
-    params = next((c for c in declarator.children if c.type == "parameter_list"), None)
-    if params is None:
-        return set()
-    names: set[str] = set()
-    for decl in params.children:
-        if decl.type != "parameter_declaration":
-            continue
-        inner = decl.child_by_field_name("declarator")
-        if inner is None or inner.type != "pointer_declarator":
-            continue
-        while inner is not None and inner.type == "pointer_declarator":
-            inner = inner.child_by_field_name("declarator")
-        if inner is not None and inner.type == "identifier":
-            names.add(_text(inner))
-    return names
-
-
-# Dispatch on the receiver scan the language DECLARES, for the same reason _MODULE_SCANS
-# dispatches on the module scan it declares. What stood here was `if this_ident: return it`
-# followed by a Go-shaped `if`, whose fall-through was the empty set. C took that
-# fall-through: it has no `this` keyword and no `method_declaration`, so it reached "this
-# function has no receiver" by omission rather than by anyone deciding it, and with no
-# receiver the member-access arm of _count_mutable_refs cannot fire at all. A C struct field
-# mutated through a pointer therefore counted as no external state on any repository ever
-# audited, and L1.18 reported 0.0 Healthy over it. A language that names no scan is now a
-# KeyError here rather than a silent nothing.
-_RECEIVER_SCANS: dict[str, Callable[[Node, LangCfg], set[str]]] = {
-    "fixed": _fixed_receivers,
-    "go_method_receiver": _go_method_receivers,
-    "c_pointer_params": _c_pointer_receivers,
-}
-
-
 def _receiver_names(func_node: Node, cfg: LangCfg) -> set[str]:
-    """Names that denote the state-holding record this function reaches into."""
-    return _RECEIVER_SCANS[cfg["receiver_scan"]](func_node, cfg)
+    """Names that denote the enclosing instance for this function. For self/this
+    languages it is the fixed keyword set; for Go it is the method receiver
+    identifier, parsed from the receiver parameter list."""
+    fixed = set(cfg["this_ident"])
+    if fixed:
+        return fixed
+    names: set[str] = set()
+    if func_node.type == "method_declaration":  # Go: `func (r *Foo) Bar(...)`
+        for child in func_node.children:
+            if child.type == "parameter_list":
+                for decl in child.children:
+                    if decl.type == "parameter_declaration":
+                        for part in decl.children:
+                            if part.type == "identifier":
+                                names.add(part.text.decode("utf8", errors="ignore"))
+                break  # first parameter_list is the receiver
+    return names
 
 # There is no I/O boundary exclusion, and its absence is the point.
 #
@@ -652,9 +468,7 @@ def analyze_mutable_state(repo: Path, lang: str) -> L1Result:
         total_funcs += file_total
         mutable_funcs += file_mutable
 
-    ratio = incomplete.ratio(mutable_funcs, total_funcs, "L1.18 unbounded mutable state",
-                             f"no function was enumerated in {lang}, so the share of them touching "
-                             "unbounded state is absent, not zero")
+    ratio = (mutable_funcs / total_funcs * 100) if total_funcs > 0 else 0.0
     return {
         "value": round(ratio, 1),
         "band": band(ratio, 15, 40, higher_is_better=False),
@@ -677,9 +491,9 @@ def _file_mutable_names(
             if body is not None:
                 receivers = _receiver_names(n, cfg)
                 if _count_mutable_refs(body, cfg, module_mutables, receivers, bounded) > 0:
-                    nm = _function_name(n)
-                    if nm:
-                        names.append(nm)
+                    nm = n.child_by_field_name("name")
+                    if nm is not None and nm.text:
+                        names.append(_text(nm))
         for c in n.children:
             find(c)
 
