@@ -18,12 +18,6 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     And the operator opts in for that run only, after the whole payload is printed rather than summarised
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
-  Scenario: _text reads the source text of a node without ever failing on a missing one
-    Given a node, or nothing
-    When _text decodes the node's own bytes
-    Then it returns the text the node covers in the file
-    But a missing node and a node with no bytes both return the empty string, so no caller has to guard the call
-
   Scenario: _attr reduces a state key to the bare attribute name
     Given a state key such as a receiver followed by an attribute
     When _attr takes the part after the last dot
@@ -31,22 +25,11 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     But a key with no dot comes back unchanged
 
   Scenario: _enclosing_class finds the class whose body a reference sits in
-    Given a reference node
-    When _enclosing_class walks up the tree looking for a class definition or declaration
-    Then it returns the nearest one
-    But a reference at module level has none, and every rule in this module declines when that happens
-
-  Scenario: _is_condition_position decides whether a child is the test part of its parent
-    Given a construct and one of its children
-    When _is_condition_position checks the child against the condition slot of that construct
-    Then it is true for the condition of an if, a while or an elif, the test of a ternary, and the first part of an assertion
-    But under a comprehension guard it is true for any child, because that construct is nothing but a test
-
-  Scenario: _in_test decides whether a reference sits inside a real test expression
-    Given a reference node
-    When _in_test walks up from the reference looking for a condition position
-    Then it is true when the reference is anywhere inside a test, however deeply nested
-    But the walk stops at the enclosing function, so a test in the caller does not count as this one
+    Given a reference node and the language spec
+    When _enclosing_class walks up the tree looking for one of the class types this language declares
+    Then it returns the nearest one, which is what the write-once and memoization rules walk
+    And Go and C declare no class type at all, so they get nothing, and the accumulator rule needs nothing
+    But a Python reference at module level has none either, and the three Python-only rules decline when that happens
 
   Scenario: _drives_no_decision recognises the carried value, which appears in no test at all
     Given every reference to one attribute
@@ -98,20 +81,14 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     Then it is true only when all four hold, which is the one shape allowed to clear a fail-closed finding
     But two assignments end it immediately, whichever receivers they went through
 
-  Scenario: _is_membership_container recognises the attribute standing as the container of a membership test
-    Given a reference node
-    When _is_membership_container checks that its parent is a comparison carrying a membership token and that the reference is the right-hand side
-    Then it is true for the attribute being asked whether it holds a key
-    But the negated form is one token in this grammar, not a negation wrapping the positive form, and both are matched
-
   Scenario: _has_presence_gate decides whether the attribute is ever asked whether it holds a key
-    Given every reference to one attribute
-    When _has_presence_gate looks for any reference standing as a membership container
+    Given every reference to one attribute and the language spec
+    When _has_presence_gate looks for any reference standing as a presence test, in whichever of the three forms this language spells
     Then it is true when at least one presence test exists, which is the first half of both the cache and the accumulator shapes
 
   Scenario: _value_reaches_condition recognises a stored value being inspected in a branch
-    Given every reference to one attribute
-    When _value_reaches_condition looks for a keyed read of the attribute sitting inside a test
+    Given every reference to one attribute and the language spec
+    When _value_reaches_condition looks for a keyed read of the attribute, by subscript or by method, sitting inside a test
     Then it is true when presence or magnitude is the answer the code turns on
     And a keyed position that is the target of a store is skipped, because putting a value in is not reading one out
     But this is the guard that keeps a stored timestamp compared against an interval flagged, so it runs before every rule
@@ -129,17 +106,11 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     Then it yields each one, parents before their own children
     But unnamed nodes such as operator and keyword tokens are never yielded
 
-  Scenario: _enclosing_function finds the function or lambda a reference sits in
-    Given a reference node
-    When _enclosing_function walks up looking for a function definition or a lambda
+  Scenario: _enclosing_function finds the function a reference sits in
+    Given a reference node and the language spec
+    When _enclosing_function walks up looking for one of the function types this language declares
     Then it returns the nearest one, which scopes the result-invariance check to the accessor
     But a reference at class or module level has none
-
-  Scenario: _is_keyed_read_of recognises the cached value being read out by key
-    Given an expression and the attribute name
-    When _is_keyed_read_of checks that the expression indexes an attribute of that name
-    Then it is true for the attribute read at a key, whatever the receiver
-    But the key itself is not examined, so any key at all satisfies this rule
 
   Scenario: _result_invariant decides whether the presence of a key changes the answer
     Given the attribute name and every reference
@@ -198,16 +169,17 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     But a keyed read anywhere else carries the stored value somewhere this rule cannot follow, so it declines
 
   Scenario: _is_pure_write_call admits an in-place method that returns no stored value
-    Given a reference and the member access above it
-    When _is_pure_write_call checks that an in-place method is being called on the attribute
-    Then it is true for the methods that only write
-    But the three methods that also hand the stored value back to the caller are excluded from that list, so they read as well as write and fail here
+    Given a reference and the language spec
+    When _is_pure_write_call checks that a declared write method is called on the attribute and that nobody reads the result
+    Then it is true for a call that writes and hands nothing back that could be branched on
+    And the result must be discarded, which is what makes Java's put and Rust's insert write-only even though each returns the value previously stored
+    But the methods whose purpose is to yield the stored value are off the declared set entirely, so they fail here however the result is used
 
   Scenario: _is_confined_reference decides whether one reference occupies a role that yields nothing
     Given a reference node
     When _is_confined_reference looks up the rule for the construct above it and applies it
-    Then it is true only for the four whitelisted roles, each of which is a write or a presence test
-    But a reference under any other construct is not on the list and the rule declines, which is how the whitelist enforces that nothing hands the value out
+    Then it is true only for the whitelisted roles, each of which is a write, a presence test, or a read written straight back
+    But a reference under any other construct has no row and the rule declines, which is how the whitelist enforces that nothing hands the value out
 
   Scenario: _is_attr_write_target recognises the left-hand side of a write to the attribute
     Given a node and the attribute name
@@ -235,20 +207,21 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
 
   Scenario: _writes_only_the_attribute decides whether a whole statement is observable only as a write to the attribute
     Given a statement and the attribute name
-    When _writes_only_the_attribute unwraps a bare expression statement and dispatches on what is inside
+    When _writes_only_the_attribute unwraps the language's discard form and dispatches on what is inside
     Then it is true for an assignment, an augmented assignment, a delete or a write call that touches only the attribute
     But a statement of any other kind, such as a return or a nested branch, has no rule and fails, which is the conservative answer
 
   Scenario: _gate_branch finds the branch a membership test is the condition of
     Given a reference standing as a membership test
-    When _gate_branch walks up to the if or elif whose condition it is
-    Then it returns that branch, whose blocks the convergence rule then reads
-    But it returns nothing when the test sits in a ternary, an assertion or a comprehension guard, because there is no block to read, and nothing at the function boundary
+    When _gate_branch walks up to the branch one of whose declared gate fields it occupies
+    Then it returns that branch, whose arms the convergence rule then reads
+    And Go's comma-ok sits in the initializer of its if rather than in the condition, which is why the gate fields are a list and not one name
+    But it returns nothing when the test sits in a ternary, an assertion or a comprehension guard, because there is no arm to read, and nothing at the function boundary
 
   Scenario: _gated_branches_converge requires every presence gate to guard writes to the attribute alone
     Given the attribute name and every reference
-    When _gated_branches_converge reads every block under every gate the membership tests control
-    Then it is true only when each statement in each of those blocks writes nothing but the attribute
+    When _gated_branches_converge reads every statement under every gate the presence tests control
+    Then it is true only when each of those statements writes nothing but the attribute
     And this is what stops a presence test clearing when the answer lands in a neighbouring counter, which the return-based invariance check cannot see
     But a gate with no branch to read fails outright, and an attribute with no membership test at all passes vacuously
 
@@ -257,6 +230,83 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     When _is_write_only_accumulator requires every reference to be confined and every gate to converge
     Then it is true for a per-key tally whose value cannot change an observable outcome
     And the gated form is the case only this rule reaches, since the ungated one already clears as a carried value
+
+  Scenario: _is_python says which rules this language can carry
+    Given the language spec
+    When _is_python compares it against the Python spec
+    Then it is true only for Python, which is the one language whose write-once, memoization and carried-value rules have been proven
+    And it is stated as a predicate rather than an inline comparison so the entry point can say which rules are staged and why
+    But the accumulator rule and the two guards in front of it do not consult it, because they read the spec and serve all nine
+
+  Scenario: _enclosing finds the nearest ancestor of a given kind
+    Given a reference and a set of node types
+    When _enclosing walks up from the reference comparing each ancestor's type
+    Then it returns the nearest match
+    But a walk that reaches the root without a match returns nothing, and an empty set of types can never match
+
+  Scenario: _is_binding_declaration admits a reference that is the declared name of a field
+    Given a reference, the declaration above it and the language spec
+    When _is_binding_declaration reads the field this declaration keeps its name in and compares the reference against it
+    Then it is true for a Java or C# field declaration, which binds the state rather than consuming it
+    But the field is checked and not just the node type, so a reference sitting in the declaration's VALUE is a read and is declined
+
+  Scenario: _is_arithmetic_host recognises a binary node that derives a value rather than deciding on it
+    Given a binary node and the language spec
+    When _is_arithmetic_host reads the node's operator and rejects the comparison and membership spellings
+    Then it is true for the addition in Java's read, add and put back
+    But Python's comparison node carries no operator field at all, so no arithmetic reading is available there and the answer is false by construction rather than by a special case
+
+  Scenario: _transparent_host finds where a value moves when its host neither consumes nor decides on it
+    Given a node, the construct above it and the language spec
+    When _transparent_host tries the declared passthrough wrappers, then arithmetic, then a method that hands back the value it was given
+    Then it returns the node the value moved to, so the walk above can continue
+    And Rust's unwrap is the third case, without which a mutable slot reached through get_mut can never be seen to be written
+    But a host that is none of the three returns nothing, and the walk stops there
+
+  Scenario: _is_attribute_write_call decides whether a call is a pure write on the attribute itself
+    Given a call, the attribute name and the language spec
+    When _is_attribute_write_call takes the call's receiver, checks it names the attribute, and checks the method only writes
+    Then it is true for the outer put of a read, add and put back
+    But a write on some other container is declined, so a value read out of one map and stored in another is not confined
+
+  Scenario: _flows_back_into_the_attribute decides whether a read's value is written straight back
+    Given a keyed read, the attribute name and the language spec
+    When _flows_back_into_the_attribute walks up through the transparent hosts looking for an assignment target or an argument of a write on the same attribute
+    Then it is true for Rust's compound assignment through a mutable slot and for Java's put of its own get
+    And both are the same runtime step Python writes as one compound assignment, which is the point of following the value rather than matching a node type
+    But anything else on the way up ends the walk in a decline, which costs a clear and never a finding
+
+  Scenario: _is_keyed_read_written_back admits a read-modify-write spelled with an explicit read
+    Given a reference, the attribute name and the language spec
+    When _is_keyed_read_written_back checks the reference receives a keyed read that is not a presence test, then follows the value it produces
+    Then it is true when the value goes straight back into the attribute
+    But a keyed read whose value goes anywhere else is not confined, which is what keeps a count that is returned to the caller flagged
+
+  Scenario: _is_confined_method_use admits every method position the rule can argue about
+    Given a reference, the construct above it, the attribute name and the language spec
+    When _is_confined_method_use tries the pure write, the presence test and the read written back
+    Then it is true for whichever of the three the reference occupies
+    And one predicate serves the flat-call grammars and the nested ones, because the call finder has already reconciled the two shapes
+    But a method that is none of the three yields the stored value to something, and the rule declines
+
+  Scenario: _confined_roles builds this language's whitelist from its own declared vocabulary
+    Given the language spec
+    When _confined_roles maps each declared assignment, wrapper, binding site, comparison, subscript and member type to the role that reads it
+    Then it returns the whitelist keyed by the construct a reference sits under
+    And the call types are added only for a flat-call grammar, where the reference's own parent is the call rather than the callee
+    But a construct with no row is a position the rule has no argument for, and the rule declines rather than guessing
+
+  Scenario: _gated_statement_rules builds the statements a gate's arm may hold
+    Given the language spec
+    When _gated_statement_rules maps this language's assignment, delete and call types to the rule that reads each
+    Then it returns the table the statement check dispatches on
+    But only Python declares a delete statement, so the other eight carry no delete row and decline a key removal rather than reading a call or a unary operator as one
+
+  Scenario: _gate_guarded_statements lists the statements a gate guards
+    Given a gate and the language spec
+    When _gate_guarded_statements drops the children sitting in the gate's own test fields and expands the declared body containers
+    Then it returns one entry per guarded statement, so Java's constructor body, Ruby's then and else, and Go's nested statement list all yield their statements
+    But a child that is neither a test nor a declared body container is returned whole, and the statement check then declines it, which is the conservative direction
 
   # The four failures in tests/test_state_bounds_filters.py land here, and none of them is a
   # disagreement about a filter. The classifier now hands this entry point the verdict

@@ -55,7 +55,7 @@ from l1_analyzer.indicators import (
     _read_source_bytes,
     bucketed_paths,
 )
-from l1_analyzer.lang_spec import _PY_MUTATING, LANG_SPEC, LangSpec
+from l1_analyzer.lang_spec import _PY_MUTATING, COMPARISON_OPS, LANG_SPEC, LangSpec
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
 from l1_analyzer.state_partition import (
     DYNAMIC_DISPATCH,
@@ -67,9 +67,12 @@ from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import arg_value as _arg_value
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import first_named as _first_named
+from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
 from l1_analyzer.ts_nodes import local_refs as _local_refs
 from l1_analyzer.ts_nodes import refs as _refs
 from l1_analyzer.ts_nodes import same as _same
+from l1_analyzer.ts_nodes import sub_collection as _sub_collection
+from l1_analyzer.ts_nodes import sub_key as _sub_key
 from l1_analyzer.ts_nodes import text as _text
 
 NEUTRAL = "neutral"
@@ -80,8 +83,10 @@ UNRESOLVED = "unresolved"
 _BOUNDED_BUILTINS = frozenset({"len", "isinstance", "bool", "id", "type", "hash", "ord", "abs"})
 # Builtins that consume a value as an effect/assertion, not a partitioning decision.
 _EFFECT_CALLS = frozenset({"print", "repr", "str", "format", "log", "logging"})
-# Comparison operators: a state value meeting one is split into finitely many classes.
-_COMPARISON_OPS = frozenset({"<", ">", "<=", ">=", "==", "!=", "===", "!==", "<>"})
+# Comparison operators: a state value meeting one is split into finitely many classes. The
+# set moved to lang_spec so state_bounds_filters can read the same one; the name stays here
+# so every call site below reads as it did.
+_COMPARISON_OPS = COMPARISON_OPS
 
 
 class Finding(TypedDict):
@@ -100,31 +105,6 @@ class Finding(TypedDict):
     silence: str
     construct: str
     partition: Partition
-
-
-def _sub_named(subscript: Node) -> list[Node]:
-    return [c for c in subscript.children if c.is_named]
-
-
-def _sub_collection(subscript: Node, sp: LangSpec) -> Node | None:
-    """The collection being indexed. Rust's index_expression has no fields, so the
-    collection is the first named child; other grammars name it."""
-    if sp.get("sub_positional"):
-        named = _sub_named(subscript)
-        return named[0] if named else None
-    return _field(subscript, sp["sub_value"])
-
-
-def _sub_key(subscript: Node, sp: LangSpec) -> Node | None:
-    """The key/index node of a subscript. Rust indexes positionally (second named
-    child); C# wraps the key in a bracketed_argument_list; others name it."""
-    if sp.get("sub_positional"):
-        named = _sub_named(subscript)
-        return named[1] if len(named) > 1 else None
-    idx = _field(subscript, sp["sub_index"])
-    if idx is not None and idx.type == "bracketed_argument_list":
-        return _arg_value(_first_named(idx))
-    return idx
 
 
 def _first_arg(call: Node | None, sp: LangSpec) -> Node | None:
@@ -242,16 +222,6 @@ def _is_comparison(node: Node | None, sp: LangSpec) -> bool:
 # --------------------------------------------------------------------------
 # Per-reference categorisation.
 # --------------------------------------------------------------------------
-
-def _is_lvalue(node: Node | None, sp: LangSpec) -> bool:
-    """True if `node` is the assigned lvalue of an assignment, unwrapping an optional
-    lvalue wrapper (Go puts assignment targets inside an expression_list)."""
-    wrapper = sp.get("lvalue_wrapper")
-    p = node.parent
-    if wrapper and p is not None and p.type == wrapper:
-        node, p = p, p.parent
-    return p is not None and p.type in sp["assign_types"] and _same(_field(p, sp["assign_left"]), node)
-
 
 def _is_binding_site(ref: Node, parent: Node, sp: LangSpec) -> bool:
     """The reference is the DECLARED NAME in a declaration: `String[] stack;`,
@@ -718,10 +688,14 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
         if verdict == NEUTRAL and _injected_slot_premise_fails(refs, sp, instance):
             verdict, drives, silence, construct, partition = (
                 UNRESOLVED, True, INJECTED_SLOT, "", state_partition.UNKNOWN)
-    # Attribute-level false-positive filter (Python): the per-reference verdict conflates
-    # unbounded data with an unbounded decision. Clear a finding to NEUTRAL only when the
-    # attribute is a provable write-once, memoization cache, or carried-value shape.
-    if verdict != NEUTRAL and sp is LANG_SPEC["python"] and state_bounds_filters.is_false_positive(key, refs, verdict):
+    # Attribute-level false-positive filter: the per-reference verdict conflates unbounded
+    # data with an unbounded decision. Clear a finding to NEUTRAL only when the attribute is
+    # a provable write-once, memoization cache, carried-value or write-only-accumulator
+    # shape. The filter is handed the spec and decides for itself which of its rules this
+    # language can carry - the accumulator rule serves all nine, the other three are still
+    # Python-only - so the language gate lives with the rules rather than at the call site,
+    # where it used to withhold every rule from eight languages without saying so.
+    if verdict != NEUTRAL and state_bounds_filters.is_false_positive(key, refs, verdict, sp):
         verdict, drives, silence, construct, partition = NEUTRAL, False, "", "", state_partition.EMPTY
     return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel,
             "line": _binding_line(refs, sp), "silence": silence, "construct": construct,

@@ -35,84 +35,95 @@ cross-language defect: `return self.cache[k]` cleared here while C reported the 
 shape promiscuous, because C has no filter to clear it with. tests/
 test_finite_testability_cross_language.py is the comparison that now holds the two together.
 
-Python only. The false positives and their proofs are Python (found and verified against
-declaro-persistum). This is slop-audit's own code; the rules are the spec, ported to
-tree-sitter, not a dependency.
+WHICH RULES SERVE WHICH LANGUAGES. The accumulator rule and the two guards in front of it
+read a LangSpec and serve all nine. The other three - write-once, memoization and carried -
+still read Python node types directly and are gated to Python at the entry point. Widening
+one rule at a time is deliberate: each widening is a claim about nine grammars, and the
+cross-language conformance suite can only hold one claim at a time to the evidence. Their
+false positives and proofs are Python (found and verified against declaro-persistum).
+
+Leaving the open-key guard Python-only is safe rather than lucky, and the reason is worth
+stating because it is what makes the staging possible. The guard refuses a container read at
+a key the class does not bound. The accumulator's whitelist is strictly tighter: it admits
+only writes, presence tests and a read written straight back, and a keyed read in any other
+position is not on it. So a shape the guard would refuse, the whitelist refuses first.
+
+A DEFECT FOUND AND NOT FIXED. `_RUBY_MUTATING` carries the string `"<<"`, and Ruby parses an
+append as a `binary` node rather than a call, so no method name is ever `"<<"` and that entry
+can never match. The classifier therefore reads `@rows << x` as a value flowing on rather
+than as a write. It is out of scope here - the accumulator rule declines the shape either
+way - and it is reported rather than patched.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from tree_sitter import Node
 
-from l1_analyzer.lang_spec import _PY_MUTATING, LANG_SPEC
+from l1_analyzer import state_ref_reads as reads
+from l1_analyzer.lang_spec import (
+    _PY_IN_PLACE,
+    COMPARISON_OPS,
+    LANG_SPEC,
+    LangSpec,
+)
+from l1_analyzer.ts_nodes import field as _field
+from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
+from l1_analyzer.ts_nodes import same as _same
+from l1_analyzer.ts_nodes import sub_collection as _sub_collection
+from l1_analyzer.ts_nodes import text as _text
 
 _PY = LANG_SPEC["python"]
-_FUNCTION_TYPES = frozenset({"function_definition", "lambda"})
 # Method names that mutate a container in place. The docstring used to CLAIM this was a
 # superset of the classifier's set and a hand-written list sat underneath, which drifted:
 # `appendleft` was in _PY_MUTATING and not here, so a deque assigned once and then grown
 # cleared as write-once. The claim is now the construction, so the two cannot part again,
-# and the extras below are only the names the classifier does not carry.
-_IN_PLACE = _PY_MUTATING | frozenset({
-    "reverse", "intersection_update", "difference_update", "symmetric_difference_update",
-})
+# and the derivation itself moved to lang_spec, where python's write-only set is taken from
+# it in the same breath.
+_IN_PLACE = _PY_IN_PLACE
 # Container reads that a memoization cache may use and that do not inspect a value's shape.
 _CACHE_READS = frozenset({"pop", "clear", "get", "keys", "values", "items", "setdefault"})
 
 
-def _text(node: Node | None) -> str:
-    return "" if node is None or node.text is None else node.text.decode("utf8", errors="ignore")
+def _is_python(sp: LangSpec) -> bool:
+    """The three rules that still read Python node types directly fire only for Python.
+    Stated as one predicate so the entry point says which rules are staged and why."""
+    return sp is _PY
 
 
 def _attr(key: str) -> str:
-    """The bare attribute name from a state key: `self._rows` -> `_rows`."""
+    """The bare attribute name from a state key: `self._rows` -> `_rows`. Ruby's sigil
+    survives (`@hits` stays `@hits`), which is right: the sigil is part of the name the
+    grammar puts in the node, and _names_the_attribute matches against that node."""
     return key.rsplit(".", 1)[-1]
 
 
-def _enclosing_class(ref: Node) -> Node | None:
+def _enclosing(ref: Node, types: tuple[str, ...] | frozenset[str]) -> Node | None:
+    """The nearest ancestor of `ref` whose type is one of `types`, or None."""
     cur = ref.parent
     while cur is not None:
-        if cur.type in ("class_definition", "class_declaration"):
+        if cur.type in types:
             return cur
         cur = cur.parent
     return None
 
 
-# --- Rule: appears in a real test expression (the drives-a-decision axis) --------
-
-def _is_condition_position(parent: Node, child: Node) -> bool:
-    """True when `child` is the test part of `parent`: an if/while/elif condition, a
-    ternary condition, an assert test, or a comprehension guard."""
-    ptype = parent.type
-    if ptype in ("if_statement", "while_statement", "elif_clause"):
-        return child == parent.child_by_field_name("condition")
-    if ptype == "conditional_expression":            # a if <cond> else b
-        named = parent.named_children
-        return len(named) >= 2 and child == named[1]
-    if ptype == "assert_statement":
-        named = parent.named_children
-        return bool(named) and child == named[0]
-    return ptype == "if_clause"                      # comprehension guard: [x for x in xs if <cond>]
+def _enclosing_class(ref: Node, sp: LangSpec) -> Node | None:
+    """The class whose body a reference sits in. Go and C declare no class types at all, so
+    this returns None for them; the two rules that need a class body to walk (write-once and
+    memoization) are Python-only anyway, and the accumulator rule needs no scope node."""
+    return _enclosing(ref, sp["class_types"])
 
 
-def _in_test(ref: Node) -> bool:
-    """The reference sits inside a real test expression, nested to any depth
-    (`if self._cfg.enabled`, `if len(self._items) > 3`), stopping at the function boundary."""
-    cur = ref
-    while cur.parent is not None:
-        parent = cur.parent
-        if parent.type in _FUNCTION_TYPES:
-            return False
-        if _is_condition_position(parent, cur):
-            return True
-        cur = parent
-    return False
+def _enclosing_function(ref: Node, sp: LangSpec) -> Node | None:
+    return _enclosing(ref, sp["func_types"])
 
 
-def _drives_no_decision(refs: list[Node]) -> bool:
+def _drives_no_decision(refs: list[Node], sp: LangSpec) -> bool:
     """Rule B (carried value): no reference appears in a test expression, so the attribute
     decides nothing. Unbounded data that never reaches a branch does not bound testability."""
-    return not any(_in_test(r) for r in refs)
+    return not any(reads.in_test(r, sp) for r in refs)
 
 
 # --- Rule: write-once, receiver-aware --------------------------------------------
@@ -236,39 +247,22 @@ def _is_write_once(cls: Node, attr: str, refs: list[Node]) -> bool:
     return not _mutated_in_place(refs, attr) and not _returned_whole(refs) and not _escapes(refs)
 
 
-# --- Rule: presence-gated, result-invariant memoization cache --------------------
-
-def _is_membership_container(ref: Node) -> bool:
-    """`ref` (self.attr) is the container of a membership test: `k in self.attr` or
-    `k not in self.attr`. The operator is a single `in` / `not in` token in this grammar."""
-    parent = ref.parent
-    if parent is None or parent.type != "comparison_operator":
-        return False
-    if not any(c.type in ("in", "not in") for c in parent.children):
-        return False
-    named = parent.named_children
-    return bool(named) and named[-1] == ref
+def _has_presence_gate(refs: list[Node], sp: LangSpec) -> bool:
+    return any(reads.is_presence_test(r, sp) for r in refs)
 
 
-def _has_presence_gate(refs: list[Node]) -> bool:
-    return any(_is_membership_container(r) for r in refs)
-
-
-def _value_reaches_condition(refs: list[Node]) -> bool:
-    """A stored value is inspected in a branch: `self.attr[k]` (a keyed READ, not the bare
-    membership container) appears inside a test expression. This is condition 2, the
-    load-bearing one - it keeps _first_failure_time (now - t >= 3600) flagged."""
+def _value_reaches_condition(refs: list[Node], sp: LangSpec) -> bool:
+    """A stored value is inspected in a branch: a keyed READ of the attribute appears inside
+    a test expression. This is condition 2, the load-bearing one - it keeps
+    _first_failure_time (now - t >= 3600) flagged."""
     for ref in refs:
-        parent = ref.parent
-        if parent is None or parent.type != "subscript" or parent.child_by_field_name("value") != ref:
-            continue                                  # only keyed reads of the value
-        gp = parent.parent
-        if gp is not None and gp.type == "assignment" and gp.child_by_field_name("left") == parent:
-            continue                                  # a store, not a read
-        if _in_test(parent):
+        read = reads.keyed_value_read(ref, sp)
+        if read is not None and reads.in_test(read, sp):
             return True
     return False
 
+
+# --- Rule: presence-gated, result-invariant memoization cache --------------------
 
 def _writes_are_plain_stores(cls: Node, attr: str, refs: list[Node]) -> bool:
     """Writes are only `d[k] = v`, `del d[k]`, empty-dict rebind, or cache methods. An
@@ -303,42 +297,25 @@ def _descendants(node: Node):
         yield from _descendants(c)
 
 
-def _enclosing_function(ref: Node) -> Node | None:
-    cur = ref.parent
-    while cur is not None:
-        if cur.type in _FUNCTION_TYPES:
-            return cur
-        cur = cur.parent
-    return None
-
-
-def _is_keyed_read_of(expr: Node | None, attr: str) -> bool:
-    """`expr` is `self.attr[...]` - the cached value read out by key."""
-    if expr is None or expr.type != "subscript":
-        return False
-    value = expr.child_by_field_name("value")
-    return value is not None and value.type == "attribute" and _text(value.child_by_field_name("attribute")) == attr
-
-
-def _result_invariant(attr: str, refs: list[Node]) -> bool:
+def _result_invariant(attr: str, refs: list[Node], sp: LangSpec) -> bool:
     """The presence of a key does not change the answer. Scoped to the ACCESSOR methods -
-    those that contain a membership test on the attribute - every return is the keyed value
+    those that contain a presence test on the attribute - every return is the keyed value
     `self.attr[k]` or a bare return. A method that returns a different value by presence
     (`return None` on a miss, `return False` for a dedup) is result-VARIANT: the presence IS
     the answer, a genuine decision, and it stays flagged. A setter in a different method that
-    returns the stored value is irrelevant - only the membership-gated method is checked."""
-    for fn in {_enclosing_function(r) for r in refs if _is_membership_container(r)}:
+    returns the stored value is irrelevant - only the presence-gated method is checked."""
+    for fn in {_enclosing_function(r, sp) for r in refs if reads.is_presence_test(r, sp)}:
         if fn is None:
             continue
-        for ret in (n for n in _descendants(fn) if n.type == "return_statement"):
+        for ret in (n for n in _descendants(fn) if n.type in sp["return_types"]):
             val = ret.named_children[0] if ret.named_children else None
-            if val is not None and not _is_keyed_read_of(val, attr):
+            if val is not None and not reads.is_keyed_read_of(val, attr, sp):
                 return False
     return True
 
 
-def _is_memoization(cls: Node, attr: str, refs: list[Node]) -> bool:
-    return _has_presence_gate(refs) and _writes_are_plain_stores(cls, attr, refs)
+def _is_memoization(cls: Node, attr: str, refs: list[Node], sp: LangSpec) -> bool:
+    return _has_presence_gate(refs, sp) and _writes_are_plain_stores(cls, attr, refs)
 
 
 # --- Guard: an open key selects among the stored values --------------------------
@@ -367,7 +344,7 @@ def _is_memoization(cls: Node, attr: str, refs: list[Node]) -> bool:
 def _unwrap_unary(node: Node | None) -> Node | None:
     """Peel unary operators off a key. `s[-1]` is the last element, one compile-time value,
     so the wrapper must not hide the literal underneath it."""
-    while node is not None and node.type in _PY.get("unary_types", ()):
+    while node is not None and node.type in _PY["unary_types"]:
         named = node.named_children
         node = named[0] if named else None
     return node
@@ -415,7 +392,7 @@ def _selects_on_an_open_key(refs: list[Node]) -> bool:
 # A per-key counter or tally: `if k not in self._h: self._h[k] = 0` followed by
 # `self._h[k] += 1`. It is not a memoization cache - the augmented assignment inspects and
 # rewrites the stored value, which is exactly why _writes_are_plain_stores rejects it, and
-# that rejection is correct. But nothing ever reads the count back out. The membership test
+# that rejection is correct. But nothing ever reads the count back out. The presence test
 # gates a branch whose arms both fall through to the same augmented assignment, so no test
 # can tell the arms apart and none needs to. State that cannot change an observable outcome
 # cannot make anything harder to test.
@@ -431,138 +408,281 @@ def _selects_on_an_open_key(refs: list[Node]) -> bool:
 # below is a WRITE or a presence test; none of them yields the stored value to anything. A
 # reference anywhere else - returned, passed as an argument, iterated, read by key into an
 # expression, invoked - is not on the list, and the rule declines.
+#
+# The read-modify-write is where the nine grammars diverge furthest and mean the same thing.
+# Python, C#, Ruby, Go, JavaScript and TypeScript write it as one compound-assignment node.
+# Java has to spell it `h.put(k, h.get(k) + 1)` and Rust `*h.get_mut(&k).unwrap() += 1`, so
+# in those two the read is a node of its own and the rule has to follow the value it produces
+# to the write on the other side. Same runtime step, three notations.
 
-# In-place methods that only write. pop, popitem and setdefault also hand the stored value
-# back to the caller, so they read as well as write and are excluded.
-_PURE_WRITE_METHODS = _IN_PLACE - {"pop", "popitem", "setdefault"}
 
-
-def _is_whole_rebind(ref: Node, parent: Node) -> bool:
+def _is_whole_rebind(ref: Node, parent: Node, attr: str, sp: LangSpec) -> bool:
     """`self.attr = {}` - the attribute itself is the assignment target."""
-    return parent.child_by_field_name("left") == ref
+    return _is_lvalue(ref, sp)
 
 
-def _is_presence_gate(ref: Node, parent: Node) -> bool:
+def _is_binding_declaration(ref: Node, parent: Node, attr: str, sp: LangSpec) -> bool:
+    """`Map<String,Integer> hits = new HashMap<>();` - the reference is the DECLARED NAME of
+    the field. A declaration binds the state, it does not consume it, so it is a write like
+    any assignment target. The field is checked and not just the node type: `int y =
+    hits.size();` puts `hits` under a variable_declarator too, in the value."""
+    field = sp["binding_sites"][parent.type]
+    return _same(_field(parent, field), ref)
+
+
+def _is_presence_gate(ref: Node, parent: Node, attr: str, sp: LangSpec) -> bool:
     """`k in self.attr` - the container of a membership test, which reads no stored value."""
-    return _is_membership_container(ref)
+    return reads.is_membership_container(ref, sp)
 
 
-def _is_confined_subscript(ref: Node, parent: Node) -> bool:
+def _is_confined_subscript(ref: Node, parent: Node, attr: str, sp: LangSpec) -> bool:
     """`self.attr[k]` standing as a store target: `= v`, `+= 1`, or `del`. A keyed read in
-    any other position carries the value somewhere this rule cannot follow."""
-    if parent.child_by_field_name("value") != ref:
+    any other position carries the value somewhere this rule cannot follow - except Go's
+    comma-ok presence test, where the value half goes to the blank identifier and only the
+    presence flag is kept."""
+    if not _same(_sub_collection(parent, sp), ref):
         return False
-    gp = parent.parent
-    if gp is None:
+    if _is_lvalue(parent, sp) or reads.is_deleted(parent, sp):
+        return True
+    return reads.is_comma_ok_presence(ref, sp)
+
+
+def _is_pure_write_call(ref: Node, sp: LangSpec) -> bool:
+    """`self.attr.add(k)` - an in-place method that returns no stored value, whose result
+    nobody reads. Two conditions, and both are needed: the name has to be one that writes,
+    and where the write also hands back what was there before (Java's put, Rust's insert)
+    the result has to be discarded."""
+    call = reads.receiver_call(ref, sp)
+    if call is None or reads.method_name(call, sp) not in sp["write_methods"]:
         return False
-    if gp.type in ("assignment", "augmented_assignment"):
-        return gp.child_by_field_name("left") == parent
-    return gp.type == "delete_statement"
+    return reads.result_discarded(call, sp)
 
 
-def _is_pure_write_call(ref: Node, parent: Node) -> bool:
-    """`self.attr.add(k)` - an in-place method that returns no stored value."""
-    if parent.child_by_field_name("object") != ref:
+def _is_arithmetic_host(parent: Node, sp: LangSpec) -> bool:
+    """A binary node carrying an operator that is neither a comparison nor a membership
+    test: `h.get(k) + 1`. The value it produces is derived, not decided on.
+
+    Python is excluded by construction rather than by a special case: its comparison node
+    carries no `operator` field, so the text is empty and no arithmetic reading is available.
+    Python spells arithmetic with a different node type entirely, and one this rule has no
+    need for."""
+    op = _field(parent, "operator")
+    if op is None:
         return False
-    gp = parent.parent
-    called = gp is not None and gp.type == "call" and gp.child_by_field_name("function") == parent
-    return called and _text(parent.child_by_field_name("attribute")) in _PURE_WRITE_METHODS
+    text = _text(op)
+    return text not in COMPARISON_OPS and text not in reads.MEMBERSHIP_TOKENS
 
 
-# The whitelist, keyed by the PARENT node type a reference sits under.
-_CONFINED_ROLES = {
-    "assignment": _is_whole_rebind,
-    "comparison_operator": _is_presence_gate,
-    "subscript": _is_confined_subscript,
-    "attribute": _is_pure_write_call,
-}
+def _transparent_host(cur: Node, parent: Node, sp: LangSpec) -> Node | None:
+    """The node the value moves to when its host neither consumes nor decides on it, or None
+    when the host is neither. Three shapes: a declared passthrough wrapper (Rust's deref,
+    a parenthesis), arithmetic, and a method that hands back the value it was given
+    (Rust's `unwrap`, without which `get_mut(&k).unwrap()` cannot reach its assignment)."""
+    if parent.type in sp["passthrough_types"]:
+        return parent
+    if parent.type in sp["comparison_types"] and _is_arithmetic_host(parent, sp):
+        return parent
+    call = reads.receiver_call(cur, sp)
+    if call is not None and reads.method_name(call, sp) in sp["value_preserving_methods"]:
+        return call
+    return None
 
 
-def _is_confined_reference(ref: Node) -> bool:
+def _is_attribute_write_call(call: Node | None, attr: str, sp: LangSpec) -> bool:
+    """`h.put(k, ...)` - a pure write whose receiver is the attribute itself."""
+    recv = reads.call_receiver(call, sp)
+    return (recv is not None and reads.names_the_attribute(recv, attr, sp)
+            and _is_pure_write_call(recv, sp))
+
+
+def _flows_back_into_the_attribute(read: Node, attr: str, sp: LangSpec) -> bool:
+    """The value this read produced is written straight back into the attribute and reaches
+    nothing else. Two endings: it is the target of an assignment (Rust's
+    `*h.get_mut(&k).unwrap() += 1`), or it is an argument of a write on the same attribute
+    (Java's `h.put(k, h.get(k) + 1)`). Anything else on the way up and the walk declines,
+    which is the conservative direction: a value that escapes keeps the finding."""
+    cur = read
+    while True:
+        parent = cur.parent
+        if parent is None or parent.type in sp["func_types"]:
+            return False
+        if parent.type in sp["assign_types"]:
+            return _is_lvalue(cur, sp)
+        if parent.type in sp["arglist_types"]:
+            return _is_attribute_write_call(parent.parent, attr, sp)
+        nxt = _transparent_host(cur, parent, sp)
+        if nxt is None:
+            return False
+        cur = nxt
+
+
+def _is_keyed_read_written_back(ref: Node, attr: str, sp: LangSpec) -> bool:
+    """A read-modify-write spelled with an explicit read. `h.get(k)` in Java and
+    `h.get_mut(&k)` in Rust are the same runtime step Python writes as `h[k] += 1`: the
+    value comes out and goes straight back in, so nothing observes it."""
+    call = reads.receiver_call(ref, sp)
+    if call is None:
+        return False
+    name = reads.method_name(call, sp)
+    if name not in sp["keyed_read"] or name in sp["presence_methods"]:
+        return False
+    return _flows_back_into_the_attribute(call, attr, sp)
+
+
+def _is_confined_method_use(ref: Node, parent: Node, attr: str, sp: LangSpec) -> bool:
+    """Every method position the rule admits: a pure write, a presence test, or a keyed read
+    written straight back. One predicate serves the flat-call grammars and the nested ones,
+    because _receiver_call already reconciles the two shapes."""
+    return (_is_pure_write_call(ref, sp)
+            or reads.is_presence_method_call(ref, sp)
+            or _is_keyed_read_written_back(ref, attr, sp))
+
+
+ConfinedRole = Callable[[Node, Node, str, LangSpec], bool]
+
+
+def _confined_roles(sp: LangSpec) -> dict[str, ConfinedRole]:
+    """The whitelist for one language, keyed by the PARENT node type a reference sits under
+    and built from that language's own declared vocabulary. A parent type with no row is a
+    position the rule has no argument for, and the rule declines rather than guessing."""
+    roles: dict[str, ConfinedRole] = {}
+    for t in sp["assign_types"]:
+        roles[t] = _is_whole_rebind
+    if sp["lvalue_wrapper"]:
+        roles[sp["lvalue_wrapper"]] = _is_whole_rebind
+    for t in sp["binding_sites"]:
+        roles[t] = _is_binding_declaration
+    for t in sp["comparison_types"]:
+        roles[t] = _is_presence_gate
+    for t in sp["subscript_types"]:
+        roles[t] = _is_confined_subscript
+    for t in sp["member_types"]:
+        roles[t] = _is_confined_method_use
+    if sp["flat_call"]:
+        for t in sp["call_types"]:
+            roles[t] = _is_confined_method_use
+    return roles
+
+
+def _is_confined_reference(ref: Node, attr: str, sp: LangSpec) -> bool:
     parent = ref.parent
     if parent is None:
         return False
-    role = _CONFINED_ROLES.get(parent.type)
-    return role is not None and role(ref, parent)
+    role = _confined_roles(sp).get(parent.type)
+    return role is not None and role(ref, parent, attr, sp)
 
 
-def _is_attr_write_target(node: Node | None, attr: str) -> bool:
+def _is_attr_write_target(node: Node | None, attr: str, sp: LangSpec) -> bool:
     """`self.attr` or `self.attr[k]`, as the left-hand side of a write."""
-    if _is_keyed_read_of(node, attr):
-        return True
-    return node is not None and node.type == "attribute" and _text(node.child_by_field_name("attribute")) == attr
+    return reads.is_keyed_read_of(node, attr, sp) or reads.names_the_attribute(node, attr, sp)
 
 
-def _stmt_is_attr_assignment(node: Node, attr: str) -> bool:
-    return _is_attr_write_target(node.child_by_field_name("left"), attr)
+def _stmt_is_attr_assignment(node: Node, attr: str, sp: LangSpec) -> bool:
+    left = _field(node, sp["assign_left"])
+    wrapper = sp["lvalue_wrapper"]
+    if left is not None and wrapper and left.type == wrapper:
+        named = left.named_children
+        left = named[0] if len(named) == 1 else None
+    return _is_attr_write_target(left, attr, sp)
 
 
-def _stmt_is_attr_delete(node: Node, attr: str) -> bool:
-    return all(_is_attr_write_target(c, attr) for c in node.named_children)
+def _stmt_is_attr_delete(node: Node, attr: str, sp: LangSpec) -> bool:
+    return all(_is_attr_write_target(c, attr, sp) for c in node.named_children)
 
 
-def _stmt_is_attr_write_call(node: Node, attr: str) -> bool:
-    fn = node.child_by_field_name("function")
-    if fn is None or fn.type != "attribute":
-        return False
-    obj = fn.child_by_field_name("object")
-    return _is_attr_write_target(obj, attr) and _is_pure_write_call(obj, fn)
+def _stmt_is_attr_write_call(node: Node, attr: str, sp: LangSpec) -> bool:
+    recv = reads.call_receiver(node, sp)
+    return (recv is not None and _is_attr_write_target(recv, attr, sp)
+            and _is_pure_write_call(recv, sp))
 
 
-_GATED_STATEMENTS = {
-    "assignment": _stmt_is_attr_assignment,
-    "augmented_assignment": _stmt_is_attr_assignment,
-    "delete_statement": _stmt_is_attr_delete,
-    "call": _stmt_is_attr_write_call,
-}
+StatementRule = Callable[[Node, str, LangSpec], bool]
 
 
-def _writes_only_the_attribute(stmt: Node, attr: str) -> bool:
+def _gated_statement_rules(sp: LangSpec) -> dict[str, StatementRule]:
+    """Which statements a gate's arm may hold, keyed by node type and built per language.
+    Only Python declares a delete statement; everywhere else a key removal is a call that
+    hands the removed value back, or a unary operator that collides with a wrapper already
+    declared transparent, and the rule declines the shape rather than reading one as the
+    other."""
+    rules: dict[str, StatementRule] = {}
+    for t in sp["assign_types"]:
+        rules[t] = _stmt_is_attr_assignment
+    for t in sp["delete_stmt_types"]:
+        rules[t] = _stmt_is_attr_delete
+    for t in sp["call_types"]:
+        rules[t] = _stmt_is_attr_write_call
+    return rules
+
+
+def _writes_only_the_attribute(stmt: Node, attr: str, sp: LangSpec) -> bool:
     """`stmt` writes `attr` and does nothing else the caller could observe."""
-    inner = stmt.named_children[0] if stmt.type == "expression_statement" and stmt.named_children else stmt
-    rule = _GATED_STATEMENTS.get(inner.type)
-    return rule is not None and rule(inner, attr)
+    inner = stmt
+    if stmt.type in sp["discard_types"] and stmt.named_children:
+        inner = stmt.named_children[0]
+    rule = _gated_statement_rules(sp).get(inner.type)
+    return rule is not None and rule(inner, attr, sp)
 
 
-def _gate_branch(ref: Node) -> Node | None:
-    """The `if` or `elif` whose condition this membership test is. None when the test sits
-    somewhere with no block to read - a ternary, an assert, a comprehension guard - or in a
-    condition the walk leaves without finding one."""
+def _gate_branch(ref: Node, sp: LangSpec) -> Node | None:
+    """The branch whose test this presence check is. None when the test sits somewhere with
+    no arm to read - a ternary, an assert, a comprehension guard - or in a position the walk
+    leaves without finding one. Go's comma-ok sits in the `initializer` of its `if` rather
+    than in the condition, which is why gate_fields is a tuple and not one name."""
     cur = ref
     while cur.parent is not None:
         parent = cur.parent
-        if parent.type in _FUNCTION_TYPES:
+        if parent.type in sp["func_types"]:
             return None
-        if parent.type in ("if_statement", "elif_clause") and parent.child_by_field_name("condition") == cur:
+        branch = parent.type in sp["branch_types"] or parent.type in sp["elif_types"]
+        if branch and any(_same(_field(parent, f), cur) for f in sp["gate_fields"]):
             return parent
         cur = parent
     return None
 
 
-def _gated_branches_converge(attr: str, refs: list[Node]) -> bool:
-    """Every membership gate on the attribute guards branches that write only the attribute.
+def _gate_guarded_statements(gate: Node, sp: LangSpec) -> list[Node]:
+    """Every statement the gate guards, with the gate's own test left out. Body containers
+    are declared per language and expanded, so Java's constructor_body, Ruby's `then` and
+    `else`, Go's statement_list and Python's else_clause all yield their statements instead
+    of reading as one unrecognised node."""
+    tests = [_field(gate, f) for f in sp["gate_fields"]]
+    out: list[Node] = []
+    for child in gate.named_children:
+        if any(_same(t, child) for t in tests):
+            continue
+        if child.type in sp["gate_body_types"]:
+            out.extend(_gate_guarded_statements(child, sp))
+        else:
+            out.append(child)
+    return out
+
+
+def _gated_branches_converge(attr: str, refs: list[Node], sp: LangSpec) -> bool:
+    """Every presence gate on the attribute guards arms that write only the attribute.
     Without this, `if k in self._seen: self._misses += 1` would clear: the presence decides
     something after all, just in a neighbouring slot rather than in a return value, and the
     module guard's result-invariance check only looks at returns."""
     for ref in refs:
-        if not _is_membership_container(ref):
+        if not reads.is_presence_test(ref, sp):
             continue
-        gate = _gate_branch(ref)
+        gate = _gate_branch(ref, sp)
         if gate is None:
             return False
-        for block in (n for n in _descendants(gate) if n.type == "block"):
-            if not all(_writes_only_the_attribute(s, attr) for s in block.named_children):
-                return False
+        if not all(_writes_only_the_attribute(s, attr, sp)
+                   for s in _gate_guarded_statements(gate, sp)):
+            return False
     return True
 
 
-def _is_write_only_accumulator(attr: str, refs: list[Node]) -> bool:
-    return all(_is_confined_reference(r) for r in refs) and _gated_branches_converge(attr, refs)
+def _is_write_only_accumulator(attr: str, refs: list[Node], sp: LangSpec) -> bool:
+    return (all(_is_confined_reference(r, attr, sp) for r in refs)
+            and _gated_branches_converge(attr, refs, sp))
 
 
 # --- entry point -----------------------------------------------------------------
 
-def is_false_positive(key: str, refs: list[Node], verdict: str) -> bool:
+def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) -> bool:
     """True when the finding for this attribute is a provable false positive under one of
     the four rules, and should be reclassified NEUTRAL. Conservative: any doubt is False.
 
@@ -573,28 +693,36 @@ def is_false_positive(key: str, refs: list[Node], verdict: str) -> bool:
     escapes."""
     if not refs:
         return False
-    cls = _enclosing_class(refs[0])
-    if cls is None:
-        return False
     attr = _attr(key)
     # The single guard that keeps every genuine finding: if the attribute drives a decision
     # whose answer depends on an unbounded value or key, it stays flagged, whatever else is
     # true of it. That is exactly the value-inspected magnitude test (_first_failure_time),
     # the dedup set, and the value-indexed lookup that returns None on a miss. Only once no
     # such decision exists is a shape eligible to clear.
-    if _value_reaches_condition(refs) or not _result_invariant(attr, refs):
+    if _value_reaches_condition(refs, sp) or not _result_invariant(attr, refs, sp):
         return False
-    # Memoization is settled BEFORE the open-key guard, and it is the one shape allowed past
-    # it. A presence-gated, result-invariant cache answers the same for a key whether or not
-    # that key is stored, so the partition its keyed read cuts belongs to the function being
-    # memoised and not to the cache: delete the cache and every observable answer is
-    # unchanged. No other rule can make that argument, which is why no other rule is exempt.
-    if verdict == "promiscuous" and _is_memoization(cls, attr, refs):
-        return True
-    if _selects_on_an_open_key(refs):
+    # Write-once, memoization and carried-value still read Python node types directly, so
+    # they run for Python and nobody else. Each is a claim about nine grammars that the
+    # cross-language suite has not yet been made to hold, and widening one rule at a time is
+    # what lets the suite say which claim broke.
+    if _is_python(sp):
+        cls = _enclosing_class(refs[0], sp)
+        if cls is None:
+            return False
+        # Memoization is settled BEFORE the open-key guard, and it is the one shape allowed
+        # past it. A presence-gated, result-invariant cache answers the same for a key
+        # whether or not that key is stored, so the partition its keyed read cuts belongs to
+        # the function being memoised and not to the cache: delete the cache and every
+        # observable answer is unchanged. No other rule can make that argument, which is why
+        # no other rule is exempt.
+        if verdict == "promiscuous" and _is_memoization(cls, attr, refs, sp):
+            return True
+        if _selects_on_an_open_key(refs):
+            return False
+        if _is_write_once(cls, attr, refs):
+            return True                               # immutable, read only in bounded ways
+        if verdict == "promiscuous" and _drives_no_decision(refs, sp):
+            return True
+    if verdict != "promiscuous":
         return False
-    if _is_write_once(cls, attr, refs):
-        return True                                   # immutable, read only in bounded ways
-    if verdict == "promiscuous":
-        return _drives_no_decision(refs) or _is_write_only_accumulator(attr, refs)
-    return False
+    return _is_write_only_accumulator(attr, refs, sp)

@@ -6,6 +6,7 @@ The orchestration (_prove_one, _prove_module, prove_coverage_repo, prove_coverag
 by nothing. Its old tests replaced propose, repair and the run boundary with canned answers,
 so they proved wiring against the test's own strings. See the deletion audit."""
 
+import pytest
 from l1_analyzer import coverage_prove, rust_facets
 
 _SRC = """\
@@ -47,6 +48,78 @@ def test_uncovered_gaps_skips_functions_with_no_return_type():
     fns = rust_facets.module_functions(src)
     assert fns[0]["return_type"] is None
     assert rust_facets.uncovered_gaps(fns, frozenset({2})) == []
+
+
+# --- reading the #[cfg(...)] gate on a branch ------------------------------
+#
+# _enclosing_cfg attaches a predicate to every branch so a branch the host cannot compile
+# is spotted before a proof is spent trying to reach it. _cfg_inner is the text reader
+# underneath it, and the balancing is what makes a nested predicate come back whole.
+
+@pytest.mark.parametrize("attr,inner", [
+    ("#[cfg(test)]", "test"),
+    ('#[cfg(not(target_os = "linux"))]', 'not(target_os = "linux")'),
+    ('#[cfg(all(unix, feature = "x"))]', 'all(unix, feature = "x")'),
+    ('#[cfg(any(a, all(b, c)))]', 'any(a, all(b, c))'),
+])
+def test_cfg_inner_returns_the_whole_predicate(attr, inner):
+    # Balanced to the matching close paren, not to the first one: stopping early would cut
+    # `not(target_os = "linux")` down to `not(target_os = "linux"` and the predicate would
+    # never parse.
+    assert rust_facets._cfg_inner(attr) == inner
+
+
+@pytest.mark.parametrize("attr", [
+    "#[derive(Debug, Clone)]",
+    "#[inline]",
+    "",
+    '#[cfg_attr(test, derive(Debug))]',
+])
+def test_a_non_cfg_attribute_yields_no_predicate(attr):
+    # None, not the empty string: _enclosing_cfg tests `is not None` to decide whether the
+    # attribute gates anything, so an attribute that gates nothing has to answer None.
+    # cfg_attr is on this list because it applies an attribute conditionally rather than
+    # gating compilation of the item, and because the `_` after `cfg` is what keeps it off
+    # the substring match.
+    assert rust_facets._cfg_inner(attr) is None
+
+
+def test_an_unterminated_cfg_yields_no_predicate():
+    # Truncated source, or a `cfg(` inside a string. The scan reaches the end without the
+    # depth returning to zero and declines rather than returning the tail.
+    assert rust_facets._cfg_inner("#[cfg(all(unix") is None
+
+
+def test_an_empty_cfg_yields_an_empty_predicate_not_none():
+    # Real behaviour, stated because it is a hole rather than a decision: `#[cfg()]` returns
+    # "", which is not None, so _enclosing_cfg appends an empty conjunct and builds
+    # `all(, ...)`. rustc rejects `#[cfg()]` outright, so nothing that compiles reaches it.
+    assert rust_facets._cfg_inner("#[cfg()]") == ""
+
+
+def test_the_first_cfg_in_the_text_is_the_one_read():
+    # An attribute_item is one attribute, so the second `cfg(` here is a shape the reader
+    # never meets in practice; the scan takes the leftmost either way.
+    assert rust_facets._cfg_inner("#[cfg(a)] #[cfg(b)]") == "a"
+
+
+def test_a_nested_cfg_inside_another_attribute_is_read_as_the_predicate():
+    # Real behaviour, and it is over-eager: find() looks for `cfg(` anywhere in the
+    # attribute text, so any attribute containing that substring reports a predicate it
+    # does not gate on. The cost is bounded - a wrong predicate marks a branch host-dead
+    # and skips a proof, it never invents a gap - but the reader is a substring search
+    # where the caller means "this attribute IS a cfg".
+    assert rust_facets._cfg_inner("#[some_macro(cfg(unix))]") == "unix"
+
+
+def test_the_branch_carries_the_predicate_of_the_function_that_gates_it():
+    # The end-to-end path: a cfg on the function reaches every branch inside it, which is
+    # how a host-dead branch is recognised before a proof is spent on it.
+    src = ('#[cfg(not(target_os = "linux"))]\n'
+           'pub fn classify(n: i32) -> &\'static str {\n'
+           '    if n < 0 { "neg" } else { "pos" }\n}\n')
+    branches = rust_facets.module_functions(src)[0]["branches"]
+    assert {b["cfg"] for b in branches} == {'not(target_os = "linux")'}
 
 
 # --- rendering + run classification ---------------------------------------

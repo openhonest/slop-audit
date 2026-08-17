@@ -30,6 +30,10 @@ class LangSpec(TypedDict, total=False):
     subscript_types: tuple[str, ...]
     sub_value: str | None
     sub_index: str | None
+    # True where the grammar gives its subscript node no fields, so the collection and the
+    # key are the first two named children. Rust and Ruby index that way; the other seven
+    # declare False rather than leaving the key out, because a missing key here would read
+    # as "not positional" and reach the field branch by default rather than by decision.
     sub_positional: bool
     decorator_types: tuple[str, ...]
     destructuring_types: tuple[str, ...]
@@ -85,15 +89,91 @@ class LangSpec(TypedDict, total=False):
     literal_types: frozenset[str]
     unary_types: tuple[str, ...]
     module_enum: str
+    # The node a grammar wraps assignment TARGETS in. Go puts them in an expression_list;
+    # the other eight put the target under the assignment directly and declare the empty
+    # string, which is a named "no wrapper" case rather than an omission. Every entry
+    # declares it, so the readers subscript instead of reaching for a default.
     lvalue_wrapper: str
     scope_by_receiver: bool
     extra_bounded: frozenset[str]
+    # --- vocabulary the write-only-accumulator rule reads (state_bounds_filters) -------
+    #
+    # The rule argues that a per-key tally nothing ever reads back cannot change an
+    # observable outcome. Making that argument in nine grammars needs five things named
+    # per language: how the language ASKS whether a key is present, which methods WRITE a
+    # container without handing a value back, where a value is DISCARDED, which node holds
+    # the statements a gate guards, and which field of a branch the gate's test sits in.
+    #
+    # A language that spells one of these no way at all declares the empty case, and the
+    # rule then declines that half explicitly. That is the point of declaring it: an
+    # omission would read as a default somebody chose.
 
+    # Methods that answer "does this container hold this key" WITHOUT yielding the stored
+    # value. Kept apart from keyed_read, which yields the value: a presence test in a
+    # condition is the accumulator's own gate, and folding the two together would make the
+    # gate look like a value inspected in a branch and refuse every shape the rule exists
+    # for. Python, JavaScript and TypeScript also have an `in` operator (see `membership`).
+    presence_methods: frozenset[str]
+    # In-place methods that write the container and hand back nothing the caller can branch
+    # on. A subset of `mutating`: pop, popitem, remove and their spellings mutate AND yield
+    # the value they touched, so a reference in that position is not confined.
+    write_methods: frozenset[str]
+    # Methods that hand back the value or handle they were given. Rust reaches a map slot
+    # through `get_mut(&k).unwrap()`, so the unwrap has to be transparent for the walk to
+    # see the write on the other side of it. Nothing else in the table needs one.
+    value_preserving_methods: frozenset[str]
+    # Where a value is thrown away, and where a statement wraps its expression - one node
+    # type doing both jobs, because they are the same fact. Ruby declares none: every Ruby
+    # expression is a value and only position decides whether anything reads it.
+    discard_types: tuple[str, ...]
+    # Go's comma-ok presence test: `_, ok := d[k]` binds the value and the presence flag at
+    # once. `blank_idents` names the discard target that proves the value was not taken.
+    # The other eight declare the empty case - they ask presence with an operator or a
+    # method, not with a binding.
+    presence_bind_types: tuple[str, ...]
+    blank_idents: frozenset[str]
+    # The fields of a branch node a presence test may occupy. Go's comma-ok sits in the
+    # `initializer` of an `if`, not in its condition, which is why this is a tuple.
+    gate_fields: tuple[str, ...]
+    # Node types that hold the statements a gate guards. Java's constructor body is
+    # `constructor_body` and not `block`; Ruby's arms are `then` and `else`; Go nests a
+    # `statement_list` inside its `block`.
+    gate_body_types: tuple[str, ...]
+    # Key removal spelled as a STATEMENT. Only Python has one. Everywhere else removing a
+    # key is a call that hands the removed value back (`map.remove(k)`, `h.delete(k)`) or,
+    # in JavaScript, a `unary_expression` that collides with the transparent wrapper
+    # already declared in passthrough_types. The rule declines a key removal in those eight
+    # rather than read one shape as another.
+    delete_stmt_types: tuple[str, ...]
+    # Test positions beyond `branch_types` + `branch_cond`, as node type -> where the test
+    # sits: "field" reads `branch_cond`, "first" and "second" take that named child, "all"
+    # means the whole node is a test. Python's ternary has no condition field, which is why
+    # this is a slot rule and not another tuple of node types.
+    extra_test_positions: dict[str, str]
+
+
+# Comparison operators, as every grammar in the table spells them. A state value meeting one
+# is split into finitely many classes; a binary node carrying any OTHER operator is
+# arithmetic, and the value it produces flows on. Both readings are needed by state_bounds
+# and by state_bounds_filters, and the two cannot import each other, so the set lives here.
+COMPARISON_OPS = frozenset({"<", ">", "<=", ">=", "==", "!=", "===", "!==", "<>"})
 
 _PY_MUTATING = frozenset({
     "append", "add", "update", "extend", "insert", "pop", "remove", "discard",
     "clear", "setdefault", "popitem", "sort", "appendleft",
 })
+# Every method that mutates a Python container in place, which is _PY_MUTATING plus the
+# names the classifier has no use for. state_bounds_filters imports this as _IN_PLACE, and
+# derives python's write-only set from it below, so the two cannot drift: a name added to
+# _PY_MUTATING is in both sets on the next line.
+_PY_IN_PLACE = _PY_MUTATING | frozenset({
+    "reverse", "intersection_update", "difference_update", "symmetric_difference_update",
+})
+# pop, popitem and setdefault mutate AND hand the stored value back, so a reference sitting
+# in one of them is not confined however the result is used. Excluded by name rather than by
+# checking whether the caller reads the result: the call's purpose IS the read.
+_PY_WRITE_ONLY = _PY_IN_PLACE - frozenset({"pop", "popitem", "setdefault"})
+
 _JS_MUTATING = frozenset({
     "push", "pop", "shift", "unshift", "splice", "fill", "sort", "copyWithin",
     "set", "add", "delete", "clear",
@@ -173,7 +253,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "func_types": ("function_definition",),
         "assign_types": ("assignment", "augmented_assignment"),
         "assign_left": "left", "assign_right": "right",
-        "subscript_types": ("subscript",), "sub_value": "value", "sub_index": "subscript",
+        "subscript_types": ("subscript",), "sub_value": "value", "sub_index": "subscript", "sub_positional": False,
         "destructuring_types": ("pattern_list", "tuple_pattern", "list_pattern"),
         "decorator_types": ("decorator",),
         "member_types": ("attribute",), "mem_object": "object", "mem_attr": "attribute",
@@ -206,13 +286,27 @@ LANG_SPEC: dict[str, LangSpec] = {
         "literal_types": _PY_LITERALS,
         "unary_types": ("unary_operator",),
         "module_enum": "python",
+        "lvalue_wrapper": "",
+        "presence_methods": frozenset(),          # spelled `k in d` / `k not in d`
+        "write_methods": _PY_WRITE_ONLY,
+        "value_preserving_methods": frozenset(),
+        "discard_types": ("expression_statement",),
+        "presence_bind_types": (), "blank_idents": frozenset(),
+        "gate_fields": ("condition",),
+        "gate_body_types": ("block", "elif_clause", "else_clause"),
+        "delete_stmt_types": ("delete_statement",),
+        "extra_test_positions": {
+            "conditional_expression": "second",   # a if <cond> else b: no condition field
+            "assert_statement": "first",
+            "if_clause": "all",                   # comprehension guard: the node IS a test
+        },
     },
     "typescript": {
         "class_types": ("class_declaration",),
         "func_types": ("function_declaration", "method_definition", "arrow_function"),
         "assign_types": ("assignment_expression", "augmented_assignment_expression"),
         "assign_left": "left", "assign_right": "right",
-        "subscript_types": ("subscript_expression",), "sub_value": "object", "sub_index": "index",
+        "subscript_types": ("subscript_expression",), "sub_value": "object", "sub_index": "index", "sub_positional": False,
         "destructuring_types": ("array_pattern", "object_pattern"),
         "decorator_types": ("decorator",),
         "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
@@ -237,13 +331,23 @@ LANG_SPEC: dict[str, LangSpec] = {
         "literal_types": _JS_LITERALS,
         "unary_types": ("unary_expression",),
         "module_enum": "js",
+        "lvalue_wrapper": "",
+        "presence_methods": frozenset({"has"}),   # `k in o` is declared by `membership` too
+        "write_methods": frozenset({"set", "add", "clear", "fill", "copyWithin", "sort", "push", "unshift"}),
+        "value_preserving_methods": frozenset(),
+        "discard_types": ("expression_statement",),
+        "presence_bind_types": (), "blank_idents": frozenset(),
+        "gate_fields": ("condition",),
+        "gate_body_types": ("statement_block", "else_clause"),
+        "delete_stmt_types": (),                  # `delete o[k]` is a unary_expression
+        "extra_test_positions": {"ternary_expression": "field"},
     },
     "javascript": {
         "class_types": ("class_declaration",),
         "func_types": ("function_declaration", "method_definition", "arrow_function", "function_expression", "generator_function_declaration"),
         "assign_types": ("assignment_expression", "augmented_assignment_expression"),
         "assign_left": "left", "assign_right": "right",
-        "subscript_types": ("subscript_expression",), "sub_value": "object", "sub_index": "index",
+        "subscript_types": ("subscript_expression",), "sub_value": "object", "sub_index": "index", "sub_positional": False,
         "destructuring_types": ("array_pattern", "object_pattern"),
         "decorator_types": ("decorator",),
         "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
@@ -268,13 +372,23 @@ LANG_SPEC: dict[str, LangSpec] = {
         "literal_types": _JS_LITERALS,
         "unary_types": ("unary_expression",),
         "module_enum": "js",
+        "lvalue_wrapper": "",
+        "presence_methods": frozenset({"has"}),
+        "write_methods": frozenset({"set", "add", "clear", "fill", "copyWithin", "sort", "push", "unshift"}),
+        "value_preserving_methods": frozenset(),
+        "discard_types": ("expression_statement",),
+        "presence_bind_types": (), "blank_idents": frozenset(),
+        "gate_fields": ("condition",),
+        "gate_body_types": ("statement_block", "else_clause"),
+        "delete_stmt_types": (),
+        "extra_test_positions": {"ternary_expression": "field"},
     },
     "java": {
         "class_types": ("class_declaration",),
         "func_types": ("method_declaration", "constructor_declaration"),
         "assign_types": ("assignment_expression",),   # `+=` is an assignment_expression with a += operator
         "assign_left": "left", "assign_right": "right",
-        "subscript_types": ("array_access",), "sub_value": "array", "sub_index": "index",
+        "subscript_types": ("array_access",), "sub_value": "array", "sub_index": "index", "sub_positional": False,
         "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": ("annotation",),
         "member_types": ("field_access",), "mem_object": "object", "mem_attr": "field",
@@ -299,13 +413,27 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _JAVA_MUTATING, "keyed_read": _JAVA_KEYED_READ,
         "literal_types": _JAVA_LITERALS,
         "unary_types": ("unary_expression",),
+        "lvalue_wrapper": "",
+        # Java has no membership operator: presence is a method.
+        "presence_methods": frozenset({"containsKey", "contains", "containsValue"}),
+        # `put` returns the PREVIOUS value at the key, so it counts as write-only only when
+        # the result is discarded, which _is_pure_write_call checks. remove, poll, pop,
+        # replace, merge and the compute family exist to hand a value back and are out.
+        "write_methods": frozenset({"put", "putAll", "add", "addAll", "clear", "offer", "push"}),
+        "value_preserving_methods": frozenset(),
+        "discard_types": ("expression_statement",),
+        "presence_bind_types": (), "blank_idents": frozenset(),
+        "gate_fields": ("condition",),
+        "gate_body_types": ("block", "constructor_body"),
+        "delete_stmt_types": (),                  # `map.remove(k)` yields the removed value
+        "extra_test_positions": {"ternary_expression": "field", "assert_statement": "first"},
     },
     "csharp": {
         "class_types": ("class_declaration",),
         "func_types": ("method_declaration", "constructor_declaration"),
         "assign_types": ("assignment_expression",),
         "assign_left": "left", "assign_right": "right",
-        "subscript_types": ("element_access_expression",), "sub_value": "expression", "sub_index": "subscript",
+        "subscript_types": ("element_access_expression",), "sub_value": "expression", "sub_index": "subscript", "sub_positional": False,
         "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": ("attribute",),  # C# member access is member_access_expression, so no clash
         "member_types": ("member_access_expression",), "mem_object": "expression", "mem_attr": "name",
@@ -330,6 +458,18 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
         "literal_types": _CS_LITERALS,
         "unary_types": ("prefix_unary_expression",),
+        "lvalue_wrapper": "",
+        "presence_methods": frozenset({"ContainsKey", "Contains", "ContainsValue"}),
+        # Remove and RemoveAt return a bool the caller can branch on, TryAdd likewise, and
+        # Pop and Dequeue exist to yield. None of them is write-only.
+        "write_methods": frozenset({"Add", "AddRange", "Clear", "Insert", "Push", "Enqueue", "Set"}),
+        "value_preserving_methods": frozenset(),
+        "discard_types": ("expression_statement",),
+        "presence_bind_types": (), "blank_idents": frozenset(),
+        "gate_fields": ("condition",),
+        "gate_body_types": ("block",),
+        "delete_stmt_types": (),                  # `dict.Remove(k)` answers with a bool
+        "extra_test_positions": {"conditional_expression": "field"},
     },
     "rust": {
         # No classes: state is struct fields used as self.<field> inside a separate
@@ -364,6 +504,24 @@ LANG_SPEC: dict[str, LangSpec] = {
         "literal_types": _RUST_LITERALS,
         "unary_types": ("unary_expression",),
         "module_enum": "rust",
+        "lvalue_wrapper": "",
+        "presence_methods": frozenset({"contains_key", "contains"}),
+        # HashMap::insert returns the previous value, so the discard check carries it.
+        # remove, pop, drain, replace and swap exist to yield and are out.
+        "write_methods": frozenset({
+            "insert", "push", "push_back", "push_front", "clear", "extend", "append",
+            "retain", "truncate",
+        }),
+        # `self.h.get_mut(&k).unwrap()` reaches a map slot to write through. The unwrap
+        # hands back the handle it was given, so the walk has to see past it to find the
+        # compound assignment on the other side.
+        "value_preserving_methods": frozenset({"unwrap", "expect"}),
+        "discard_types": ("expression_statement",),
+        "presence_bind_types": (), "blank_idents": frozenset(),
+        "gate_fields": ("condition",),
+        "gate_body_types": ("block", "else_clause"),
+        "delete_stmt_types": (),                  # `map.remove(&k)` yields an Option
+        "extra_test_positions": {},               # `if` is an expression, already in branch_types
     },
     "ruby": {
         "class_types": ("class", "module"),
@@ -398,6 +556,25 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
         "literal_types": _RUBY_LITERALS,
         "unary_types": ("unary",),
+        "lvalue_wrapper": "",
+        "presence_methods": frozenset({"key?", "has_key?", "include?", "member?"}),
+        # `<<` is deliberately absent: Ruby parses an append as a `binary` node, so the
+        # entry carrying it in _RUBY_MUTATING can never match a method name (see the
+        # module docstring of state_bounds_filters).
+        "write_methods": frozenset({
+            "store", "clear", "concat", "merge!", "update", "reject!", "map!", "fill",
+            "push", "append", "unshift", "insert", "delete_if",
+        }),
+        "value_preserving_methods": frozenset(),
+        # Ruby discards nothing syntactically: every expression is a value and only its
+        # position decides whether anything reads it. So a write method whose result must
+        # be proven unread cannot be proven here, and the rule declines it.
+        "discard_types": (),
+        "presence_bind_types": (), "blank_idents": frozenset(),
+        "gate_fields": ("condition",),
+        "gate_body_types": ("then", "else", "body_statement"),
+        "delete_stmt_types": (),                  # `h.delete(k)` yields the removed value
+        "extra_test_positions": {"conditional": "field"},
     },
     "c": {
         # No classes or methods: state is file-scope variables only (module_enum: c).
@@ -405,7 +582,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "func_types": ("function_definition",),
         "assign_types": ("assignment_expression",),
         "assign_left": "left", "assign_right": "right",
-        "subscript_types": ("subscript_expression",), "sub_value": "argument", "sub_index": "index",
+        "subscript_types": ("subscript_expression",), "sub_value": "argument", "sub_index": "index", "sub_positional": False,
         "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": (),       # the language has no decorator syntax
         "member_types": ("field_expression",), "mem_object": "argument", "mem_attr": "field",
@@ -430,6 +607,20 @@ LANG_SPEC: dict[str, LangSpec] = {
         "literal_types": _C_LITERALS,
         "unary_types": ("unary_expression",),
         "module_enum": "c",
+        "lvalue_wrapper": "",
+        # C asks no presence question and grows no container: a fixed array answers for
+        # every index whether or not anything was stored there. Both halves of the
+        # accumulator rule's gate are unspellable here, so the rule declines rather than
+        # stretching an analogy, and C carries no gated-accumulator shape at all.
+        "presence_methods": frozenset(),
+        "write_methods": frozenset(),
+        "value_preserving_methods": frozenset(),
+        "discard_types": ("expression_statement",),
+        "presence_bind_types": (), "blank_idents": frozenset(),
+        "gate_fields": ("condition",),
+        "gate_body_types": ("compound_statement",),
+        "delete_stmt_types": (),
+        "extra_test_positions": {"conditional_expression": "field"},
     },
     "go": {
         # No classes: state is struct fields, methods bound by a named receiver. State
@@ -439,7 +630,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_types": ("assignment_statement",),
         "assign_left": "left", "assign_right": "right",
         "lvalue_wrapper": "expression_list",   # Go wraps assignment targets in expression_list
-        "subscript_types": ("index_expression",), "sub_value": "operand", "sub_index": "index",
+        "subscript_types": ("index_expression",), "sub_value": "operand", "sub_index": "index", "sub_positional": False,
         "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": (),      # the language has no decorator syntax
         "member_types": ("selector_expression",), "mem_object": "operand", "mem_attr": "field",
@@ -466,5 +657,20 @@ LANG_SPEC: dict[str, LangSpec] = {
         "literal_types": _GO_LITERALS,
         "unary_types": ("unary_expression",),
         "module_enum": "go",
+        # Go maps carry no methods: a write is an index assignment and a removal is the
+        # `delete` builtin, so both method sets are empty on purpose.
+        "presence_methods": frozenset(),
+        "write_methods": frozenset(),
+        "value_preserving_methods": frozenset(),
+        "discard_types": ("expression_statement",),
+        # `_, ok := d[k]` is Go's presence test. It binds rather than compares, and it sits
+        # in the `initializer` of the `if` rather than in its condition, which is why both
+        # presence_bind_types and gate_fields carry an entry no other language needs.
+        "presence_bind_types": ("short_var_declaration",),
+        "blank_idents": frozenset({"_"}),
+        "gate_fields": ("condition", "initializer"),
+        "gate_body_types": ("block", "statement_list"),
+        "delete_stmt_types": (),                  # `delete(d, k)` is a builtin call
+        "extra_test_positions": {},               # no ternary, no assert expression
     },
 }

@@ -7,7 +7,11 @@ import pathlib
 import tempfile
 
 import pytest
-from l1_analyzer import state_bounds
+from l1_analyzer import state_bounds, state_bounds_filters
+from l1_analyzer.indicators import _get_parser
+from l1_analyzer.lang_spec import LANG_SPEC
+
+_PY = LANG_SPEC["python"]
 
 
 def _verdict(src: str, attr: str) -> str:
@@ -350,3 +354,133 @@ def test_the_in_place_set_is_a_superset_of_the_classifier_by_construction():
     from l1_analyzer.lang_spec import _PY_MUTATING
     from l1_analyzer.state_bounds_filters import _IN_PLACE
     assert _PY_MUTATING <= _IN_PLACE
+
+
+# --- The whitelist predicates, called directly ------------------------------------
+#
+# _is_confined_reference and _writes_only_the_attribute dispatch on a node type and hand
+# the node to one of these. Above, they are exercised only through classify(), which can
+# reach a predicate for reasons that have nothing to do with what the predicate decides.
+# Here each one is handed the node shapes it must accept and the neighbouring shapes it
+# must decline, so a predicate that stopped drawing its distinction fails on its own.
+
+def _stmt(src: str):
+    """The first statement of `src`, unwrapped from its expression_statement."""
+    top = _get_parser("python").parse(src.encode()).root_node.named_children[0]
+    return top.named_children[0] if top.type == "expression_statement" else top
+
+
+def _method_call(src: str):
+    """(receiver, function-attribute) for a call like `self._h.add(k)`: the pair
+    _is_pure_write_call is asked about."""
+    call = _stmt(src)
+    fn = call.child_by_field_name("function")
+    return fn.child_by_field_name("object"), fn
+
+
+@pytest.mark.parametrize("method", ["add", "append", "appendleft", "update", "clear", "sort"])
+def test_a_call_to_an_in_place_method_is_a_pure_write(method):
+    """`self._h.add(k)` writes the container and hands nothing back, so the reference sits
+    in a position no stored value escapes through. Every name in _PURE_WRITE_METHODS must
+    read this way, including the ones the filter inherits from the classifier."""
+    ref, _parent = _method_call(f"self._h.{method}(k)")
+    assert state_bounds_filters._is_pure_write_call(ref, _PY) is True
+
+
+@pytest.mark.parametrize("method", ["pop", "popitem", "setdefault"])
+def test_a_call_that_returns_the_stored_value_is_not_a_pure_write(method):
+    """This is the distinction the predicate exists to draw. pop, popitem and setdefault
+    mutate in place AND return the value they touched, so the decision they feed can be
+    made one frame up in the caller. A reference in that position is not confined, and the
+    accumulator rule must not clear the attribute."""
+    ref, _parent = _method_call(f"self._h.{method}(k)")
+    assert state_bounds_filters._is_pure_write_call(ref, _PY) is False
+
+
+def test_a_read_only_method_is_not_a_pure_write():
+    """`self._h.keys()` mutates nothing and yields the container's contents. Not on the
+    whitelist, so the rule declines."""
+    ref, _parent = _method_call("self._h.keys()")
+    assert state_bounds_filters._is_pure_write_call(ref, _PY) is False
+
+
+def test_an_in_place_method_that_is_never_called_is_not_a_pure_write():
+    """`self._h.add` with no argument list is the bound method itself, handed to whatever
+    reads the expression. The grandparent is not a call, so the write never happens and the
+    reference is not confined."""
+    attr = _stmt("f(self._h.add)")
+    bound = attr.child_by_field_name("arguments").named_children[0]
+    assert state_bounds_filters._is_pure_write_call(bound.child_by_field_name("object"), _PY) is False
+
+
+def test_the_method_name_node_is_not_the_receiver():
+    """The predicate is asked about one reference under an `attribute` parent, and the
+    parent has two children. Handed the `add` identifier rather than `self._h`, it declines:
+    the reference whose position is being judged must be the receiver."""
+    _ref, parent = _method_call("self._h.add(k)")
+    name = parent.child_by_field_name("attribute")
+    assert state_bounds_filters._is_pure_write_call(name, _PY) is False
+
+
+def test_a_delete_of_the_attribute_alone_is_an_attribute_delete():
+    """`del self._h[k]` and `del self._h` each name only the attribute, so the statement
+    writes nothing else the caller could observe."""
+    assert state_bounds_filters._stmt_is_attr_delete(_stmt("del self._h[k]"), "_h", _PY) is True
+    assert state_bounds_filters._stmt_is_attr_delete(_stmt("del self._h"), "_h", _PY) is True
+
+
+def test_a_delete_of_a_different_attribute_is_declined():
+    assert state_bounds_filters._stmt_is_attr_delete(_stmt("del self._g[k]"), "_h", _PY) is False
+
+
+def test_a_multi_target_delete_is_declined_because_the_targets_arrive_as_one_list():
+    """Real behaviour, and not what the `all(...)` over named_children suggests. tree-sitter
+    wraps `del a, b` in a single expression_list child, so the loop sees one node that is
+    neither an attribute nor a keyed read and declines - even when both targets are the same
+    attribute. The refusal is conservative, so it costs a clear and never a finding."""
+    two = _stmt("del self._h[k], self._h[j]")
+    assert [c.type for c in two.named_children] == ["expression_list"]
+    assert state_bounds_filters._stmt_is_attr_delete(two, "_h", _PY) is False
+
+
+def test_a_nested_delete_is_declined():
+    """`del self._h[k][j]` reaches into the stored value. The subscript's own value is
+    another subscript, not `self._h`, so it is not a write target of the attribute."""
+    assert state_bounds_filters._stmt_is_attr_delete(_stmt("del self._h[k][j]"), "_h", _PY) is False
+
+
+def test_a_node_with_no_named_children_passes_vacuously():
+    """Pinned because it is a real property of `all(...)` over an empty sequence, not an
+    intention: handed a node with no named children the predicate returns True, having
+    examined nothing. Nothing reaches it that way today - _GATED_STATEMENTS calls it only
+    for a delete_statement, which always carries a target - so the vacuous answer is the
+    caller's dispatch to keep, not this predicate's."""
+    assert state_bounds_filters._stmt_is_attr_delete(_stmt("x"), "_h", _PY) is True
+
+
+def test_an_in_place_call_on_the_attribute_writes_only_the_attribute():
+    assert state_bounds_filters._stmt_is_attr_write_call(_stmt("self._h.add(k)"), "_h", _PY) is True
+
+
+def test_a_value_returning_call_on_the_attribute_is_declined():
+    """`self._h.pop(k)` as a bare statement still hands the stored value back, and the
+    statement rule refuses it for the same reason the reference rule does."""
+    assert state_bounds_filters._stmt_is_attr_write_call(_stmt("self._h.pop(k)"), "_h", _PY) is False
+
+
+def test_a_call_on_a_different_attribute_is_declined():
+    assert state_bounds_filters._stmt_is_attr_write_call(_stmt("self._g.add(k)"), "_h", _PY) is False
+
+
+def test_a_plain_function_call_is_declined():
+    """`foo(k)` has an identifier in the function field, not an attribute, so there is no
+    receiver to test and the statement is not a write of the attribute."""
+    assert state_bounds_filters._stmt_is_attr_write_call(_stmt("foo(k)"), "_h", _PY) is False
+
+
+def test_an_in_place_call_on_a_stored_value_counts_as_writing_the_attribute():
+    """Real behaviour, stated because it surprised the reading: `self._h[k].add(v)` mutates
+    the value stored at one key, and the rule accepts it. The receiver is `self._h[k]`,
+    which _is_attr_write_target reads as a keyed write target, and `add` returns nothing.
+    Nothing the caller can observe leaves the statement, which is what the rule asks."""
+    assert state_bounds_filters._stmt_is_attr_write_call(_stmt("self._h[k].add(v)"), "_h", _PY) is True

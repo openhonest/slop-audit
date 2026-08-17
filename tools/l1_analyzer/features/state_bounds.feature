@@ -18,24 +18,6 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     And the operator opts in for that run only, after the whole payload is printed rather than summarised
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
-  Scenario: _sub_named lists the named parts of an indexing expression
-    Given a subscript node
-    When _sub_named keeps only its named children
-    Then it returns them in source order, which is what the positional grammars index into
-    But the bracket tokens are dropped, since they carry no part of the collection or the key
-
-  Scenario: _sub_collection finds the collection being indexed
-    Given a subscript node and the language spec
-    When _sub_collection takes the first named child in a positional grammar, or the named field elsewhere
-    Then it returns the collection
-    But a positional subscript with no named children yields nothing, so the caller gets an absence rather than a wrong node
-
-  Scenario: _sub_key finds the key or index of an indexing expression
-    Given a subscript node and the language spec
-    When _sub_key takes the second named child in a positional grammar, unwraps a bracketed argument list, or reads the named field
-    Then it returns the key, which is what decides whether the read is bounded
-    But a positional subscript with fewer than two named children yields nothing
-
   Scenario: _first_arg reads the value of the first argument at a call site
     Given a call node and the language spec
     When _first_arg finds the argument list, takes its first named entry and unwraps a named-argument wrapper
@@ -91,12 +73,6 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     When _is_comparison accepts any comparison node in Python, and elsewhere reads the operator
     Then it is true when the operator is one of the ordering or equality operators
     But it reads the node without checking that one was supplied, so an absent node is a caller error rather than a false answer
-
-  Scenario: _is_lvalue decides whether a node is the target of an assignment
-    Given a node and the language spec
-    When _is_lvalue steps out through an optional target wrapper and compares the node against the assignment's target
-    Then it is true when the node is what the assignment writes to
-    And the wrapper step is what lets a grammar that puts targets in a list still be read
 
   Scenario: _is_binding_site decides whether a reference is the declared name of a declaration
     Given a reference, the construct above it and the language spec

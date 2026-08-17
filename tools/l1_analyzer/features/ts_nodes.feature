@@ -61,3 +61,27 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
     When arg_value checks the node's type
     Then an argument wrapper yields its first named child, the expression actually passed
     But any other node, and an absent node, comes back exactly as it went in
+
+  Scenario: sub_named lists the named parts of an indexing expression
+    Given a subscript node
+    When sub_named keeps only its named children
+    Then it returns them in source order, which is what the positional grammars index into
+    But the bracket tokens are dropped, since they carry no part of the collection or the key
+
+  Scenario: sub_collection finds the collection being indexed
+    Given a subscript node and the language spec
+    When sub_collection takes the first named child in a positional grammar, or the named field elsewhere
+    Then it returns the collection
+    But a positional subscript with no named children yields nothing, so the caller gets an absence rather than a wrong node
+
+  Scenario: sub_key finds the key or index of an indexing expression
+    Given a subscript node and the language spec
+    When sub_key takes the second named child in a positional grammar, unwraps a bracketed argument list, or reads the named field
+    Then it returns the key, which is what decides whether the read is bounded
+    But a positional subscript with fewer than two named children yields nothing
+
+  Scenario: is_lvalue decides whether a node is the target of an assignment
+    Given a node and the language spec
+    When is_lvalue steps out through an optional target wrapper and compares the node against the assignment's target
+    Then it is true when the node is what the assignment writes to
+    And the wrapper step is what lets a grammar that puts targets in a list still be read
