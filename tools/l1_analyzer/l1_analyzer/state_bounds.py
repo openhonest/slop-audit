@@ -383,6 +383,22 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
     if (not sp["flat_call"] and node.type not in sp["call_types"]
             and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node)):
         return _flow(parent, sp, closed_sets)
+    # THE TWO ROWS THE COMMENT ABOVE PROMISED AND NOBODY WROTE. It excludes the call form
+    # deliberately and correctly, but excluding a shape from one row is not the same as
+    # handling it, and until 2026-08-17 both forms fell through to the total row. That is why
+    # the honest-framework reference server came back unresolved on its own route table:
+    # `@app.get("/")` is the whole of what that server does with `app`.
+    #
+    # Both spellings reach the same conclusion. The state is consumed by the inner call, and
+    # what comes back is a registrar applied to a definition. `app` never reaches an arm
+    # selector: nothing branches on it, compares it, or keys a lookup with it. Registration is
+    # an effect, which is the conclusion `sink_types` already draws for `app.add_middleware(x)`
+    # written as a bare statement.
+    if parent.type in sp["decorator_types"]:      # @app.get("/")
+        return state_partition.output()
+    if (not sp["flat_call"] and node.type in sp["call_types"]        # app.get(p)(handler)
+            and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node)):
+        return state_partition.output()
     if parent.type in sp["passthrough_types"]:
         return _flow(parent, sp, closed_sets)
     if parent.type in sp["comparison_types"]:
