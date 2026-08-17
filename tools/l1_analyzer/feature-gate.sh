@@ -32,12 +32,30 @@ mods=$(printf '%s\n' "$staged" | sed -nE \
 fail=0
 for m in $mods; do
   src="$pkg/$m.py"
-  [ -f "$src" ] || continue   # a feature whose module was deleted; the extra-scenario arm below is not reachable
+  feat="$featdir/$m.feature"
+  # A feature whose module was deleted used to be skipped here, which made a spec for
+  # removed code the one thing this gate could not see. It is allowed, but only when
+  # declared: every scenario must carry @pending, which separates a specification waiting
+  # for its implementation from one nobody noticed had rotted.
+  if [ ! -f "$src" ]; then
+    [ -f "$feat" ] || continue
+    total=$(grep -cE '^  Scenario:' "$feat")
+    pending=$(grep -cE '^  @pending' "$feat")
+    if [ "$total" -ne "$pending" ] || [ "$total" -eq 0 ]; then
+      fail=1
+      echo ""
+      echo "feature-gate: $m — the module is gone and $pending of $total scenarios say @pending."
+      echo "  Either delete features/$m.feature, or tag every scenario @pending to declare it"
+      echo "  a specification waiting for its implementation."
+    else
+      echo "feature-gate: $m OK (spec only, $total pending implementation)"
+    fi
+    continue
+  fi
 
   funcs=$(grep -hoE '^(async )?def [a-z_][a-z0-9_]*' "$src" | sed -E 's/^(async )?def //' | sort)
   nf=$(printf '%s\n' "$funcs" | grep -c .)
 
-  feat="$featdir/$m.feature"
   if [ ! -f "$feat" ]; then
     [ "$nf" -eq 0 ] && continue   # a data-only module declares no function and needs no feature
     fail=1
@@ -64,8 +82,14 @@ for m in $mods; do
     echo "  that the shape of what it could not read is offered for collection, opt-in per run,"
     echo "  node types only. See research/candidates/collecting-unmeasured-constructs.md."
   fi
+  # A scenario naming no function is a spec awaiting code when it says so, and rot when it
+  # does not. The tag is what makes the second detectable.
+  pend=$(awk '/^  @pending/{p=1;next} /^  Scenario:/{if(p){sub(/^  Scenario: /,"");sub(/ .*$/,"");print} p=0} {if($0 !~ /^  @/) p=0}' "$feat" | sort -u)
+  npend=$(printf '%s\n' "$pend" | grep -c .)
+  ns=$((ns - npend))
   missing=$(comm -23 <(printf '%s\n' "$funcs" | uniq) <(printf '%s\n' "$scen" | uniq))
   extra=$(comm -13 <(printf '%s\n' "$funcs" | uniq) <(printf '%s\n' "$scen" | uniq))
+  extra=$(comm -23 <(printf '%s\n' "$extra" | grep . | sort -u) <(printf '%s\n' "$pend" | grep . | sort -u))
 
   if [ "$nf" != "$ns" ] || [ -n "$missing" ] || [ -n "$extra" ]; then
     fail=1
