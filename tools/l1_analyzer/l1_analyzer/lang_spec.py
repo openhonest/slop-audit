@@ -32,6 +32,7 @@ class LangSpec(TypedDict, total=False):
     sub_index: str | None
     sub_positional: bool
     decorator_types: tuple[str, ...]
+    destructuring_types: tuple[str, ...]
     member_types: tuple[str, ...]
     mem_object: str
     mem_attr: str
@@ -173,6 +174,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_types": ("assignment", "augmented_assignment"),
         "assign_left": "left", "assign_right": "right",
         "subscript_types": ("subscript",), "sub_value": "value", "sub_index": "subscript",
+        "destructuring_types": ("pattern_list", "tuple_pattern", "list_pattern"),
         "decorator_types": ("decorator",),
         "member_types": ("attribute",), "mem_object": "object", "mem_attr": "attribute",
         "call_types": ("call",), "flat_call": False,
@@ -194,7 +196,13 @@ LANG_SPEC: dict[str, LangSpec] = {
         "field_decl_types": (),
         "record_enum": "python_class_body",
         "key_prefix": "",
-        "mutating": _PY_MUTATING, "keyed_read": frozenset(),
+        # `dict.get(k)` is the same keyed read as `Map.get(k)`, which javascript and
+        # typescript have declared since the spec was written. Python declared an empty set,
+        # so `self._h.get(k, 0)` fell through to "the method result flows on" and the flow
+        # walk then met an assignment it had no row for. `setdefault` and `pop` are keyed
+        # too but they mutate, and _PY_MUTATING already claims them; a name in both sets
+        # would be read by whichever branch ran first, so `get` is the only addition.
+        "mutating": _PY_MUTATING, "keyed_read": frozenset({"get"}),
         "literal_types": _PY_LITERALS,
         "unary_types": ("unary_operator",),
         "module_enum": "python",
@@ -205,6 +213,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_types": ("assignment_expression", "augmented_assignment_expression"),
         "assign_left": "left", "assign_right": "right",
         "subscript_types": ("subscript_expression",), "sub_value": "object", "sub_index": "index",
+        "destructuring_types": ("array_pattern", "object_pattern"),
         "decorator_types": ("decorator",),
         "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
         "call_types": ("call_expression",), "flat_call": False,
@@ -235,6 +244,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_types": ("assignment_expression", "augmented_assignment_expression"),
         "assign_left": "left", "assign_right": "right",
         "subscript_types": ("subscript_expression",), "sub_value": "object", "sub_index": "index",
+        "destructuring_types": ("array_pattern", "object_pattern"),
         "decorator_types": ("decorator",),
         "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
         "call_types": ("call_expression",), "flat_call": False,
@@ -265,6 +275,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_types": ("assignment_expression",),   # `+=` is an assignment_expression with a += operator
         "assign_left": "left", "assign_right": "right",
         "subscript_types": ("array_access",), "sub_value": "array", "sub_index": "index",
+        "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": ("annotation",),
         "member_types": ("field_access",), "mem_object": "object", "mem_attr": "field",
         "call_types": ("method_invocation",), "flat_call": True,
@@ -295,6 +306,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_types": ("assignment_expression",),
         "assign_left": "left", "assign_right": "right",
         "subscript_types": ("element_access_expression",), "sub_value": "expression", "sub_index": "subscript",
+        "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": ("attribute",),  # C# member access is member_access_expression, so no clash
         "member_types": ("member_access_expression",), "mem_object": "expression", "mem_attr": "name",
         "call_types": ("invocation_expression",), "flat_call": False,
@@ -328,6 +340,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_left": "left", "assign_right": "right",
         "subscript_types": ("index_expression",), "sub_value": None, "sub_index": None,
         "sub_positional": True,   # index_expression has no fields: [collection, key] by position
+        "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": ("attribute",),  # Rust member access is field_expression, so no clash
         "member_types": ("field_expression",), "mem_object": "value", "mem_attr": "field",
         "call_types": ("call_expression",), "flat_call": False,
@@ -359,6 +372,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_left": "left", "assign_right": "right",
         "subscript_types": ("element_reference",), "sub_value": "object", "sub_index": None,
         "sub_positional": True,   # element_reference: [object, key] by position
+        "destructuring_types": ("left_assignment_list",),
         "decorator_types": (),    # the language has no decorator syntax
         "member_types": ("call",),   # unused for ivar state, but keep valid node types
         "mem_object": "receiver", "mem_attr": "method",
@@ -392,6 +406,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_types": ("assignment_expression",),
         "assign_left": "left", "assign_right": "right",
         "subscript_types": ("subscript_expression",), "sub_value": "argument", "sub_index": "index",
+        "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": (),       # the language has no decorator syntax
         "member_types": ("field_expression",), "mem_object": "argument", "mem_attr": "field",
         "call_types": ("call_expression",), "flat_call": False,
@@ -425,6 +440,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "assign_left": "left", "assign_right": "right",
         "lvalue_wrapper": "expression_list",   # Go wraps assignment targets in expression_list
         "subscript_types": ("index_expression",), "sub_value": "operand", "sub_index": "index",
+        "destructuring_types": (),  # destructuring is a declaration here, not an assignment
         "decorator_types": (),      # the language has no decorator syntax
         "member_types": ("selector_expression",), "mem_object": "operand", "mem_attr": "field",
         "call_types": ("call_expression",), "flat_call": False,

@@ -399,6 +399,31 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
     if (not sp["flat_call"] and node.type in sp["call_types"]        # app.get(p)(handler)
             and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node)):
         return state_partition.output()
+    # THE VALUE IS STORED. `n._qs = self._qs.filter(**kw)`: a derived value comes to rest in a
+    # binding, reaching no arm selector at this site. That is the same conclusion `sink_types`
+    # draws for a value the language discards, and the difference between "stored" and
+    # "discarded" is not one this row has to settle: neither selects an arm.
+    #
+    # Read through `assign_right`, which every language has declared since the spec was
+    # written and which nothing read until now. That is why this row was missing rather than
+    # wrong: the walk had a field for the value half of an assignment and no rule that used
+    # it, so it reached the total row and reported `call in assignment` honestly.
+    #
+    # Whether the attribute as a whole then clears is not decided here. It is the carried-value
+    # rule in state_bounds_filters that reads every reference together, and it needs this site
+    # to resolve rather than to fail closed, because an unresolved site suppresses the whole
+    # attribute regardless of what the other references say.
+    # A DESTRUCTURING TARGET is excluded, and finding out why cost a red test. `first, *rest =
+    # self.row` takes the value APART rather than storing it, and a starred target takes an
+    # unbounded slice of it, so the two are not the same question. This row first claimed that
+    # shape as clean and broke test_unmeasured_constructs, which exists to hold exactly this
+    # line: a construct with no rule must read as unmeasured, never as clean. Destructuring
+    # forms are declared per language and an unlisted one falls to the total row, which is the
+    # honest direction to be wrong in.
+    left = _field(parent, sp["assign_left"])
+    if (parent.type in sp["assign_types"] and _same(_field(parent, sp["assign_right"]), node)
+            and (left is None or left.type not in sp["destructuring_types"])):
+        return state_partition.output()
     if parent.type in sp["passthrough_types"]:
         return _flow(parent, sp, closed_sets)
     if parent.type in sp["comparison_types"]:
