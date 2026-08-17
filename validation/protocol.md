@@ -27,7 +27,7 @@ A methodology that has not been validated is a methodology that nobody can defen
 
 **Availability.** As of 2026-04-09, the `honest-conversion` branch is expected to be complete within three weeks (by 2026-04-30 at the latest, probably sooner). The positive-control audit should be run immediately upon branch stabilization. This date is the gating prerequisite for the Paper 2 drafting effort (see `project_peer_review_strategy.md` in the user's auto-memory).
 
-**Expected outcome.** Layer 1 slop signal count ≤ 3 of 11. Layer 2 dimensions scoring *Present*: ≥ 14 of 18. Layer 3 markers in aggregate scoring *Present*: ≥ 70%.
+**Expected outcome.** Layer 1 slop signal count ≤ 3 of the panel (see the note below on what the denominator is). Layer 2 dimensions scoring *Present*: ≥ 14 of 18. Layer 3 markers in aggregate scoring *Present*: ≥ 70%.
 
 **If the result deviates from the expected outcome:** investigate before changing the methodology. The deviation may be a real finding (the branch has actually drifted), or it may be a methodology calibration problem. Determine which before adjusting anything.
 
@@ -51,16 +51,25 @@ A methodology that has not been validated is a methodology that nobody can defen
 
 **Decision deadline.** Negative control must be selected before the v1 methodology is finalized. Recommendation: use the `idd develop` branch as the first negative control because it is the cleanest comparison; add a synthetic or open-source negative control in v2.
 
-**Expected outcome (once selected).** Layer 1 slop signal count ≥ 7 of 11. Layer 2 dimensions scoring *Present*: ≤ 4 of 18. Layer 3 markers in aggregate scoring *Present*: ≤ 30%.
+**Expected outcome (once selected).** Layer 1 slop signal count ≥ 11 of 20, which is the spec's own high-confidence threshold (see the note below). Layer 2 dimensions scoring *Present*: ≤ 4 of 18. Layer 3 markers in aggregate scoring *Present*: ≤ 30%.
 
 ---
+
+
+## Note on the denominator, added 2026-08-17 after the first run
+
+This document was written against an eleven-indicator panel and said "of 11" in both expected outcomes. The methodology now defines **twenty** indicators, and `spec/03-layer1-indicators.md` sets the high-confidence threshold itself: *"A codebase scoring in the slop column on eleven or more of the twenty indicators is considered to exhibit the unstructured-condition pattern with high confidence."* The same paragraph rules that indicators returning **n/a** are excluded from both the numerator and the denominator of the slop signal count, so the denominator is twenty minus however many came back n/a on that repository.
+
+The expected outcomes above have been repointed at the spec rather than left to contradict it. That is a correction to a document that lagged the methodology, not a change to the methodology, which the first run was explicitly forbidden from making.
+
+The first run is recorded in `results/2026-08-17-layer1.md`. Read the deviation there against this note: the negative control's apparent miss was measured against a threshold this document had already outgrown.
 
 ## Validation procedure
 
 ### Step 1 — Positive control run
 
 1. Clone the `idd` repository at the `honest-conversion` branch to a fresh working directory. Confirm full git history (no shallow clone).
-2. Run the Layer 1 reference indicators (eleven of them, per methodology Section 3). Record the results in `validation/results/positive-control-layer1.md`.
+2. Run the Layer 1 reference indicators (twenty of them, per methodology Section 3). Record the results in `validation/results/positive-control-layer1.md`.
 3. Run the Layer 2 inspection procedures for all 18 dimensions, per methodology Section 4. Record scores and evidence in `validation/results/positive-control-layer2.md`.
 4. Run the Layer 3 marker assessments for all 18 dimensions. Record scores in `validation/results/positive-control-layer3.md`.
 5. Compute the combined dimension scores per the rubric in each Section 4 entry. Record in `validation/results/positive-control-combined.md`.
