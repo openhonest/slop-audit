@@ -6,10 +6,25 @@ vectors in test_finite_testability_vectors.py (the ten cases of
 This file keeps only the invariants that outlive the predicate change from
 value-count to partition-count:
 
-  1. The frozen path is untouched: with classify_state_bounds=False the output
-     equals the golden captured before the classifier existed, byte for byte.
-     This is the guarantee that "on by default" cannot move a pre-registered run,
-     and it is exactly the v1 side of the spec section 9 side-by-side rule.
+  1. The frozen path is stable: with classify_state_bounds=False the output equals
+     the golden, byte for byte.
+
+     THIS DOCSTRING USED TO CLAIM MORE THAN THAT, and the claim was false. It said
+     the golden was "captured before the classifier existed", which would make it
+     the guarantee that on-by-default cannot move a pre-registered run. git says
+     otherwise: py_repo.json has been re-captured in six commits (f9640b7,
+     61f4090, 4c2e805, f89508a, c5a1b97, 4b3ffdf), five of them on 2026-08-15
+     alongside the very changes it was supposed to detect. In f89508a the L1.18
+     off-mode value moved from 83.3 to 50.0 in the same commit that changed the
+     analyzer, so a behaviour change and an expectation change arrived together
+     and the suite was green on both sides.
+
+     A golden re-captured beside the change it is meant to detect detects nothing.
+     What it does enforce is real but narrower: the off-mode output does not drift
+     between re-captures, and it does not drift with the capturing machine, because
+     PATH is emptied so no optional tool can move it. The hash below is what makes
+     a re-capture visible: "the expectation moved" and "the behaviour moved" are
+     now two different reds instead of one silence.
   2. On-mode is purely additive: L1.18's registered number never moves; the
      classifier only adds the L1.18b and path_cover keys.
   3. A non-Python target is n/a, never guessed.
@@ -25,6 +40,10 @@ from pathlib import Path
 from l1_analyzer import indicators, state_bounds
 
 GOLDEN = Path(__file__).parent / "golden" / "py_repo.json"
+# The golden's own content, pinned. Without this a re-capture is invisible: the diff that
+# would have shown a behaviour change is committed as the new expectation and nothing is red.
+# Update it deliberately, in the same commit as the re-capture, with the reason in the message.
+_GOLDEN_SHA256 = "0d01775c86105b60e5e6dc33971726c3d7339e15317cb29e1936c3d1160c81af"
 
 # A deliberately-sloppy sample: pure function + reads of dict/list/str/int/bool
 # state, plus one bounded projection (len). Written to tmp_path per test. Kept
@@ -234,3 +253,17 @@ def test_a_membership_partition_is_not_ordered(tmp_path):
     for op in ("in", "not in"):
         finding = _membership_finding(tmp_path / op.replace(" ", "_"), op)
         assert finding["partition"]["ordered"] is False, op
+
+
+def test_the_golden_itself_is_unchanged():
+    """A re-capture must be a decision, not a side effect.
+
+    The golden has been re-captured six times, five of them on one day beside the changes it
+    existed to detect, and none of those re-captures was red anywhere. This is the guard that
+    was missing: it fails when the file's bytes move, so re-capturing costs one deliberate
+    edit here and cannot happen by accident.
+    """
+    import hashlib
+    assert hashlib.sha256(GOLDEN.read_bytes()).hexdigest() == _GOLDEN_SHA256, (
+        "the golden moved. If that is deliberate, update _GOLDEN_SHA256 in the same commit "
+        "and say in the message what behaviour changed and why the expectation follows it.")
