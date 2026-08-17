@@ -405,7 +405,7 @@ def test_l1_18_refusal_still_does_not_crash_the_boundary(tmp_path):
     handler turns it into n/a with the basis printed, and nothing above it sees an
     exception."""
     (tmp_path / "broken.py").write_bytes(b"\xff\xfe def f( : : :\n\x00 ??? (((")
-    res = indicators._measure("L1.18", analyze_mutable_state, tmp_path, "python")
+    res = indicators._measure(analyze_mutable_state, tmp_path, "python")
     assert res["value"] == "n/a" and res["band"] == "n/a"
     assert "L1.18 unbounded mutable state" in res["details"]
 

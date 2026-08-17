@@ -36,6 +36,7 @@ from pathlib import Path
 
 from tree_sitter import Node
 
+from l1_analyzer import incomplete
 from l1_analyzer.indicators import (
     _BODY_NODE_TYPES,
     LANG_CFG,
@@ -468,10 +469,12 @@ def analyze_mutable_state(repo: Path, lang: str) -> L1Result:
         total_funcs += file_total
         mutable_funcs += file_mutable
 
-    ratio = (mutable_funcs / total_funcs * 100) if total_funcs > 0 else 0.0
+    pct = incomplete.ratio(mutable_funcs, total_funcs, "L1.18 unbounded mutable state",
+                           f"no function was enumerated in {lang}, so the share of them touching "
+                           "unbounded state is absent, not zero")
     return {
-        "value": round(ratio, 1),
-        "band": band(ratio, 15, 40, higher_is_better=False),
+        "value": round(pct, 1),
+        "band": band(pct, 15, 40, higher_is_better=False),
         "details": _with_skipped(
             f"{mutable_funcs}/{total_funcs} functions reference unbounded external mutable state ({lang})", skipped),
     }

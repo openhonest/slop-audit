@@ -146,12 +146,13 @@ Feature: vacuity — paths where a check publishes a property it never measured,
     And this is the one place the check knowingly trades a miss for a false positive: a half-repair publishing zero beside a refusal reads as a refusal here and is not reported
     But false equals zero in Python, so a false value reaches this answer as well as the earlier one
 
-  Scenario: _refuses decides whether a branch declines to publish and returns
+  Scenario: _refuses decides whether a branch declines to publish
     Given the statements of a branch, the helpers known to refuse, and the function
     When _refuses looks at the last statement
     Then a return of nothing, of a refusal constant, of a call to a known refusing helper, or of a refusal dictionary all count as a refusal
+    And a raise counts too, whatever it raises, because no raise publishes a verdict and the sanctioned refusal here is spelled as one
     And a path ending in a refusal is not a vacuous path, and nothing below it is reachable on an empty input, which is the repair this check must not convict
-    But a branch whose last statement is not a return does not count, however it refuses in the middle
+    But a branch that neither returns nor raises does not count, however it refuses in the middle
 
   Scenario: _terminates decides whether a block leaves rather than falling through
     Given the statements of a block

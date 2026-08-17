@@ -554,7 +554,22 @@ def _refuses(stmts: list[ast.stmt], refusing_calls: frozenset[str], scope: ast.A
     vacuous path, and everything below it is unreachable on an empty input - which is
     exactly the repair this check must not convict. A dict of nothing but refusals and
     prose counts, because that is how every fixed check in this package spells it."""
-    if not stmts or not isinstance(stmts[-1], ast.Return):
+    if not stmts:
+        return False
+    # A branch that raises publishes nothing, so the two arms cannot be the same answer and
+    # the path is not vacuous. `_terminates` below has always known a raise ends a path; this
+    # function did not, and that mismatch convicted the repair it exists to protect. The
+    # sanctioned refusal in this package is `raise incomplete.refuse(...)`, spelled as a raise
+    # precisely so it cannot be ignored by a caller, and every site written that way was
+    # reported as an unrepaired empty-denominator path.
+    #
+    # Every raise counts, not only the sanctioned one. The test is whether the branch declines
+    # to publish a verdict, and no raise publishes anything; a narrower rule keyed to
+    # `refusing_calls` would convict `raise ValueError(...)` for spelling its refusal in the
+    # language's own words rather than in this package's.
+    if isinstance(stmts[-1], ast.Raise):
+        return True
+    if not isinstance(stmts[-1], ast.Return):
         return False
     value = stmts[-1].value
     if value is None or _is_refusal_constant(value):

@@ -117,7 +117,6 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     Then it returns the reason the file is out of scope, or nothing at all when the file counts
     And the generated-code test lives here rather than in the shared scope rule, so excluding a machine-written file moves the god-file number and no other
 
-  @pending
   Scenario: _measure runs one measure and turns its refusal to answer into a named n/a
     Given a measure that may raise IncompleteCode rather than publish a value it has no basis for
     When _measure runs it

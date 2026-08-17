@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from l1_analyzer import incomplete
 from l1_analyzer.scope import PRODUCTION
 
 # Roots that identify one machine: a home or user directory, a temp or scratch location, a
@@ -77,6 +78,14 @@ def scan(repo: Path, lang: str) -> dict:
     # detects, so scanning the test tree measures the fixtures, not the code. This repo's
     # own tests carried 24 of the 57 findings on the run that prompted the scope fix.
     files, _skipped = _read_text_files(repo, _CODE_EXTS, scope=PRODUCTION)
+    # A count of zero over zero files read is not a clean bill, it is no reading at all, and
+    # this module returned "no hardcoded machine-specific absolute paths" for both. vacuity.py
+    # had already named this module as an instance; secret_scan and thread_surface were
+    # repaired at the time and this one was missed.
+    if not files:
+        raise incomplete.refuse(
+            "absolute-path scan",
+            f"no production file carried a scanned extension, so nothing was searched ({sorted(_CODE_EXTS)})")
     findings = [
         {"file": str(path.relative_to(repo)) if repo in path.parents else str(path),
          "line": lineno, "path": matched}
