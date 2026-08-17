@@ -1,10 +1,10 @@
-# Amendment 2026-08-17: eight blind spots closed, and every published number they touched
+# Amendment 2026-08-17: nine blind spots closed, and every published number they touched
 
 ## What this covers
 
-Twenty-five commits on `restructure/spec-research-tools-split`, `8b10367..ce63332`. They close eight defects in which the analyzer published a value it had not earned, and each one moves numbers the instrument has already reported. The instrument is cited as Zenodo DOI 10.5281/zenodo.20385346, so no figure from a run before `ce63332` should be quoted without checking it against this document.
+28 commits on `restructure/spec-research-tools-split`, `8b10367..1190568`. They close nine defects in which the analyzer published a value it had not earned, and each one moves numbers the instrument has already reported. The instrument is cited as Zenodo DOI 10.5281/zenodo.20385346, so no figure from a run before `1190568` should be quoted without checking it against this document.
 
-One amendment rather than eight, deliberately. Each fix moved the corpus, and writing an amendment per fix produces a stream of amendments that each need amending.
+One amendment rather than nine, deliberately. Each fix moved the corpus, and writing an amendment per fix produces a stream of amendments that each need amending.
 
 ## What is verified here, and what is not
 
@@ -12,7 +12,7 @@ Every before/after in the reproductions below was run by hand on this machine an
 
 **The corpus figures are not.** The six pinned corpus repositories are not checked out on this machine, so the effect on libuv, json-c, gson, junit4, Newtonsoft.Json and RestSharp has not been measured. During the work an agent reported libuv moving from 6.1 Healthy to 50.7 Slop and json-c from 1.7 Healthy to 34.9 Not Healthy on L1.18. Those two figures are plausible and consistent with the mechanism, and they are **unverified**: treat them as an indication of scale and not as a result. A corpus re-run is owed before any C figure is published again.
 
-## The eight, and what each one moves
+## The nine, and what each one moves
 
 ### 1. C could not reach a struct field through a pointer
 
@@ -56,7 +56,7 @@ Moves: every small, empty or unrecognised-language repository. A Clean becomes a
 
 ### 4. Zero state read was published as "100% finitely testable"
 
-The sharpest of the eight. A fourteen-line Ruby file whose entire state is an unbounded `@@cache` keyed by an arbitrary argument and an unbounded `$seen`:
+The sharpest of the nine. A fourteen-line Ruby file whose entire state is an unbounded `@@cache` keyed by an arbitrary argument and an unbounded `$seen`:
 
 > **Grade: C** — 100% of its state is finitely testable
 > This code definitely CAN be exhaustively tested.
@@ -119,8 +119,16 @@ The gate ratchet and the secret scanner changed behaviour without changing a pub
 
 ## What is still owed
 
-A corpus re-run, and it is the reason this document cannot close the question. Six pinned repositories and the supplementary local trees need one pass at `ce63332`, and the resulting table belongs beside this one.
+A corpus re-run, and it is the reason this document cannot close the question. Six pinned repositories and the supplementary local trees need one pass at `1190568`, and the resulting table belongs beside this one.
 
-`slop-audit-c7r` is open and unfixed: `_compute_decision_space` walks `n.children` rather than `n.named_children`, so the unnamed `if` keyword token matches alongside the `if_statement` node and every `if` counts twice in all nine languages, while the set misses Ruby `unless`, `elsif` and `conditional`, C `case_statement`, Java `switch_block_statement_group` and `switch_label`, C# `switch_expression_arm` and Rust `if_let_expression`. The published static decision-space figure is therefore wrong in both directions at once and the errors do not cancel. It is not fixed here and no number in this document depends on it.
+`slop-audit-c7r` was open and unfixed when this document was first written, and was fixed the same day in `1190568`. It belongs with the eight above and is recorded here as the ninth. `_compute_decision_space` used one shared node-type set holding the bare strings `"if"`, `"case"` and `"when"`, and walked unnamed children, so in most grammars the keyword token inside an already-matched node matched again: a single Python `if` counted 2. In the other direction Ruby's `unless`, `elsif` and ternary went unseen, and a C switch with a case and a default counted 2 where a reader would say 3. The errors ran opposite ways and did not cancel.
 
-`slop-audit-uef` is open: the validation protocol has never been run, and `validation/` holds a protocol and no results. Both controls exist and are named there. Running it against `ce63332` is the next thing, and its results and this amendment belong to one stable pass.
+One shared set could not work, which is why it survived: Ruby's `if`, `unless`, `case` and `when` are named node types while Python's `if` is an unnamed keyword token. The table is now declared per language, probed against each grammar, and read by subscript, and the walk reads named children only. The rule the figure means is written beside the table: an `if`, `elsif`, `unless` or ternary counts one each, an `else` counts nothing because it is the other path of an `if` that already counted, and each arm of a switch or match counts one while the container counts nothing.
+
+| | before | after |
+|---|---|---|
+| this repository's Python scope, 53 files | 3042 | **1499** |
+
+Moves: every L1.19 static figure in every language, and by roughly half on the one repository measured. The README carried 2017 from an older 37-file snapshot and now carries 1499 with a dated note. One residual is named rather than hidden: Ruby spells a `case`'s `else` with the same node type as an `if`'s `else`, so no flat set separates them and a Ruby `case` enumerates its `when` arms only, where the other seven grammars also count their default.
+
+`slop-audit-uef` is open: the validation protocol has never been run, and `validation/` holds a protocol and no results. Both controls exist and are named there. Running it against `1190568` is the next thing, and its results and this amendment belong to one stable pass.
