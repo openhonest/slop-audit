@@ -42,11 +42,21 @@ def _on_path(monkeypatch, bindir):
 
 # --- L1.12-L1.14: real stub binaries on PATH --------------------------------
 
-@given(parsers.parse("vulture reports {n:d} unreachable symbols"), target_fixture="codebase")
-def given_vulture(n, tmp_path, monkeypatch) -> Codebase:
-    (tmp_path / "a.py").write_text("x = 1\n")
-    _stub(tmp_path / "bin", "vulture", "".join("echo 'a.py:1: unused'\n" for _ in range(n)))
-    _on_path(monkeypatch, tmp_path / "bin")
+@given("a codebase where every definition is referenced", target_fixture="codebase")
+def given_all_referenced(tmp_path) -> Codebase:
+    # Native now: no binary is consulted, so the source is the input. `used` is called at
+    # module level, which is what makes the reference real rather than asserted.
+    (tmp_path / "a.py").write_text("def used():\n    return 1\n\n\nprint(used())\n")
+    return {"repo": tmp_path, "lang": "python"}
+
+
+@given(parsers.parse("a codebase with {dead:d} of {total:d} definitions unreferenced"),
+       target_fixture="codebase")
+def given_unreferenced(dead, total, tmp_path) -> Codebase:
+    bodies = "".join(f"def d{i}():\n    return {i}\n\n\n" for i in range(dead))
+    live = "".join(f"def l{i}():\n    return {i}\n\n\n" for i in range(total - dead))
+    calls = "".join(f"print(l{i}())\n" for i in range(total - dead))
+    (tmp_path / "a.py").write_text(bodies + live + calls)
     return {"repo": tmp_path, "lang": "python"}
 
 
@@ -58,11 +68,14 @@ def given_clones(pct, tmp_path, monkeypatch) -> Codebase:
     return {"repo": tmp_path, "lang": "python"}
 
 
-@given(parsers.parse("gitleaks reports {n:d} secret findings"), target_fixture="codebase")
-def given_secrets(n, tmp_path, monkeypatch) -> Codebase:
-    (tmp_path / "a.py").write_text("x = 1\n")
-    _stub(tmp_path / "bin", "gitleaks", "".join("echo '{\"RuleID\":\"x\"}'\n" for _ in range(n)))
-    _on_path(monkeypatch, tmp_path / "bin")
+@given(parsers.parse("a codebase carrying {n:d} credential-shaped strings"),
+       target_fixture="codebase")
+def given_credentials(n, tmp_path) -> Codebase:
+    # Assembled from parts, as the rest of this suite does, so no committed literal in this
+    # repository matches a provider pattern and trips the scanner on our own tree.
+    key = "AKIA" + "IOSFODNN7" + "EXAMPL"
+    body = "x = 1\n" if n == 0 else "".join(f'K{i} = "{key}{chr(81 + i)}"\n' for i in range(n))
+    (tmp_path / "a.py").write_text(body)
     return {"repo": tmp_path, "lang": "python"}
 
 
