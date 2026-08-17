@@ -32,6 +32,13 @@ Feature: csharp_trace — the L1.19 and L1.20 runtime harness for C# repositorie
     And the probe runs inside the repository, so the repository's own SDK pin selects the version rather than whatever launched the analyzer
     But a probe that fails or times out yields the phrase "an unknown dotnet SDK", because naming the SDK is never the measurement
 
+  Scenario: _coverage_verdict decides L1.19 from a finished run and the Cobertura branch counts
+    Given the covered and valid branch counts the coverage report carried, or the fact that no report was written at all, together with the run's exit status and the name of the SDK that ran it
+    When _coverage_verdict reads them
+    Then a run that finished yields covered over valid as a percentage, banded Healthy above 90, Not Healthy from 60 to 90 and Slop below 60, with the detail naming the counts, whether the suite passed and the SDK
+    And a run that ran out of time says so, and a run that wrote no coverage report says the collector is not referenced by the test project rather than reporting nothing covered
+    But no valid branches at all is not-applicable carrying its remedy, never a percentage, because nothing had a branch to cover and that is absent rather than zero
+
   Scenario: decision_space_coverage measures C# branch coverage from a Cobertura report
     Given a repository, a timeout, and a runtime override that C# ignores because the repository selects its own SDK
     When decision_space_coverage runs the test suite with the cross-platform coverage collector and reads the branch counts out of the report it wrote
@@ -44,6 +51,13 @@ Feature: csharp_trace — the L1.19 and L1.20 runtime harness for C# repositorie
     When _ran_tests looks for the banners the test runner prints only when it executed a suite
     Then it answers yes when any of them is present
     But a build error, or a project with no discovered tests, prints none of them and it answers no, which is what stops a suite that never ran from being scored as failing
+
+  Scenario: _determinism_verdict decides L1.20 from the outcome of every repeated run
+    Given the exit status and combined output of each repeated run, in the order they were made, and the name of the SDK that ran them
+    When _determinism_verdict reads them
+    Then it returns the count of clean runs over the count of runs made, banded Healthy when every run passed, Not Healthy at one short and Slop below that, and it says the order was varied by the scheduler rather than controlled by a seed
+    And each run that failed is named by its number with the first line of its output, up to three of them, so a low score arrives carrying its own reason instead of a bare score
+    But the first run that ran out of time, and the first run where the suite never executed, each stop the count and return not-applicable naming that run, and no runs at all is not-applicable too, because none clean out of none is absent and not a clean sweep
 
   Scenario: test_determinism counts the repeated runs where the whole C# suite passes
     Given a repository, a number of runs, a timeout, and a runtime override the repository ignores

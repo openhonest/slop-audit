@@ -44,6 +44,21 @@ Feature: c_trace — the L1.19 and L1.20 runtime harness for C repositories
     And it only reads the file, because the harness never edits the target's build
     But a repository with no makefile, an unreadable makefile, or a makefile declaring neither target yields nothing, and coverage is then not applicable
 
+  Scenario: _coverage_verdict decides L1.19 from the lcov summary and the build that produced it
+    Given lcov's summary text, the exit code of the instrumented make run, that run's output, the compiler that built it and the make target that ran
+    When _coverage_verdict reads the covered and total line counts out of the summary
+    Then a summary carrying instrumented lines yields the line-coverage percentage banded Healthy above 90, Not Healthy from 60 to 90, and Slop below 60
+    And the detail says the figure is gcov LINE coverage rather than the branch coverage this field carries for other languages, and names the counts, the compiler and whether the make target passed
+    And a build that timed out, and a summary with no line reading at all, each name their own reason and quote the build's own first line rather than borrowing another reason's wording
+    But a reading of nought lines out of nought is not-applicable and never nought percent, because a rate over no lines is absent rather than zero
+
+  Scenario: _determinism_verdict declines L1.20 for C and says why
+    Given the name of the compiler that would have run the suite
+    When _determinism_verdict is asked for C's execution-order determinism
+    Then it returns not applicable, because C ships no standard test-order randomizer to shuffle the suite with
+    And the reason names the compiler, so a reader sees a measurement declined for the language rather than one that failed on this repository
+    But the value is never a count of runs, because nought out of five reads as a suite that shuffled badly instead of one that was never shuffled
+
   Scenario: decision_space_coverage measures C line coverage through an instrumented make run
     Given a repository, a timeout, and a runtime override that C ignores because the compiler comes from the path
     When decision_space_coverage builds and runs the makefile's test target with coverage instrumentation, then totals the result with lcov

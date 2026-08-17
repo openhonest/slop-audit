@@ -138,6 +138,34 @@ def _branch_totals(resultset: dict) -> tuple[int, int]:
     return covered, total
 
 
+def _coverage_verdict(covered: int, total: int, returncode: int, version: str) -> L1Result:
+    """L1.19 from a finished run and SimpleCov's branch counts. No I/O, so it can be asserted.
+
+    Extracted because it could not be reached otherwise. `decision_space_coverage` pins the
+    interpreter, runs the suite, reads the resultset and decides the band inside one function,
+    so the band table below was only ever provable through a fake that wrote the very resultset
+    the module then read back.
+
+    The timeout is decided first, and the order carries meaning. A killed run leaves the same
+    zero counts a suite with no branch data leaves, and the remedy the zero case prints tells
+    the reader to enable branch coverage in a helper that may already enable it. A timeout must
+    say it ran out of time, never prescribe a change the suite already made.
+    """
+    if returncode == 124:
+        return _na("test suite timed out before coverage could be measured")
+    if total == 0:
+        return _na("SimpleCov produced no branch data; enable branch coverage in the suite's spec_helper "
+                   f"(SimpleCov.start {{ enable_coverage :branch }}) under {version}")
+    pct = covered / total * 100
+    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
+    return {
+        "value": round(pct, 1),
+        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "details": f"{covered}/{total} SimpleCov branches exercised by tests "
+                   f"({suite}; ran under {version})",
+    }
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.19 for Ruby: SimpleCov branch coverage from the suite's own coverage/.resultset.json.
     Bands match the spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is
@@ -153,7 +181,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     resultset_file = repo / "coverage" / ".resultset.json"
     run = _run_untrusted(_COVERAGE_COMMAND[runner](bundle), cwd=repo, env=env, timeout_seconds=timeout_seconds)
     if run.returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
+        return _coverage_verdict(0, 0, run.returncode, version)
     # SimpleCov must be started in the suite's spec_helper; it cannot be injected
     # non-invasively. No resultset means we cannot measure - n/a with the exact remedy,
     # never a 0.0 that reads as real-but-terrible coverage (a silent failure is a lie).
@@ -166,24 +194,49 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         return _na("SimpleCov resultset was unreadable")
 
     covered, total = _branch_totals(resultset)
-    if total == 0:
-        return _na(f"SimpleCov produced no branch data; enable branch coverage in the suite's spec_helper "
-                   f"(SimpleCov.start {{ enable_coverage :branch }}) under {version}")
-
-    pct = covered / total * 100
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
-    suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": result_band,
-        "details": f"{covered}/{total} SimpleCov branches exercised by tests "
-                   f"({suite}; ran under {version})",
-    }
+    return _coverage_verdict(covered, total, run.returncode, version)
 
 
 # ---------------------------------------------------------------------------
 # L1.20 test determinism (repeated randomized-order runs)
 # ---------------------------------------------------------------------------
+
+def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runs: int, version: str) -> L1Result:
+    """L1.20 from the outcome of every randomized-order run. No I/O, so it can be asserted.
+
+    `per_seed` is one `(returncode, combined output)` pair per run made, in seed order, so seed
+    N is the Nth pair. `runs` is the number of runs asked for, and it is the denominator: the
+    score says how many of the runs the spec requires came back clean, not how many of the runs
+    that happened did. A run that stopped the count leaves a shorter list and reaches an n/a
+    before the denominator is used, so the two numbers can only meet when every run was made.
+
+    No runs at all is n/a as well: zero clean out of zero satisfies `passing == runs`, which is
+    how a measure that ran nothing issues itself a clean bill.
+    """
+    if not per_seed:
+        return _na("no randomized-order runs were made; determinism not measured")
+    passing = 0
+    failing: list[str] = []
+    for seed, (returncode, output) in enumerate(per_seed, start=1):
+        if returncode == 124:
+            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
+        if _ran(runner, output) == 0:
+            return _na(f"the suite did not run (seed {seed}, exit {returncode}: {_first_line(output)}); "
+                       f"determinism not measured under {version}")
+        if returncode == 0:
+            passing += 1
+        else:  # the suite ran, but not every test passed
+            failing.append(f"seed {seed}: {_summary_line(runner, output)}")
+
+    details = f"{passing} of {runs} randomized-order runs passed cleanly (under {version})"
+    if failing:
+        details += f"; runs with failures: {'; '.join(failing[:3])}"
+    return {
+        "value": f"{passing}/{runs}",
+        "band": "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop"),
+        "details": details,
+    }
+
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.20 for Ruby: run the suite `runs` times in randomized order and count the runs
@@ -199,23 +252,14 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         return _na("no RSpec (spec/, .rspec, or rspec in Gemfile.lock) or Minitest (test/ + Rakefile) suite detected")
     version = _ruby_version(ruby, repo, timeout_seconds, env) + prov
 
-    passing = 0
-    failing: list[str] = []
+    per_seed: list[tuple[int, str]] = []
     for seed in range(1, runs + 1):
         run = _run_untrusted(_DETERMINISM_COMMAND[runner](bundle, seed), cwd=repo, env=env, timeout_seconds=timeout_seconds)
         output = (run.stdout or "") + (run.stderr or "")
-        if run.returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
-        if _ran(runner, output) == 0:
-            return _na(f"the suite did not run (seed {seed}, exit {run.returncode}: {_first_line(output)}); "
-                       f"determinism not measured under {version}")
-        if run.returncode == 0:
-            passing += 1
-        else:  # the suite ran, but not every test passed
-            failing.append(f"seed {seed}: {_summary_line(runner, output)}")
-
-    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
-    details = f"{passing} of {runs} randomized-order runs passed cleanly (under {version})"
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
+        per_seed.append((run.returncode, output))
+        # A run that timed out or ran no test at all ends the measurement, and nothing a later
+        # seed could do would change that, so the remaining seeds are not spent. The verdict
+        # names which of the two happened; this only stops the spending.
+        if run.returncode == 124 or _ran(runner, output) == 0:
+            break
+    return _determinism_verdict(per_seed, runner, runs, version)

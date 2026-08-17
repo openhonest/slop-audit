@@ -87,6 +87,14 @@ Feature: js_trace — running a JavaScript or TypeScript project's own suite to 
     Then it answers yes only when that probe succeeds
     And a no becomes a not-applicable naming the coverage tool and how to add it, never a coverage number
 
+  Scenario: _coverage_verdict decides L1.19 from a finished run and the coverage tool's branch totals
+    Given the branch totals the coverage tool wrote, the exit code of the test command, and the name of the runtime that ran it
+    When _coverage_verdict reads them
+    Then a run that finished yields the branch percentage the tool measured, banded Healthy above ninety, Not Healthy from sixty to ninety, and Slop below sixty
+    And a run that exited non-zero is still measured, with that exit named in the detail line, because tests that fail still exercise branches
+    And a run that ran out of time is a not-applicable naming the timeout, decided before any total is read, because a run that was killed wrote none
+    But a tree with no countable branches is a not-applicable, never zero percent, since a share of no branches is absent and not zero
+
   Scenario: decision_space_coverage reports branch coverage measured by the engine's own coverage tool
     Given a repository, a time limit, and a runtime override
     When decision_space_coverage runs the project's own test command under the coverage tool and reads the branch percentage from the summary report
@@ -112,6 +120,14 @@ Feature: js_trace — running a JavaScript or TypeScript project's own suite to 
     When _failure_summary looks for the first line mentioning failure
     Then it returns that line, trimmed to two hundred characters
     But when no line mentions failure it returns the first non-blank line, so the reason is never empty
+
+  Scenario: _determinism_verdict decides L1.20 from the outcome of every shuffled-order run
+    Given the exit code and combined output of each seeded run, in the order the runs were made, the runner that made them, and the runtime that ran them
+    When _determinism_verdict reads them
+    Then it returns the count of clean runs over the count of runs it was handed, banded Healthy when every run passed, Not Healthy at one short, and Slop below that
+    And each run that failed is named by its seed with the line that names its failure, up to three of them, so a low score arrives carrying its own reason rather than as a bare number
+    And the first run that ran out of time, and the first run whose runner executed no suite at all, each stop the count and return a not-applicable naming that seed, rather than the misleading score of zero passes
+    But no runs at all is a not-applicable too, because none clean out of none is absent and not a clean sweep
 
   Scenario: test_determinism counts how many shuffled-order runs of the project's own suite pass
     Given a repository, a number of runs, a time limit, and a runtime override

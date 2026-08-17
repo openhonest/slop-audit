@@ -74,12 +74,28 @@ Feature: ruby_trace — running a Ruby repository's own suite to measure branch 
     Then it returns the covered count and the total
     But a file stored in the older line-only format contributes nothing to either number, so an old result reads as no branch data rather than as zero coverage
 
+  Scenario: _coverage_verdict decides L1.19 from a finished run and the branch counts the coverage gem recorded
+    Given the covered and total branch counts, the exit code of the suite that produced them, and the interpreter that ran it
+    When _coverage_verdict reads them
+    Then a run that finished yields the covered share, banded Healthy above ninety, Not Healthy from sixty to ninety, and Slop below sixty, with both counts and the interpreter in the detail line
+    And a suite that exited non-zero is still measured, with that exit named in the detail line, because tests that fail still exercise branches
+    And a run that ran out of time is a not-applicable naming the timeout, decided before any count is read, because a run that was killed recorded none
+    But a total of no branches is a not-applicable naming the exact change the suite's helper needs, never zero percent, since a share of no branches is absent and not zero
+
   Scenario: decision_space_coverage reports the branch coverage the repository's own coverage gem recorded
     Given a repository, a time limit, and a runtime override
     When decision_space_coverage runs the detected suite once and reads the branch totals from the coverage result the suite wrote
     Then it returns the covered share as a percentage, banded Healthy above ninety, Not Healthy from sixty to ninety, and Slop below sixty, with a detail line naming the counts, the suite outcome, and the interpreter
     And the runtime override is accepted and ignored, because the repository's own version manager selects the interpreter
     But a missing interpreter or Bundler, no detected suite, a timed-out run, a coverage result that was never written, an unreadable result, or a result with no branch data each returns a not-applicable naming that reason and, where it applies, the exact change the suite needs, because the coverage gem must be started inside the repository's own helper and cannot be injected from outside
+
+  Scenario: _determinism_verdict decides L1.20 from the outcome of every randomized-order run
+    Given the exit code and combined output of each seeded run, in the order the runs were made, the runner that made them, the number of runs asked for, and the interpreter that ran them
+    When _determinism_verdict reads them
+    Then it returns the count of clean runs over the number asked for, banded Healthy when every run passed, Not Healthy at one short, and Slop below that
+    And each run that failed is named by its seed with the runner's own summary line, up to three of them, so a low score arrives carrying its own reason rather than as a bare number
+    And the first run that ran out of time, and the first run in which no test executed at all, each stop the count and return a not-applicable naming that seed, rather than the misleading score of zero passes
+    But no runs at all is a not-applicable too, because none clean out of none is absent and not a clean sweep
 
   Scenario: test_determinism counts how many randomized-order runs of the suite pass
     Given a repository, a number of runs, a time limit, and a runtime override

@@ -51,6 +51,13 @@ Feature: java_trace — running a Maven project's own test suite to measure bran
     Then it returns the covered and missed branch counts, taken from the grand total across every package so no level is counted twice
     But a report carrying no branch counter yields zero and zero, which the caller treats as a project with no branches rather than as a project with none covered
 
+  Scenario: _coverage_verdict decides L1.19 from a finished build and the report's branch counts
+    Given the covered and missed branch counts the coverage report carried, or the fact that no report was written at all, together with the build's exit status and the name of the Java runtime that ran it
+    When _coverage_verdict reads them
+    Then a build that finished yields the covered share of branches as a percentage, banded Healthy above 90, Not Healthy from 60 to 90 and Slop below 60, with the detail naming the counts, whether the suite passed and the runtime
+    And a build that ran out of time says so, and a build that wrote no coverage report says the coverage plugin is missing from the build rather than reporting nothing covered
+    But a report whose branch counts add to nothing is not-applicable, never a percentage, because a share of no branches is absent and not zero
+
   Scenario: decision_space_coverage measures the share of decision branches the suite exercises
     Given a repository, a time limit and a runtime override
     When decision_space_coverage runs the project's tests with coverage reporting and reads the report the build writes
@@ -69,6 +76,13 @@ Feature: java_trace — running a Maven project's own test suite to measure bran
     When _surefire_summary looks for the test runner's summary lines
     Then it returns the last one, which carries that run's own counts of tests, failures and errors
     But output with no summary line yields a plain note saying so, which keeps a failing run from reaching a reader with no reason attached
+
+  Scenario: _determinism_verdict decides L1.20 from the outcome of every randomized-order run
+    Given the exit status and combined output of each randomized-order run, in the order they were made, and the name of the Java runtime that ran them
+    When _determinism_verdict reads them
+    Then it returns the count of clean runs over the count of runs made, banded Healthy when every run passed, Not Healthy at one short and Slop below that
+    And each run that failed is named by its seed with that run's own counts of tests, failures and errors, up to three of them, so a low score arrives carrying its own reason instead of a bare score
+    But the first run that ran out of time, and the first run that executed no tests at all, each stop the count and return not-applicable naming that seed, and no runs at all is not-applicable too, because none clean out of none is absent and not a clean sweep
 
   Scenario: test_determinism counts how many randomized-order runs pass cleanly
     Given a repository, how many runs to make, a time limit and a runtime override

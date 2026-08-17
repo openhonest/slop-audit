@@ -122,6 +122,35 @@ def _c8_available(repo: Path, timeout_seconds: float) -> bool:
     return probe.returncode == 0
 
 
+def _coverage_verdict(branches: dict, returncode: int, runtime: str) -> L1Result:
+    """L1.19 from a finished run and c8's branch totals. No I/O, so it can be asserted.
+
+    Extracted because it could not be reached otherwise. `decision_space_coverage` probes node,
+    probes c8, wraps the command in nvm, opens a temp directory, reads the summary and decides
+    the band inside one function, so the band table below was only ever provable through a fake
+    that wrote the very summary file the module then read back.
+
+    The timeout is decided first, before any total is touched: a killed run wrote no summary,
+    so the caller has nothing to hand over but an empty object.
+
+    `branches` is read by subscript. c8 writes `total`, `covered`, `skipped` and `pct` into
+    every json-summary report it produces, and a summary missing them is a schema change rather
+    than a tree with no branches. Defaulting the miss to zero would file that schema change
+    under the answer written for an empty tree, which is the one thing this module must not do.
+    """
+    if returncode == 124:
+        return _na("test suite timed out before coverage could be measured")
+    if int(branches["total"]) == 0:
+        return _na("no enumerable decision branches found in the measured tree")
+    pct = float(branches["pct"])
+    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
+    return {
+        "value": round(pct, 1),
+        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "details": f"{pct}% branch coverage from c8 (V8) ({suite}; ran under {runtime})",
+    }
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.19 for JS/TS: branch coverage from c8 (V8). Bands match the spec: >90% Healthy,
     60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a uniform harness
@@ -149,8 +178,9 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
                          *shlex.split(test_cmd)]),
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
+        runtime = _runtime_name(repo, timeout_seconds)
         if run.returncode == 124:
-            return _na("test suite timed out before coverage could be measured")
+            return _coverage_verdict({}, run.returncode, runtime)
         # c8 writes the summary for every file that ran, even when some tests fail. No summary
         # means the suite did not build or ran no tests: n/a with the reason, never a 0.0 that
         # reads as real-but-terrible coverage (a silent failure is a lie).
@@ -162,18 +192,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         except (OSError, json.JSONDecodeError, KeyError, TypeError):
             return _na("coverage summary had no branch totals")
 
-    if int(branches.get("total", 0)) == 0:
-        return _na("no enumerable decision branches found in the measured tree")
-
-    pct = float(branches["pct"])
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
-    suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": result_band,
-        "details": f"{pct}% branch coverage from c8 (V8) "
-                   f"({suite}; ran under {_runtime_name(repo, timeout_seconds)})",
-    }
+    return _coverage_verdict(branches, run.returncode, runtime)
 
 
 # ---------------------------------------------------------------------------
@@ -227,6 +246,45 @@ def _failure_summary(output: str) -> str:
     return _first_line(output)
 
 
+def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runtime: str) -> L1Result:
+    """L1.20 from the outcome of every shuffled-order run. No I/O, so it can be asserted.
+
+    `per_seed` is one `(returncode, combined output)` pair per run made, in seed order, so seed
+    N is the Nth pair. The denominator is the number of pairs handed over rather than a count
+    passed alongside them: a promised total and a list of outcomes are two statements of one
+    fact, and only one of them can be right when they disagree.
+
+    A run that stopped the count leaves a shorter list, and its own row says which run it was,
+    so the n/a is reached before the denominator matters. No runs at all is n/a as well: zero
+    clean out of zero satisfies `passing == runs`, which is how a measure that ran nothing
+    issues itself a clean bill.
+    """
+    if not per_seed:
+        return _na("no shuffled-order runs were made; determinism not measured")
+    passing = 0
+    failing: list[str] = []
+    for seed, (returncode, output) in enumerate(per_seed, start=1):
+        if returncode == 124:
+            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
+        if not _suite_ran(runner, output):
+            return _na(f"the suite did not run (seed {seed}: no {runner} tests executed under "
+                       f"{runtime}); determinism not measured")
+        if returncode == 0:
+            passing += 1
+        else:
+            failing.append(f"seed {seed}: {_failure_summary(output)}")
+
+    runs = len(per_seed)
+    details = f"{passing} of {runs} shuffled-order {runner} runs passed cleanly (under {runtime})"
+    if failing:
+        details += f"; runs with failures: {'; '.join(failing[:3])}"
+    return {
+        "value": f"{passing}/{runs}",
+        "band": "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop"),
+        "details": details,
+    }
+
+
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.20 for JS/TS: run the project's own runner `runs` times in a shuffled order with a
     distinct seed, counting the runs where the whole suite passes. Value is "passing/runs".
@@ -255,23 +313,14 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
             return _na(f"jest --seed needs jest>=30; detected jest {major} in node_modules")
 
     runtime = _runtime_name(repo, timeout_seconds)
-    passing = 0
-    failing: list[str] = []
+    per_seed: list[tuple[int, str]] = []
     for seed in range(1, runs + 1):
         run = _run_untrusted(_wrap(repo, builder(seed)), cwd=repo, env={}, timeout_seconds=timeout_seconds)
         output = (run.stdout or "") + (run.stderr or "")
-        if run.returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
-        if not _suite_ran(runner, output):
-            return _na(f"the suite did not run (seed {seed}: no {runner} tests executed under "
-                       f"{runtime}); determinism not measured")
-        if run.returncode == 0:
-            passing += 1
-        else:
-            failing.append(f"seed {seed}: {_failure_summary(output)}")
-
-    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
-    details = f"{passing} of {runs} shuffled-order {runner} runs passed cleanly (under {runtime})"
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
+        per_seed.append((run.returncode, output))
+        # A run that timed out or never executed a suite ends the measurement, and nothing a
+        # later seed could do would change that, so the remaining seeds are not spent. The
+        # verdict names which of the two happened; this only stops the spending.
+        if run.returncode == 124 or not _suite_ran(runner, output):
+            break
+    return _determinism_verdict(per_seed, runner, runtime)

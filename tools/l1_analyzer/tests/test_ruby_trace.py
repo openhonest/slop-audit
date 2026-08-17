@@ -12,10 +12,11 @@ broke in the field.
 
 The claims they defended are real: the bands, the SimpleCov-not-started n/a with its exact
 remedy, the nothing-ran guard, and per-seed failure surfacing instead of a bare score. They
-are now proved by nothing, because `decision_space_coverage` pins the interpreter, runs the
-suite, reads the resultset and decides the band inside one function. Extracting
-`_determinism_verdict(per_seed, runner, runs, version)` and the matching coverage verdict is
-filed as separate work.
+went unproved for as long as `decision_space_coverage` pinned the interpreter, ran the suite,
+read the resultset and decided the band inside one function.
+`_coverage_verdict(covered, total, returncode, version)` and `_determinism_verdict(per_seed,
+runner, runs, version)` are now the decisions on their own, taking plain values and doing no
+I/O, and the tests at the end of this file assert them as `f(input) == expected`.
 
 This file is the least damaged of the four language harnesses, because `_branch_totals` and
 `_detect_runner` were already extracted and already tested directly. Those tests are
@@ -130,3 +131,106 @@ def test_l19_na_when_no_runner_detected(tmp_path):
 def test_l20_na_when_no_runner_detected(tmp_path):
     r = ruby_trace.test_determinism(tmp_path, 5, 30)
     assert r["band"] == "n/a" and "no RSpec" in r["details"]
+
+
+# --- the L1.19 verdict, extracted so its band table can be asserted as a value -----------
+#
+# Written before `_coverage_verdict` exists, so every one of these was red on AttributeError
+# rather than on a band. The deleted tests reached this table only through a fake that wrote
+# the resultset the module then read back, so what they proved was that the module can parse a
+# file the test had written moments earlier.
+
+def test_a_finished_run_yields_the_covered_share():
+    r = ruby_trace._coverage_verdict(38, 40, 0, "ruby 3.3.0")
+    assert r["value"] == 95.0 and r["band"] == "Healthy"
+    assert "38/40 SimpleCov branches exercised by tests" in r["details"]
+    assert "suite passed" in r["details"] and "ruby 3.3.0" in r["details"]
+
+
+def test_a_failing_but_valid_suite_is_still_measured():
+    # A non-zero exit means the suite ran and some tests failed. The branches they took are
+    # real, so this is a measurement, and the exit is named so the reader knows the shape.
+    r = ruby_trace._coverage_verdict(7, 10, 1, "ruby 3.3.0")
+    assert r["value"] == 70.0 and r["band"] == "Not Healthy"
+    assert "suite exit 1" in r["details"]
+
+
+@pytest.mark.parametrize("covered,total,band", [
+    (100, 100, "Healthy"),
+    (901, 1000, "Healthy"),
+    (90, 100, "Not Healthy"),   # exactly 90 is not above 90
+    (60, 100, "Not Healthy"),   # exactly 60 is the floor of the middle band
+    (599, 1000, "Slop"),
+    (0, 100, "Slop"),           # a measured zero: branches exist and none were taken
+])
+def test_the_coverage_bands_are_decided_at_the_exact_edges(covered, total, band):
+    assert ruby_trace._coverage_verdict(covered, total, 0, "ruby 3.3.0")["band"] == band
+
+
+def test_a_timed_out_run_is_named_rather_than_scored():
+    # Decided before the counts are read, and the counts a killed run leaves are the same zeroes
+    # a suite with no branch data leaves. The reason must name the timeout, not prescribe a
+    # change to the helper the suite may already have made.
+    r = ruby_trace._coverage_verdict(0, 0, 124, "ruby 3.3.0")
+    assert r["band"] == "n/a" and r["value"] == "n/a"
+    assert "timed out" in r["details"] and "enable_coverage" not in r["details"]
+
+
+def test_no_branch_data_is_absent_not_zero_percent():
+    r = ruby_trace._coverage_verdict(0, 0, 0, "ruby 3.3.0")
+    assert r["band"] == "n/a" and r["value"] == "n/a"
+    assert "enable_coverage :branch" in r["details"] and "ruby 3.3.0" in r["details"]
+
+
+# --- the L1.20 verdict, extracted so the per-seed outcomes can be handed over as values ---
+
+_CLEAN = (0, "Finished in 0.1 seconds\n5 examples, 0 failures\n")
+_FAILED = (1, "Finished in 0.1 seconds\n5 examples, 2 failures\n")
+
+
+def test_every_run_clean_is_the_full_score_and_healthy():
+    r = ruby_trace._determinism_verdict([_CLEAN] * 5, "rspec", 5, "ruby 3.3.0")
+    assert r["value"] == "5/5" and r["band"] == "Healthy"
+    assert "5 of 5 randomized-order runs passed cleanly" in r["details"]
+    assert "ruby 3.3.0" in r["details"]
+
+
+def test_one_run_short_is_not_healthy_and_two_short_is_slop():
+    one = ruby_trace._determinism_verdict([_CLEAN] * 4 + [_FAILED], "rspec", 5, "ruby 3.3.0")
+    assert one["value"] == "4/5" and one["band"] == "Not Healthy"
+    two = ruby_trace._determinism_verdict([_CLEAN] * 3 + [_FAILED] * 2, "rspec", 5, "ruby 3.3.0")
+    assert two["value"] == "3/5" and two["band"] == "Slop"
+
+
+def test_a_failing_seed_is_named_with_the_runners_own_summary_line():
+    r = ruby_trace._determinism_verdict([_CLEAN, _CLEAN, _FAILED, _CLEAN, _CLEAN], "rspec", 5, "ruby 3.3.0")
+    assert r["value"] == "4/5"
+    assert "seed 3: 5 examples, 2 failures" in r["details"]
+
+
+def test_at_most_three_failing_seeds_are_named():
+    r = ruby_trace._determinism_verdict([_FAILED] * 5, "rspec", 5, "ruby 3.3.0")
+    assert r["value"] == "0/5" and r["band"] == "Slop"
+    assert r["details"].count("seed ") == 3
+
+
+def test_a_seed_that_timed_out_stops_the_count_and_names_that_seed():
+    r = ruby_trace._determinism_verdict([_CLEAN, _CLEAN, (124, "")], "rspec", 5, "ruby 3.3.0")
+    assert r["band"] == "n/a" and r["value"] == "n/a"
+    assert "seed 3" in r["details"] and "timed out" in r["details"]
+
+
+def test_a_seed_in_which_no_test_executed_is_not_a_failing_run():
+    # The not-run guard. A missing gem is a broken project, not a flaky one, and counting it as
+    # a failing run reports it as non-determinism.
+    r = ruby_trace._determinism_verdict([(1, "Could not find gem 'rspec' in bundle")], "rspec", 5, "ruby 3.3.0")
+    assert r["band"] == "n/a" and "did not run" in r["details"]
+    assert "seed 1" in r["details"] and "exit 1" in r["details"]
+    assert "Could not find gem 'rspec' in bundle" in r["details"] and "ruby 3.3.0" in r["details"]
+
+
+def test_no_runs_at_all_is_absent_not_a_clean_sweep():
+    # Zero clean out of zero runs satisfies `passing == runs`, which is how a measure that ran
+    # nothing issues itself a clean bill. It is the absence of a measurement.
+    r = ruby_trace._determinism_verdict([], "rspec", 0, "ruby 3.3.0")
+    assert r["band"] == "n/a" and r["value"] == "n/a"

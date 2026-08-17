@@ -40,6 +40,50 @@ def _toolchain(go: str, repo: Path, timeout_seconds: float) -> str:
     return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown go toolchain"
 
 
+def _coverage_verdict(func_output: str, profile_written: bool, run_returncode: int,
+                      run_output: str, toolchain: str) -> L1Result:
+    """L1.19 for Go from `go tool cover -func`'s stdout and the run that produced the profile.
+    No I/O, so it can be asserted as a value.
+
+    Extracted because it could not be reached otherwise. `decision_space_coverage` probes the
+    toolchain, runs the whole suite into a temp-directory profile, shells out again to total it
+    and decides the band inside one function, so this band table and these three refusals were
+    only ever provable through a replaced `_run_untrusted` - a fake that both answered `go
+    version` and wrote the profile the module then read back, so the total parser was proved
+    against the test's own string.
+
+    The substitution this function performs and cannot show in its own value: L1.19 carries
+    branch coverage for Python, and the Go toolchain instruments statements, so statement
+    coverage goes into the same field. The `details` line discloses it. The value and the band
+    cannot.
+
+    `profile_written` is the caller's reading of the file, passed as a plain fact so the
+    decision that depends on it needs no filesystem. No profile at all is n/a with the run's
+    own first line, never a 0.0 that reads as real-but-terrible coverage.
+    """
+    if run_returncode == 124:
+        return _na("test suite timed out before coverage could be measured")
+    # The profile is written for every package that built and ran, even if some tests failed.
+    # No profile means the module did not build or ran no tests.
+    if not profile_written:
+        return _na(f"coverage produced no data (go test exit {run_returncode}): "
+                   f"{_first_line(run_output)}")
+    match = _TOTAL.search(func_output)
+    if match is None:
+        return _na("coverage profile had no statement total")
+
+    pct = float(match.group(1))
+    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
+    suite = "suite passed" if run_returncode == 0 else f"suite exit {run_returncode}"
+    return {
+        "value": round(pct, 1),
+        "band": result_band,
+        "details": f"{pct}% STATEMENT coverage from `go test -coverprofile` ({suite}; ran under "
+                   f"{toolchain}); Go instruments statements rather than branches, so this field "
+                   f"carries statement coverage where other languages carry branch coverage",
+    }
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.19 for Go: statement coverage from `go test -coverprofile`. Bands match the spec:
     >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a uniform
@@ -54,28 +98,18 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
             [go, "test", "./...", "-covermode=set", f"-coverprofile={profile}"],
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
-        if run.returncode == 124:
-            return _na("test suite timed out before coverage could be measured")
-        # The profile is written for every package that built and ran, even if some tests
-        # failed. No profile means the module did not build or ran no tests: n/a with the
-        # reason, never a 0.0 that reads as real-but-terrible coverage (a silent failure is a lie).
-        if not profile.exists() or profile.stat().st_size == 0:
-            return _na(f"coverage produced no data (go test exit {run.returncode}): "
-                       f"{_first_line(run.stderr or run.stdout)}")
-        func = _run_untrusted([go, "tool", "cover", f"-func={profile}"], cwd=repo, env={},
-                              timeout_seconds=min(timeout_seconds, 60))
-        match = _TOTAL.search(func.stdout or "")
-        if match is None:
-            return _na("coverage profile had no statement total")
+        written = profile.exists() and profile.stat().st_size > 0
+        # Totalling a profile that was never written, or one from a run that was killed, buys
+        # nothing the verdict can use, so the second subprocess is skipped and the verdict is
+        # left to name which of the two happened.
+        func_output = ""
+        if written and run.returncode != 124:
+            func = _run_untrusted([go, "tool", "cover", f"-func={profile}"], cwd=repo, env={},
+                                  timeout_seconds=min(timeout_seconds, 60))
+            func_output = func.stdout or ""
 
-    pct = float(match.group(1))
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
-    suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": result_band,
-        "details": f"{pct}% statement coverage from `go test -coverprofile` ({suite}; ran under {toolchain})",
-    }
+    return _coverage_verdict(func_output, written, run.returncode,
+                             run.stderr or run.stdout or "", toolchain)
 
 
 def _ran_tests(output: str) -> bool:
@@ -83,6 +117,47 @@ def _ran_tests(output: str) -> bool:
     error, or a module with no test files) - the difference between a real determinism data
     point and the suite never executing."""
     return any(marker in output for marker in _RAN)
+
+
+def _determinism_verdict(outcomes: list[tuple[int, int, str]], runs: int, toolchain: str) -> L1Result:
+    """L1.20 for Go from the shuffled runs' outcomes alone: one `(seed, exit code, combined
+    output)` per run, in seed order. No I/O, so it can be asserted as a value.
+
+    Extracted for the same reason as `_coverage_verdict`: the loop that produced these outcomes
+    also owned the band table and the three refusals, so a fake subprocess was the only way to
+    reach them, and the fake's canned success meant an unrecognised command scored as a clean
+    run.
+
+    A failing seed is quoted with its own first line, up to three of them, because a bare 3/5
+    is a score a reader cannot act on. A run that timed out and a run whose suite never
+    executed are not failing runs at all: they say so and stop, rather than lowering a count
+    that would read as a suite falling over when reordered.
+
+    Fewer outcomes than `runs` with nothing among them to refuse over is the same absence one
+    step out: a fraction over runs that were never made. It is named, not banded.
+    """
+    passing = 0
+    failing: list[str] = []
+    for seed, returncode, output in outcomes:
+        if returncode == 124:
+            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
+        if not _ran_tests(output):
+            return _na(f"the suite did not run (seed {seed}: no test packages built or executed under "
+                       f"{toolchain}); determinism not measured")
+        if returncode == 0:
+            passing += 1
+        else:
+            failing.append(f"seed {seed}: {_first_line(output)}")
+
+    if len(outcomes) != runs:
+        return _na(f"only {len(outcomes)} of {runs} shuffled-order runs produced an outcome; "
+                   f"determinism not measured (under {toolchain})")
+
+    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
+    details = f"{passing} of {runs} shuffled-order runs passed cleanly (under {toolchain})"
+    if failing:
+        details += f"; runs with failures: {'; '.join(failing[:3])}"
+    return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
 
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
@@ -94,26 +169,18 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         return _na("needs the Go toolchain (go) in PATH")
     toolchain = _toolchain(go, repo, timeout_seconds)
 
-    passing = 0
-    failing: list[str] = []
+    outcomes: list[tuple[int, int, str]] = []
     for seed in range(1, runs + 1):
         run = _run_untrusted(
             [go, "test", "./...", f"-shuffle={seed}", "-count=1"],
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
         output = (run.stdout or "") + (run.stderr or "")
-        if run.returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
-        if not _ran_tests(output):
-            return _na(f"the suite did not run (seed {seed}: no test packages built or executed under "
-                       f"{toolchain}); determinism not measured")
-        if run.returncode == 0:
-            passing += 1
-        else:
-            failing.append(f"seed {seed}: {_first_line(output)}")
+        outcomes.append((seed, run.returncode, output))
+        # Stop spending suite runs once the verdict can only be a refusal. This is the stopping
+        # rule and nothing else: the reason, the band and the value stay in _determinism_verdict,
+        # which reaches the same two cases from the outcome it was handed.
+        if run.returncode == 124 or not _ran_tests(output):
+            break
 
-    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
-    details = f"{passing} of {runs} shuffled-order runs passed cleanly (under {toolchain})"
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
+    return _determinism_verdict(outcomes, runs, toolchain)

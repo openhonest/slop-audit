@@ -31,6 +31,7 @@ import os
 import re
 import shutil
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
 from pathlib import Path
 
 from l1_analyzer.pytest_trace import (
@@ -100,6 +101,43 @@ def _branch_totals(xml_text: str) -> tuple[int, int]:
     return 0, 0
 
 
+def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, jdk: str) -> L1Result:
+    """L1.19 from a finished build and what the coverage report carried. No I/O, so it can be
+    asserted as a value.
+
+    `branches` is JaCoCo's (covered, missed) pair, or None when the build wrote no jacoco.xml
+    at all. Absence is a case here rather than a pair of zeroes because the two say different
+    things: no report means the plugin is not in the build, while a report of (0, 0) means the
+    plugin ran and found nothing to cover. Both are n/a, and each names its own reason.
+
+    Extracted because it could not be reached otherwise. `decision_space_coverage` probes the
+    JDK, runs Maven, locates the report, parses it and decided the band inside one function,
+    so this table was only ever provable through a replaced `_run_untrusted` - a fake that
+    ignored its arguments, and so would have passed had the harness invoked Maven with the
+    wrong goals in the wrong directory.
+    """
+    if returncode == 124:
+        return _na("test suite timed out before coverage could be measured")
+    # JaCoCo writes jacoco.xml only when the plugin is wired into the build and the suite
+    # built and ran. No report means the coverage tool is not configured, not that coverage
+    # is 0: n/a with the reason, never a 0.0 that reads as real-but-terrible coverage (a
+    # silent failure is a lie).
+    if branches is None:
+        return _na("Java branch coverage needs the JaCoCo plugin in the build (jacoco.xml not produced)")
+    covered, missed = branches
+    total = covered + missed
+    if total == 0:
+        return _na("no enumerable decision branches found (JaCoCo reported zero BRANCH counters)")
+    pct = covered / total * 100
+    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
+    return {
+        "value": round(pct, 1),
+        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "details": f"{covered}/{total} decision branches exercised by tests "
+                   f"(JaCoCo BRANCH counters; {suite}; ran under {jdk})",
+    }
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.19 for Java: branch coverage from JaCoCo (`mvn test jacoco:report`). Bands match the
     spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a
@@ -111,32 +149,14 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     env, prov = _pin_jdk(repo, timeout_seconds)
     jdk = _jdk(repo, timeout_seconds, env) + prov
     run = _run_untrusted([maven, "-q", "test", "jacoco:report"], cwd=repo, env=env, timeout_seconds=timeout_seconds)
-    if run.returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
-    # JaCoCo writes jacoco.xml only when the plugin is wired into the build and the suite
-    # built and ran. No report means the coverage tool is not configured, not that coverage
-    # is 0: n/a with the reason, never a 0.0 that reads as real-but-terrible coverage (a
-    # silent failure is a lie).
     report = repo / "target" / "site" / "jacoco" / "jacoco.xml"
-    if not report.exists():
-        return _na("Java branch coverage needs the JaCoCo plugin in the build (jacoco.xml not produced)")
+    if run.returncode == 124 or not report.exists():
+        return _coverage_verdict(None, run.returncode, jdk)
     try:
-        covered, missed = _branch_totals(report.read_text())
+        branches = _branch_totals(report.read_text())
     except (OSError, ET.ParseError):
         return _na("JaCoCo report was unreadable")
-
-    total = covered + missed
-    if total == 0:
-        return _na("no enumerable decision branches found (JaCoCo reported zero BRANCH counters)")
-    pct = covered / total * 100
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
-    suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": result_band,
-        "details": f"{covered}/{total} decision branches exercised by tests "
-                   f"(JaCoCo BRANCH counters; {suite}; ran under {jdk})",
-    }
+    return _coverage_verdict(branches, run.returncode, jdk)
 
 
 def _ran_tests(output: str) -> bool:
@@ -153,6 +173,45 @@ def _surefire_summary(output: str) -> str:
     return matches[-1].strip() if matches else "no test summary line"
 
 
+def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str) -> L1Result:
+    """L1.20 from the outcome of every randomized-order run. Each outcome is one run's exit
+    status and its combined output, in the order the runs were made; the position is the seed.
+    No I/O, so it can be asserted as a value.
+
+    The count comes from the outcomes rather than from a requested number of runs, so the
+    value reports what actually happened. No outcomes at all is n/a: zero clean out of zero
+    satisfies "every run passed" and would band Healthy, which is the zero-denominator lie
+    this package exists to refuse.
+
+    `outcomes` is consumed lazily, so a caller may hand over a generator that runs Maven one
+    seed at a time. Returning here on the first terminal outcome is then what stops the
+    remaining seeds from each burning a full timeout, which is how the loop this replaced
+    behaved.
+    """
+    passing = 0
+    made = 0
+    failing: list[str] = []
+    for returncode, output in outcomes:
+        made += 1
+        if returncode == 124:
+            return _na(f"a randomized run timed out (seed {made}); determinism not measured")
+        if not _ran_tests(output):
+            return _na(f"the suite did not run (seed {made}: no tests executed under {jdk}); "
+                       "determinism not measured")
+        if returncode == 0:
+            passing += 1
+        else:
+            failing.append(f"seed {made}: {_surefire_summary(output)}")
+
+    if made == 0:
+        return _na("no randomized-order runs were made; determinism not measured")
+    result_band = "Healthy" if passing == made else ("Not Healthy" if passing == made - 1 else "Slop")
+    details = f"{passing} of {made} randomized-order runs passed cleanly (under {jdk})"
+    if failing:
+        details += f"; runs with failures: {'; '.join(failing[:3])}"
+    return {"value": f"{passing}/{made}", "band": result_band, "details": details}
+
+
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.20 for Java: `mvn -Dsurefire.runOrder=random test` run `runs` times, counting the
     runs where the whole suite passes. Value is "passing/runs". Bands: 5/5 Healthy, 4/5 Not
@@ -166,26 +225,13 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     env, prov = _pin_jdk(repo, timeout_seconds)
     jdk = _jdk(repo, timeout_seconds, env) + prov
 
-    passing = 0
-    failing: list[str] = []
-    for seed in range(1, runs + 1):
-        run = _run_untrusted(
-            [maven, "-q", "-Dsurefire.runOrder=random", "test"],
-            cwd=repo, env=env, timeout_seconds=timeout_seconds,
-        )
-        output = (run.stdout or "") + (run.stderr or "")
-        if run.returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
-        if not _ran_tests(output):
-            return _na(f"the suite did not run (seed {seed}: no tests executed under {jdk}); "
-                       "determinism not measured")
-        if run.returncode == 0:
-            passing += 1
-        else:
-            failing.append(f"seed {seed}: {_surefire_summary(output)}")
+    def outcomes() -> Iterable[tuple[int, str]]:
+        # Lazy, so the verdict's return on a timed-out or never-run seed stops the rest.
+        for _ in range(runs):
+            run = _run_untrusted(
+                [maven, "-q", "-Dsurefire.runOrder=random", "test"],
+                cwd=repo, env=env, timeout_seconds=timeout_seconds,
+            )
+            yield run.returncode, (run.stdout or "") + (run.stderr or "")
 
-    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
-    details = f"{passing} of {runs} randomized-order runs passed cleanly (under {jdk})"
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
+    return _determinism_verdict(outcomes(), jdk)

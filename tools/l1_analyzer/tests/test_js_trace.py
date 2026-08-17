@@ -10,12 +10,12 @@ it matched on were the test author's, not the runner's. If vitest changed its wo
 changed its summary schema, all eleven stayed green while the harness broke in the field.
 
 The claims those tests defended are real: the bands, the c8-missing n/a, the no-summary n/a,
-the zero-branches n/a and the per-seed failure surfacing. They are now proved by nothing,
-because `decision_space_coverage` probes node, probes c8, runs the wrap, opens a temp
-directory, reads the summary and decides the band inside one function, so a fake is the only
-way in. Extracting `_coverage_verdict(branches: dict, returncode: int, runtime: str)` and
-`_determinism_verdict(per_seed, runner, runs, runtime)` turns them into
-`assert f(input) == expected`, and is filed as separate work.
+the zero-branches n/a and the per-seed failure surfacing. They went unproved for as long as
+`decision_space_coverage` probed node, probed c8, ran the wrap, opened a temp directory, read
+the summary and decided the band inside one function, because a fake was then the only way in.
+`_coverage_verdict(branches, returncode, runtime)` and `_determinism_verdict(per_seed, runner,
+runtime)` are now the decisions on their own, taking plain values and doing no I/O, and the
+tests at the end of this file assert them as `f(input) == expected`.
 
 What is new here: the pure helpers those tests reached only indirectly are now asserted
 directly, so the runner detection, the test-command reading, the installed-version reading,
@@ -186,3 +186,111 @@ def test_l20_jest_below_30_is_na(tmp_path):
     _write_pkg(tmp_path, {"test": "jest"}, {"jest": "^29.0.0"})
     r = js_trace.test_determinism(tmp_path, 5, 30)
     assert r["band"] == "n/a" and "jest>=30" in r["details"]
+
+
+# --- the L1.19 verdict, extracted so its band table can be asserted as a value -----------
+#
+# Written before `_coverage_verdict` exists, so every one of these was red on AttributeError
+# rather than on a band. The deleted tests reached this table only through a fake that wrote
+# the very summary file the module then read back, so what they proved was that the module can
+# parse a file the test had written moments earlier. The claim they were defending is real and
+# is restated here as `assert f(input) == expected`.
+
+def _c8_branches(covered: int, total: int, pct: float) -> dict:
+    """The `total.branches` object c8 writes into its json-summary report. Every field is
+    named at every call site: a default here would hide which number the band actually read."""
+    return {"total": total, "covered": covered, "skipped": total - covered, "pct": pct}
+
+
+def test_a_finished_run_yields_the_branch_share_c8_measured():
+    r = js_trace._coverage_verdict(_c8_branches(38, 40, 95.0), 0, "v22.3.0 via nvm")
+    assert r["value"] == 95.0 and r["band"] == "Healthy"
+    assert "95.0% branch coverage from c8 (V8)" in r["details"]
+    assert "suite passed" in r["details"] and "v22.3.0 via nvm" in r["details"]
+
+
+def test_a_failing_but_valid_run_is_still_measured():
+    # A non-zero exit means the suite ran and some tests failed. The branches they took are
+    # real, so this is a measurement, and the exit is named so the reader knows the shape.
+    r = js_trace._coverage_verdict(_c8_branches(7, 10, 70.0), 1, "v22.3.0")
+    assert r["value"] == 70.0 and r["band"] == "Not Healthy"
+    assert "suite exit 1" in r["details"]
+
+
+@pytest.mark.parametrize("pct,band", [
+    (100.0, "Healthy"),
+    (90.01, "Healthy"),
+    (90.0, "Not Healthy"),      # exactly 90 is not above 90
+    (60.0, "Not Healthy"),      # exactly 60 is the floor of the middle band
+    (59.99, "Slop"),
+    (0.0, "Slop"),              # a measured zero: branches exist and none were taken
+])
+def test_the_coverage_bands_are_decided_at_the_exact_edges(pct, band):
+    assert js_trace._coverage_verdict(_c8_branches(1, 2, pct), 0, "node")["band"] == band
+
+
+def test_a_timed_out_run_is_named_rather_than_scored():
+    # Decided before any total is read: a killed run wrote no summary, so there is nothing to
+    # hand over but an empty object, and the verdict must reach its answer without it.
+    r = js_trace._coverage_verdict({}, 124, "node")
+    assert r["band"] == "n/a" and r["value"] == "n/a"
+    assert "timed out" in r["details"]
+
+
+def test_zero_countable_branches_is_absent_not_zero_percent():
+    r = js_trace._coverage_verdict(_c8_branches(0, 0, 0.0), 0, "node")
+    assert r["band"] == "n/a" and r["value"] == "n/a"
+    assert "no enumerable decision branches" in r["details"]
+
+
+# --- the L1.20 verdict, extracted so the per-seed outcomes can be handed over as values ---
+
+_CLEAN = (0, "Test Files  1 passed (1)\nTests  12 passed (12)")
+_FAILED = (1, "Test Files  1 failed (1)\nTests  2 failed | 10 passed (12)")
+
+
+def test_every_run_clean_is_the_full_score_and_healthy():
+    r = js_trace._determinism_verdict([_CLEAN] * 5, "vitest", "v22.3.0")
+    assert r["value"] == "5/5" and r["band"] == "Healthy"
+    assert "5 of 5 shuffled-order vitest runs passed cleanly" in r["details"]
+    assert "v22.3.0" in r["details"]
+
+
+def test_one_run_short_is_not_healthy_and_two_short_is_slop():
+    one = js_trace._determinism_verdict([_CLEAN] * 4 + [_FAILED], "vitest", "node")
+    assert one["value"] == "4/5" and one["band"] == "Not Healthy"
+    two = js_trace._determinism_verdict([_CLEAN] * 3 + [_FAILED] * 2, "vitest", "node")
+    assert two["value"] == "3/5" and two["band"] == "Slop"
+
+
+def test_a_failing_seed_is_named_with_the_line_that_says_why():
+    r = js_trace._determinism_verdict([_CLEAN, _CLEAN, _FAILED, _CLEAN, _CLEAN], "vitest", "node")
+    assert r["value"] == "4/5"
+    assert "seed 3: Test Files  1 failed (1)" in r["details"]
+
+
+def test_at_most_three_failing_seeds_are_named():
+    r = js_trace._determinism_verdict([_FAILED] * 5, "vitest", "node")
+    assert r["value"] == "0/5" and r["band"] == "Slop"
+    assert r["details"].count("seed ") == 3
+
+
+def test_a_seed_that_timed_out_stops_the_count_and_names_that_seed():
+    r = js_trace._determinism_verdict([_CLEAN, _CLEAN, (124, "")], "vitest", "node")
+    assert r["band"] == "n/a" and r["value"] == "n/a"
+    assert "seed 3" in r["details"] and "timed out" in r["details"]
+
+
+def test_a_seed_whose_runner_executed_no_suite_is_not_a_failing_run():
+    # The not-run guard. npm failing to find the runner is a broken project, not a flaky one,
+    # and counting it as a failing run reports it as non-determinism.
+    r = js_trace._determinism_verdict([(1, "npm error could not determine executable")], "vitest", "v22.3.0")
+    assert r["band"] == "n/a" and "did not run" in r["details"]
+    assert "seed 1" in r["details"] and "vitest" in r["details"] and "v22.3.0" in r["details"]
+
+
+def test_no_runs_at_all_is_absent_not_a_clean_sweep():
+    # Zero clean out of zero runs satisfies `passing == runs`, which is how a measure that ran
+    # nothing issues itself a clean bill. It is the absence of a measurement.
+    r = js_trace._determinism_verdict([], "vitest", "node")
+    assert r["band"] == "n/a" and r["value"] == "n/a"

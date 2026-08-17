@@ -31,6 +31,21 @@ Feature: go_trace — the L1.19 and L1.20 runtime harness for Go modules
     And the probe runs inside the module, so the module's own toolchain directive selects the version rather than whatever launched the analyzer
     But a probe that fails or times out yields the phrase "an unknown go toolchain", because naming the toolchain is never the measurement
 
+  Scenario: _coverage_verdict decides L1.19 from the cover tool's total and the run that produced it
+    Given the cover tool's output, whether the suite wrote a profile at all, the suite's exit code, that run's output and the toolchain that ran it
+    When _coverage_verdict reads the statement total out of that output
+    Then a total present yields the statement-coverage percentage banded Healthy above 90, Not Healthy from 60 to 90, and Slop below 60
+    And the detail says the figure is STATEMENT coverage rather than the branch coverage this field carries for other languages, and names the toolchain and whether the suite passed
+    And a suite that failed but still wrote a profile is measured, because the toolchain writes the profile for every package that built and ran
+    But a suite that timed out, a profile that was never written, and output carrying no statement total each return not-applicable naming which of the three happened, never a zero that would read as real but terrible coverage
+
+  Scenario: _determinism_verdict counts the shuffled runs that passed, from their outcomes alone
+    Given one outcome per shuffled run — its seed, its exit code and its combined output — together with the number of runs promised and the toolchain that ran them
+    When _determinism_verdict walks the outcomes in seed order
+    Then it returns the passing count over the promised count, Healthy only when every run passed, Not Healthy when exactly one failed, and Slop below that
+    And each failing seed is named in the detail with the first line of its own output, up to three of them, so a low count arrives with its reason attached
+    But a run that timed out, a run whose suite never executed, and a set holding fewer outcomes than the promised count each return not-applicable naming the seed and the cause, rather than a count of zero that would read as a suite that fails when shuffled
+
   Scenario: decision_space_coverage measures Go statement coverage from a coverage profile
     Given a module, a timeout, and a runtime override that Go ignores because the module selects its own toolchain
     When decision_space_coverage runs the whole test suite writing a coverage profile, then totals it with the cover tool

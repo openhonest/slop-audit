@@ -71,6 +71,64 @@ def _make_target(repo: Path) -> str | None:
     return None
 
 
+def _coverage_verdict(summary_text: str, build_returncode: int, build_output: str,
+                      compiler: str, target: str) -> L1Result:
+    """L1.19 for C from lcov's summary text and the build that produced it. No I/O, so it can
+    be asserted as a value.
+
+    Extracted because it could not be reached otherwise. `decision_space_coverage` probes the
+    toolchain, drives an instrumented `make`, shells out to lcov twice and decides the band
+    inside one function, so this band table and these three refusals were only ever provable
+    through a replaced `_run_untrusted` - a fake that answered from strings the test author
+    wrote, and whose unrecognised-command branch returned a canned success, so a command it did
+    not know about was filed under an answer written for a different one.
+
+    The substitution this function performs and cannot show in its own value: L1.19 carries
+    branch coverage for Python, and the standard C toolchain has no branch-coverage convention,
+    so gcov LINE coverage goes into the same field. The `details` line discloses it. The value
+    and the band cannot.
+
+    `0 of 0` lines is the refusal that matters. lcov prints 0.0% for an instrumented build that
+    executed no instrumented code, and a rate over no lines is an absent measurement rather
+    than a measurement of zero - the difference between not-looked-at and read-and-terrible.
+    """
+    if build_returncode == 124:
+        return _na(f"the test build/run timed out before coverage could be measured (make {target})")
+    match = _LCOV_LINES.search(summary_text)
+    # No gcov data means the instrumented build did not run the target's tests: n/a with the
+    # reason, never a 0.0 that reads as real-but-terrible coverage.
+    if match is None:
+        return _na(f"coverage produced no gcov data (make {target} exit {build_returncode}): "
+                   f"{_first_line(build_output)}")
+    total_lines = int(match.group(3))
+    if total_lines == 0:
+        return _na(f"the instrumented build produced no gcov lines; `make {target}` did not run "
+                   f"instrumented code (compiler: {compiler})")
+
+    pct = float(match.group(1))
+    covered = int(match.group(2))
+    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
+    suite = f"make {target} passed" if build_returncode == 0 else f"make {target} exit {build_returncode}"
+    return {
+        "value": round(pct, 1),
+        "band": result_band,
+        "details": f"{pct}% gcov LINE coverage ({covered}/{total_lines} lines; {suite}; "
+                   f"compiled by {compiler}); C has no standard branch-coverage convention, so "
+                   f"this field carries line coverage where other languages carry branch coverage",
+    }
+
+
+def _determinism_verdict(compiler: str) -> L1Result:
+    """L1.20 for C: a permanent n/a, naming the compiler that would have run the suite.
+
+    Not a gap in this harness and not a failure on the repository. C ships no standard
+    test-order randomizer - no pytest-randomly, no `go test -shuffle` - so there is no shuffled
+    run to count, and 0/5 would read as a suite that falls over when reordered rather than one
+    that was never reordered. Pure, so the distinction is asserted rather than assumed.
+    """
+    return _na(f"C has no standard test-order randomizer; determinism not measured (compiler: {compiler})")
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.19 for C (best-effort): line coverage from a gcov-instrumented `make <target>`,
     totalled by lcov. Bands match the spec: >90% Healthy, 60-90% Not Healthy, <60% Slop.
@@ -92,8 +150,9 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         info = Path(directory) / "cov.info"
         env = {"CFLAGS": _COVERAGE_FLAGS, "CXXFLAGS": _COVERAGE_FLAGS, "LDFLAGS": "--coverage"}
         build = _run_untrusted(["make", target], cwd=repo, env=env, timeout_seconds=timeout_seconds)
+        build_output = build.stderr or build.stdout or ""
         if build.returncode == 124:
-            return _na(f"the test build/run timed out before coverage could be measured (make {target})")
+            return _coverage_verdict("", 124, build_output, compiler, target)
         capture = _run_untrusted(
             [lcov, "--capture", "--directory", str(repo), "--output-file", str(info), "--quiet"],
             cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 120),
@@ -102,28 +161,9 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
             return _na("lcov coverage capture timed out")
         summary = _run_untrusted([lcov, "--summary", str(info)], cwd=repo, env={},
                                  timeout_seconds=min(timeout_seconds, 60))
-        match = _LCOV_LINES.search((summary.stdout or "") + (summary.stderr or ""))
+        summary_text = (summary.stdout or "") + (summary.stderr or "")
 
-    # No gcov data means the instrumented build did not run the target's tests: n/a with the
-    # reason, never a 0.0 that reads as real-but-terrible coverage.
-    if match is None:
-        return _na(f"coverage produced no gcov data (make {target} exit {build.returncode}): "
-                   f"{_first_line(build.stderr or build.stdout)}")
-    total_lines = int(match.group(3))
-    if total_lines == 0:
-        return _na(f"the instrumented build produced no gcov lines; `make {target}` did not run "
-                   f"instrumented code (compiler: {compiler})")
-
-    pct = float(match.group(1))
-    covered = int(match.group(2))
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
-    suite = f"make {target} passed" if build.returncode == 0 else f"make {target} exit {build.returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": result_band,
-        "details": f"{pct}% line coverage via gcov/lcov ({covered}/{total_lines} lines; {suite}; "
-                   f"compiled by {compiler})",
-    }
+    return _coverage_verdict(summary_text, build.returncode, build_output, compiler, target)
 
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
@@ -134,5 +174,4 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     cc = _cc()
     if cc is None:
         return _na("needs a C compiler (cc/gcc/clang) in PATH")
-    compiler = _compiler(cc, repo, timeout_seconds)
-    return _na(f"C has no standard test-order randomizer; determinism not measured (compiler: {compiler})")
+    return _determinism_verdict(_compiler(cc, repo, timeout_seconds))

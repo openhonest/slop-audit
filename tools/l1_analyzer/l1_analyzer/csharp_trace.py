@@ -24,6 +24,7 @@ from __future__ import annotations
 import re
 import shutil
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
 
 from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
@@ -46,6 +47,46 @@ def _sdk(dotnet: str, repo: Path, timeout_seconds: float) -> str:
     return f"dotnet {_first_line(probe.stdout)}" if probe.returncode == 0 else "an unknown dotnet SDK"
 
 
+def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, sdk: str) -> L1Result:
+    """L1.19 from a finished run and what the Cobertura report carried. No I/O, so it can be
+    asserted as a value.
+
+    `branches` is the report's (covered, valid) pair, or None when the run wrote no
+    coverage.cobertura.xml at all. Absence is a case here rather than a pair of zeroes because
+    the two say different things: no report means the collector is not referenced by the test
+    project, while a report with `branches-valid="0"` means the collector ran and found nothing
+    with a branch in it. Both are n/a, and each names its own remedy.
+
+    Extracted because it could not be reached otherwise. The old tests replaced `_dotnet` and
+    `_run_untrusted` with a fake that both answered `dotnet --version` and wrote the report the
+    module read back, so this table was proved against the test's own XML and `dotnet test`
+    could have been invoked with any flags at all.
+    """
+    if returncode == 124:
+        return _na("test suite timed out before coverage could be measured")
+    # coverlet.collector writes a Cobertura file for every project that built and ran, even
+    # when some tests failed. No file means the collector was not wired in (or nothing ran):
+    # n/a with the reason, never a 0.0 that reads as real-but-terrible coverage.
+    if branches is None:
+        return _na("C# branch coverage needs coverlet.collector in the test project "
+                   "(coverage.cobertura.xml not produced)")
+    covered, valid = branches
+    # branches-valid == 0 means nothing had a branch to cover, NOT that coverage is 0. It
+    # usually means the code under test sits in the test assembly, which coverlet excludes by
+    # default. n/a with the remedy, never a 0.0 that reads as real-but-terrible coverage.
+    if valid == 0:
+        return _na("no branches instrumented; the code under test may be in the test assembly "
+                   "(coverlet excludes it) - put it in a separate project the tests reference")
+    pct = covered / valid * 100
+    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
+    return {
+        "value": round(pct, 1),
+        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "details": f"{covered}/{valid} branches exercised by tests from `dotnet test --collect "
+                   f"\"XPlat Code Coverage\"` ({suite}; ran under {sdk})",
+    }
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.19 for C#: branch coverage from `dotnet test --collect:"XPlat Code Coverage"`. Bands
     match the spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is accepted
@@ -59,37 +100,17 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
             [dotnet, "test", "--collect:XPlat Code Coverage", "--results-directory", directory],
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
-        if run.returncode == 124:
-            return _na("test suite timed out before coverage could be measured")
-        # coverlet.collector writes a Cobertura file for every project that built and ran, even
-        # when some tests failed. No file means the collector was not wired in (or nothing ran):
-        # n/a with the reason, never a 0.0 that reads as real-but-terrible coverage.
         reports = sorted(Path(directory).rglob("coverage.cobertura.xml"))
-        if not reports:
-            return _na("C# branch coverage needs coverlet.collector in the test project "
-                       "(coverage.cobertura.xml not produced)")
+        if run.returncode == 124 or not reports:
+            return _coverage_verdict(None, run.returncode, sdk)
         text = reports[0].read_text(errors="ignore")
         valid_match = _BRANCHES_VALID.search(text)
         covered_match = _BRANCHES_COVERED.search(text)
         if valid_match is None or covered_match is None:
             return _na("cobertura report had no branch counts")
-        valid, covered = int(valid_match.group(1)), int(covered_match.group(1))
+        branches = (int(covered_match.group(1)), int(valid_match.group(1)))
 
-    # branches-valid == 0 means nothing had a branch to cover, NOT that coverage is 0. It
-    # usually means the code under test sits in the test assembly, which coverlet excludes by
-    # default. n/a with the remedy, never a 0.0 that reads as real-but-terrible coverage.
-    if valid == 0:
-        return _na("no branches instrumented; the code under test may be in the test assembly "
-                   "(coverlet excludes it) - put it in a separate project the tests reference")
-    pct = covered / valid * 100
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
-    suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": result_band,
-        "details": f"{covered}/{valid} branches exercised by tests from `dotnet test --collect "
-                   f"\"XPlat Code Coverage\"` ({suite}; ran under {sdk})",
-    }
+    return _coverage_verdict(branches, run.returncode, sdk)
 
 
 def _ran_tests(output: str) -> bool:
@@ -97,6 +118,45 @@ def _ran_tests(output: str) -> bool:
     error, or a project with no discovered tests) - the difference between a real determinism
     data point and the suite never executing."""
     return any(marker in output for marker in _RAN)
+
+
+def _determinism_verdict(outcomes: Iterable[tuple[int, str]], sdk: str) -> L1Result:
+    """L1.20 from the outcome of every repeated run. Each outcome is one run's exit status and
+    its combined output, in the order the runs were made. No I/O, so it can be asserted as a
+    value.
+
+    The count comes from the outcomes rather than from a requested number of runs, so the value
+    reports what actually happened. No outcomes at all is n/a: zero clean out of zero satisfies
+    "every run passed" and would band Healthy, which is the zero-denominator lie this package
+    exists to refuse.
+
+    `outcomes` is consumed lazily, so a caller may hand over a generator that runs the suite one
+    attempt at a time. Returning here on the first terminal outcome is then what stops the
+    remaining runs from each burning a full timeout, which is how the loop this replaced behaved.
+    """
+    passing = 0
+    made = 0
+    failing: list[str] = []
+    for returncode, output in outcomes:
+        made += 1
+        if returncode == 124:
+            return _na(f"a run timed out (run {made}); determinism not measured")
+        if not _ran_tests(output):
+            return _na(f"the suite did not run (run {made}: no test project built or executed under "
+                       f"{sdk}); determinism not measured")
+        if returncode == 0:
+            passing += 1
+        else:
+            failing.append(f"run {made}: {_first_line(output)}")
+
+    if made == 0:
+        return _na("no `dotnet test` runs were made; determinism not measured")
+    result_band = "Healthy" if passing == made else ("Not Healthy" if passing == made - 1 else "Slop")
+    details = (f"{passing} of {made} `dotnet test` runs passed cleanly (order is scheduler-varied, "
+               f"not seed-controlled; under {sdk})")
+    if failing:
+        details += f"; runs with failures: {'; '.join(failing[:3])}"
+    return {"value": f"{passing}/{made}", "band": result_band, "details": details}
 
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
@@ -109,24 +169,10 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         return _na("needs the dotnet SDK in PATH")
     sdk = _sdk(dotnet, repo, timeout_seconds)
 
-    passing = 0
-    failing: list[str] = []
-    for attempt in range(1, runs + 1):
-        run = _run_untrusted([dotnet, "test"], cwd=repo, env={}, timeout_seconds=timeout_seconds)
-        output = (run.stdout or "") + (run.stderr or "")
-        if run.returncode == 124:
-            return _na(f"a run timed out (run {attempt}); determinism not measured")
-        if not _ran_tests(output):
-            return _na(f"the suite did not run (run {attempt}: no test project built or executed under "
-                       f"{sdk}); determinism not measured")
-        if run.returncode == 0:
-            passing += 1
-        else:
-            failing.append(f"run {attempt}: {_first_line(output)}")
+    def outcomes() -> Iterable[tuple[int, str]]:
+        # Lazy, so the verdict's return on a timed-out or never-run attempt stops the rest.
+        for _ in range(runs):
+            run = _run_untrusted([dotnet, "test"], cwd=repo, env={}, timeout_seconds=timeout_seconds)
+            yield run.returncode, (run.stdout or "") + (run.stderr or "")
 
-    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
-    details = (f"{passing} of {runs} `dotnet test` runs passed cleanly (order is scheduler-varied, "
-               f"not seed-controlled; under {sdk})")
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
+    return _determinism_verdict(outcomes(), sdk)
