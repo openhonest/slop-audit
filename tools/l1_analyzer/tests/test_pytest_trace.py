@@ -79,3 +79,59 @@ def test_resolve_via_shim_none_when_no_manager(monkeypatch, tmp_path):
     # proved only that the module calls the function the test had just written.
     monkeypatch.setenv("PATH", "")
     assert pytest_trace.resolve_via_shim(tmp_path, "ruby", 5) == (None, "")
+
+
+# --- the L1.19 verdict, extracted so it can be asserted without faking a run ----
+#
+# Written before `_coverage_verdict` exists. The six tests deleted in the fixture sweep
+# proved this table only through a replaced `_run_untrusted`, which meant the harness could
+# have invoked pytest with the wrong flags against the wrong interpreter and every one would
+# still have passed. The claim they defended is real and is restated here as a value.
+
+def test_a_completed_run_yields_the_covered_share_and_its_band():
+    totals = {"num_branches": 40, "covered_branches": 38}
+    r = pytest_trace._coverage_verdict(0, totals, "the analyzer's own interpreter")
+    assert r["value"] == 95.0 and r["band"] == "Healthy"
+    assert "38/40 decision branches" in r["details"]
+
+
+def test_a_failing_but_valid_run_is_still_measured():
+    # exit 1 means tests ran and some failed, which is a real coverage reading.
+    r = pytest_trace._coverage_verdict(1, {"num_branches": 10, "covered_branches": 7}, "p")
+    assert r["value"] == 70.0 and r["band"] == "Not Healthy"
+    assert "suite exit 1" in r["details"]
+
+
+def test_the_band_boundaries_follow_the_spec():
+    band = lambda c, n: pytest_trace._coverage_verdict(0, {"num_branches": n, "covered_branches": c}, "p")["band"]
+    assert band(95, 100) == "Healthy"        # above 90
+    assert band(90, 100) == "Not Healthy"    # 90 exactly is not above 90
+    assert band(60, 100) == "Not Healthy"    # 60 exactly is the floor
+    assert band(59, 100) == "Slop"
+
+
+def test_a_timeout_is_named_rather_than_scored():
+    r = pytest_trace._coverage_verdict(124, {}, "p")
+    assert r["band"] == "n/a" and "timed out" in r["details"]
+
+
+def test_each_invalid_exit_code_names_its_own_reason():
+    reasons = {2: "interrupted", 3: "internal error", 4: "usage or collection error",
+               5: "collected no tests"}
+    for code, phrase in reasons.items():
+        r = pytest_trace._coverage_verdict(code, {"num_branches": 9, "covered_branches": 9}, "p")
+        assert r["band"] == "n/a", f"exit {code} must not be scored"
+        assert phrase in r["details"], f"exit {code} must say {phrase!r}"
+
+
+def test_an_unrecognised_exit_code_reports_the_code_rather_than_another_rows_reason():
+    # The miss is a named case: it prints the actual code. It must not borrow the wording of
+    # a code somebody did write a row for.
+    r = pytest_trace._coverage_verdict(137, {"num_branches": 9, "covered_branches": 9}, "p")
+    assert r["band"] == "n/a" and "137" in r["details"]
+    assert "collected no tests" not in r["details"]
+
+
+def test_zero_enumerable_branches_is_absent_not_zero_percent():
+    r = pytest_trace._coverage_verdict(0, {"num_branches": 0, "covered_branches": 0}, "p")
+    assert r["band"] == "n/a" and r["value"] == "n/a"

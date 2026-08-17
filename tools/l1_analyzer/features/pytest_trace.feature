@@ -72,6 +72,14 @@ Feature: pytest_trace — running a Python repository's own test suite to measur
     Then it returns the first line that is not blank, trimmed and cut to 200 characters
     But output that is empty or entirely blank yields the words "no output", so the reason a reader sees is never itself blank
 
+  Scenario: _coverage_verdict decides L1.19 from a finished run and its totals
+    Given a pytest exit code, coverage.py's totals, and the provenance of the interpreter that ran
+    When _coverage_verdict reads them
+    Then exit 0 or 1 with enumerable branches yields the covered share and its band
+    And exit 124 says the suite timed out, and 2, 3, 4 and 5 each name why the run was not valid
+    And an exit code no row names reports the code itself rather than borrowing another row's reason
+    But zero enumerable branches is n/a, never a percentage, because a share of no branches is absent and not zero
+
   Scenario: decision_space_coverage measures the share of decision branches the suite exercises
     Given a repository, a language name, a time limit and, optionally, an interpreter
     When decision_space_coverage runs the suite under branch tracing and reads the resulting coverage report

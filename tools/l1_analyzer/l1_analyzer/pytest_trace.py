@@ -159,6 +159,49 @@ def _first_line(text: str) -> str:
 # L1.19 decision-space coverage
 # ---------------------------------------------------------------------------
 
+# Why a pytest exit code is not a coverage figure. 0 and 1 mean the suite ran; everything
+# else means it did not, and a percentage computed over a run that never happened reads as
+# real-but-terrible coverage, which is the silent failure this package exists to name.
+_INVALID_RUN = {
+    2: "the run was interrupted",
+    3: "pytest hit an internal error",
+    4: "pytest usage or collection error",
+    5: "pytest collected no tests",
+    124: "the test suite timed out before coverage could be measured",
+}
+
+
+def _coverage_verdict(returncode: int, totals: dict, provenance: str) -> L1Result:
+    """L1.19 from a finished run and coverage.py's totals. No I/O, so it can be asserted.
+
+    Extracted because it could not be reached otherwise. `decision_space_coverage` runs the
+    suite, opens a temp directory, shells out again for `coverage json`, reads the report and
+    decides the band inside one function, so the exit-code table below was only ever provable
+    through a replaced `_run_untrusted` - a fake that ignored its arguments, and so would have
+    passed had the harness invoked pytest with the wrong flags against the wrong interpreter.
+
+    An exit code no row names reports the code itself. That is a named miss and not a default:
+    it cannot be mistaken for a row somebody wrote, which is the thing a default does wrong.
+    """
+    if returncode not in (0, 1):
+        why = _INVALID_RUN.get(returncode, f"pytest exit {returncode}")
+        if returncode == 124:
+            return _na(why)
+        return _na(f"the test suite did not complete a valid run ({why}); coverage not measured")
+    num_branches = int(totals.get("num_branches", 0))
+    covered = int(totals.get("covered_branches", 0))
+    if num_branches == 0:
+        return _na("no enumerable decision branches found in the measured tree")
+    pct = covered / num_branches * 100
+    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
+    return {
+        "value": round(pct, 1),
+        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "details": f"{covered}/{num_branches} decision branches exercised by tests "
+                   f"({suite}; ran under {provenance})",
+    }
+
+
 def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
                             python_executable: str | None = None) -> L1Result:
     """L1.19: branch-level decision coverage from coverage.py.
@@ -181,17 +224,8 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
             [exe, "-m", "coverage", "run", "--branch", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
             cwd=repo, env=env, timeout_seconds=timeout_seconds,
         )
-        if run.returncode == 124:
-            return _na("test suite timed out before coverage could be measured")
-        # Coverage is a valid number only when the suite actually ran tests: pytest exit 0
-        # (all passed) or 1 (some failed). Exit 2/3/4/5 mean the suite did not complete a
-        # valid run, so a coverage figure for it is meaningless. Report n/a with the reason,
-        # never a 0.0 that reads as real-but-terrible coverage (a silent failure is a lie).
         if run.returncode not in (0, 1):
-            reasons = {2: "the run was interrupted", 3: "pytest hit an internal error",
-                       4: "pytest usage or collection error", 5: "pytest collected no tests"}
-            why = reasons.get(run.returncode, f"pytest exit {run.returncode}")
-            return _na(f"the test suite did not complete a valid run ({why}); coverage not measured")
+            return _coverage_verdict(run.returncode, {}, provenance)
         # `coverage json` is our own trusted, fast step.
         subprocess.run(
             [exe, "-m", "coverage", "json", "-o", str(report_file)],
@@ -204,21 +238,7 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
         except (OSError, json.JSONDecodeError):
             return _na("coverage report was unreadable")
 
-    totals = report.get("totals", {})
-    num_branches = int(totals.get("num_branches", 0))
-    covered_branches = int(totals.get("covered_branches", 0))
-    if num_branches == 0:
-        return _na("no enumerable decision branches found in the measured tree")
-
-    pct = covered_branches / num_branches * 100
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
-    suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": result_band,
-        "details": f"{covered_branches}/{num_branches} decision branches exercised by tests "
-                   f"({suite}; ran under {provenance})",
-    }
+    return _coverage_verdict(run.returncode, report.get("totals", {}), provenance)
 
 
 # ---------------------------------------------------------------------------
