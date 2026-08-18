@@ -86,6 +86,37 @@ VECTORS = [
             "}\n"
         ),
     },
+    {
+        # C# spells a read-modify-write `n++` / `++n`, which is a postfix or prefix unary
+        # node and no kind of assignment, so the commonest counter in the language sat in no
+        # assign key at all. Nothing reads the tally back here: it is a write and no more.
+        "id": "increment-counter",
+        "state": "hits",
+        "verdict": "neutral",
+        "drives_decision": False,
+        "src": (
+            "class Meter {\n"
+            "  int hits = 0;\n"
+            "  void Bump() { hits++; }\n"
+            "  void Bump2() { ++hits; }\n"
+            "}\n"
+        ),
+    },
+    {
+        # The increment still PRODUCES a value, and where a branch reads that value the
+        # decision is real. Reading the node as a write and stopping would lose it, which is
+        # why the write is concluded only once every other row has declined.
+        "id": "increment-in-a-condition",
+        "state": "hits",
+        "verdict": "neutral",
+        "drives_decision": True,
+        "src": (
+            "class Meter {\n"
+            "  int hits = 0;\n"
+            "  bool Bump() { if (hits++ > 3) { return true; } return false; }\n"
+            "}\n"
+        ),
+    },
 ]
 
 

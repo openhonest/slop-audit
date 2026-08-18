@@ -430,3 +430,32 @@ def test_only_python_spells_a_key_removal_as_a_statement():
     declines a key removal there rather than reading one shape as another."""
     spelled = {lang for lang, sp in LANG_SPEC.items() if sp["delete_stmt_types"]}
     assert spelled == {"python"}
+
+
+def test_go_reads_the_condition_of_a_bare_for_loop_as_a_test_position():
+    """Go's only loop is `for`, and the bare form gives its condition no field: `for_statement`
+    names `body` and nothing else. Every other grammar in the table names the field, so the
+    reader asked for one and got nothing, and a field driving a Go loop sat in no test
+    position at all. The three-clause header is the other half of the same gap: there the
+    condition IS a field, but of the `for_clause` rather than of the statement above it."""
+    sp = LANG_SPEC["go"]
+    bare = ("package main\n"
+            "func (s *S) run() {\n  for s.running {\n    work()\n  }\n}\n")
+    ref = _first_ref("go", bare, lambda n: n.type == "selector_expression" and _text(n) == "s.running")
+    assert state_ref_reads.in_test(ref, sp) is True
+
+    clause = ("package main\n"
+              "func (s *S) run() {\n  for i := 0; s.running; i++ {\n    work(i)\n  }\n}\n")
+    ref = _first_ref("go", clause, lambda n: n.type == "selector_expression" and _text(n) == "s.running")
+    assert state_ref_reads.in_test(ref, sp) is True
+
+
+def test_go_reads_an_endless_loop_body_as_no_test_position_at_all():
+    """The exclusions are the whole of what makes the row above safe. `for { }` has one named
+    child, the body, and reading "the first named child is the condition" without them would
+    make every statement in an endless loop sit inside a test."""
+    sp = LANG_SPEC["go"]
+    src = ("package main\n"
+           "func (s *S) run() {\n  for {\n    use(s.running)\n  }\n}\n")
+    ref = _first_ref("go", src, lambda n: n.type == "selector_expression" and _text(n) == "s.running")
+    assert state_ref_reads.in_test(ref, sp) is False

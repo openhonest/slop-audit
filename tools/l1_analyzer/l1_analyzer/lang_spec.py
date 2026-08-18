@@ -150,6 +150,53 @@ class LangSpec(TypedDict, total=False):
     # means the whole node is a test. Python's ternary has no condition field, which is why
     # this is a slot rule and not another tuple of node types.
     extra_test_positions: dict[str, str]
+    # --- vocabulary added by the 2026-08-17 per-language sweep ------------------------
+    #
+    # Nodes that WRITE their operand in place, as node type -> the operator tokens that make
+    # one. `n++`, `++n`, `@xs << x`: the reference is mutated where it stands, and no
+    # assignment node is involved anywhere, so `assign_types` can never reach it. Four
+    # grammars spell it four ways and one shared question sits underneath, which is why this
+    # is one table and not four special cases.
+    #
+    # The operator has to be checked and not just the node type, because C# reuses
+    # `postfix_unary_expression` for the null-forgiving `x!` and `prefix_unary_expression`
+    # for `!b` and `-n`, none of which writes anything. Ruby reuses `binary` for every
+    # operator it has. A language that writes nothing in place declares the empty table, and
+    # the reader then never asks for an operator.
+    write_in_place_ops: dict[str, tuple[str, ...]]
+    # Unary operators the language does NOT let a value pass through untouched. Go's `<-ch`
+    # is a `unary_expression` like `-x` and `!b`, and unary_expression is declared a
+    # transparent wrapper, so a channel receive read as the channel itself flowing on. It is
+    # not: the receive CONSUMES an element. Naming the operator is what separates the
+    # transparent unary from the consuming one; the eight that have no such operator declare
+    # the empty set.
+    opaque_unary_ops: frozenset[str]
+    # Branch nodes that hold their condition POSITIONALLY, as node type -> the child types
+    # that are never the condition. Go's `for` takes its condition as a bare first named
+    # child and gives it no field, so `branch_cond` reads nothing there however the type is
+    # declared: `for p.running {}` was a loop on a bool field that no row could see. The
+    # excluded types are what tell `for {}` (body only) and `for k := range m {}` (a range
+    # clause) apart from a real condition. Every other grammar names the field and declares
+    # the empty table.
+    bare_cond_types: dict[str, tuple[str, ...]]
+    # Nodes that take a MUTABLE ALIAS of a value, as node type -> the field holding the
+    # aliased value. `let r = &mut self.v; r.push(1);` writes the field through a local whose
+    # name has no relation to it, so every rule that argues from where the FIELD's own
+    # references sit is unsound the moment one of these exists. Only Rust spells it; the
+    # other eight declare the empty table and never consult the marker below.
+    alias_types: dict[str, str]
+    # The child node type that marks an alias as mutable (`mutable_specifier` in Rust). The
+    # empty string where the language declares no alias type, so a reader that got there
+    # anyway would match no child rather than every child.
+    alias_marker: str
+    # Regions the grammar hands back as unparsed tokens. Rust's `macro_invocation` swallows
+    # its arguments into a `token_tree`, so `format!("{}", self.v.len())` holds no
+    # field_expression and no call_expression and every reference inside it is invisible to a
+    # walk. An invisible reference reads as absence, which is the failure this analyzer
+    # exists to name, so a state whose name appears inside one of these regions is refused
+    # rather than judged on the half that could be read. The eight whose grammars parse
+    # everything declare the empty tuple.
+    opaque_region_types: tuple[str, ...]
 
 
 # Comparison operators, as every grammar in the table spells them. A state value meeting one
@@ -363,6 +410,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("block", "elif_clause", "else_clause"),
         "delete_stmt_types": ("delete_statement",),
+        "write_in_place_ops": {},
+        "opaque_unary_ops": frozenset(),
+        "bare_cond_types": {},
+        "alias_types": {}, "alias_marker": "",
+        "opaque_region_types": (),
         "extra_test_positions": {
             "conditional_expression": "second",   # a if <cond> else b: no condition field
             "assert_statement": "first",
@@ -408,6 +460,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("statement_block", "else_clause"),
         "delete_stmt_types": (),                  # `delete o[k]` is a unary_expression
+        "write_in_place_ops": {"update_expression": ("++", "--")},
+        "opaque_unary_ops": frozenset(),
+        "bare_cond_types": {},
+        "alias_types": {}, "alias_marker": "",
+        "opaque_region_types": (),
         "extra_test_positions": {"ternary_expression": "field"},
     },
     "javascript": {
@@ -449,6 +506,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("statement_block", "else_clause"),
         "delete_stmt_types": (),
+        "write_in_place_ops": {"update_expression": ("++", "--")},
+        "opaque_unary_ops": frozenset(),
+        "bare_cond_types": {},
+        "alias_types": {}, "alias_marker": "",
+        "opaque_region_types": (),
         "extra_test_positions": {"ternary_expression": "field"},
     },
     "java": {
@@ -494,6 +556,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("block", "constructor_body"),
         "delete_stmt_types": (),                  # `map.remove(k)` yields the removed value
+        "write_in_place_ops": {"update_expression": ("++", "--")},
+        "opaque_unary_ops": frozenset(),
+        "bare_cond_types": {},
+        "alias_types": {}, "alias_marker": "",
+        "opaque_region_types": (),
         "extra_test_positions": {"ternary_expression": "field", "assert_statement": "first"},
     },
     "csharp": {
@@ -537,6 +604,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("block",),
         "delete_stmt_types": (),                  # `dict.Remove(k)` answers with a bool
+        "write_in_place_ops": {"postfix_unary_expression": ("++", "--"), "prefix_unary_expression": ("++", "--")},
+        "opaque_unary_ops": frozenset(),
+        "bare_cond_types": {},
+        "alias_types": {}, "alias_marker": "",
+        "opaque_region_types": (),
         "extra_test_positions": {"conditional_expression": "field"},
     },
     "rust": {
@@ -589,6 +661,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("block", "else_clause"),
         "delete_stmt_types": (),                  # `map.remove(&k)` yields an Option
+        "write_in_place_ops": {},
+        "opaque_unary_ops": frozenset(),
+        "bare_cond_types": {},
+        "alias_types": {"reference_expression": "value"}, "alias_marker": "mutable_specifier",
+        "opaque_region_types": ("macro_invocation",),
         "extra_test_positions": {},               # `if` is an expression, already in branch_types
     },
     "ruby": {
@@ -626,9 +703,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "unary_types": ("unary",),
         "lvalue_wrapper": "",
         "presence_methods": frozenset({"key?", "has_key?", "include?", "member?"}),
-        # `<<` is deliberately absent: Ruby parses an append as a `binary` node, so the
-        # entry carrying it in _RUBY_MUTATING can never match a method name (see the
-        # module docstring of state_bounds_filters).
+        # `<<` is deliberately absent from the METHOD set: Ruby parses an append as a
+        # `binary` node, so the entry carrying it in _RUBY_MUTATING can never match a method
+        # name. The operator form is declared in write_in_place_ops below, which is where a
+        # node that writes its operand belongs; the `<<` in _RUBY_MUTATING covers only the
+        # rare `@xs.<<(x)` spelling and is kept for it.
         "write_methods": frozenset({
             "store", "clear", "concat", "merge!", "update", "reject!", "map!", "fill",
             "push", "append", "unshift", "insert", "delete_if",
@@ -642,6 +721,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("then", "else", "body_statement"),
         "delete_stmt_types": (),                  # `h.delete(k)` yields the removed value
+        "write_in_place_ops": {"binary": ("<<",)},
+        "opaque_unary_ops": frozenset(),
+        "bare_cond_types": {},
+        "alias_types": {}, "alias_marker": "",
+        "opaque_region_types": (),
         "extra_test_positions": {"conditional": "field"},
     },
     "c": {
@@ -688,6 +772,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("compound_statement",),
         "delete_stmt_types": (),
+        "write_in_place_ops": {"update_expression": ("++", "--")},
+        "opaque_unary_ops": frozenset(),
+        "bare_cond_types": {},
+        "alias_types": {}, "alias_marker": "",
+        "opaque_region_types": (),
         "extra_test_positions": {"conditional_expression": "field"},
     },
     "go": {
@@ -695,7 +784,13 @@ LANG_SPEC: dict[str, LangSpec] = {
         # is grouped by receiver type (scope_by_receiver) and keyed <Type>.<field>.
         "class_types": (),
         "func_types": ("function_declaration", "method_declaration", "func_literal"),
-        "assign_types": ("assignment_statement",),
+        # `:=` is the commonest store in Go and it is a `short_var_declaration`, not an
+        # `assignment_statement`. It carries the same `left` and `right` fields and the same
+        # expression_list wrapper, so it is the same row, and leaving it out made every
+        # idiomatic Go store a construct with no rule. It stays in presence_bind_types too:
+        # `_, ok := d[k]` is one of these AND the language's presence test, and the two
+        # readings do not collide because the comma-ok read sits on the RIGHT of it.
+        "assign_types": ("assignment_statement", "short_var_declaration"),
         "assign_left": "left", "assign_right": "right",
         "lvalue_wrapper": "expression_list",   # Go wraps assignment targets in expression_list
         "subscript_types": ("index_expression",), "sub_value": "operand", "sub_index": "index", "sub_positional": False,
@@ -706,7 +801,13 @@ LANG_SPEC: dict[str, LangSpec] = {
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
         "return_types": ("return_statement",),
-        "branch_types": ("if_statement", "for_statement", "expression_switch_statement"), "branch_cond": "condition",
+        # `for_clause` is the three-clause loop header (`for i := 0; g.live; i++`), and it is
+        # the node that carries the `condition` field: the for_statement above it has only a
+        # `body`. Both are named, because the two spellings of a Go loop put the condition in
+        # two different places and declaring one of them reads the other as no loop at all.
+        # The bare form (`for g.live {}`) has no field anywhere and is declared in
+        # bare_cond_types instead.
+        "branch_types": ("if_statement", "for_statement", "for_clause", "expression_switch_statement"), "branch_cond": "condition",
         "elif_types": (),
         "passthrough_types": ("parenthesized_expression", "unary_expression", "expression_list"),
         "comparison_types": ("binary_expression",),
@@ -739,6 +840,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition", "initializer"),
         "gate_body_types": ("block", "statement_list"),
         "delete_stmt_types": (),                  # `delete(d, k)` is a builtin call
+        "write_in_place_ops": {"inc_statement": ("++",), "dec_statement": ("--",)},
+        "opaque_unary_ops": frozenset({"<-"}),
+        "bare_cond_types": {"for_statement": ("block", "for_clause", "range_clause")},
+        "alias_types": {}, "alias_marker": "",
+        "opaque_region_types": (),
         "extra_test_positions": {},               # no ternary, no assert expression
     },
 }

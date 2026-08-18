@@ -92,6 +92,12 @@ Feature: state_ref_reads — how one reference to a piece of state reads, in nin
     Then it is true for a comprehension guard, where every part of the construct is the test
     But the answer is unconditional, so only a node type declared to hold this slot may be handed to it
 
+  Scenario: test_slot_bare reads a test that no field names
+    Given a branch node, one of its children, and the language spec
+    When test_slot_bare asks the spec for the branch's positional condition and compares it against the child
+    Then it is true when the child is that condition, which is the only way a loop holding its test positionally can be read
+    But a branch whose spec leaves nothing after its exclusions has no condition, so an endless loop's body is not a test
+
   Scenario: test_slot_of says how a construct holds its test
     Given a construct and the language spec
     When test_slot_of reads the extra positions the language declares, then falls to the branch and elif types

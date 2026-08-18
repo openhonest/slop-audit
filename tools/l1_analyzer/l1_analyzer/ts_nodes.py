@@ -109,6 +109,105 @@ def sub_key(subscript: Node, sp: LangSpec) -> Node | None:
     return idx
 
 
+def written_in_place(node: Node | None, sp: LangSpec) -> Node | None:
+    """The operand `node` writes where it stands, or None when `node` writes nothing.
+
+    `n++`, `++n`, `c.n++` and `@xs << x` are one runtime step spelled four ways, and not one
+    of them involves an assignment node, so `assign_types` cannot reach any of them. The
+    reference is mutated in place and the node also PRODUCES a value, which is why this
+    returns the operand rather than a verdict: the caller decides what the produced value
+    then does.
+
+    The operator is checked and not only the node type, because two grammars reuse the node
+    for things that write nothing: C# spells the null-forgiving `x!` as a
+    postfix_unary_expression and `!b` as a prefix one, and Ruby spells every binary operator
+    it has as `binary`. A node type carrying an operator this language did not declare comes
+    back None, so a shift into a variable is not read as an append.
+
+    The operand is the declared assignment TARGET field where the node has one (Ruby's
+    `binary` names `left`) and the first named child where it does not (nothing else in the
+    table names a field). Both reach the same place; the field is preferred because a
+    grammar that named it meant it."""
+    if node is None or node.type not in sp["write_in_place_ops"]:
+        return None
+    ops = sp["write_in_place_ops"][node.type]
+    if not any(not c.is_named and text(c) in ops for c in node.children):
+        return None
+    return field(node, sp["assign_left"]) or first_named(node)
+
+
+def is_opaque_unary(node: Node | None, sp: LangSpec) -> bool:
+    """`node` is a unary operator this language does NOT let a value pass through.
+
+    Go's `<-ch` is a `unary_expression`, exactly as `-x` and `!b` are, and unary_expression
+    is declared a transparent wrapper. So a channel receive walked through as if the channel
+    itself flowed onward, when what actually happens is that an element is consumed. Only the
+    operator separates the two, which is why the whole node type cannot simply be dropped
+    from the wrapper list: that would take `-x` with it."""
+    if node is None or node.type not in sp["unary_types"]:
+        return False
+    return text(field(node, "operator")) in sp["opaque_unary_ops"]
+
+
+def bare_condition(node: Node | None, sp: LangSpec) -> Node | None:
+    """The condition of a branch that holds it POSITIONALLY, or None.
+
+    Go's `for` is the only one in the table. It gives its condition no field at all -
+    `for_statement` names only `body` - so reading `branch_cond` there returns nothing
+    however the node type is declared, and `for p.running {}` was a loop on a bool field that
+    no row could see. The condition is the first named child that is not one of the types the
+    spec excludes, which is what tells the three real forms apart: `for {}` has only a body,
+    `for k := range m {}` has a range clause, and `for i := 0; c; i++ {}` has a for_clause
+    that names its own condition field."""
+    if node is None or node.type not in sp["bare_cond_types"]:
+        return None
+    excluded = sp["bare_cond_types"][node.type]
+    return next((c for c in node.named_children if c.type not in excluded), None)
+
+
+def mutable_alias_value(node: Node | None, sp: LangSpec) -> Node | None:
+    """The value `node` hands out as a MUTABLE alias, or None when it hands out none.
+
+    `let r = &mut self.v; r.push(1);` writes the field through a local whose name has no
+    relation to it. Every rule in this analyzer argues from where a piece of state's OWN
+    references sit, and from that line on there is a write those references do not contain,
+    so no such rule is sound about it any more.
+
+    The marker is checked and not the node type, and that is the whole of the reading: Rust's
+    `reference_expression` is on the transparent-wrapper list because `&self.v` genuinely is
+    a wrapper - a shared borrow cannot be written through. Only the `mutable_specifier`
+    separates the two, and it is a child rather than a field."""
+    if node is None or node.type not in sp["alias_types"]:
+        return None
+    if not any(c.type == sp["alias_marker"] for c in node.children):
+        return None
+    return field(node, sp["alias_types"][node.type])
+
+
+def hidden_names(scope: Node, sp: LangSpec) -> frozenset[str]:
+    """Every name that appears inside a region this grammar leaves unparsed, under `scope`.
+
+    Rust's `macro_invocation` swallows its arguments into a `token_tree`:
+    `format!("{}", self.v.len())` holds no field_expression and no call_expression, and the
+    flat token sequence does not even keep the field name attached to `self`. So a walk that
+    looks for references finds none there, and a state used only inside macros reads as state
+    nothing touches - an invisible reference reported as an absence, which is the failure
+    this analyzer exists to name.
+
+    Names, not references, because names are all that survive: the tokens carry `self`, `v`
+    and `len` as three unrelated identifiers. Matching a state's bare name against them
+    over-refuses - a local called `v` inside a macro refuses a field called `v` - and that is
+    the direction to be wrong in, because the alternative is to clear a state on a reading
+    that skipped part of it. A language whose grammar parses everything declares no region
+    type and gets the empty set without a walk."""
+    if not sp["opaque_region_types"]:
+        return frozenset()
+    names: set[str] = set()
+    for region in refs(scope, lambda n: n.type in sp["opaque_region_types"]):
+        names.update(text(n) for n in refs(region, lambda n: n.is_named and not n.children))
+    return frozenset(names)
+
+
 def is_lvalue(node: Node | None, sp: LangSpec) -> bool:
     """True if `node` is the assigned lvalue of an assignment, unwrapping an optional
     lvalue wrapper (Go puts assignment targets inside an expression_list)."""

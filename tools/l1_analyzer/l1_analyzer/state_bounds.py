@@ -65,15 +65,20 @@ from l1_analyzer.state_partition import (
 )
 from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import arg_value as _arg_value
+from l1_analyzer.ts_nodes import bare_condition as _bare_condition
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import first_named as _first_named
+from l1_analyzer.ts_nodes import hidden_names as _hidden_names
 from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
+from l1_analyzer.ts_nodes import is_opaque_unary as _is_opaque_unary
 from l1_analyzer.ts_nodes import local_refs as _local_refs
+from l1_analyzer.ts_nodes import mutable_alias_value as _mutable_alias_value
 from l1_analyzer.ts_nodes import refs as _refs
 from l1_analyzer.ts_nodes import same as _same
 from l1_analyzer.ts_nodes import sub_collection as _sub_collection
 from l1_analyzer.ts_nodes import sub_key as _sub_key
 from l1_analyzer.ts_nodes import text as _text
+from l1_analyzer.ts_nodes import written_in_place as _written_in_place
 
 NEUTRAL = "neutral"
 PROMISCUOUS = "promiscuous"
@@ -394,7 +399,32 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
     if (parent.type in sp["assign_types"] and _same(_field(parent, sp["assign_right"]), node)
             and (left is None or left.type not in sp["destructuring_types"])):
         return state_partition.output()
-    if parent.type in sp["passthrough_types"]:
+    # THE VALUE IS HANDED OUT UNDER ANOTHER NAME, and that name can be written through:
+    # `let r = &mut self.v; r.push(1);`. Every rule below and every rule in
+    # state_bounds_filters argues from where this state's OWN references sit, and from this
+    # line on there is a write that none of them contains. So the walk stops and says so.
+    #
+    # It sits ABOVE the wrapper row because Rust's reference_expression is on the wrapper
+    # list, correctly: `&self.v` is a shared borrow and cannot be written through. Only the
+    # mutability marker separates the two, so the order here is the rule.
+    #
+    # An UNRESOLVED verdict is also what keeps the clearing rules off it. Write-once is the
+    # only rule allowed to clear an UNRESOLVED, and it is Python-only; when it is widened to
+    # a language that spells a mutable alias, the alias check is the premise it needs.
+    if _same(_mutable_alias_value(parent, sp), node):
+        return state_partition.undecided(state_partition.MUTABLE_ALIAS)
+    # A transparent wrapper, EXCEPT where the operator consumes rather than wraps. Go spells
+    # a channel receive `<-ch`, which is a unary_expression exactly as `-x` is, and
+    # unary_expression is on the wrapper list. So a receive read as the channel flowing on
+    # untouched, when what happens is that an element leaves the channel. Dropping the node
+    # type from the list would take `-x` with it, so the operator is what decides.
+    if parent.type in sp["passthrough_types"] and not _is_opaque_unary(parent, sp):
+        return _flow(parent, sp, closed_sets)
+    # The host WRITES this value where it stands: `n++`, `c.n++`, `@xs << x`. The host is
+    # transparent for the flow, because it also produces a value and that value may still
+    # reach a decision - `if (n++ > 3)` is a comparison whichever way the counter moves. The
+    # row below settles what happens when nothing reads what the host produced.
+    if _same(_written_in_place(parent, sp), node):
         return _flow(parent, sp, closed_sets)
     if parent.type in sp["comparison_types"]:
         mem = _membership_operands(parent, sp)
@@ -422,6 +452,12 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
         return state_partition.finite(2, True, "truthy")
     if parent.type in sp["elif_types"] and _same(_field(parent, sp["branch_cond"]), node):
         return state_partition.finite(2, True, "truthy")
+    # The same two-class split, in a branch that names no condition field. Go's `for` holds
+    # its condition as a bare first child, so the row above reads nothing there whatever the
+    # node type says, and `for p.running {}` was a loop on a bool field that came back as a
+    # construct with no rule. It is the same discriminator and shares the same key.
+    if _same(_bare_condition(parent, sp), node):
+        return state_partition.finite(2, True, "truthy")
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
@@ -431,6 +467,13 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
         return state_partition.silence_kind(parent.parent, sp)
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), node):
         return _keyed_read(_sub_key(parent, sp), sp)
+    # THE VALUE AN IN-PLACE WRITE PRODUCED, WHICH NOTHING READS. Every row above has now been
+    # offered it and declined, so `c.n++` standing alone as a statement, and `@xs << x` in a
+    # modifier arm, are writes and nothing more. This sits at the bottom rather than beside
+    # the transparent-host row on purpose: putting it higher would swallow `if (n++ > 3)`,
+    # where the produced value is exactly what the branch decides on.
+    if _written_in_place(node, sp) is not None:
+        return state_partition.write()
     # THE TOTAL ROW. Every row above declined, so no rule in this table describes how this
     # construct consumes the value, and the handler says exactly that and stops. It used to
     # be `output()`, which is a verdict: compositional, reaches no decision, costs no tests.
@@ -676,7 +719,7 @@ def _binding_line(refs: list[Node], sp: LangSpec) -> int:
     return min((r.start_point[0] + 1 for r in refs), default=1)
 
 
-def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: dict[str, int | None], immutable_ctors: set[str], instance: bool) -> Finding:
+def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: dict[str, int | None], immutable_ctors: set[str], instance: bool, hidden: frozenset[str]) -> Finding:
     const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp is LANG_SPEC["python"] else None
     if const is not None:
         # An immutable constant has a one-value domain, so its partition is one class.
@@ -697,6 +740,16 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
     # where it used to withhold every rule from eight languages without saying so.
     if verdict != NEUTRAL and state_bounds_filters.is_false_positive(key, refs, verdict, sp):
         verdict, drives, silence, construct, partition = NEUTRAL, False, "", "", state_partition.EMPTY
+    # THE READING WAS INCOMPLETE, and this is the last word on the finding for that reason.
+    # `hidden` holds the names that appear inside a region the grammar handed back as tokens,
+    # so a reference in one of them was never built and no walk above could have reached it.
+    # Every line above ran on the references that WERE built, which is a proper subset, and a
+    # verdict from a subset - most of all a NEUTRAL one a filter just cleared - would report
+    # what was not looked at as what was read and found clean. It sits after the filter
+    # rather than before it so that no rule can clear it back.
+    if key.rsplit(".", 1)[-1] in hidden:
+        verdict, drives, silence, construct, partition = (
+            UNRESOLVED, True, state_partition.UNPARSED_REGION, "", state_partition.UNKNOWN)
     return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel,
             "line": _binding_line(refs, sp), "silence": silence, "construct": construct,
             "partition": partition}
@@ -722,19 +775,26 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
     findings: list[Finding] = []
     visited: set[Site] = set()
     judged: set[Site] = set()
+    # The names sitting inside regions this grammar left unparsed, for the whole file. Read
+    # once and handed to every finding, because a macro in one function can name a field of
+    # another and a module static alike, and because a language that parses everything gets
+    # the empty set here without a walk.
+    hidden = _hidden_names(root, sp)
 
     module = state_enum.module_cands(root, sp, cfg)
     visited |= set(module)
     for name in state_enum.keys_of(module):
         refs = _bound_to(_refs(root, lambda n, nm=name: n.type == "identifier" and _text(n) == nm), name, sp)
         if refs:
-            findings.append(_finding(name, refs, rel, sp, closed_sets, immutable_ctors, instance=False))
+            findings.append(_finding(name, refs, rel, sp, closed_sets, immutable_ctors,
+                                     instance=False, hidden=hidden))
             judged |= state_enum.sites_of(module, name)
 
     if sp.get("scope_by_receiver"):    # Go: state spans methods, grouped by receiver type
         for slot in state_enum.go_slots(root):
             findings.append(_finding(slot["state"], slot["refs"], rel, sp, closed_sets,
-                                     immutable_ctors, instance=slot["writers_enumerable"]))
+                                     immutable_ctors, instance=slot["writers_enumerable"],
+                                     hidden=hidden))
             visited.add(slot["site"])
             judged.add(slot["site"])
 
@@ -744,7 +804,8 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
         for key in state_enum.keys_of(cands):
             refs = _state_refs(cls, key, sp)
             if refs:
-                findings.append(_finding(key, refs, rel, sp, closed_sets, immutable_ctors, instance=True))
+                findings.append(_finding(key, refs, rel, sp, closed_sets, immutable_ctors,
+                                         instance=True, hidden=hidden))
                 judged |= state_enum.sites_of(cands, key)
 
     # State declared inside a record, which neither enumerator above can reach: both work
@@ -756,7 +817,8 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
     visited |= set(read["visited"])
     for slot in read["slots"]:
         findings.append(_finding(slot["state"], slot["refs"], rel, sp, closed_sets,
-                                 immutable_ctors, instance=slot["writers_enumerable"]))
+                                 immutable_ctors, instance=slot["writers_enumerable"],
+                                 hidden=hidden))
         judged.add(slot["site"])
 
     return {"findings": findings, "visited": visited, "judged": judged}

@@ -48,6 +48,27 @@ VECTORS = [
         "  def initialize(h); @handler = h; end\n"
         "  def route(r); @handler.call(r); end\n"
         "end\n")},
+    # `@xs << x` is the idiomatic append and Ruby parses it as a `binary` node, not a call,
+    # so the `<<` sitting in the mutating-method set could never match: only the rare
+    # `@xs.<<(x)` spelling could. In a modifier arm the append reached no row at all and
+    # came back as a construct nobody had written a rule for.
+    {"id": "shovel-append-in-a-modifier", "state": "@seen", "verdict": "promiscuous", "drives_decision": True,
+     "src": (
+        "class Dedup\n"
+        "  def initialize; @seen = []; end\n"
+        "  def add(x)\n"
+        "    @seen << x unless @seen.include?(x)\n"
+        "  end\n"
+        "end\n")},
+    # The same append with nothing else touching the array: written and never read back.
+    {"id": "shovel-append-only", "state": "@rows", "verdict": "neutral", "drives_decision": False,
+     "src": (
+        "class Log\n"
+        "  def initialize; @rows = []; end\n"
+        "  def add(x)\n"
+        "    @rows << x if x\n"
+        "  end\n"
+        "end\n")},
 ]
 
 

@@ -32,6 +32,7 @@ from collections.abc import Callable
 from tree_sitter import Node
 
 from l1_analyzer.lang_spec import LangSpec
+from l1_analyzer.ts_nodes import bare_condition as _bare_condition
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
 from l1_analyzer.ts_nodes import same as _same
@@ -162,11 +163,19 @@ def test_slot_all(parent: Node, child: Node, sp: LangSpec) -> bool:
     return True
 
 
+def test_slot_bare(parent: Node, child: Node, sp: LangSpec) -> bool:
+    """The test is held positionally, with no field naming it. Go's `for` is the only one in
+    the table: `for_statement` names `body` and nothing else, so asking for a condition field
+    there returns nothing however the node type is declared."""
+    return _same(_bare_condition(parent, sp), child)
+
+
 _TEST_SLOTS: dict[str, Callable[[Node, Node, LangSpec], bool]] = {
     "field": test_slot_field,
     "first": test_slot_first,
     "second": test_slot_second,
     "all": test_slot_all,
+    "bare": test_slot_bare,
 }
 
 
@@ -177,6 +186,11 @@ def test_slot_of(parent: Node, sp: LangSpec) -> str:
     slot = sp["extra_test_positions"].get(parent.type, NO_TEST_SLOT)
     if slot != NO_TEST_SLOT:
         return slot
+    # Before the field reading, because a node in both tables holds its test positionally and
+    # names no field: Go's for_statement is a branch type AND has only a `body`, so falling
+    # through to "field" there asks for a condition that does not exist.
+    if parent.type in sp["bare_cond_types"]:
+        return "bare"
     if parent.type in sp["branch_types"] or parent.type in sp["elif_types"]:
         return "field"
     return NO_TEST_SLOT

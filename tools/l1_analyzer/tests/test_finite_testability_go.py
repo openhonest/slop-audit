@@ -48,6 +48,47 @@ VECTORS = [
         "package main\n"
         "type Gate struct { config int }\n"
         "func (g *Gate) Route(r int) int { return dispatch(g.config, r) }\n")},
+    # `:=` is the commonest store in Go and was in no assign key, so a field read into a
+    # short variable declaration reached no row and came back unresolved. Nothing decides on
+    # the map here: it is bound once and copied out, which is observe-only.
+    {"id": "short-var-declaration-store", "state": "Cache.store", "verdict": "neutral", "drives_decision": False,
+     "src": (
+        "package main\n"
+        "type Cache struct { store map[string]int }\n"
+        "func (c *Cache) Copy() map[string]int { m := c.store; return m }\n"
+        "func (c *Cache) Reset() { c.store = nil }\n")},
+    # Go's only loop is `for`, and its condition sits in no `condition` field: it is the
+    # first named child. A bool field driving a loop is a two-class split like any `if`.
+    {"id": "for-loop-truthiness", "state": "Pump.running", "verdict": "neutral", "drives_decision": True,
+     "src": (
+        "package main\n"
+        "type Pump struct { running bool }\n"
+        "func (p *Pump) Run() { for p.running { work() } }\n"
+        "func (p *Pump) Stop() { p.running = false }\n")},
+    # The three-clause header puts its condition in a for_clause, which is a branch node the
+    # spec never named.
+    {"id": "for-clause-condition", "state": "Gauge.live", "verdict": "neutral", "drives_decision": True,
+     "src": (
+        "package main\n"
+        "type Gauge struct { live bool }\n"
+        "func (g *Gauge) Run() { for i := 0; g.live; i++ { work(i) } }\n"
+        "func (g *Gauge) Stop() { g.live = false }\n")},
+    # `c.n++` is an inc_statement: a read-modify-write in no assign key at all.
+    {"id": "increment-statement", "state": "Counter.n", "verdict": "neutral", "drives_decision": False,
+     "src": (
+        "package main\n"
+        "type Counter struct { n int }\n"
+        "func (c *Counter) Bump() { c.n++ }\n")},
+    # `<-ch` is a unary_expression, and unary_expression is declared transparent, so a
+    # channel receive walked through as if the element flowed on untouched. It does not: the
+    # receive CONSUMES an element, and no row in the table describes that, so the honest
+    # answer is that the reading stopped here.
+    {"id": "channel-receive", "state": "Worker.jobs", "verdict": "unresolved", "drives_decision": True,
+     "src": (
+        "package main\n"
+        "type Worker struct { jobs chan int }\n"
+        "func (w *Worker) Next() int { return <-w.jobs }\n"
+        "func (w *Worker) Init() { w.jobs = make(chan int) }\n")},
 ]
 
 

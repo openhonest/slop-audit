@@ -55,8 +55,18 @@ UNMODELED_CALLEE = "unmodeled_callee"     # a plain name we could model and have
 DYNAMIC_DISPATCH = "dynamic_dispatch"     # the call target is chosen while the program runs
 INJECTED_SLOT = "injected_slot"           # an invoked slot whose compositional premise fails
 UNMODELED_CONSTRUCT = "unmodeled_construct"   # a syntax shape no dispatch row covers
+# The grammar handed the region back as tokens, so there is no shape to dispatch on. Rust's
+# macro arguments are the case: `format!("{}", self.v.len())` parses to a flat token_tree
+# that does not even keep the field name attached to `self`. It is kept apart from
+# UNMODELED_CONSTRUCT because the two send the reader to different places - a construct is a
+# dispatch row somebody can write, and this is not.
+UNPARSED_REGION = "unparsed_region"
+# The value was handed out under a name the walk cannot follow, so writes can arrive through
+# an alias no rule about this state's own references will ever see. Rust's `&mut self.v` is
+# the case in the table.
+MUTABLE_ALIAS = "mutable_alias"
 SILENCE_REASONS = (EXTERNAL_BOUNDARY, UNMODELED_CALLEE, DYNAMIC_DISPATCH, INJECTED_SLOT,
-                   UNMODELED_CONSTRUCT)
+                   UNMODELED_CONSTRUCT, UNPARSED_REGION, MUTABLE_ALIAS)
 
 WRITE = "write"            # target of an assignment / mutating method: not a decision
 OUTPUT = "output"          # returned or handed to the caller: compositional

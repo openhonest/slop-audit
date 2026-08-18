@@ -86,6 +86,35 @@ VECTORS = [
             "}\n"
         ),
     },
+    {
+        # Java spells the read-modify-write `n++` as an `update_expression`, which is not an
+        # assignment node and was in no assign key. Same shape as C#'s postfix unary and
+        # Go's inc_statement, and one table row now serves all three.
+        "id": "increment-counter",
+        "state": "hits",
+        "verdict": "neutral",
+        "drives_decision": False,
+        "src": (
+            "class Meter {\n"
+            "  int hits = 0;\n"
+            "  void bump() { hits++; }\n"
+            "  void bump2() { ++hits; }\n"
+            "}\n"
+        ),
+    },
+    {
+        # The value the increment produces still reaches the branch that reads it.
+        "id": "increment-in-a-condition",
+        "state": "hits",
+        "verdict": "neutral",
+        "drives_decision": True,
+        "src": (
+            "class Meter {\n"
+            "  int hits = 0;\n"
+            "  boolean bump() { if (hits++ > 3) { return true; } return false; }\n"
+            "}\n"
+        ),
+    },
 ]
 
 

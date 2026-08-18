@@ -80,6 +80,38 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
     Then it returns the key, which is what decides whether the read is bounded
     But a positional subscript with fewer than two named children yields nothing
 
+  Scenario: written_in_place finds the operand a node mutates where it stands
+    Given a node and the language spec
+    When written_in_place checks the node's type against the language's in-place writers, then checks that the operator it carries is one of the ones declared for that type
+    Then it returns the operand written, which is the declared target field where the grammar names one and the first named child where it does not
+    And the node still produces a value, so the operand is returned rather than a verdict, and the caller decides what that value goes on to do
+    But a node type the language did not declare, and a declared type carrying an operator that writes nothing, both yield nothing, so a shift is never read as an append
+
+  Scenario: is_opaque_unary decides whether a unary operator lets a value pass through
+    Given a node and the language spec
+    When is_opaque_unary checks that the node is a unary form and reads the operator it carries
+    Then it is true for an operator the language declares as consuming, such as a channel receive, which takes an element rather than passing the container on
+    But every other unary operator is false, so negation and arithmetic stay transparent and the whole node type does not have to be dropped from the wrapper list
+
+  Scenario: bare_condition finds the condition of a branch that names no condition field
+    Given a branch node and the language spec
+    When bare_condition takes the first named child that is not one of the types the spec excludes for that node
+    Then it returns the condition, which is how a loop that holds its test positionally is read at all
+    But a branch with nothing left after the exclusions yields nothing, which is what an endless loop and a loop over a range both come to
+
+  Scenario: mutable_alias_value finds the value a node hands out under another name
+    Given a node and the language spec
+    When mutable_alias_value checks the node against the language's alias forms and then looks for the child that marks the alias mutable
+    Then it returns the value borrowed, which is a write route that none of this state's own references contain
+    But an alias with no mutability marker yields nothing, so a shared borrow stays the transparent wrapper it has always been
+
+  Scenario: hidden_names collects the names inside a region the grammar leaves unparsed
+    Given a scope node and the language spec
+    When hidden_names walks the scope for the language's unparsed region types and collects the text of every leaf inside them
+    Then it returns those names, because a reference the parser never built cannot be found by a walk and would otherwise read as an absence
+    And matching a bare name over-refuses rather than under-refuses, which is the direction to be wrong in when the alternative is clearing a state on a reading that skipped part of it
+    But a language whose grammar parses everything declares no such region and gets the empty set without a walk
+
   Scenario: is_lvalue decides whether a node is the target of an assignment
     Given a node and the language spec
     When is_lvalue steps out through an optional target wrapper and compares the node against the assignment's target

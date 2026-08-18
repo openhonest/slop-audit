@@ -48,11 +48,13 @@ a key the class does not bound. The accumulator's whitelist is strictly tighter:
 only writes, presence tests and a read written straight back, and a keyed read in any other
 position is not on it. So a shape the guard would refuse, the whitelist refuses first.
 
-A DEFECT FOUND AND NOT FIXED. `_RUBY_MUTATING` carries the string `"<<"`, and Ruby parses an
-append as a `binary` node rather than a call, so no method name is ever `"<<"` and that entry
-can never match. The classifier therefore reads `@rows << x` as a value flowing on rather
-than as a write. It is out of scope here - the accumulator rule declines the shape either
-way - and it is reported rather than patched.
+A DEFECT FOUND AND SINCE FIXED. `_RUBY_MUTATING` carries the string `"<<"`, and Ruby parses
+an append as a `binary` node rather than a call, so no method name is ever `"<<"` and that
+entry could never match: the classifier read `@rows << x` as a value flowing on rather than
+as a write. The operator form is now declared in `write_in_place_ops`, beside C#'s `n++`,
+Java's `update_expression` and Go's `inc_statement`, because all four are one question the
+table had never asked - which nodes write their operand where it stands. The accumulator rule
+still declines the shape, for the reason it always did: Ruby can prove no discard.
 """
 
 from __future__ import annotations
