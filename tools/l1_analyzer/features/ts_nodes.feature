@@ -131,8 +131,9 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
     Then it is true for all three ways the code puts a value in
     And a keyed store counts, because the collection is being written through even though the reference is not itself the target
 
-  Scenario: unwrap_unary peels unary operators off a value
+  Scenario: unwrap_unary peels the wrappers that leave a value's identity alone
     Given a value node and the language spec
-    When unwrap_unary steps down to the operand through each unary operator in turn
-    Then it returns the value underneath, so a negated literal is still one compile-time value
-    But a negated variable peels to a name, which is no literal, and stays unbounded
+    When unwrap_unary steps down to the operand through each wrapper its language declares identity-preserving
+    Then it returns the value underneath, so a negated, borrowed, parenthesised or cast literal is still one compile-time value
+    And the vocabulary is its own key and not the flow walker's passthrough set, which carries boolean and try wrappers that do not preserve a literal, so a key written as one value or another stays unbounded
+    But a negated or borrowed variable peels to a name, which is no literal, and stays unbounded

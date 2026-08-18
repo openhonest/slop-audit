@@ -88,6 +88,7 @@ class LangSpec(TypedDict, total=False):
     dispatch_methods: frozenset[str]
     literal_types: frozenset[str]
     unary_types: tuple[str, ...]
+    value_wrapper_types: tuple[str, ...]
     module_enum: str
     # The node a grammar wraps assignment TARGETS in. Go puts them in an expression_list;
     # the other eight put the target under the assignment directly and declare the empty
@@ -401,6 +402,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _PY_MUTATING, "keyed_read": frozenset({"get"}),
         "literal_types": _PY_LITERALS,
         "unary_types": ("unary_operator",),
+        "value_wrapper_types": ('unary_operator', 'parenthesized_expression'),
         "module_enum": "python",
         "lvalue_wrapper": "",
         "presence_methods": frozenset(),          # spelled `k in d` / `k not in d`
@@ -452,6 +454,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
         "unary_types": ("unary_expression",),
+        "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'non_null_expression', 'as_expression'),
         "module_enum": "js",
         "lvalue_wrapper": "",
         "presence_methods": frozenset({"has"}),   # `k in o` is declared by `membership` too
@@ -499,6 +502,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
         "unary_types": ("unary_expression",),
+        "value_wrapper_types": ('unary_expression', 'parenthesized_expression'),
         "module_enum": "js",
         "lvalue_wrapper": "",
         "presence_methods": frozenset({"has"}),
@@ -547,6 +551,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _JAVA_MUTATING, "keyed_read": _JAVA_KEYED_READ,
         "literal_types": _JAVA_LITERALS,
         "unary_types": ("unary_expression",),
+        "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'cast_expression'),
         "lvalue_wrapper": "",
         # Java has no membership operator: presence is a method.
         "presence_methods": frozenset({"containsKey", "contains", "containsValue"}),
@@ -598,6 +603,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
         "literal_types": _CS_LITERALS,
         "unary_types": ("prefix_unary_expression",),
+        "value_wrapper_types": ('prefix_unary_expression', 'parenthesized_expression', 'cast_expression'),
         "lvalue_wrapper": "",
         "presence_methods": frozenset({"ContainsKey", "Contains", "ContainsValue"}),
         # Remove and RemoveAt return a bool the caller can branch on, TryAdd likewise, and
@@ -649,6 +655,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _RUST_MUTATING, "keyed_read": _RUST_KEYED_READ,
         "literal_types": _RUST_LITERALS,
         "unary_types": ("unary_expression",),
+        "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'reference_expression', 'type_cast_expression'),
         "module_enum": "rust",
         "lvalue_wrapper": "",
         "presence_methods": frozenset({"contains_key", "contains"}),
@@ -708,6 +715,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
         "literal_types": _RUBY_LITERALS,
         "unary_types": ("unary",),
+        "value_wrapper_types": ('unary', 'parenthesized_statements'),
         "lvalue_wrapper": "",
         "presence_methods": frozenset({"key?", "has_key?", "include?", "member?"}),
         # `<<` is deliberately absent from the METHOD set: Ruby parses an append as a
@@ -766,6 +774,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "mutating": frozenset(), "keyed_read": frozenset(),
         "literal_types": _C_LITERALS,
         "unary_types": ("unary_expression",),
+        "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'cast_expression'),
         "module_enum": "c",
         "lvalue_wrapper": "",
         # C asks no presence question and grows no container: a fixed array answers for
@@ -834,6 +843,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "extra_bounded": frozenset({"append", "len", "cap", "copy", "make", "new"}),
         "literal_types": _GO_LITERALS,
         "unary_types": ("unary_expression",),
+        "value_wrapper_types": ('unary_expression', 'parenthesized_expression'),
         "module_enum": "go",
         # Go maps carry no methods: a write is an index assignment and a removal is the
         # `delete` builtin, so both method sets are empty on purpose.

@@ -250,12 +250,31 @@ def is_write_target(ref: Node, parent: Node, sp: LangSpec) -> bool:
 
 
 def unwrap_unary(node: Node | None, sp: LangSpec) -> Node | None:
-    """Peel unary operators off a value. A unary operator over a literal is itself one
-    compile-time value (`-1` is the last element, `+1` the second), so the wrapper must
-    not hide the literal underneath. Unwrapping rather than whitelisting the wrapper is
-    what keeps `-x` unbounded: it peels to an identifier, which is no literal. The loop
-    handles a stack of them (`- -1`). The operator token is unnamed in every grammar in
-    the table, so the first named child is the operand."""
-    while node is not None and node.type in sp.get("unary_types", ()):
+    """Peel the wrappers that leave a value's identity alone, so none of them can hide a
+    literal underneath.
+
+    A unary operator over a literal is itself one compile-time value (`-1` is the last
+    element, `+1` the second). So is a borrow, a parenthesis and a cast: `&1`, `(1)` and
+    `(int)1` each name the same single constant that `1` names. Unwrapping rather than
+    whitelisting the wrapper is what keeps `-x` and `&k` unbounded, because both peel to
+    an identifier, which is no literal. The loop handles a stack of them.
+
+    The vocabulary is `value_wrapper_types` and is deliberately NOT the flow walker's
+    `passthrough_types`, though the two overlap. Passthrough answers "does the value flow
+    onward through this node", which is true of `boolean_operator`, `not_operator`,
+    `try_expression`, `await` and `expression_list`. None of those preserves a literal's
+    identity: `s[1 or x]` is not a constant index, and folding it would be a false green
+    rather than the false RED this function was fixing. Reusing passthrough wholesale was
+    the tempting shortcut and it is the wrong set.
+
+    The borrow is why this was worth a second pass. `reference_expression` was already in
+    Rust's passthrough set, so the flow walker read the borrow as transparent while this
+    predicate did not, and two walks disagreeing about one wrapper is what let the defect
+    survive the unary fix. In Rust it is not an edge case: `map.contains_key(&1)` is what
+    real code writes, and it graded F where the unidiomatic spelling graded neutral.
+
+    The operator token is unnamed in every grammar in the table, so the first named child
+    is the operand."""
+    while node is not None and node.type in sp["value_wrapper_types"]:
         node = first_named(node)
     return node

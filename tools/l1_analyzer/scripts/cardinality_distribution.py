@@ -9,9 +9,13 @@ which is a limit worth fixing before any figure from it is published again.
 
     uv run python scripts/cardinality_distribution.py
 """
-import json, pathlib, sys
+import json
+import pathlib
+import sys
 from collections import Counter
+
 from l1_analyzer import state_bounds
+
 H = pathlib.Path.home()
 REPOS = [
  ("libuv", H/".cache/slop-audit-corpus/libuv__libuv", "c"),
@@ -46,9 +50,11 @@ for name, path, lang in REPOS:
         else: unordered[c] += 1; u += 1
     per_repo[name] = (u, o)
     print(f"  {name:18s} unordered={u:4d} ordered={o:4d}", flush=True)
-print("\nUNORDERED n=%d" % sum(unordered.values()))
+print(f"\nUNORDERED n={sum(unordered.values())}")
 print("  " + " ".join(f"{k}:{v}" for k, v in sorted(unordered.items())))
-print("ORDERED n=%d  max=%s" % (sum(ordered.values()), max(ordered) if ordered else "-"))
+print(f"ORDERED n={sum(ordered.values())}  max={max(ordered) if ordered else '-'}")
 print("  " + " ".join(f"{k}:{v}" for k, v in sorted(ordered.items())))
-json.dump({"unordered": dict(unordered), "ordered": dict(ordered), "per_repo": per_repo},
-          open("/private/tmp/claude-501/-Users-adam-dev-honest-open-honest-slop-audit/ab4ac205-05dd-47f4-8d55-463405f143cc/scratchpad/dist.json","w"), indent=1)
+OUT = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path("cardinality-distribution.json")
+with OUT.open("w") as fh:
+    json.dump({"unordered": dict(unordered), "ordered": dict(ordered), "per_repo": per_repo}, fh, indent=1)
+print(f"wrote {OUT}")
