@@ -201,8 +201,48 @@ def _escapes(tmp_path, lang, fname, code):
 
 
 def test_l1_15_detects_python_any(tmp_path):
+    # Two uses. The import names the symbol; it does not opt out of anything, and this
+    # assertion read "3 escapes  # import + param + return" until 2026-08-18.
     res = _escapes(tmp_path, "python", "a.py", "from typing import Any\ndef f(x: Any) -> Any:\n    return x\n")
-    assert res["details"].startswith("3 escapes")  # import + param + return
+    assert res["details"].startswith("2 escapes")
+
+
+def test_l1_15_an_import_of_the_escape_token_is_not_an_escape(tmp_path):
+    """`from typing import Any` says a symbol is available. It types nothing. Charging it
+    put a floor of one under every statically-typed Python file and charged a file that
+    imports the name and never uses it."""
+    res = _escapes(tmp_path, "python", "a.py", "from typing import Any\nx = 1\n")
+    assert res["details"].startswith("0 escapes")
+
+
+def test_l1_15_quoting_an_annotation_does_not_hide_it(tmp_path):
+    """The same cast written two ways is the same code and must carry the same count.
+    It did not: the string exclusion dropped the quoted form, so a score moved on
+    quotation marks alone. Raised from outside the project against a Jinja seam, where
+    `cast("dict[str, Any]", ctx)` is the ordinary way to write it."""
+    quoted = _escapes(tmp_path, "python", "a.py",
+                      'from typing import Any, cast\nctx = cast("dict[str, Any]", d)\n')
+    (tmp_path / "a.py").unlink()
+    plain = _escapes(tmp_path, "python", "b.py",
+                     "from typing import Any, cast\nctx = cast(dict[str, Any], d)\n")
+    assert quoted["details"].startswith("1 escapes")
+    assert plain["details"].startswith("1 escapes")
+
+
+def test_l1_15_an_import_of_the_escape_token_is_not_an_escape_in_java_or_typescript(tmp_path):
+    """The same defect, in the two other languages whose grammar names imports. Java's
+    `import java.lang.Object` and TypeScript's `import {any}` were each charged one."""
+    assert _escapes(tmp_path, "java", "A.java", "import java.lang.Object;\nclass A { }\n"
+                    )["details"].startswith("0 escapes")
+    (tmp_path / "A.java").unlink()
+    assert _escapes(tmp_path, "typescript", "a.ts", 'import {any} from "x";\nconst v = 1;\n'
+                    )["details"].startswith("0 escapes")
+
+
+def test_l1_15_an_object_key_spelled_like_the_token_is_not_an_escape(tmp_path):
+    """`{any: 1}` names a field. TypeScript's `any` in key position types nothing."""
+    res = _escapes(tmp_path, "typescript", "a.ts", "const o = {any: 1};\n")
+    assert res["details"].startswith("0 escapes")
 
 
 def test_l1_15_string_literal_is_not_a_false_positive(tmp_path):
@@ -296,6 +336,81 @@ def test_l1_15_typescript_any_and_unknown(tmp_path):
 def test_l1_15_untyped_language_is_na(tmp_path):
     res = _escapes(tmp_path, "ruby", "a.rb", "x = 1\n")
     assert res["band"] == "n/a"
+
+
+# --- L1.15: the four position helpers, read directly ------------------------
+# Every test above reaches these through _compute_type_escapes, which divides the count
+# by a line total and publishes a rounded quotient. A helper that is only ever read
+# through a quotient can be wrong by one and round clean, and the two defects these
+# helpers exist to close were both off-by-one against a single file.
+
+
+def _py_root(src: str):
+    return indicators._get_parser("python").parse(src.encode()).root_node
+
+
+def _leaves(node):
+    if not node.children:
+        yield node
+    for child in node.children:
+        yield from _leaves(child)
+
+
+def test_in_non_type_position_refuses_the_import_and_keeps_the_annotation():
+    """Two `Any` tokens, identical text, one an import and one an annotation. The token
+    text cannot separate them; only the position can."""
+    root = _py_root("from typing import Any\ndef f(x: Any) -> None:\n    return None\n")
+    nonpositions = frozenset(indicators.LANG_CFG["python"]["type_escape_nonpositions"])
+    imported, annotated = [n for n in _leaves(root) if indicators._node_text(n) == "Any"]
+
+    assert indicators._in_non_type_position(imported, nonpositions) is True
+    assert indicators._in_non_type_position(annotated, nonpositions) is False
+    # The rule is a refusal, not an allow-list. A language that declares no non-type
+    # position must refuse nothing, because Go and C# leave a bare type sitting in a
+    # declaration with no node to key on and an allow-list would stop counting them.
+    assert indicators._in_non_type_position(imported, frozenset()) is False
+
+
+def test_cast_type_strings_reads_the_quoted_type_and_leaves_the_data_table_alone():
+    """A quoted type is a type. A quoted word in a tuple is data. The call name is the
+    whole of what separates them."""
+    root = _py_root(
+        "from typing import Any, cast\n"
+        'ctx = cast("dict[str, Any]", d)\n'
+        "plain = cast(dict[str, Any], d)\n"
+        'PATTERNS = ("Any",)\n'
+    )
+    # The unquoted cast is absent on purpose: the leaf walk already counts it, and
+    # returning it here too would charge that line twice.
+    assert indicators._cast_type_strings(root, frozenset({"cast"})) == ['"dict[str, Any]"']
+    # A language declaring no cast call gets no walk at all, which is what keeps this
+    # rule free for Rust, C, Go, JavaScript and Ruby.
+    assert indicators._cast_type_strings(root, frozenset()) == []
+
+
+def test_refs_of_type_collects_every_node_of_one_type_in_document_order():
+    """Document order, and a nested match reported as well as the node containing it."""
+    root = _py_root("a = outer(inner(1))\nb = second(2)\n")
+    found = [indicators._node_text(n) for n in indicators._refs_of_type(root, "call")]
+
+    assert found == ["outer(inner(1))", "inner(1)", "second(2)"]
+    # Exact type name, never a prefix and never a near miss. A caller that names the
+    # node type a different grammar uses gets an empty list, which is the honest answer:
+    # this walker cannot tell "no such construct" from "no such node name", and the
+    # caller's language table is what has to be right.
+    assert indicators._refs_of_type(root, "cal") == []
+    assert indicators._refs_of_type(root, "method_invocation") == []
+
+
+def test_node_text_decodes_what_it_can_and_never_raises():
+    """Every caller compares the result against a vocabulary, so it must be a string."""
+    assert indicators._node_text(_py_root('x = "ok"\n')) == 'x = "ok"\n'
+    # A source file that is not valid UTF-8 must not stop a scan. The undecodable bytes
+    # are dropped rather than replaced, so the text shrinks and never raises.
+    ugly = indicators._get_parser("python").parse(b'x = "\xff\xfe"\n').root_node
+    assert indicators._node_text(ugly) == 'x = ""\n'
+    # A node spanning no bytes reads as the empty string, not None. No caller guards.
+    assert indicators._node_text(indicators._get_parser("python").parse(b"").root_node) == ""
 
 
 # --- L1.15: the thousand-line floor, removed 2026-08-15 ----------------------

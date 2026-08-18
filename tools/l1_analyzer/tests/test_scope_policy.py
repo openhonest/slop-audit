@@ -157,10 +157,19 @@ def test_one_import_line_moves_the_type_escape_count(tmp_path):
     escapes_measured = int(measured["L1.15"]["details"].split()[0])
     escapes_excluded = int(excluded["L1.15"]["details"].split()[0])
 
-    # 300 probe annotations, plus the test tree's own `Any` import and its one annotated
-    # parameter: all of them invisible once the directory corroborates its name.
-    assert escapes_measured - escapes_excluded == _PROBES + 2
-    assert escapes_excluded == 2      # the import and the annotation in the production package
+    # 300 probe annotations plus the test tree's one annotated parameter: all of them
+    # invisible once the directory corroborates its name. The import line that makes `Any`
+    # available is not among them, because an import names a symbol and types nothing.
+    #
+    # This test used to assert `_PROBES + 2` and `escapes_excluded == 2`, counting
+    # `from typing import Any` as an escape in each tree. That was the defect, not the
+    # rule: it put a floor of one escape under every statically-typed Python file, and it
+    # charged a file that imported the name and never used it. L1.15 now counts by
+    # grammatical position, so the import is refused and one file with one import and
+    # twenty uses counts twenty, not twenty-one. The scope claim this test exists to make
+    # is unchanged: one marker line inside `tests/` still moves a published number.
+    assert escapes_measured - escapes_excluded == _PROBES + 1
+    assert escapes_excluded == 1      # the annotated parameter in the production package
 
 
 def test_the_scope_table_names_every_indicator_the_test_directory_rule_moves(tmp_path):

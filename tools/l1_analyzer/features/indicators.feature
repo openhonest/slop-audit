@@ -178,8 +178,36 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     Given one parsed file and its language's escape vocabulary
     When _count_type_escapes_in_tree walks every node for escape tokens, suppression comments and suppression annotations
     Then it returns how many escapes that file holds
-    And a token counts only on a leaf and only outside a string, and a comment only when it begins with a suppression marker, so prose, data tables and a comment explaining the marker are not charged
+    And a token counts on a leaf outside the positions its language declares are not types, so an import that names the token and an object key spelled like it are not charged
+    And a string counts when it sits where its language declares a type is named, so a quoted annotation and an unquoted one carry the same count, while a string in a data table carries none
+    And a comment counts only when it begins with a suppression marker, so a comment explaining the marker is not charged
     But a suppression written as an annotation counts once however many warnings it names
+
+  Scenario: _in_non_type_position answers whether a matching token names something other than a type
+    Given a leaf whose text matches the language's escape vocabulary
+    When _in_non_type_position walks up for a node the language declares is not a type position
+    Then it returns true for an import, a using directive and an object key, so the token is not charged
+    But it returns false everywhere else, because a language whose grammar leaves a bare type in a declaration must still be counted
+
+  Scenario: _cast_type_strings finds the type names written as strings
+    Given a parsed tree and the language's cast-call vocabulary
+    When _cast_type_strings collects the first argument of every cast call that is a string
+    Then it yields the type names inside those strings, because a quoted type is still a type
+    But it yields nothing for a language that declares no cast call, and nothing for a cast whose type argument is not quoted, which the leaf walk already counts
+
+  Scenario: _refs_of_type collects every node of one type in document order
+    Given a parsed tree and the name of one grammar node type
+    When _refs_of_type walks the whole tree from the root
+    Then it returns every node whose type is exactly that name, in the order the source writes them
+    And it walks all children rather than named children only, so a node the grammar leaves unnamed is still reachable
+    But it matches the type name exactly and never by prefix, so a caller asking for "call" gets no macro_invocation and no method_invocation, and a language spelling the node differently returns an empty list rather than a near miss
+
+  Scenario: _node_text reads the source text a node covers
+    Given a node from a parsed file
+    When _node_text decodes the bytes that node spans
+    Then it returns that source text as a string
+    And it decodes as UTF-8 dropping whatever will not decode, because a source file that is not valid UTF-8 must not stop a scan
+    But a node carrying no bytes reads as the empty string, which is what a caller comparing against a vocabulary needs rather than a None it would have to guard
 
   Scenario: _compute_type_escapes publishes the escape density with no floor under it
     Given a repository and a language

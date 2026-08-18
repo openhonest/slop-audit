@@ -327,6 +327,8 @@ class LangCfg(TypedDict, total=False):
     this_ident: frozenset[str]
     module_level_assign: tuple[str, ...]
     type_escape_patterns: tuple[str, ...]
+    type_escape_nonpositions: tuple[str, ...]
+    type_cast_calls: tuple[str, ...]
     annotation_escape_nodes: tuple[str, ...]
     annotation_escape_names: tuple[str, ...]
     member_op: str
@@ -349,6 +351,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"self"},
         "module_level_assign": ("assignment", "augmented_assignment"),
         "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
+        "type_escape_nonpositions": ("import_statement", "import_from_statement"),
+        "type_cast_calls": ("cast",),
         # Read the binding name from the assignment's `left` field, not by text-
         # splitting the node. See ../../../research/amendments/amendment-2026-08-01-l1-18-module-global.md.
         "member_op": ".",
@@ -375,6 +379,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "receiver_scan": "fixed",
         "module_scan": "mutable_specifier",
         "type_escape_patterns": (),
+        "type_escape_nonpositions": (),
+        "type_cast_calls": (),
         # Retained per ../../../research/amendments/amendment-2026-07-31-rust-raw-pattern-scope.md; structural
         # detection above now carries the load, and these never fire inside a body.
         "raw_mut_patterns": ("static mut", "&mut self", "mut self"),
@@ -388,6 +394,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": set(),
         "module_level_assign": ("declaration", "init_declarator"),
         "type_escape_patterns": (),
+        "type_escape_nonpositions": (),
+        "type_cast_calls": (),
         "member_op": "->",
         "receiver_scan": "c_pointer_params",
         "module_scan": "c_declarations",
@@ -404,6 +412,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_variable_declaration"),
         "type_escape_patterns": ("Object",),  # raw types, etc.
+        "type_escape_nonpositions": ("import_declaration",),
+        "type_cast_calls": (),
         # Java's suppression marker is an annotation node, not a comment. See
         # ../../../research/amendments/amendment-2026-08-14-java-suppression-marker.md.
         "annotation_escape_nodes": ("annotation", "marker_annotation"),
@@ -426,6 +436,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": ("any", "unknown"),  # plus // @ts-ignore
+        "type_escape_nonpositions": ("import_statement", "pair"),
+        "type_cast_calls": (),
         "member_op": ".",
         "receiver_scan": "fixed",
         "module_scan": "text",
@@ -444,6 +456,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_declaration_statement"),
         "type_escape_patterns": ("object", "dynamic"),
+        "type_escape_nonpositions": ("using_directive",),
+        "type_cast_calls": (),
         "member_op": ".",
         "receiver_scan": "fixed",
         "module_scan": "class_fields",
@@ -459,6 +473,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": (),  # untyped
+        "type_escape_nonpositions": (),
+        "type_cast_calls": (),
         "member_op": ".",
         "receiver_scan": "fixed",
         "module_scan": "text",
@@ -477,6 +493,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "instance_field_types": ("instance_variable", "global_variable"),
         "module_level_assign": ("assignment", "operator_assignment"),
         "type_escape_patterns": (),  # untyped
+        "type_escape_nonpositions": (),
+        "type_cast_calls": (),
         "member_op": ".",
         "receiver_scan": "fixed",
         "module_scan": "text",
@@ -495,6 +513,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "this_ident": set(),
         "module_level_assign": ("var_declaration",),
         "type_escape_patterns": ("any",),  # Go's `any` alias for interface{}
+        "type_escape_nonpositions": ("import_declaration", "import_spec"),
+        "type_cast_calls": (),
         "member_op": ".",
         "receiver_scan": "go_method_receiver",
         "module_scan": "text",
@@ -854,10 +874,30 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
 
     A leaf inside a string is data, not an annotation. `("Any",)` in a pattern table,
     an "object" key in a C# message, a "dynamic" label: none of them opt out of a type
-    checker. The cost is a stringified forward reference (`x: "Any"`), which is rare,
-    while strings holding these very ordinary words are not. In a language whose escape
-    token is `object` or `Object`, charging every string that says "object" would swamp
-    the measure.
+    checker. In a language whose escape token is `object` or `Object`, charging every
+    string that says "object" would swamp the measure.
+
+    That exclusion used to be the whole string rule, and it called its own cost, a
+    stringified forward reference, rare. It is not rare. `cast("dict[str, Any]", ctx)`
+    is the ordinary way to write the one acknowledged escape at a framework seam whose
+    signature forces `dict[str, Any]`, and the exclusion dropped it. So the same code
+    scored 2 unquoted and 1 quoted, and a reader could move the number by adding
+    quotation marks. `type_cast_calls` names, per language, the calls whose first
+    argument IS a type, and a string there is counted like the annotation it is.
+
+    A token in a NON-type position is not an escape however exactly it matches.
+    `from typing import Any` makes a symbol available and types nothing; it was charged
+    one escape, so every statically-typed Python file carried a floor of one and a file
+    that imported the name without using it was charged for the import alone. The same
+    held for `import java.lang.Object`, `import {any}`, and TypeScript's `{any: 1}`,
+    where the token is a field name. `type_escape_nonpositions` names those positions
+    per language.
+
+    The rule is stated as a refusal rather than an allow-list on purpose. Go and C#
+    leave a bare type sitting directly in a declaration with no node to key on, so an
+    allow-list of type positions would silently stop counting them. Naming the places a
+    match is NOT a type keeps the default counted, which is the direction that fails
+    toward reporting an escape rather than hiding one.
 
     A comment counts only when it BEGINS with a marker, which is what a real suppression
     looks like. A comment that mentions `# type: ignore` while explaining the rule is
@@ -870,6 +910,8 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
     many warnings it names, the same rule `# type: ignore[a, b]` already gets.
     """
     escape_tokens = frozenset(cfg["type_escape_patterns"])
+    nonpositions = frozenset(cfg["type_escape_nonpositions"])
+    cast_calls = frozenset(cfg["type_cast_calls"])
     annotation_nodes = frozenset(cfg.get("annotation_escape_nodes", ()))
     annotation_names = frozenset(cfg.get("annotation_escape_names", ()))
     count = 0
@@ -886,7 +928,7 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
         nonlocal count
         if not n.children:  # leaf token
             text = n.text.decode("utf8", errors="ignore") if n.text else ""
-            if text in escape_tokens and not in_string(n):
+            if text in escape_tokens and not in_string(n) and not _in_non_type_position(n, nonpositions):
                 count += 1
         if "comment" in n.type:
             text = n.text.decode("utf8", errors="ignore") if n.text else ""
@@ -898,7 +940,64 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
             walk(c)
 
     walk(root)
+    for named in _cast_type_strings(root, cast_calls):
+        count += sum(1 for tok in escape_tokens if re.search(rf"\b{re.escape(tok)}\b", named))
     return count
+
+
+def _in_non_type_position(leaf: Node, nonpositions: frozenset[str]) -> bool:
+    """True when a matching token sits somewhere its language says is not a type: an
+    import or using declaration that names the symbol, or an object key spelled like it.
+
+    Stated as a refusal rather than an allow-list of type positions, because Go and C#
+    put a bare type straight into a declaration with no node to key on. An empty
+    vocabulary refuses nothing, which is the counted direction."""
+    parent = leaf.parent
+    while parent is not None:
+        if parent.type in nonpositions:
+            return True
+        parent = parent.parent
+    return False
+
+
+def _cast_type_strings(root: Node, cast_calls: frozenset[str]) -> list[str]:
+    """The type names written as strings in a cast, which the leaf walk cannot see
+    because it drops everything inside a string.
+
+    `cast("dict[str, Any]", ctx)` names a type. `("Any",)` in a pattern table does not.
+    The call name is what separates them, and each language declares its own in
+    `type_cast_calls`. A language declaring none gets no walk."""
+    if not cast_calls:
+        return []
+    out: list[str] = []
+    for call in _refs_of_type(root, "call"):
+        fn = call.child_by_field_name("function")
+        if fn is None or _node_text(fn) not in cast_calls:
+            continue
+        args = call.child_by_field_name("arguments")
+        first = next((c for c in args.named_children), None) if args is not None else None
+        if first is not None and "string" in first.type:
+            out.append(_node_text(first))
+    return out
+
+
+def _refs_of_type(root: Node, node_type: str) -> list[Node]:
+    """Every node of one type in a tree, in document order."""
+    found: list[Node] = []
+
+    def walk(n: Node) -> None:
+        if n.type == node_type:
+            found.append(n)
+        for c in n.children:
+            walk(c)
+
+    walk(root)
+    return found
+
+
+def _node_text(n: Node) -> str:
+    return n.text.decode("utf8", errors="ignore") if n.text else ""
+
 
 def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
     """L1.15: density of type-escape hatches (Any/object/dynamic and ignore comments).
