@@ -25,7 +25,7 @@ import json
 import pathlib
 import sys
 
-from l1_analyzer import indicators
+from l1_analyzer import indicators, vacuity
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 BASELINE = pathlib.Path(__file__).resolve().parent / "self-audit-baseline.json"
@@ -46,14 +46,31 @@ def slop_keys(bands: dict[str, str]) -> list[str]:
     return [k for k, b in bands.items() if b == "Slop"]
 
 
+def vacuous_paths() -> int:
+    """How many vacuous paths `vacuity.check` finds in the analyzer package.
+
+    vacuity.py is 892 lines that only its own test imports, which L1.12 reports as
+    test-only. It is not dead: it found the L1.4 and L1.5 empty-denominator defect on
+    2026-08-18, a false Slop published over any range that added nothing. A checker that
+    finds real defects and that nothing runs is a gate nobody wired, so it is wired here.
+
+    Counted rather than gated, and ratcheted with the panel rather than given its own
+    hook, for the same reason: it reports ten today, so a bar demanding zero would fail
+    every commit and teach everyone to pass --no-verify."""
+    return len(vacuity.check(REPO / "tools" / "l1_analyzer" / "l1_analyzer")["findings"])
+
+
 def main(argv: list[str]) -> int:
     bands = panel(REPO)
     slop = slop_keys(bands)
     measured = len([b for b in bands.values() if b != "n/a"])
+    vacuous = vacuous_paths()
     print(f"slop signals: {len(slop)} of {measured} measured  ({', '.join(slop) or 'none'})")
+    print(f"vacuous paths: {vacuous}")
 
     if "--record" in argv:
-        BASELINE.write_text(json.dumps({"slop": slop, "bands": bands}, indent=1, sort_keys=True) + "\n")
+        BASELINE.write_text(json.dumps({"slop": slop, "bands": bands, "vacuity": vacuous},
+                                       indent=1, sort_keys=True) + "\n")
         print(f"recorded {BASELINE.name}")
         return 0
 
@@ -68,6 +85,13 @@ def main(argv: list[str]) -> int:
         print(f"  improved: {k} is no longer Slop")
     for k in new:
         print(f"  REGRESSED: {k} is now Slop (was {was['bands'].get(k)})", file=sys.stderr)
+    was_vacuous = was.get("vacuity")
+    if was_vacuous is not None and vacuous > was_vacuous:
+        print(f"  REGRESSED: {vacuous} vacuous paths, was {was_vacuous}", file=sys.stderr)
+        new = new + ["vacuity"]
+    elif was_vacuous is not None and vacuous < was_vacuous:
+        print(f"  improved: {vacuous} vacuous paths, was {was_vacuous}")
+        gone = gone + ["vacuity"]
     if new:
         print("\nThe panel got worse. Fix it, or run --record in the same commit that "
               "explains why the new reading is the honest one.", file=sys.stderr)

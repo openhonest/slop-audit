@@ -25,7 +25,7 @@ def test_the_baseline_is_committed_and_names_todays_slop_signals():
     job that silently passes because it found no baseline is worse than no job."""
     assert BASELINE.is_file(), "no baseline; the CI job would have nothing to ratchet against"
     d = json.loads(BASELINE.read_text())
-    assert set(d) == {"slop", "bands"}
+    assert set(d) == {"slop", "bands", "vacuity"}
     assert d["slop"], "a baseline claiming zero slop signals for this repository is wrong"
     assert all(d["bands"][k] == "Slop" for k in d["slop"]), "baseline disagrees with itself"
 
@@ -51,3 +51,17 @@ def test_the_script_refuses_rather_than_passing_when_no_baseline_exists(tmp_path
                        cwd=SCRIPT.parents[1], check=False)
     assert r.returncode == 2, r.stdout + r.stderr
     assert "no baseline" in r.stderr
+
+
+def test_the_baseline_ratchets_the_vacuity_count_too():
+    """`vacuity.py` is 892 lines that only its own test imports. It is not dead: it found
+    the L1.4 and L1.5 empty-denominator defect on 2026-08-18, which shipped as a false
+    Slop over any range that added nothing. A checker that finds real defects and that
+    nothing runs is a gate nobody wired, so it is wired here rather than deleted.
+
+    It joins the existing ratchet instead of getting its own gate, for the same reason
+    the panel did: it reports ten vacuous paths in this package today, so a bar demanding
+    zero would fail every commit."""
+    d = json.loads(BASELINE.read_text())
+    assert "vacuity" in d, "the baseline does not ratchet vacuity, so nothing runs it"
+    assert isinstance(d["vacuity"], int) and d["vacuity"] >= 0
