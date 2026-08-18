@@ -93,6 +93,19 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     Then an unbounded key yields an unbounded partition, and a literal key yields a two-class split keyed on the literal's text
     And the split is ordered only when the literal is numeric, because a numbered position has a neighbour and a named one does not
 
+  Scenario: _reads_its_own_target says whether an assignment reads what it writes
+    Given a reference standing as an assignment target, through a subscript or a member access
+    When _reads_its_own_target reads the assignment's operator
+    Then a conditional operator the language declares, such as Ruby's ||= or C#'s ??=, counts as a read
+    And a plain store does not, and neither does a language that declares no such operator
+    But a reference that is not a target at all is declined before the operator is consulted
+
+  Scenario: _categorize_read decides how the read half of a conditional assignment lands
+    Given a target that its own assignment reads before writing
+    When _categorize_read looks at what the target is
+    Then a keyed target is a keyed read, so an open key is unbounded exactly as on the right-hand side
+    But a bare name is the value meeting a presence test, which is the two-class split any truthiness test makes
+
   Scenario: _categorize decides how one reference to a piece of state is consumed
     Given a reference, the language spec and the file's fixed collections
     When _categorize works down its rows: written to, invoked, indexed, reached through, or passed as an argument

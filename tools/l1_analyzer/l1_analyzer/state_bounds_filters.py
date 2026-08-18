@@ -444,7 +444,21 @@ def _is_confined_subscript(ref: Node, parent: Node, attr: str, sp: LangSpec) -> 
     presence flag is kept."""
     if not _same(_sub_collection(parent, sp), ref):
         return False
-    if _is_lvalue(parent, sp) or reads.is_deleted(parent, sp):
+    if _is_lvalue(parent, sp):
+        # A CONDITIONAL ASSIGNMENT IS NOT A PLAIN STORE. `@cache[k] ||= compute(k)` evaluates
+        # to the stored value, so the value leaves through the expression itself, and in Ruby
+        # a method's tail expression is its return. That is the compositional hole this rule
+        # guards everywhere else: the decision moves one frame up to the caller and the
+        # finding evaporates. It admitted the shape anyway, and the result was a false green
+        # on the commonest memoization cache in the language, where the same cache written as
+        # a read plus a store came back promiscuous.
+        #
+        # It is admitted only where the language can PROVE the value is thrown away. Ruby
+        # declares no discard_types, so in Ruby it never can, and the rule declines.
+        if _text(_field(parent.parent, "operator")) in sp["read_write_assign_ops"]:
+            return reads.result_discarded(parent.parent, sp)
+        return True
+    if reads.is_deleted(parent, sp):
         return True
     return reads.is_comma_ok_presence(ref, sp)
 

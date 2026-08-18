@@ -266,6 +266,37 @@ def _keyed_read(key_node: Node | None, sp: LangSpec) -> Reach:
     return state_partition.finite(2, key is not None and key.type in state_partition.ORDERED_LITERALS, f"key:{_text(key)}")
 
 
+def _reads_its_own_target(ref: Node, sp: LangSpec) -> bool:
+    """The reference is the target of an assignment whose operator reads it before writing.
+
+    Only the conditional operators, not the arithmetic ones. `x += 1` also reads x, but its
+    read is of the whole value and is already carried by the accumulator rule; a conditional
+    assignment's read is a PRESENCE test on a key, which is what decides a cache.
+    """
+    node = ref
+    while node.parent is not None and node.parent.type not in sp["assign_types"]:
+        if node.parent.type not in sp["subscript_types"] and node.parent.type not in sp["member_types"]:
+            return False
+        node = node.parent
+    parent = node.parent
+    if parent is None or not _same(_field(parent, sp["assign_left"]), node):
+        return False
+    return _text(_field(parent, "operator")) in sp["read_write_assign_ops"]
+
+
+def _categorize_read(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> Reach:
+    """How the READ half of a conditional assignment reaches a decision.
+
+    A keyed target is a keyed read, so an open key is unbounded exactly as it is on the
+    right-hand side. A bare name is the value itself meeting a presence test, which is the
+    two-class split any truthiness test makes.
+    """
+    parent = ref.parent
+    if parent is not None and parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
+        return _keyed_read(_sub_key(parent, sp), sp)
+    return state_partition.finite(2, True, "truthy")
+
+
 def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> Reach:
     """How this single reference to a state value is consumed."""
     parent = ref.parent
@@ -273,6 +304,19 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> 
         return state_partition.output()
 
     if _is_write_target(ref, parent, sp):
+        # A CONDITIONAL ASSIGNMENT IS BOTH HALVES. `@cache[k] ||= compute(k)` tests what is
+        # stored at k and stores only if it is absent, so the target is read as surely as it
+        # is written. Reading it as a write alone was a false green: the same cache written
+        # `@cache[k] = compute(k) unless @cache.key?(k)` came back promiscuous and had to earn
+        # its clear through the memoization rule's premises, while this spelling was handed
+        # neutral with no premise checked. One operation, two notations, opposite verdicts,
+        # and the clean one was the commonest shape in the language.
+        #
+        # Declared per language because the operators are: Ruby has `||=` and `&&=`,
+        # JavaScript and TypeScript add `??=`, C# has `??=` alone, and the rest have none and
+        # say so with an empty row rather than by omission.
+        if _reads_its_own_target(ref, sp):
+            return _categorize_read(ref, sp, closed_sets)
         return state_partition.write()
 
     # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target

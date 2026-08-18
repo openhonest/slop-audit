@@ -163,6 +163,7 @@ class LangSpec(TypedDict, total=False):
     # for `!b` and `-n`, none of which writes anything. Ruby reuses `binary` for every
     # operator it has. A language that writes nothing in place declares the empty table, and
     # the reader then never asks for an operator.
+    read_write_assign_ops: tuple[str, ...]
     write_in_place_ops: dict[str, tuple[str, ...]]
     # Unary operators the language does NOT let a value pass through untouched. Go's `<-ch`
     # is a `unary_expression` like `-x` and `!b`, and unary_expression is declared a
@@ -410,6 +411,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("block", "elif_clause", "else_clause"),
         "delete_stmt_types": ("delete_statement",),
+        "read_write_assign_ops": (),  # the language has no conditional-assignment operator
         "write_in_place_ops": {},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -460,6 +462,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("statement_block", "else_clause"),
         "delete_stmt_types": (),                  # `delete o[k]` is a unary_expression
+        "read_write_assign_ops": ("||=", "&&=", "??="),
         "write_in_place_ops": {"update_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -506,6 +509,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("statement_block", "else_clause"),
         "delete_stmt_types": (),
+        "read_write_assign_ops": ("||=", "&&=", "??="),
         "write_in_place_ops": {"update_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -556,6 +560,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("block", "constructor_body"),
         "delete_stmt_types": (),                  # `map.remove(k)` yields the removed value
+        "read_write_assign_ops": (),  # the language has no conditional-assignment operator
         "write_in_place_ops": {"update_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -604,6 +609,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("block",),
         "delete_stmt_types": (),                  # `dict.Remove(k)` answers with a bool
+        "read_write_assign_ops": ("??=",),
         "write_in_place_ops": {"postfix_unary_expression": ("++", "--"), "prefix_unary_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -661,6 +667,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("block", "else_clause"),
         "delete_stmt_types": (),                  # `map.remove(&k)` yields an Option
+        "read_write_assign_ops": (),  # the language has no conditional-assignment operator
         "write_in_place_ops": {},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -721,6 +728,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("then", "else", "body_statement"),
         "delete_stmt_types": (),                  # `h.delete(k)` yields the removed value
+        "read_write_assign_ops": ("||=", "&&="),
         "write_in_place_ops": {"binary": ("<<",)},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -772,6 +780,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition",),
         "gate_body_types": ("compound_statement",),
         "delete_stmt_types": (),
+        "read_write_assign_ops": (),  # the language has no conditional-assignment operator
         "write_in_place_ops": {"update_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -840,6 +849,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_fields": ("condition", "initializer"),
         "gate_body_types": ("block", "statement_list"),
         "delete_stmt_types": (),                  # `delete(d, k)` is a builtin call
+        "read_write_assign_ops": (),  # the language has no conditional-assignment operator
         "write_in_place_ops": {"inc_statement": ("++",), "dec_statement": ("--",)},
         "opaque_unary_ops": frozenset({"<-"}),
         "bare_cond_types": {"for_statement": ("block", "for_clause", "range_clause")},
