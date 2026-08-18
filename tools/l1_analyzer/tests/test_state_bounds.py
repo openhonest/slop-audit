@@ -47,7 +47,7 @@ GOLDEN = Path(__file__).parent / "golden" / "py_repo.json"
 # single `if self.enabled:`, and the old shared node set matched both the if_statement and
 # the unnamed `if` keyword token inside it, so every `if` counted twice. 1 is the number a
 # reader gives. Nothing else in the golden moved.
-_GOLDEN_SHA256 = "8b628f6e0facff829001770cd361535def7d6e9b1900377064d5a50f2fdb0a23"
+_GOLDEN_SHA256 = "b7e50e94d07b839477e22879e6a35d38fe139240384389645b9c9809b82b2983"
 
 # A deliberately-sloppy sample: pure function + reads of dict/list/str/int/bool
 # state, plus one bounded projection (len). Written to tmp_path per test. Kept

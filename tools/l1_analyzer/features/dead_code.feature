@@ -59,6 +59,39 @@ Feature: dead_code — finding unreachable statements and unreferenced definitio
     Then it answers yes
     And only these count as a real use of a name, which is what separates a genuine reference from the same word appearing in a string or a comment
 
+  Scenario: _island_files names the production modules nothing else imports
+    Given the reference corpus and the production file set
+    When _island_files asks, for each Python module, whether any OTHER production file names its stem
+    Then it returns the modules no sibling names, because a module nothing imports cannot vouch for what it contains
+    And a package initialiser and a __main__ module are never islands, since one re-exports for its package and the other is invoked rather than imported
+    But a reference from the test tree does not rescue a module, because a subsystem certified by its own tests plus itself is the same island one importer wider
+
+  Scenario: _runnable_islands decides whether an island's module level ever executes
+    Given a repository, its islands and its production file set
+    When _runnable_islands looks for a main guard, a declared console script, a module-level call statement, or a one-file repository
+    Then it returns the islands that can actually be run, so only those seed roots from their module level
+    And a module holding only declarations is not runnable, which is what stops a dispatch table naming forty functions from certifying all forty
+    But a file it cannot open is called runnable, so an unreadable file is never accused on evidence nobody read
+
+  Scenario: _has_module_level_call separates a script doing work from a module declaring values
+    Given the source text of one module
+    When _has_module_level_call parses it and looks for a bare call statement at module level
+    Then it answers yes for `main()` and no for a table or a compiled pattern bound to a name, because the statement kind is the signal and not whether a call appears
+    But a file it cannot parse answers yes, which under-accuses rather than over-accuses
+
+  Scenario: _owner_at names the definition a reference sits inside
+    Given the definition spans of one file and a byte offset in it
+    When _owner_at finds the innermost span holding that offset
+    Then it returns that definition's name, or nothing when the offset is at module level
+    But nothing is the answer that carries the rule: module-level code runs when the file runs, while a reference inside a definition runs only if that definition does
+
+  Scenario: _island_live_names decides which island definitions are actually reachable
+    Given every definition, the reference corpus, the production files, the islands and which of them are runnable
+    When _island_live_names seeds from the roots and closes over references sitting inside a live definition
+    Then it returns the reachable names, so a helper called by a live function stays live and one called only by a dead function does not
+    And reference is not reachability, which is the whole defect: two functions in a module nothing imports prove each other alive under a reference test
+    But names are pooled across files rather than resolved per module, so two island modules holding a same-named function rescue each other, which over-excuses
+
   Scenario: _string_reference_names keeps the names a string could be resolving, not every word it holds
     Given a string literal node from any of the nine grammars
     When _string_reference_names reads the string's content

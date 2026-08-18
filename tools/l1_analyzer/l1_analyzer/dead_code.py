@@ -31,6 +31,7 @@ absence pushes the ratio down, never up.
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 from functools import lru_cache
@@ -428,11 +429,188 @@ _SOFT_REASONS = (
 )
 
 
+def _has_module_level_call(body: str) -> bool:
+    """Whether the module does work at import time, as opposed to declaring values.
+
+    A bare call at module level (`main()`, `print(f())`) is a script running. An
+    assignment whose value happens to be a call (`_WORD = re.compile(...)`) is a
+    declaration, and so is a dispatch table naming forty functions. The difference is the
+    statement kind, not whether a call appears.
+
+    Read with the standard library parser rather than tree-sitter because this clause is
+    Python-only, as the island rule above it is, and asking a second parser the same
+    question is how two readers come to disagree about one file. A file this cannot parse
+    is reported runnable, which under-accuses."""
+    try:
+        tree = ast.parse(body)
+    except (SyntaxError, ValueError):
+        return True
+    return any(isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) for node in tree.body)
+
+
+def _runnable_islands(repo: Path, islands: frozenset[str], production_files: frozenset[str]) -> frozenset[str]:
+    """The island modules that can actually be RUN, so their module level executes.
+
+    This is the clause that decides whether seeding roots from module-level code is
+    honest. An island is never imported, so its top level runs only if somebody runs the
+    file. Three pieces of evidence say they can, and nothing else counts:
+
+      a `if __name__ == "__main__"` guard, which is what a runnable module carries;
+      a declared console script naming the module, read from pyproject;
+      a module-level CALL statement, which is a script doing its work at import time;
+      being the repository's only production module, which is a one-file program.
+
+    The call-statement clause is the one that separates a script from a subsystem, and it
+    is not the same as having module-level code. `TABLE = {"a": handler}` and
+    `_WORD = re.compile(...)` are declarations: they build a value and bind it. `main()`
+    and `print(f())` are work. Measured across this package, vacuity.py, cli.py and
+    indicators.py each hold zero module-level call statements, while a nine-line script
+    holds one.
+
+    Without this, module-level code seeded roots in every island, and a module written in
+    the dispatch-table style certified itself: name forty functions in a table at module
+    level and all forty are roots. That is exactly the shape of this repository's own
+    vacuity.py, 892 lines and 60 definitions, of which the island rule alone reached 58.
+    It has no guard, no declared script and forty siblings, so nothing in it runs.
+
+    cli.py is the control in the same tree: a guard AND a declared script, so it keeps its
+    roots and stays alive."""
+    if len(production_files) == 1:
+        return islands
+    declared: set[str] = set()
+    pyproject = repo / "pyproject.toml"
+    if pyproject.is_file():
+        try:
+            text = pyproject.read_text(encoding="utf8", errors="ignore")
+        except OSError:
+            text = ""
+        for match in re.finditer(r'=\s*"([\w.]+):', text):
+            declared.add(match.group(1).rsplit(".", 1)[-1])
+    runnable: set[str] = set()
+    for relpath in islands:
+        stem = relpath.rsplit("/", 1)[-1][:-3]
+        if stem in declared:
+            runnable.add(relpath)
+            continue
+        path = repo / relpath
+        try:
+            body = path.read_text(encoding="utf8", errors="ignore")
+        except OSError:
+            runnable.add(relpath)      # unreadable: do not accuse on a file we could not open
+            continue
+        if "__main__" in body and re.search(r'__name__\s*==\s*["\']__main__["\']', body) or _has_module_level_call(body):
+            runnable.add(relpath)
+    return frozenset(runnable)
+
+
+def _owner_at(spans: list[tuple[int, int, str]], offset: int) -> str | None:
+    """The innermost definition whose span holds `offset`, or None for module level.
+
+    None is the answer that matters: a reference at module level runs when the file runs,
+    so it is a root. A reference inside a definition only runs if that definition does."""
+    owner, width = None, None
+    for start, end, name in spans:
+        if start <= offset < end and (width is None or end - start < width):
+            owner, width = name, end - start
+    return owner
+
+
+def _island_live_names(definitions: list[tuple[str, Definition]], corpus: Corpus,
+                       production_files: frozenset[str], islands: frozenset[str],
+                       runnable: frozenset[str]) -> set[str]:
+    """Which definitions in the island modules are actually reachable.
+
+    Reference is not reachability, and the difference is the whole defect. Two functions
+    in a module nothing imports prove each other alive under a reference test, and a
+    subsystem of forty prove each other alive forty times over. The roots are what runs:
+    module-level code in an island file, which executes when the file does, and any
+    reference from a production file that is NOT an island. From those roots this closes
+    over references sitting inside a live definition's span, so a helper called by a live
+    function stays live and a helper called only by a dead one does not.
+
+    Names are global rather than per-file because the corpus's reference map is keyed by
+    name, as every other rule here reads it. Two island modules holding a same-named
+    function therefore rescue each other, which over-EXCUSES and is the direction this
+    module takes when it cannot tell."""
+    spans: dict[str, list[tuple[int, int, str]]] = {}
+    for relpath, d in definitions:
+        if relpath in islands:
+            spans.setdefault(relpath, []).append((d["start_byte"], d["end_byte"], d["name"]))
+
+    def sites(d: Definition, relpath: str):
+        for site, offset in corpus["hard"].get(d["name"], ()):
+            if site not in production_files:
+                continue
+            if site == relpath and d["start_byte"] <= offset < d["end_byte"]:
+                continue          # the definition's own name token, or its recursion
+            yield site, offset
+
+    live: set[str] = set()
+    for relpath, d in definitions:
+        if relpath not in islands:
+            continue
+        for site, offset in sites(d, relpath):
+            if site not in islands or (site in runnable and _owner_at(spans.get(site, []), offset) is None):
+                live.add(d["name"])
+                break
+
+    changed = True
+    while changed:
+        changed = False
+        for relpath, d in definitions:
+            if relpath not in islands or d["name"] in live:
+                continue
+            for site, offset in sites(d, relpath):
+                if site in islands and _owner_at(spans.get(site, []), offset) in live:
+                    live.add(d["name"])
+                    changed = True
+                    break
+    return live
+
+
+def _island_files(corpus: Corpus, production_files: frozenset[str]) -> frozenset[str]:
+    """The production modules no OTHER production file names.
+
+    A definition was proven alive by a reference from any production file, and the file it
+    is defined in is a production file. So a module whose functions call each other
+    certified its own contents, and the bigger the island the more thoroughly it did so.
+    This repository is the case that found it: vacuity.py is 892 lines holding 40
+    functions, its only importer is its own test, and L1.12 named two of the forty. The
+    rest were alive because vacuity called vacuity.
+
+    A module is named when its stem appears as a real identifier somewhere else in
+    production, which is what `import m`, `from p import m` and `m.f()` all leave behind.
+    Test references deliberately do NOT rescue it: a subsystem certified by its own tests
+    plus itself is the same island one importer wider, and `test_only` already exists to
+    report that shape honestly.
+
+    Package initialisers and entry-point modules are never islands. `__init__` re-exports
+    on behalf of a package and `__main__` is invoked rather than imported, so neither is
+    named by a sibling even when the package is live.
+
+    Language scope is Python, because the stem-equals-module-name rule is Python's. Every
+    other language returns the empty set and keeps the old behaviour, which under-accuses
+    rather than over-accuses and says so here rather than by omission."""
+    islands: set[str] = set()
+    for relpath in production_files:
+        if not relpath.endswith(".py"):
+            continue
+        stem = relpath.rsplit("/", 1)[-1][:-3]
+        if stem in ("__init__", "__main__"):
+            continue
+        sites = corpus["hard"].get(stem, ())
+        if not any(site in production_files and site != relpath for site, _offset in sites):
+            islands.add(relpath)
+    return frozenset(islands)
+
+
 def _referenced_from(definition: Definition, relpath: str, corpus: Corpus,
                      files: frozenset[str]) -> bool:
     """True when the name has a real identifier use in one of `files`, outside the
     definition's own span. Excluding its own span is what stops a self-recursive call,
-    or the name token itself, from proving the definition alive."""
+    or the name token itself, from proving the definition alive.
+
+"""
     for site_path, offset in corpus["hard"].get(definition["name"], ()):
         if site_path not in files:
             continue
@@ -559,6 +737,9 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
             "a preprocessor, so macro-decorated declarations and #if regions do not parse; "
             "a ratio computed over the remainder would describe a different codebase")
 
+    islands = _island_files(corpus, production_files) if lang == "python" else frozenset()
+    runnable = _runnable_islands(repo, islands, production_files)
+    island_live = _island_live_names(definitions, corpus, production_files, islands, runnable)
     dead: list[dict] = []
     undecidable: list[dict] = []
     test_only: list[dict] = []
@@ -570,7 +751,14 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
             excluded += 1
         elif definition["status"] == UNDECIDABLE:
             undecidable.append({**entry, "reason": definition["reason"]})
-        elif _referenced_from(definition, relpath, corpus, production_files):
+        # An island definition that nothing reaches has no production reference worth
+        # consulting: the references it has are its neighbours', and its neighbours are
+        # unreachable too. It falls through to the same tail as any other unreferenced
+        # definition, so a test consumer still reports test_only and a config entry point
+        # still reports undecidable. An earlier draft appended it straight to `dead` and
+        # stole both of those cases.
+        elif ((relpath not in islands or definition["name"] in island_live)
+              and _referenced_from(definition, relpath, corpus, production_files)):
             continue
         elif _referenced_from(definition, relpath, corpus, test_files):
             test_only.append({**entry, "reason": "referenced only from the test tree"})
