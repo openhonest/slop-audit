@@ -64,6 +64,13 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     And a local nobody reads returns output, since the value came to rest
     But several uses collapse into one reach and the narrower ones are lost, and the depth bound stops a pair of locals bound from each other walking forever
 
+  Scenario: _switch_partition counts the classes a switch cuts in its subject
+    Given the subject reference, the switch node and the language's name for an arm
+    When _switch_partition counts the arms
+    Then it returns one class per arm, plus one more when no default arm exists, because a subject matching no case is an outcome too
+    And the partition is unordered, since there is no value just above a case label, which is the distinction the D tier rests on
+    But the discriminator is keyed on the switch's own position, so one switch read twice is one cut and two switches on one state are two
+
   Scenario: _categorize decides how one reference to a piece of state is consumed
     Given a reference, the language spec and the file's fixed collections
     When _categorize works down its rows: written to, named as a member of another receiver, invoked, indexed, reached through, or passed as an argument

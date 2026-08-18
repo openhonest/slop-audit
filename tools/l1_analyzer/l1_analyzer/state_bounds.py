@@ -87,6 +87,7 @@ from l1_analyzer.ts_nodes import same as _same
 from l1_analyzer.ts_nodes import sub_collection as _sub_collection
 from l1_analyzer.ts_nodes import sub_key as _sub_key
 from l1_analyzer.ts_nodes import text as _text
+from l1_analyzer.ts_nodes import unwrap_unary as _unwrap_unary
 from l1_analyzer.ts_nodes import written_in_place as _written_in_place
 
 NEUTRAL = "neutral"
@@ -260,6 +261,24 @@ def _follow_local(ref: Node, name: Node, sp: LangSpec, closed_sets: dict[str, in
     return state_partition.output()
 
 
+def _switch_partition(subject: Node, switch: Node, arm_type: str) -> Reach:
+    """The partition a switch cuts in its subject: one class per arm, plus one for the
+    values that match no arm when there is no default.
+
+    Unordered on purpose. There is no value "just above" a case label, so limit testing
+    buys nothing here and every class costs its own test. That is the distinction the D
+    tier rests on, and counting these arms is what lets a switch contribute to it: before
+    this the subject was an unread construct and a state whose whole job is selecting
+    behaviour contributed no classes at all.
+
+    The key is the switch's own span, so the same switch read twice is one discriminator
+    and two different switches on one state are two."""
+    arms = [n for n in _refs(switch, lambda n: n.type == arm_type)]
+    has_default = any("default" in _text(a).split(":", 1)[0] for a in arms)
+    classes = len(arms) + (0 if has_default else 1)
+    return state_partition.finite(classes, False, f"switch:{switch.start_byte}")
+
+
 def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None, depth: int = 3) -> Reach:
     """How this single reference to a state value is consumed."""
     parent = ref.parent
@@ -308,6 +327,20 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
     local = _local_binding_name(ref, sp)
     if local is not None:
         return _follow_local(ref, local, sp, closed_sets, cells, depth)
+
+    # THE STATE IS A SWITCH SUBJECT. Its value selects one arm, and the arms are countable
+    # from the tree, so this is the one row here that produces CLASSES rather than merely
+    # reading a construct. Java wraps the subject in parentheses, which the value-wrapper
+    # peel handles, so the comparison is against the unwrapped node.
+    for switch_type, (subject_field, arm_type) in sp["switch_types"].items():
+        holder = ref.parent
+        while holder is not None and holder.type != switch_type:
+            if holder.type not in sp["value_wrapper_types"]:
+                holder = None
+                break
+            holder = holder.parent
+        if holder is not None and _same(_unwrap_unary(_field(holder, subject_field), sp), ref):
+            return _switch_partition(ref, holder, arm_type)
 
     # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target
     # position is compositional exactly as return position is, and the meter neither
