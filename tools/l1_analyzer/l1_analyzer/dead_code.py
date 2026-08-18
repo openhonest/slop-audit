@@ -515,6 +515,30 @@ def _owner_at(spans: list[tuple[int, int, str]], offset: int) -> str | None:
     return owner
 
 
+def _sees(site: str, home: str, corpus: Corpus) -> bool:
+    """Whether the file at `site` can see the module defined in `home`.
+
+    The corpus maps a bare NAME to its reference sites and knows nothing about which
+    module a reference resolves to, so any identifier anywhere in production kept a
+    definition alive. `vacuity.py` is the case: correctly detected as an island, and zero
+    of its sixty definitions reported, because `check` is also the name of a function in
+    three unrelated modules and `render` in two more. Only names unique in the whole
+    repository survived to be reported.
+
+    A file sees a module when it names that module's stem as a real identifier, which is
+    what `import m`, `from p import m` and `m.f()` all leave behind, or when it is that
+    module. Read off the same hard-reference map as everything else here rather than by
+    parsing imports a second way, so the two readings cannot drift apart.
+
+    Asked ONLY about islands, where the question is already being put and where a wrong
+    answer decides between reporting a subsystem and reporting nothing. Everywhere else
+    the name-pooled behaviour stands, which under-accuses."""
+    if site == home:
+        return True
+    stem = home.rsplit("/", 1)[-1][:-3] if home.endswith(".py") else home
+    return any(where == site for where, _offset in corpus["hard"].get(stem, ()))
+
+
 def _island_live_names(definitions: list[tuple[str, Definition]], corpus: Corpus,
                        production_files: frozenset[str], islands: frozenset[str],
                        runnable: frozenset[str]) -> set[str]:
@@ -543,6 +567,8 @@ def _island_live_names(definitions: list[tuple[str, Definition]], corpus: Corpus
                 continue
             if site == relpath and d["start_byte"] <= offset < d["end_byte"]:
                 continue          # the definition's own name token, or its recursion
+            if not _sees(site, relpath, corpus):
+                continue          # a same-named symbol in a module that cannot see this one
             yield site, offset
 
     live: set[str] = set()

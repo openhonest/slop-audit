@@ -85,6 +85,13 @@ Feature: dead_code — finding unreachable statements and unreferenced definitio
     Then it returns that definition's name, or nothing when the offset is at module level
     But nothing is the answer that carries the rule: module-level code runs when the file runs, while a reference inside a definition runs only if that definition does
 
+  Scenario: _sees answers whether one file can see the module another is defined in
+    Given a reference site, the file a definition lives in, and the reference corpus
+    When _sees asks whether the site names that module's stem, or is that module
+    Then it answers yes only for a file that can actually reach the definition, so a same-named symbol in an unrelated module rescues nothing
+    And it reads the same hard-reference map every other rule here reads, rather than parsing imports a second way, so the two readings cannot drift apart
+    But it is asked only about islands, because everywhere else the name-pooled behaviour stands and under-accuses rather than over-accusing
+
   Scenario: _island_live_names decides which island definitions are actually reachable
     Given every definition, the reference corpus, the production files, the islands and which of them are runnable
     When _island_live_names seeds from the roots and closes over references sitting inside a live definition
