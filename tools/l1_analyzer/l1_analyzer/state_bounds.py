@@ -208,6 +208,25 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
             return _categorize_read(ref, sp, closed_sets, cells)
         return state_partition.write()
 
+    # S AS THE NAME HALF OF A MEMBER ACCESS: `other.V = s`, `o.v`, `o->v`. In the three
+    # languages whose class state is keyed by a bare identifier, C, C# and Java, a field is
+    # enumerated as `v`, so a read of it off ANOTHER receiver puts that identifier on the
+    # right of the dot. Every row here was written for the state as the RECEIVER, so the
+    # name half fell off the bottom into the unmodeled-construct terminal. It was the
+    # largest single shape in the corpus's silence: 173 sites in C# and 142 in Java.
+    #
+    # The member access IS the reference, so this re-enters the same dispatch one node up
+    # rather than deciding anything new. A write to it is a write; anything else flows on
+    # exactly as a bare read of the field would. Languages whose state is keyed by the
+    # member itself (`self.v`) declare no name field and never reach this row, because for
+    # them the member access is what was matched in the first place.
+    name_field = sp["member_name_field"]
+    if (name_field is not None and parent.type in sp["member_types"]
+            and _same(_field(parent, name_field), ref)):
+        if _is_write_target(parent, parent.parent, sp):
+            return state_partition.write()
+        return _flow(parent, sp, closed_sets, cells)
+
     # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target
     # position is compositional exactly as return position is, and the meter neither
     # fail-closes nor assumes: it follows the call RESULT like any other call result (spec

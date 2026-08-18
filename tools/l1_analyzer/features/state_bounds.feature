@@ -51,9 +51,10 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
 
   Scenario: _categorize decides how one reference to a piece of state is consumed
     Given a reference, the language spec and the file's fixed collections
-    When _categorize works down its rows: written to, invoked, indexed, reached through, or passed as an argument
+    When _categorize works down its rows: written to, named as a member of another receiver, invoked, indexed, reached through, or passed as an argument
     Then it returns the category for the first row that matches, and a reference at the top of the tree is output
     And a reference supplying what runs is followed through the call result rather than fail-closed, since no arm selector reads its value
+    And a reference sitting in the name half of a member access re-enters the same dispatch one node up, so a field read off another receiver is judged exactly as a bare read of it would be, in the three languages that key class state by a bare identifier
     But when no row consumes the value the reference is the value itself, and the question moves to where that value goes
 
   # This is where five currently-red tests part company with the code, and the disagreement is
