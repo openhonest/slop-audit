@@ -31,11 +31,24 @@ _A_MIN, _B_MIN = 0.85, 0.60
 # distribution it comes from. It gates only the good grades - a proven unbounded state is
 # still F above the floor, because a proof stands whatever else went unread.
 #
-# It sits just above the worst silence the analyzer produces on the pinned corpus (libuv,
-# 0.458), so no repository is refused a grade for a limit of OUR reading. That makes it a
-# ratchet, not a quality bar: every builtin we teach the analyzer lowers observed silence,
-# and this number comes down with it.
-SILENCE_FLOOR = 0.50
+# It sits just above the worst silence the analyzer produces on the pinned corpus, so no
+# repository is refused a grade for a limit of OUR reading. That makes it a ratchet, not a
+# quality bar: every builtin we teach the analyzer lowers observed silence, and this number
+# comes down with it.
+#
+# 0.50 from 2026-08-15 to 2026-08-18, set against libuv at 0.458. It did not come down with
+# the reading, and the rule inverted: by 2026-08-18 SEVEN of the eight pinned repositories
+# sat above it, so it refused a grade to almost the whole corpus, libuv included. A ratchet
+# nobody turns is a quality bar on our own eyesight, which is the exact thing this number
+# was written not to be.
+#
+# 0.52 from 2026-08-18, set against psf/requests at 0.511, which is the worst of the eight
+# after ten classifier rules landed the same day. Measured, not chosen: libuv 0.466,
+# junit4 0.477, json-c 0.451, gson 0.399, RestSharp 0.318, Newtonsoft.Json 0.218,
+# requests 0.511, click 0.376. `scripts/cardinality_distribution.py` prints the provenance
+# of any such run, and a test beside this asserts the rule rather than the value, so the
+# next drift fails a build instead of surviving three days.
+SILENCE_FLOOR = 0.52
 
 # Why the floor above cannot catch a repository the analyzer never read, and what does.
 #

@@ -189,3 +189,25 @@ def test_a_silence_site_points_at_the_line_whose_shape_it_names(tmp_path):
     assert site["construct"] == "attribute in interpolation"
     assert site["line"] == 10, "the site must point at the reference whose shape it names"
     assert finding["line"] == 3, "the finding still reports where the state is bound"
+
+
+def test_the_floor_sits_above_the_worst_silence_the_pinned_corpus_produces():
+    """The floor's own rule, checked rather than remembered.
+
+    The study states it: the floor "sits just above the worst silence the analyzer
+    produces on the pinned corpus, so no repository is refused a grade for a limit of OUR
+    reading". That makes it a ratchet, not a quality bar, and it means the number has to
+    move whenever the reading does.
+
+    It did not. Set at 0.50 against libuv's 0.458 on 2026-08-15, it drifted until seven of
+    the eight pinned repositories sat ABOVE it and it refused a grade to almost the whole
+    corpus, including libuv, whose measurement had set it. Ten classifier rules on
+    2026-08-18 brought the worst down to psf/requests at 0.511, and the floor is 0.52.
+
+    The assertion is a range rather than a value, because the rule is "just above the
+    worst" and the worst is what moves. A floor below the worst refuses a repository for
+    our reading; a floor far above it stops being a floor at all.
+    """
+    worst = 0.511      # psf/requests, measured over the eight pinned repositories
+    assert report.SILENCE_FLOOR > worst, "a repository is refused a grade for our reading"
+    assert report.SILENCE_FLOOR < worst + 0.05, "the floor has drifted away from what it measures"
