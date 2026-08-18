@@ -591,7 +591,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "call_types": ("invocation_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
-        "return_types": ("return_statement",),
+        "return_types": ("return_statement", "arrow_expression_clause"),
+        # `=> expr` is the body of an expression-bodied member, so its value leaves the
+        # member exactly as a spelled return does. Without this row `public int V => _v;`
+        # read unresolved while `{ get { return _v; } }` read neutral: one program, two
+        # spellings, and only one of them read. 237 sites across the pinned corpus, 228 of
+        # them in Newtonsoft.Json.
         "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
         "elif_types": (),
         "passthrough_types": ("parenthesized_expression", "prefix_unary_expression", "cast_expression", "argument"),
