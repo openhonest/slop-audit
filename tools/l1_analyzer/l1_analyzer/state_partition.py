@@ -218,6 +218,12 @@ def silence_summary(findings: list[dict], total: int) -> dict[str, object]:
         by_reason[f["silence"]] += 1
     return {
         "count": len(silent),
+        # 0.0 over zero state is vacuously true and deliberately kept: no state means
+        # nothing went unread. vacuity.check flags this line as a fabricated affirmative
+        # and it is a FALSE POSITIVE, because the failure it guards against, a repository
+        # the classifier never read, is caught by the census rather than here. Replacing
+        # the constant with None on 2026-08-18 broke three census tests that say exactly
+        # that, and the revert is the answer to the finding rather than a workaround.
         "fraction": round(len(silent) / total, 3) if total else 0.0,
         "by_reason": by_reason,
         # `construct` is empty on every reason but UNMODELED_CONSTRUCT, and on that one it

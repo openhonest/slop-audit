@@ -902,6 +902,11 @@ def classify(repo: Path, lang: str) -> dict[str, object]:
         verdict = NEUTRAL
     else:
         verdict = "n/a"
+    # 1.0 over zero state is deliberate and load-bearing: a codebase with no mutable
+    # state by design IS fully resolved, and report._meter_ran reads a numeric value here
+    # as the signal that the meter ran at all. vacuity.check flags it as a fabricated
+    # affirmative and it is a FALSE POSITIVE for the same reason as the silence fraction:
+    # the "read nothing" failure is the census's job, not this line's.
     resolvable = round((counts[NEUTRAL] + counts[PROMISCUOUS]) / total, 3) if total else 1.0
 
     _order = {PROMISCUOUS: 0, UNRESOLVED: 1, NEUTRAL: 2}

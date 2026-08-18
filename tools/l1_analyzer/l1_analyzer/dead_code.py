@@ -772,7 +772,13 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
     flagged = {(f["file"], line)
                for f in dead + unreachable
                for line in range(f["line"], f["end_line"] + 1)}
-    percent = round(len(flagged) / production_loc * 100, 2) if production_loc else 0.0
+    if not production_loc:
+        # 0.0 here bands Healthy, so a tree with no lines to measure published "no dead
+        # code" over a measurement that never happened. Same shape as the L1.4 and L1.5
+        # empty denominators fixed on 2026-08-18, and found by vacuity.check.
+        return _na(f"no production {lang} lines to measure: {len(definitions)} definition(s) "
+                   "were read but the files carry no countable code")
+    percent = round(len(flagged) / production_loc * 100, 2)
     counts = {"unreferenced": len(dead), "unreachable": len(unreachable),
               "undecidable": len(undecidable), "test_only": len(test_only),
               "entry_points": excluded, "definitions": len(definitions),
