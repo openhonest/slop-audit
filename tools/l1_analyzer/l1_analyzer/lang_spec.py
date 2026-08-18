@@ -384,7 +384,13 @@ LANG_SPEC: dict[str, LangSpec] = {
         "elif_types": ("elif_clause",),
         # `await X` is a transparent wrapper around X's value: an awaited call result reaches
         # the same decision the bare call result would, so it must not stop the flow walk.
-        "passthrough_types": ("parenthesized_expression", "not_operator", "boolean_operator", "unary_operator", "await"),
+        "passthrough_types": ("parenthesized_expression", "not_operator", "boolean_operator",
+                              "unary_operator", "await", "keyword_argument"),
+        # `keyword_argument` last, and it is a wrapper rather than an operator: Python puts
+        # that node between the value and the argument list, so `f(url=self.url)` never
+        # reached the argument row that `f(self.url)` reaches. C# already solves the same
+        # problem the same way, with its `argument` wrapper listed here. Eleven of
+        # psf/requests' forty-five silent states were this one shape.
         "comparison_types": ("comparison_operator",),
         "membership": "comparison_in",
         "this_idents": frozenset({"self"}),

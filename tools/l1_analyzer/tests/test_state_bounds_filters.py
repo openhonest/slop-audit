@@ -333,7 +333,12 @@ def test_a_container_handed_out_through_a_wrapper_is_unresolved_not_cleared(call
            "    def put(self, k, v):\n        self._a[k] = v\n"
            f"    def send(self):\n        return {call}\n")
     assert _verdict(src, "self._a") == "unresolved"
-    assert _construct(src, "self._a") == f"attribute in {construct}"
+    # The splat still has no row and names its construct. The keyword argument gained one
+    # on 2026-08-18 and now refuses for THEIR reason, an unmodelled callee, rather than for
+    # ours. What this test protects is the refusal, and both spellings still refuse: the
+    # container is not cleared, which is what stands in front of `_escapes`.
+    expected = f"attribute in {construct}" if construct == "list_splat" else ""
+    assert _construct(src, "self._a") == expected
 
 
 def test_a_tuple_assignment_target_is_unresolved_not_cleared():

@@ -170,17 +170,22 @@ def test_a_silence_site_points_at_the_line_whose_shape_it_names(tmp_path):
     be read off the report and worked down, and a backlog whose line numbers point at the
     wrong shape cannot be worked down. It was found while doing exactly that.
     """
-    src = ("class S:\n"
+    # The fixture was `f(config=self.opts)` until the keyword-argument row landed and made
+    # that shape readable. An f-string interpolation is still unmodelled, which is what
+    # this test needs: any construct with no rule will do, and the point is the LINE.
+    src = ("class Q:\n"
            "    def __init__(self):\n"
-           "        self.opts = {}\n"      # line 3: where the state is bound
-           "\n\n\n\n\n"
-           "    def go(self, f):\n"
-           "        return f(config=self.opts)\n")   # line 10: the shape with no rule
+           "        self._a = {}\n"        # line 3: where the state is bound
+           "    def put(self, k, v):\n"
+           "        self._a[k] = v\n"
+           "\n\n\n"
+           "    def go(self):\n"
+           "        return f'{self._a}'\n")   # line 10: the shape with no rule
     (tmp_path / "m.py").write_text(src)
     r = state_bounds.classify(tmp_path, "python")
-    finding = next(f for f in r["findings"] if f["state"] == "self.opts")
-    site = next(s for s in r["silence"]["sites"] if s["state"] == "self.opts")
+    finding = next(f for f in r["findings"] if f["state"] == "self._a")
+    site = next(s for s in r["silence"]["sites"] if s["state"] == "self._a")
 
-    assert site["construct"] == "attribute in keyword_argument"
+    assert site["construct"] == "attribute in interpolation"
     assert site["line"] == 10, "the site must point at the reference whose shape it names"
     assert finding["line"] == 3, "the finding still reports where the state is bound"
