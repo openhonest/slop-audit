@@ -59,6 +59,13 @@ Feature: dead_code — finding unreachable statements and unreferenced definitio
     Then it answers yes
     And only these count as a real use of a name, which is what separates a genuine reference from the same word appearing in a string or a comment
 
+  Scenario: _string_reference_names keeps the names a string could be resolving, not every word it holds
+    Given a string literal node from any of the nine grammars
+    When _string_reference_names reads the string's content
+    Then it yields the content as one name when the whole string is a single identifier, which is what a getattr or a registry key looks like
+    And it yields nothing for a string carrying the name among other words, so prose about a symbol no longer exempts it from the dead-code count
+    But a comment never reaches here at all, because a comment carries no execution and so can never be the dynamic reference the exemption exists for
+
   Scenario: _harvest_source records every name a source file uses and every word it merely mentions
     Given a parsed tree, the file's path relative to the repository, and the corpus being built
     When _harvest_source walks the tree

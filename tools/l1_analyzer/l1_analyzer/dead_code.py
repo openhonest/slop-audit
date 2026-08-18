@@ -307,14 +307,41 @@ def _is_identifier_leaf(node: Node) -> bool:
     return node.child_count == 0 and (node.type in _IDENT_EXTRA or node.type.endswith("_identifier"))
 
 
+def _string_reference_names(node: Node) -> set[str]:
+    """The names a string literal could be RESOLVING, which is not every word it holds.
+
+    This collected every word of every string and comment, and a hit exempts a definition
+    as "a dynamic reference cannot be resolved". So a dead function whose name appeared in
+    any docstring anywhere in the repository was excluded from the numerator, and the
+    exemption written for `getattr(o, "f")` was satisfied by prose about `f`.
+
+    A string is a candidate reference when the WHOLE string is one identifier, which is
+    what `getattr(o, "f")` and `REGISTRY["f"]` look like. A string carrying the name among
+    other words is prose and carries no lookup. The quote characters are children of the
+    string node in every grammar in the table, so the content is read from the named
+    children rather than by trimming quotes this reader would have to know the spelling of.
+
+    Comments no longer reach here at all. A comment carries no execution, which is the
+    reason `_is_comment` gives twenty lines up for not charging a trailing comment as an
+    unreachable statement, and the same fact makes a comment incapable of being the
+    dynamic reference this exemption exists for.
+
+    This narrows an exemption, so it can only ACCUSE code the old rule excused. That is the
+    direction that needed the corpus run recorded in the commit, not a quiet landing."""
+    parts = [c for c in node.named_children if "content" in c.type or c.type == "string_content"]
+    text = "".join(c.text.decode("utf8", errors="ignore") for c in parts if c.text) if parts else (
+        node.text.decode("utf8", errors="ignore") if node.text else "")
+    stripped = text.strip()
+    return {stripped} if _WORD.fullmatch(stripped) else set()
+
+
 def _harvest_source(root: Node, relpath: str, corpus: Corpus) -> None:
     def walk(node: Node) -> None:
         if _is_identifier_leaf(node):
             name = node.text.decode("utf8", errors="ignore") if node.text else ""
             corpus["hard"].setdefault(name, []).append((relpath, node.start_byte))
-        elif "string" in node.type or "comment" in node.type:
-            text = node.text.decode("utf8", errors="ignore") if node.text else ""
-            corpus["words"]["strings"].update(_WORD.findall(text))
+        elif "string" in node.type:
+            corpus["words"]["strings"].update(_string_reference_names(node))
         for child in node.children:
             walk(child)
 
