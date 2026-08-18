@@ -70,6 +70,7 @@ from l1_analyzer.state_partition import (
     Partition,
     Reach,
 )
+from l1_analyzer.state_refs import bound_to as _bound_to
 from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import arg_value as _arg_value
 from l1_analyzer.ts_nodes import bare_condition as _bare_condition
@@ -186,7 +187,80 @@ def _categorize_read(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]
     return state_partition.finite(2, True, "truthy")
 
 
-def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None) -> Reach:
+def _local_binding_name(ref: Node, sp: LangSpec) -> Node | None:
+    """The local this reference is being bound INTO, or None.
+
+    `var entries = _entries;` binds the state's value to a local. Every grammar in the
+    table carries the link: Java, JavaScript, TypeScript name a `value` field beside
+    `name`, Python, Ruby and Go use left/right, Rust and C name a pattern or declarator,
+    and C# alone leaves the initialiser unnamed as the last named child. The vocabulary
+    records which, so `None` for the value field means "the last named child" rather than
+    "not available".
+
+    Returns the NAME node, so the caller can look for what the function does with it. Only
+    a plain identifier counts: a destructuring pattern binds several names and none of them
+    is this value on its own."""
+    parent = ref.parent
+    if parent is None:
+        return None
+    slots = sp["local_binding"].get(parent.type)
+    if slots is None:
+        return None
+    name_field, value_field = slots
+    value = _field(parent, value_field) if value_field else (
+        parent.named_children[-1] if parent.named_children else None)
+    if value is None or not _same(value, ref):
+        return None
+    name = _field(parent, name_field)
+    return name if name is not None and name.type == "identifier" else None
+
+
+def _follow_local(ref: Node, name: Node, sp: LangSpec, closed_sets: dict[str, int | None],
+                  cells: int | None, depth: int) -> Reach:
+    """What the state reaches THROUGH a local it was copied into.
+
+    The largest family of unread constructs in the corpus, 194 sites, and it needed a row
+    rather than a new kind of silence. The tree carries the binding and this module already
+    finds references inside a scope; following a local is that same walk bounded to the
+    enclosing function.
+
+    What the tree does NOT carry is whether the copy aliases: `var e = _m` shares the
+    object for a reference type and copies it for a value type, and no types are resolved
+    here. That matters only for a WRITE through the local reaching the state, so a write
+    keeps its own refusal and is not folded into the reads below.
+
+    `depth` bounds the walk. `a = b; b = a` inside one function would otherwise recurse
+    forever, and a chain longer than a few hops is not a chain a reader is following either.
+    """
+    if depth <= 0:
+        return state_partition.silence_kind(ref, sp)
+    scope = ref
+    while scope is not None and scope.type not in sp["func_types"]:
+        scope = scope.parent
+    if scope is None:
+        return state_partition.output()   # module level: the binding is its own state
+    key = _text(name)
+    uses = [n for n in _local_refs(scope, lambda n: n.type == "identifier" and _text(n) == key, ())
+            if not _same(n, name)]
+    if not uses:
+        return state_partition.output()   # bound and never read: the value came to rest
+    reaches = [_categorize(u, sp, closed_sets, cells, depth - 1) for u in uses]
+    kinds = [r["kind"] for r in reaches]
+    if state_partition.UNDECIDED in kinds:
+        return next(r for r in reaches if r["kind"] == state_partition.UNDECIDED)
+    if state_partition.UNBOUNDED in kinds:
+        return state_partition.unbounded()
+    finite = [r for r in reaches if r["kind"] == state_partition.FINITE]
+    if finite:
+        # The widest of them, and that is a stated limit rather than a roll-up. `_categorize`
+        # answers with ONE reach per reference, so several uses of one local collapse into
+        # one here and the narrower ones are lost. Taking the widest under-counts the state's
+        # partition, which is the direction this module takes when it cannot say more.
+        return max(finite, key=lambda r: r["classes"])
+    return state_partition.output()
+
+
+def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None, depth: int = 3) -> Reach:
     """How this single reference to a state value is consumed."""
     parent = ref.parent
     if parent is None:
@@ -225,7 +299,15 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
             and _same(_field(parent, name_field), ref)):
         if _is_write_target(parent, parent.parent, sp):
             return state_partition.write()
-        return _flow(parent, sp, closed_sets, cells)
+        return _flow(parent, sp, closed_sets, cells, depth)
+
+    # THE STATE COPIED INTO A LOCAL. `var entries = _entries;` and then whatever the method
+    # does with `entries`. 194 sites in the corpus came out as constructs with no rule, and
+    # the rule they needed is this one: follow the local. Sits above the terminal and below
+    # the write row, so a local that is itself written keeps the write verdict.
+    local = _local_binding_name(ref, sp)
+    if local is not None:
+        return _follow_local(ref, local, sp, closed_sets, cells, depth)
 
     # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target
     # position is compositional exactly as return position is, and the meter neither
@@ -234,7 +316,7 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
     # checks that make this a proof rather than an assumption are per-attribute, and live in
     # _injected_slot_premise_fails.
     if not sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), ref):
-        return _flow(parent, sp, closed_sets, cells)
+        return _flow(parent, sp, closed_sets, cells, depth)
 
     # S[x] read : indexed by x. Unbounded key -> unbounded partition.
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
@@ -254,8 +336,8 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
         if called and attr in sp["keyed_read"]:
             return _keyed_read(_first_arg(gp, sp), sp, cells)
         if called:
-            return _flow(gp, sp, closed_sets, cells)     # method result flows on (.clone(), .len(), an accessor)
-        return _flow(parent, sp, closed_sets, cells)     # plain field access: self.x.y
+            return _flow(gp, sp, closed_sets, cells, depth)     # method result flows on (.clone(), .len(), an accessor)
+        return _flow(parent, sp, closed_sets, cells, depth)     # plain field access: self.x.y
 
     # S.method(args) flattened (Java method_invocation / Ruby call with a receiver).
     if sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_recv"]), ref):
@@ -266,13 +348,13 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
             return state_partition.write()
         if name in sp["keyed_read"]:
             return _keyed_read(_first_arg(parent, sp), sp, cells)
-        return _flow(parent, sp, closed_sets, cells)
+        return _flow(parent, sp, closed_sets, cells, depth)
 
     # f(..., S, ...) : argument to a call.
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
-            return _flow(parent.parent, sp, closed_sets, cells)
+            return _flow(parent.parent, sp, closed_sets, cells, depth)
         if fname in _EFFECT_CALLS:
             return state_partition.output()
         return state_partition.silence_kind(parent.parent, sp)
@@ -283,10 +365,10 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
     # row that says "the host construct is transparent, follow the flow" - and `_flow`
     # below is where the table ends. It matters which of the two is the last one, because
     # only the last one can be the total handler and only one of them can be it.
-    return _flow(ref, sp, closed_sets, cells)
+    return _flow(ref, sp, closed_sets, cells, depth)
 
 
-def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None) -> Reach:
+def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None, depth: int = 3) -> Reach:
     """Categorise how a value derived from the state (node) reaches a decision."""
     parent = node.parent
     if parent is None:
@@ -309,7 +391,7 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
     # not app - so exclude nodes that are themselves a call.
     if (not sp["flat_call"] and node.type not in sp["call_types"]
             and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node)):
-        return _flow(parent, sp, closed_sets, cells)
+        return _flow(parent, sp, closed_sets, cells, depth)
     # THE TWO ROWS THE COMMENT ABOVE PROMISED AND NOBODY WROTE. It excludes the call form
     # deliberately and correctly, but excluding a shape from one row is not the same as
     # handling it, and until 2026-08-17 both forms fell through to the total row. That is why
@@ -365,19 +447,26 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
     # a language that spells a mutable alias, the alias check is the premise it needs.
     if _same(_mutable_alias_value(parent, sp), node):
         return state_partition.undecided(state_partition.MUTABLE_ALIAS)
+    # A DERIVED VALUE BOUND TO A LOCAL: `var n = _m.Count;`. The row in _categorize catches
+    # the state bound straight to a local; this catches it bound after passing through
+    # something, which is the commoner half. Both hand off to the same walk.
+    local = _local_binding_name(node, sp)
+    if local is not None:
+        return _follow_local(node, local, sp, closed_sets, cells, depth)
+
     # A transparent wrapper, EXCEPT where the operator consumes rather than wraps. Go spells
     # a channel receive `<-ch`, which is a unary_expression exactly as `-x` is, and
     # unary_expression is on the wrapper list. So a receive read as the channel flowing on
     # untouched, when what happens is that an element leaves the channel. Dropping the node
     # type from the list would take `-x` with it, so the operator is what decides.
     if parent.type in sp["passthrough_types"] and not _is_opaque_unary(parent, sp):
-        return _flow(parent, sp, closed_sets, cells)
+        return _flow(parent, sp, closed_sets, cells, depth)
     # The host WRITES this value where it stands: `n++`, `c.n++`, `@xs << x`. The host is
     # transparent for the flow, because it also produces a value and that value may still
     # reach a decision - `if (n++ > 3)` is a comparison whichever way the counter moves. The
     # row below settles what happens when nothing reads what the host produced.
     if _same(_written_in_place(parent, sp), node):
-        return _flow(parent, sp, closed_sets, cells)
+        return _flow(parent, sp, closed_sets, cells, depth)
     if parent.type in sp["comparison_types"]:
         mem = _membership_operands(parent, sp)
         if mem is not None:
@@ -409,7 +498,7 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
             # cuts leave n+1 intervals that boundary values reach. Keyed on the comparison
             # text so the same cut written twice is one cut, not two.
             return state_partition.finite(2, True, f"cmp:{_text(parent)}")
-        return _flow(parent, sp, closed_sets, cells)   # arithmetic / logical: derived value flows on
+        return _flow(parent, sp, closed_sets, cells, depth)   # arithmetic / logical: derived value flows on
     # Truthiness is the SAME two-class split wherever it is written, so every site shares
     # one key: `if S:` in fifty methods is two classes, not fifty-one.
     if parent.type in sp["branch_types"] and _same(_field(parent, sp["branch_cond"]), node):
@@ -425,7 +514,7 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
-            return _flow(parent.parent, sp, closed_sets, cells)
+            return _flow(parent.parent, sp, closed_sets, cells, depth)
         if fname in _EFFECT_CALLS:
             return state_partition.output()
         return state_partition.silence_kind(parent.parent, sp)
@@ -526,82 +615,6 @@ def _verdict(reaches: list[Reach], refs: list[Node] | None = None) -> tuple[str,
 # Node types whose subtree is a module path rather than a value: `from app.auth import X`
 # names a package, not the variable `app` defined below it. Matching on identifier text
 # alone made the two the same state.
-_IMPORT_PATH_TYPES = ("import", "using_directive", "package_declaration", "package_clause")
-
-
-def _under_import_path(node: Node) -> bool:
-    """True when the identifier is part of an import or package path, so it binds nothing
-    here and is not a reference to same-named state."""
-    parent = node.parent
-    while parent is not None:
-        if any(marker in parent.type for marker in _IMPORT_PATH_TYPES):
-            return True
-        parent = parent.parent
-    return False
-
-
-def _shadowing_scope(node: Node, key: str, sp: LangSpec) -> Node | None:
-    """The nearest enclosing function that BINDS `key` itself, or None.
-
-    A parameter named `app` and a module variable named `app` are different objects, and
-    the classifier treated them as one because their text matched. A reference inside a
-    function whose own parameter list declares that name belongs to the parameter, so it
-    is not evidence about the module variable. Ablation that isolated this: renaming the
-    parameter, and changing nothing else, flipped the file's verdict.
-
-    Only the parameter list is consulted. A local assignment shadows too, in Python and
-    in most of the nine, but the rules diverge per language (Python's `global`, Ruby's
-    block scoping), and a parameter is unambiguous everywhere. Narrow on purpose."""
-    parent = node.parent
-    while parent is not None:
-        if parent.type in sp["func_types"]:
-            for params in parent.children:
-                if params.type not in sp.get("arglist_types", ()) and "param" not in params.type:
-                    continue
-                for declared in _refs(params, lambda n: n.type == "identifier"):
-                    if _text(declared) == key:
-                        return parent
-        parent = parent.parent
-    return None
-
-
-def _in_type_position(node: Node) -> bool:
-    """True when the identifier is naming a TYPE rather than referring to state.
-
-    `private static readonly Encoding Encoding = null;` names a type and then a field,
-    both `Encoding`. References are collected by matching identifier text, so the type
-    occurrence was collected as a reference to the field, and no dispatch row covers an
-    identifier in a declaration's type slot: it surfaced as `identifier in
-    variable_declaration`, which reads as a missing rule when the reference should never
-    have been collected at all.
-
-    The test is the grammar's own `type` field, which is the convention across every
-    grammar in the table rather than a per-language spelling, so this needs no vocabulary
-    entry. The walk is bounded to the enclosing type expression: a nullable, generic or
-    array type wraps the name in one or two more nodes before the field appears, and
-    stopping at the first non-type ancestor keeps `Foo.Bar` on the value side out of it."""
-    node_, parent = node, node.parent
-    while parent is not None:
-        field = parent.child_by_field_name("type")
-        if field is not None and field.id == node_.id:
-            return True
-        if "type" not in parent.type:
-            return False
-        node_, parent = parent, parent.parent
-    return False
-
-
-def _bound_to(refs: list[Node], key: str, sp: LangSpec) -> list[Node]:
-    """The references that actually denote `key`, dropping the three ways a matching name
-    does not: it names a package, it names a type, or a nearer parameter binds it.
-
-    Both collection sites go through this. Module state and class state used to collect
-    references separately, so a filter applied to one silently missed the other."""
-    return [n for n in refs
-            if not _under_import_path(n) and not _in_type_position(n)
-            and _shadowing_scope(n, key, sp) is None]
-
-
 def _state_refs(scope: Node, key: str, sp: LangSpec) -> list[Node]:
     stop = sp["class_types"]
     if sp["instance_enum"] == "ruby_ivar":

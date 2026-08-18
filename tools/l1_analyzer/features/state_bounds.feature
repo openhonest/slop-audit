@@ -49,6 +49,21 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     Then a keyed target is a keyed read, so an open key is unbounded exactly as on the right-hand side
     But a bare name is the value meeting a presence test, which is the two-class split any truthiness test makes
 
+  Scenario: _local_binding_name finds the local a reference is being bound into
+    Given a reference and the language's local-binding vocabulary
+    When _local_binding_name checks whether the reference fills the binding's value slot
+    Then it returns the name being bound, so the caller can look for what the function does with it
+    And a language whose grammar leaves the initialiser unnamed declares no value field, and the last named child is read instead, which is C# alone among the nine
+    But a destructuring pattern returns nothing, because it binds several names and none of them is this value on its own
+
+  Scenario: _follow_local reports what the state reaches through a local it was copied into
+    Given the reference, the local's name, and a remaining depth
+    When _follow_local finds every use of that local inside the enclosing function and categorises each
+    Then it returns the widest finite reach among them, or the first undecided one, so the state is read through the copy instead of stopping at it
+    And a local bound at module level is not followed, because there the binding is its own state and is enumerated as such
+    And a local nobody reads returns output, since the value came to rest
+    But several uses collapse into one reach and the narrower ones are lost, and the depth bound stops a pair of locals bound from each other walking forever
+
   Scenario: _categorize decides how one reference to a piece of state is consumed
     Given a reference, the language spec and the file's fixed collections
     When _categorize works down its rows: written to, named as a member of another receiver, invoked, indexed, reached through, or passed as an argument
@@ -97,31 +112,6 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     Then it returns the verdict, whether the state drives a decision, the silence reason, the construct and the partition
     And the reason reported is the first undecided reference in source order, because the reader's next move is to open the site and any ranking would be invented here
     But a state with no decision-reaching reference at all is neutral and observe-only, with an empty reaching set of one class
-
-  Scenario: _under_import_path recognises an identifier that names a package rather than a value
-    Given an identifier node
-    When _under_import_path walks up looking for an import or package construct
-    Then it is true when the name binds nothing here, so an import of a package is not read as a reference to same-named state
-    But the match is on the construct type containing the marker word, not on an exact type, so it catches each grammar's spelling
-
-  Scenario: _shadowing_scope finds the nearer function that binds the same name
-    Given a reference, the state key and the language spec
-    When _shadowing_scope walks up looking for a function whose parameters declare that name
-    Then it returns that function, and the reference is then known to belong to the parameter rather than the state
-    And only the parameter list is consulted, because a local assignment shadows by rules that diverge per language while a parameter is unambiguous everywhere
-
-  Scenario: _in_type_position tells a type name from a reference to state
-    Given an identifier whose text matches a piece of state
-    When _in_type_position asks whether it fills the grammar's own type field, walking out through any wrapping type expression
-    Then it answers yes for the type half of `private static readonly Encoding Encoding = null`, so the declaration's type is not collected as a use of the field
-    And it reads the `type` field rather than a per-language spelling, because that field name is the convention across every grammar in the table
-    But it stops at the first ancestor that is not itself a type, so a name on the value side of a member access is left alone
-
-  Scenario: _bound_to keeps only the references that really denote the state
-    Given a list of name matches, the state key and the language spec
-    When _bound_to drops the ones under an import path and the ones a nearer parameter binds
-    Then it returns the references that actually denote the state
-    And both collection routes go through it, because a filter applied to one used to miss the other silently
 
   Scenario: _state_refs collects every reference to one piece of state inside its own scope
     Given the scope to search, the state key and the language spec

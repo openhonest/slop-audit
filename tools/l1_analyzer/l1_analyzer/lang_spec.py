@@ -39,6 +39,7 @@ class LangSpec(TypedDict, total=False):
     destructuring_types: tuple[str, ...]
     member_types: tuple[str, ...]
     member_name_field: str | None
+    local_binding: dict[str, tuple[str, str | None]]
     mem_object: str
     mem_attr: str
     call_types: tuple[str, ...]
@@ -376,6 +377,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("decorator",),
         "member_types": ("attribute",), "mem_object": "object", "mem_attr": "attribute",
         "member_name_field": None,
+        "local_binding": {"assignment": ("left", "right")},
         "call_types": ("call",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -443,6 +445,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("decorator",),
         "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
         "member_name_field": None,
+        "local_binding": {"variable_declarator": ("name", "value")},
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
@@ -492,6 +495,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("decorator",),
         "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
         "member_name_field": None,
+        "local_binding": {"variable_declarator": ("name", "value")},
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
@@ -541,6 +545,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("annotation",),
         "member_types": ("field_access",), "mem_object": "object", "mem_attr": "field",
         "member_name_field": "field",
+        "local_binding": {"variable_declarator": ("name", "value")},
         "call_types": ("method_invocation",), "flat_call": True,
         "call_fn": "name", "call_args": "arguments", "call_name": "name", "call_recv": "object",
         "arglist_types": ("argument_list",),
@@ -594,6 +599,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("attribute",),  # C# member access is member_access_expression, so no clash
         "member_types": ("member_access_expression",), "mem_object": "expression", "mem_attr": "name",
         "member_name_field": "name",
+        "local_binding": {"variable_declarator": ("name", None)},
         "call_types": ("invocation_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -660,6 +666,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("attribute",),  # Rust member access is field_expression, so no clash
         "member_types": ("field_expression",), "mem_object": "value", "mem_attr": "field",
         "member_name_field": None,
+        "local_binding": {"let_declaration": ("pattern", "value")},
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
@@ -718,6 +725,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": (),    # the language has no decorator syntax
         "member_types": ("call",),   # unused for ivar state, but keep valid node types
         "member_name_field": None,
+        "local_binding": {"assignment": ("left", "right")},
         "mem_object": "receiver", "mem_attr": "method",
         "call_types": ("call",), "flat_call": True,
         "call_fn": "method", "call_args": "arguments", "call_name": "method", "call_recv": "receiver",
@@ -781,6 +789,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": (),       # the language has no decorator syntax
         "member_types": ("field_expression",), "mem_object": "argument", "mem_attr": "field",
         "member_name_field": "field",
+        "local_binding": {"init_declarator": ("declarator", "value")},
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -843,6 +852,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": (),      # the language has no decorator syntax
         "member_types": ("selector_expression",), "mem_object": "operand", "mem_attr": "field",
         "member_name_field": None,
+        "local_binding": {"short_var_declaration": ("left", "right")},
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),

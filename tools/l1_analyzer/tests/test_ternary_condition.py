@@ -18,15 +18,11 @@ would make the analyzer read the consequence as the condition. That needs its ow
 and has its own issue; two sites in the pinned corpus depend on it.
 """
 
-import pathlib
-import tempfile
 
 import pytest
-
-from tree_sitter import Parser
-
 from l1_analyzer import state_bounds
 from l1_analyzer.indicators import LANG_CFG
+from tree_sitter import Parser
 
 
 def _reach(lang: str, src: str, name: str, line: int) -> dict:
