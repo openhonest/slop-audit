@@ -15,11 +15,9 @@ match found. It prints "0" on stdout and exits 1, which is exactly the shape the
 has to survive. No stub, and nothing here asserts a string this file wrote.
 """
 
-import pathlib
 import shutil
 
 import pytest
-
 from l1_analyzer import indicators
 
 

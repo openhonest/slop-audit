@@ -8,9 +8,16 @@ ones the study used, so this is reproducible on the measuring machine and nowher
 which is a limit worth fixing before any figure from it is published again.
 
     uv run python scripts/cardinality_distribution.py
+
+Every run prints its provenance first: the analyzer commit, and each repository's HEAD
+with a dirty marker. Ten of the sixteen are live working trees rather than pinned
+checkouts, so without that header two runs of this script are not comparable and the
+figures it prints cannot be re-derived later. That is not a caveat about the script, it
+is the reason the 2026-08-15 figures could not be reproduced on 2026-08-18.
 """
 import json
 import pathlib
+import subprocess
 import sys
 from collections import Counter
 
@@ -35,6 +42,21 @@ REPOS = [
  ("open-vrm-app", H/"dev/buckler/open-vrm-app", "python"),
  ("umbra", H/"dev/honest/open-honest/umbra", "python"),
 ]
+def _head(path: pathlib.Path) -> str:
+    """The repository's commit and whether its tree is dirty, or a marker saying we could
+    not tell. A figure measured over an unrecorded working tree cannot be checked later."""
+    try:
+        sha = subprocess.run(["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, check=False).stdout.strip()
+        dirty = subprocess.run(["git", "-C", str(path), "status", "--porcelain"],
+                               capture_output=True, text=True, check=False).stdout.strip()
+    except OSError:
+        return "unknown"
+    return f"{sha or 'unknown'}{'+dirty' if dirty else ''}"
+
+
+ANALYZER = _head(pathlib.Path(__file__).resolve().parents[3])
+print(f"analyzer {ANALYZER}")
 unordered, ordered, per_repo = Counter(), Counter(), {}
 for name, path, lang in REPOS:
     if not path.exists():
@@ -49,12 +71,13 @@ for name, path, lang in REPOS:
         if p.get("ordered"): ordered[c] += 1; o += 1
         else: unordered[c] += 1; u += 1
     per_repo[name] = (u, o)
-    print(f"  {name:18s} unordered={u:4d} ordered={o:4d}", flush=True)
+    print(f"  {name:18s} {_head(path):18s} unordered={u:4d} ordered={o:4d}", flush=True)
 print(f"\nUNORDERED n={sum(unordered.values())}")
 print("  " + " ".join(f"{k}:{v}" for k, v in sorted(unordered.items())))
 print(f"ORDERED n={sum(ordered.values())}  max={max(ordered) if ordered else '-'}")
 print("  " + " ".join(f"{k}:{v}" for k, v in sorted(ordered.items())))
 OUT = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path("cardinality-distribution.json")
 with OUT.open("w") as fh:
-    json.dump({"unordered": dict(unordered), "ordered": dict(ordered), "per_repo": per_repo}, fh, indent=1)
+    json.dump({"analyzer": ANALYZER, "provenance": {n: _head(p) for n, p, _l in REPOS if p.exists()},
+               "unordered": dict(unordered), "ordered": dict(ordered), "per_repo": per_repo}, fh, indent=1)
 print(f"wrote {OUT}")
