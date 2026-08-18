@@ -401,6 +401,9 @@ def _tracked_files(repo: Path) -> frozenset[str] | None:
     return frozenset(p for p in run["output"].split("\0") if p)
 
 
+_DOC_SUFFIXES = frozenset({".md", ".markdown", ".rst", ".txt", ".adoc"})
+
+
 def analyze(repo: Path, lang: str) -> dict[str, object]:
     """L1.14 for one repository, over the current tree (never git history), which is what
     `gitleaks detect --no-git` means. `lang` is accepted for a uniform indicator
@@ -425,30 +428,45 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
             skipped += 1
             continue
         scanned += 1
-        in_tests = _bucket_reason(path, repo, has_packages, PRODUCTION) in ("tests", "test")
+        bucket = _bucket_reason(path, repo, has_packages, PRODUCTION)
+        in_tests = bucket in ("tests", "test")
+        # A specification, a README or a design note is not production code. The scope
+        # helper has a docs bucket but it fires only on a directory literally named
+        # `docs`, and this repository's specification lives in `spec/`, so a credential in
+        # a fenced block showing an ANTIPATTERN was reported as being in production code.
+        # Decided on the extension rather than the directory: prose is prose wherever it
+        # is filed, and this is the only indicator that scans files which are not code.
+        in_docs = not in_tests and (bucket == "docs" or path.suffix.lower() in _DOC_SUFFIXES)
         text = raw.decode("utf8", errors="ignore")
         # The parser is handed the bytes of the decoded text, not the bytes read off disk.
         # The two differ only for a file carrying something that is not valid UTF-8, where the
         # decode drops it - and then every span tree-sitter returned would be shifted by the
         # dropped bytes against the offsets the regexes below report. Re-encoding costs one
         # pass and makes `_byte_offset` exact by construction rather than by assumption.
-        raw_hits.extend((rule_id, value, relpath, line, in_tests)
+        raw_hits.extend((rule_id, value, relpath, line, in_tests, in_docs)
                         for rule_id, line, value in _scan_text(text, text.encode("utf8"), path.name))
 
-    grouped: dict[tuple[str, str], list[tuple[str, int, bool]]] = {}
-    for rule_id, value, relpath, line, in_tests in raw_hits:
-        grouped.setdefault((rule_id, value), []).append((relpath, line, in_tests))
+    grouped: dict[tuple[str, str], list[tuple[str, int, bool, bool]]] = {}
+    for rule_id, value, relpath, line, in_tests, in_docs in raw_hits:
+        grouped.setdefault((rule_id, value), []).append((relpath, line, in_tests, in_docs))
     findings: list[Finding] = [
         {"rule": rule_id, "file": sites[0][0], "line": sites[0][1], "excerpt": _excerpt(value),
          # A credential that appears anywhere outside the test tree is a production
          # finding, however many fixtures also carry it.
-         "in_tests": all(site[2] for site in sites), "occurrences": len(sites)}
+         "in_tests": all(site[2] for site in sites),
+         # Documentation only when EVERY site is documentation, for the same reason as
+         # tests: one production copy makes it a production finding however many pages
+         # also print it.
+         "in_docs": all(site[3] for site in sites) and not all(site[2] for site in sites),
+         "occurrences": len(sites)}
         for (rule_id, value), sites in grouped.items()
     ]
 
     total = len(findings)
     in_tests = sum(1 for f in findings if f["in_tests"])
-    counts = {"total": total, "in_tests": in_tests, "in_production": total - in_tests,
+    in_docs = sum(1 for f in findings if f["in_docs"])
+    counts = {"total": total, "in_tests": in_tests, "in_docs": in_docs,
+              "in_production": total - in_tests - in_docs,
               "occurrences": len(raw_hits),
               "by_rule": dict(sorted(Counter(f["rule"] for f in findings).items()))}
     scope_note = ("git-tracked files only" if tracked is not None
@@ -458,8 +476,9 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
     # The file counts are now named as file counts and stand on their own.
     details = (
         f"{total} distinct secret(s) in {len(raw_hits)} occurrence(s) across {scanned} scanned "
-        f"file(s); {total - in_tests} of the secret(s) are in production code and {in_tests} "
-        f"only in the test tree; scope: {scope_note}; "
+        f"file(s); {total - in_tests - in_docs} of the secret(s) are in production code, "
+        f"{in_docs} only in documentation and {in_tests} only in the test tree; "
+        f"scope: {scope_note}; "
         "the canon's second Slop arm, a confirmed true positive, is not evaluated: "
         "no credential is validated against its issuer"
     )
