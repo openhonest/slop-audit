@@ -25,6 +25,13 @@ Feature: state_cells — how wide a keyed access is, and how many cells the writ
     Then it is true for a parameter or a variable, and false for a literal
     But a missing node counts as bounded, so an absent key never makes a read unbounded on its own
 
+  Scenario: cell_key names the one discriminator a literal key owns
+    Given the key node of a keyed access
+    When cell_key builds the discriminator identity for that cell
+    Then both spellings of a question about the same literal key share it, so a membership test and a subscript read cut the partition once between them
+    And distinct key texts stay distinct cuts, so the merge never collapses two different keys
+    But it reads the key's TEXT, so a sequence asking `1 in xs` and `xs[1]` two different questions is merged into one and under-counted
+
   Scenario: keyed_read grades a read of the collection at a key
     Given the key node, the language spec and the number of cells the writes can create, which may be unknown
     When keyed_read tests whether the key is bounded

@@ -57,6 +57,7 @@ from l1_analyzer.indicators import (
 )
 from l1_analyzer.lang_spec import _PY_MUTATING, COMPARISON_OPS, LANG_SPEC, LangSpec
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
+from l1_analyzer.state_cells import cell_key as _cell_key
 from l1_analyzer.state_cells import collect_closed_sets as _collect_closed_sets
 from l1_analyzer.state_cells import is_closed_set as _is_closed_set
 from l1_analyzer.state_cells import is_unbounded_value as _is_unbounded_value
@@ -367,7 +368,19 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
                 # boundary between "holds it" and "does not". A closed container answers the
                 # same way, so the size of the container is not what is being split here.
                 if _is_closed_set(node, closed_sets) or not _is_unbounded_value(left, sp):
-                    return state_partition.finite(2, False, f"holds:{_text(left)}")
+                    # SAME discriminator as the subscript read of that key. `"a" in S` and
+                    # `S["a"]` ask about one cell: one asks whether it is there, the other
+                    # what is in it, and both cut the partition at that key and nowhere else.
+                    # Keying them apart made `if "a" in S: return S["a"]`, the commonest
+                    # table idiom there is, count every key twice: two keys read both ways
+                    # reported five classes where three is the count.
+                    #
+                    # The merge is by key TEXT, so distinct keys stay distinct cuts. It is
+                    # wrong for a sequence, where `1 in xs` asks about a value and `xs[1]`
+                    # about a position, and merging those under-counts. That direction is
+                    # the one this module already declares safe for a measure that only
+                    # accuses, and the over-count it replaces was not.
+                    return state_partition.finite(2, False, _cell_key(left))
                 return state_partition.unbounded()
             if _is_closed_set(right, closed_sets):                                 # S in FIXED
                 return state_partition.membership_reach(right, closed_sets)

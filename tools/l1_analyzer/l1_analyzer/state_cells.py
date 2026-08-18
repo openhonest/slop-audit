@@ -47,7 +47,7 @@ def keyed_read(key_node: Node | None, sp: LangSpec, cells: int | None) -> Reach:
             return state_partition.finite(cells + 1, False, "cells")
         return state_partition.unbounded()
     key = _unwrap_unary(key_node, sp)
-    return state_partition.finite(2, key is not None and key.type in state_partition.ORDERED_LITERALS, f"key:{_text(key)}")
+    return state_partition.finite(2, key is not None and key.type in state_partition.ORDERED_LITERALS, cell_key(key))
 
 
 def guarded_by_closed_set(key_node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -> int | None:
@@ -180,3 +180,13 @@ def is_immutable_collection(rhs: Node | None) -> bool:
 
 
 # name -> member count, with None for a collection that is provably fixed and not countable.
+
+
+def cell_key(key_node: Node | None) -> str:
+    """The discriminator identity of one cell of a keyed state.
+
+    Both spellings of a question about a literal key share it, so `"a" in S` and `S["a"]`
+    cut the partition once between them rather than twice. It exists as a function rather
+    than an f-string at each site because the two sites are in different modules and drifted
+    apart: one wrote holds:"a" and the other key:"a" for the same cell."""
+    return f"cell:{_text(key_node)}"

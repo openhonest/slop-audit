@@ -240,3 +240,33 @@ def test_no_bound_is_configured_so_no_repository_is_graded_d(tmp_path):
     shipped = report.grade_summary(_panel(result), report.UNORDERED_CLASS_BOUND)
     assert shipped["coarse"] == []
     assert shipped["status"] == "can"
+
+
+# --- one literal key is one discriminator, however it is read -----------------
+# `"a" in S` keyed the discriminator holds:"a" and `S["a"]` keyed key:"a", so the
+# commonest table idiom counted every key twice. Both ask about the same cell, so they
+# are one cut in the same partition and not two.
+
+def _classes(tmp_path, src):
+    (tmp_path / "m.py").write_text(src)
+    r = state_bounds.classify(tmp_path, "python")
+    return next(f["partition"]["classes"] for f in r["findings"] if f["state"] == "S")
+
+
+def test_a_literal_key_read_both_ways_is_one_discriminator(tmp_path):
+    src = 'S = {}\ndef g():\n    if "a" in S:\n        return S["a"]\n    return 0\n'
+    assert _classes(tmp_path, src) == 2   # was 3
+
+
+def test_two_literal_keys_read_both_ways_leave_three_classes(tmp_path):
+    """d distinct literal keys leave d+1 classes. Reading each of two keys both ways
+    reported 5."""
+    src = ('S = {}\ndef g():\n    if "a" in S:\n        return S["a"]\n'
+           '    if "b" in S:\n        return S["b"]\n    return 0\n')
+    assert _classes(tmp_path, src) == 3
+
+
+def test_distinct_literal_keys_still_cut_distinct_classes(tmp_path):
+    """The merge is per key text. Two different keys must not collapse into one."""
+    src = 'S = {}\ndef g():\n    if "a" in S:\n        return 1\n    if "b" in S:\n        return 2\n    return 0\n'
+    assert _classes(tmp_path, src) == 3
