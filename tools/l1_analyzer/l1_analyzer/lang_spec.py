@@ -447,7 +447,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
         "return_types": ("return_statement",),
-        "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
+        "branch_types": ("if_statement", "while_statement", "ternary_expression"), "branch_cond": "condition",
         "elif_types": (),
         "passthrough_types": ("parenthesized_expression", "unary_expression", "non_null_expression", "as_expression"),
         "comparison_types": ("binary_expression",),
@@ -496,7 +496,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
         "return_types": ("return_statement",),
-        "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
+        "branch_types": ("if_statement", "while_statement", "ternary_expression"), "branch_cond": "condition",
         "elif_types": (),
         "passthrough_types": ("parenthesized_expression", "unary_expression"),
         "comparison_types": ("binary_expression",),
@@ -545,7 +545,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "call_fn": "name", "call_args": "arguments", "call_name": "name", "call_recv": "object",
         "arglist_types": ("argument_list",),
         "return_types": ("return_statement",),
-        "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
+        "branch_types": ("if_statement", "while_statement", "ternary_expression"), "branch_cond": "condition",
         "elif_types": (),
         "passthrough_types": ("parenthesized_expression", "unary_expression"),
         "comparison_types": ("binary_expression",),
@@ -603,7 +603,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         # read unresolved while `{ get { return _v; } }` read neutral: one program, two
         # spellings, and only one of them read. 237 sites across the pinned corpus, 228 of
         # them in Newtonsoft.Json.
-        "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
+        "branch_types": ("if_statement", "while_statement", "conditional_expression"),
+        # The ternary joins the branch list because its condition IS a condition: the
+        # truthiness row already says a state tested for truth is the same two-class split
+        # wherever it is written, and a ternary is one of the places it is written.
+        # Python is deliberately absent: its conditional_expression carries no named
+        # fields, so the condition cannot be read by the `condition` key and adding it
+        # would make the reader take the consequence for the condition.
+        "branch_cond": "condition",
         "elif_types": (),
         "passthrough_types": ("parenthesized_expression", "prefix_unary_expression", "cast_expression", "argument"),
         "comparison_types": ("binary_expression",),
@@ -716,7 +723,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "call_fn": "method", "call_args": "arguments", "call_name": "method", "call_recv": "receiver",
         "arglist_types": ("argument_list",),
         "return_types": ("return",),
-        "branch_types": ("if", "unless", "while", "until", "if_modifier", "unless_modifier", "while_modifier", "until_modifier", "elsif"),
+        "branch_types": ("if", "unless", "while", "until", "if_modifier", "unless_modifier", "while_modifier", "until_modifier", "elsif", "conditional"),
         "branch_cond": "condition",
         "elif_types": (),
         "passthrough_types": ("parenthesized_statements", "unary", "begin"),
@@ -778,7 +785,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
         "return_types": ("return_statement",),
-        "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
+        "branch_types": ("if_statement", "while_statement", "conditional_expression"), "branch_cond": "condition",
         "elif_types": (),
         "passthrough_types": ("parenthesized_expression", "unary_expression", "pointer_expression"),
         "comparison_types": ("binary_expression",),
