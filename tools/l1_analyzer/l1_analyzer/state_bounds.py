@@ -489,6 +489,13 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
     if local is not None:
         return _follow_local(node, local, sp, closed_sets, cells, depth)
 
+    # THE OPERAND IS NOT READ. `sizeof(state)` and `typeof(state)` ask about the TYPE at
+    # compile time and never look at the value, so the state reaches no decision through
+    # them and costs no test. Reporting them as unread said we could not tell, when there
+    # is nothing there to tell.
+    if parent.type in sp["unread_operand_types"]:
+        return state_partition.output()
+
     # A transparent wrapper, EXCEPT where the operator consumes rather than wraps. Go spells
     # a channel receive `<-ch`, which is a unary_expression exactly as `-x` is, and
     # unary_expression is on the wrapper list. So a receive read as the channel flowing on

@@ -22,13 +22,11 @@ from l1_analyzer.lang_spec import _PY_MUTATING, LangSpec
 from l1_analyzer.state_partition import NEUTRAL
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import first_named as _first_named
-from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
+from l1_analyzer.ts_nodes import is_write_target as _is_write_target
 from l1_analyzer.ts_nodes import refs as _refs
 from l1_analyzer.ts_nodes import same as _same
-from l1_analyzer.ts_nodes import is_write_target as _is_write_target
 from l1_analyzer.ts_nodes import text as _text
 from l1_analyzer.ts_nodes import unwrap_unary as _unwrap_unary
-
 
 IMMUTABLE_WRAPPERS = frozenset({"MappingProxyType", "frozenset", "tuple", "bytes"})
 

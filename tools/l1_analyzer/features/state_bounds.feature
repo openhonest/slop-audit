@@ -89,9 +89,10 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
   # earned; the fix owed is the three missing rows, not a return to the silent clearing.
   Scenario: _flow follows a value derived from the state until it reaches a decision, or admits it cannot
     Given a node holding a value derived from the state, the language spec and the file's fixed collections
-    When _flow works down its rows: returned, discarded, invoked, passed through, compared, branched on, passed as an argument, or indexed
+    When _flow works down its rows: returned, discarded, invoked, bound to a local, asked about rather than read, passed through, compared, branched on, passed as an argument, or indexed
     Then it returns the category for the first row that matches, recursing through every construct that merely carries the value onward
     And a truthiness test anywhere in the file shares one discriminator, so the same two-class split written fifty times is counted once
+    And an operand its language declares unread, such as a sizeof or a typeof, reaches no decision at all, because those ask about the type at compile time and never look at the value
     But when every row declines it returns unmeasured rather than output, because output is a verdict and the reader has not earned one
 
   Scenario: _is_call_target decides whether a reference supplies what runs at a call site
