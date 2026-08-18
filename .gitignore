@@ -34,3 +34,6 @@ research/arms/paper-a-v2/
 # Agent worktrees. Created by background agents working in isolation; each is a
 # checkout of this same repository and belongs to no commit.
 .claude/worktrees/
+
+# Output of scripts/cardinality_distribution.py, which defaults to the working directory.
+cardinality-distribution.json
