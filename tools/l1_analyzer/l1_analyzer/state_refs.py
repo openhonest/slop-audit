@@ -21,7 +21,6 @@ from l1_analyzer.lang_spec import LangSpec
 from l1_analyzer.ts_nodes import refs as _refs
 from l1_analyzer.ts_nodes import text as _text
 
-
 IMPORT_PATH_TYPES = ("import", "using_directive", "package_declaration", "package_clause")
 
 

@@ -47,7 +47,8 @@ def test_the_details_disclose_that_go_publishes_statement_coverage_not_branch_co
 
 
 def test_the_band_boundaries_follow_the_spec():
-    band = lambda pct: go_trace._coverage_verdict(_func_output(pct), True, 0, "", "go1.24.0")["band"]
+    def band(pct):
+        return go_trace._coverage_verdict(_func_output(pct), True, 0, "", "go1.24.0")["band"]
     assert band("90.1") == "Healthy"        # above 90
     assert band("90.0") == "Not Healthy"    # 90 exactly is not above 90
     assert band("60.0") == "Not Healthy"    # 60 exactly is the floor

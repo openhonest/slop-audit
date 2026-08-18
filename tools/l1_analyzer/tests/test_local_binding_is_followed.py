@@ -27,22 +27,31 @@ import pathlib
 import tempfile
 
 import pytest
-
 from l1_analyzer import state_bounds
 
+_JAVA = """class A {
+  java.util.Map<String,Integer> m;
+  int q(String k) {
+    var local = m;
+    if (local.containsKey(k)) { return 1; }
+    return 0;
+  }
+}
+"""
+
+_CSHARP = """class A {
+  System.Collections.Generic.Dictionary<string,int> _m;
+  int Q(string k) {
+    var local = _m;
+    if (local.ContainsKey(k)) { return 1; }
+    return 0;
+  }
+}
+"""
+
 _CASES = {
-    "java": ("M.java", "class A {\n"
-                       "  java.util.Map<String,Integer> m;\n"
-                       "  int q(String k) {\n"
-                       "    var local = m;\n"
-                       "    if (local.containsKey(k)) { return 1; }\n"
-                       "    return 0;\n  }\n}\n", "m"),
-    "csharp": ("m.cs", "class A {\n"
-                       "  System.Collections.Generic.Dictionary<string,int> _m;\n"
-                       "  int Q(string k) {\n"
-                       "    var local = _m;\n"
-                       "    if (local.ContainsKey(k)) { return 1; }\n"
-                       "    return 0;\n  }\n}\n", "_m"),
+    "java": ("M.java", _JAVA, "m"),
+    "csharp": ("m.cs", _CSHARP, "_m"),
 }
 
 

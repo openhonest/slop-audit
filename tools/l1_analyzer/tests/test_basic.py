@@ -538,14 +538,18 @@ def _commit(repo, msg):
 def test_git_indicators_classify_and_score(tmp_path):
     _git(tmp_path, "init", "-q")
     (tmp_path / "doc.md").write_text("# doc\nline\n")
-    _git(tmp_path, "add", "-A"); _commit(tmp_path, "doc only")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "doc only")
     (tmp_path / "app.py").write_text("def f():\n    return 1\n")
-    _git(tmp_path, "add", "-A"); _commit(tmp_path, "code only")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "code only")
     (tmp_path / "app.py").write_text("def f():\n    return 2\n    # note\n")
     (tmp_path / "doc.md").write_text("# doc\nline\nmore\n")
-    _git(tmp_path, "add", "-A"); _commit(tmp_path, "mixed")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "mixed")
     (tmp_path / "app.py").write_text("x = 1\n")  # net-negative, delete-heavy
-    _git(tmp_path, "add", "-A"); _commit(tmp_path, "shrink")
+    _git(tmp_path, "add", "-A")
+    _commit(tmp_path, "shrink")
 
     res = compute_git_indicators(tmp_path, None, None)
     # 4 commits: 1 doc-only, 2 code-only, 1 mixed

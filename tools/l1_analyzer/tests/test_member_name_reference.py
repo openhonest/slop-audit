@@ -23,16 +23,29 @@ import tempfile
 
 from l1_analyzer import state_bounds
 
+_CSHARP = """class A {
+  public string V { get; set; }
+  void M(A other, string s) { other.V = s; }
+  string R(A other) { if (other.V != null) { return "y"; } return "n"; }
+}
+"""
+
+_JAVA = """class A {
+  String v;
+  void m(A o, String s) { o.v = s; }
+  String r(A o) { if (o.v != null) { return "y"; } return "n"; }
+}
+"""
+
+_C = """struct A { int v; };
+void m(struct A *o, int s) { o->v = s; }
+int r(struct A *o) { if (o->v) { return 1; } return 0; }
+"""
+
 _SRC = {
-    "csharp": ("m.cs", "class A {\n  public string V { get; set; }\n"
-                       "  void M(A other, string s) { other.V = s; }\n"
-                       "  string R(A other) { if (other.V != null) { return \"y\"; } return \"n\"; }\n}\n"),
-    "java": ("M.java", "class A {\n  String v;\n"
-                       "  void m(A o, String s) { o.v = s; }\n"
-                       "  String r(A o) { if (o.v != null) { return \"y\"; } return \"n\"; }\n}\n"),
-    "c": ("m.c", "struct A { int v; };\n"
-                 "void m(struct A *o, int s) { o->v = s; }\n"
-                 "int r(struct A *o) { if (o->v) { return 1; } return 0; }\n"),
+    "csharp": ("m.cs", _CSHARP),
+    "java": ("M.java", _JAVA),
+    "c": ("m.c", _C),
 }
 
 

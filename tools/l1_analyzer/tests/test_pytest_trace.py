@@ -103,7 +103,8 @@ def test_a_failing_but_valid_run_is_still_measured():
 
 
 def test_the_band_boundaries_follow_the_spec():
-    band = lambda c, n: pytest_trace._coverage_verdict(0, {"num_branches": n, "covered_branches": c}, "p")["band"]
+    def band(c, n):
+        return pytest_trace._coverage_verdict(0, {"num_branches": n, "covered_branches": c}, "p")["band"]
     assert band(95, 100) == "Healthy"        # above 90
     assert band(90, 100) == "Not Healthy"    # 90 exactly is not above 90
     assert band(60, 100) == "Not Healthy"    # 60 exactly is the floor

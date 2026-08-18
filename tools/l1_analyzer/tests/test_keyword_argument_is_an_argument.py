@@ -71,7 +71,19 @@ def test_a_default_value_in_a_signature_is_not_swept_up():
     """The guard. `keyword_argument` is a call site. A default in a DEFINITION is a
     `default_parameter`, a different node, and must not start passing through."""
     src = "class S:\n    def __init__(self):\n        self.url = ''\n    def go(self, u=1):\n        return u\n"
+    # The assertion is on the vocabulary, because that is where the mistake would be made:
+    # `default_parameter` must never join the passthrough list. The source above names the
+    # shape the guard is about, and the parse proves the grammar really spells it that way
+    # rather than leaving the claim to a comment.
     parser = Parser()
     parser.language = LANG_CFG["python"]["language"]
-    root = parser.parse(src.encode()).root_node
+    kinds = set()
+
+    def walk(node):
+        kinds.add(node.type)
+        for child in node.children:
+            walk(child)
+
+    walk(parser.parse(src.encode()).root_node)
+    assert "default_parameter" in kinds
     assert "default_parameter" not in state_bounds.LANG_SPEC["python"]["passthrough_types"]

@@ -58,7 +58,8 @@ def test_the_details_disclose_that_c_publishes_line_coverage_not_branch_coverage
 
 
 def test_the_band_boundaries_follow_the_spec():
-    band = lambda pct: c_trace._coverage_verdict(_summary(pct, 1, 1000), 0, "", "cc", "test")["band"]
+    def band(pct):
+        return c_trace._coverage_verdict(_summary(pct, 1, 1000), 0, "", "cc", "test")["band"]
     assert band("90.1") == "Healthy"        # above 90
     assert band("90.0") == "Not Healthy"    # 90 exactly is not above 90
     assert band("60.0") == "Not Healthy"    # 60 exactly is the floor
