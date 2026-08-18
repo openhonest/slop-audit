@@ -216,7 +216,12 @@ def silence_summary(findings: list[dict], total: int) -> dict[str, object]:
         # `construct` is empty on every reason but UNMODELED_CONSTRUCT, and on that one it
         # names the syntax shape no dispatch row covered. Without it the reader is told a
         # rule is missing and not which one, which is a complaint rather than a backlog.
-        "sites": [{"file": f["file"], "line": f["line"], "state": f["state"],
+        # `line` is the SILENT REFERENCE's line, not the state's binding line. The two are
+        # usually different, and publishing the binding line here named a shape at a line
+        # that does not hold it, which makes the backlog this list exists to be unworkable.
+        # The finding keeps the binding line, because that is the right answer about the
+        # state; only the site, which is about one reference, follows the reference.
+        "sites": [{"file": f["file"], "line": f.get("silence_line") or f["line"], "state": f["state"],
                    "reason": f["silence"], "construct": f["construct"]}
                   for f in silent],
     }

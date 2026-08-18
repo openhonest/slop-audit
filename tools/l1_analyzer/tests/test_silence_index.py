@@ -86,7 +86,12 @@ def test_silence_is_reported_with_a_file_and_line_for_every_silent_site(tmp_path
     assert len(silence["sites"]) == silence["count"]
     site = silence["sites"][0]
     assert site["file"] == "app.py"
-    assert site["line"] == 5          # where self.workbook is bound
+    # Line 7, `openpyxl.persist(self.workbook, path)`, is the reference nobody could
+    # read. This asserted 5, the line the state is BOUND on, until 2026-08-18. Line 5 is
+    # `self.workbook = openpyxl.Workbook()`, which is not the thing that went unread and
+    # tells a reader nothing to act on. The site exists so the reader can open it and
+    # decide whether to model that callee, so it follows the callee.
+    assert site["line"] == 7
     assert site["state"] == "self.workbook"
     assert site["reason"]
     # And the reader gets them, not just the JSON: a share nobody can act on is not a
@@ -96,7 +101,9 @@ def test_silence_is_reported_with_a_file_and_line_for_every_silent_site(tmp_path
     # The reason, not only the site. Which of the four it is decides whose move is next, and
     # the card printed the location without it until report.py's renderers were deleted and
     # this assertion moved to the output that ships.
-    assert "`app.py:5` — `self.workbook` (handed to" in markdown
+    # 5 until 2026-08-18, when the site started following the unread reference
+    # rather than the binding. The rendered line is what an adopter opens.
+    assert "`app.py:7` — `self.workbook` (handed to" in markdown
 
 
 def test_one_silent_state_no_longer_caps_the_grade_at_d(tmp_path):
@@ -146,3 +153,34 @@ def test_unreadable_library_and_unmodeled_builtin_are_different_facts(tmp_path):
     assert reasons["book"] == state_partition.EXTERNAL_BOUNDARY
     assert result["silence"]["by_reason"][state_partition.UNMODELED_CALLEE] == 1
     assert result["silence"]["by_reason"][state_partition.EXTERNAL_BOUNDARY] == 1
+
+
+# --- a silence site must point at the shape it names -------------------------
+
+def test_a_silence_site_points_at_the_line_whose_shape_it_names(tmp_path):
+    """The site carried the state's BINDING line while `construct` came from the first
+    silent reference, which is a different node somewhere else in the file. So the report
+    said "at m.py:3 the shape is an attribute in a keyword argument" and line 3 is an
+    assignment. _verdict's own docstring says the construct travels with its reference
+    "so it names the shape at the site the reader is being sent to, and picking it from a
+    different reference would send them to one place and describe another" -- which is
+    what the binding line did to it.
+
+    This matters beyond tidiness. `construct` exists so the backlog of missing rules can
+    be read off the report and worked down, and a backlog whose line numbers point at the
+    wrong shape cannot be worked down. It was found while doing exactly that.
+    """
+    src = ("class S:\n"
+           "    def __init__(self):\n"
+           "        self.opts = {}\n"      # line 3: where the state is bound
+           "\n\n\n\n\n"
+           "    def go(self, f):\n"
+           "        return f(config=self.opts)\n")   # line 10: the shape with no rule
+    (tmp_path / "m.py").write_text(src)
+    r = state_bounds.classify(tmp_path, "python")
+    finding = next(f for f in r["findings"] if f["state"] == "self.opts")
+    site = next(s for s in r["silence"]["sites"] if s["state"] == "self.opts")
+
+    assert site["construct"] == "attribute in keyword_argument"
+    assert site["line"] == 10, "the site must point at the reference whose shape it names"
+    assert finding["line"] == 3, "the finding still reports where the state is bound"

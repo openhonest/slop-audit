@@ -471,26 +471,33 @@ def _injected_slot_premise_fails(refs: list[Node], sp: LangSpec, instance: bool)
     return any(_written_through(r, sp) for r in refs)
 
 
-def _verdict(reaches: list[Reach]) -> tuple[str, bool, str, str, Partition]:
+def _verdict(reaches: list[Reach], refs: list[Node] | None = None) -> tuple[str, bool, str, str, Partition, int]:
     """Combine per-reference reaches into (verdict, drives_decision, silence, construct,
     partition).
 
     The silence reason reported is the FIRST undecided reference in source order, not the
-    worst of them by some ranking. Any ranking would be invented here, and the reader's next
+    worst of them by some ranking.
+
+    Its LINE travels with it too, and that was missing. The construct was picked from this
+    reference while the site published the state's binding line, so the report named a shape
+    at a line that does not hold it. The paragraph below already says why they must agree;
+    the finding simply carried the wrong one of the two. Any ranking would be invented here, and the reader's next
     move is to open the site, so the site that comes first is the one to send them to. The
     construct travels with that same reference for the same reason: it names the shape at
     the site the reader is being sent to, and picking it from a different reference would
     send them to one place and describe another."""
     kinds = [r["kind"] for r in reaches]
-    silent = [r for r in reaches if r["kind"] == state_partition.UNDECIDED]
+    silent = [(i, r) for i, r in enumerate(reaches) if r["kind"] == state_partition.UNDECIDED]
     if silent:
-        return UNRESOLVED, True, silent[0]["silence"], silent[0]["construct"], state_partition.UNKNOWN
+        index, reach = silent[0]
+        line = refs[index].start_point[0] + 1 if refs is not None and index < len(refs) else 0
+        return UNRESOLVED, True, reach["silence"], reach["construct"], state_partition.UNKNOWN, line
     if state_partition.UNBOUNDED in kinds:
-        return PROMISCUOUS, True, "", "", state_partition.UNKNOWN
+        return PROMISCUOUS, True, "", "", state_partition.UNKNOWN, 0
     if state_partition.FINITE in kinds:
-        return NEUTRAL, True, "", "", state_partition.roll_up(reaches)
+        return NEUTRAL, True, "", "", state_partition.roll_up(reaches), 0
     # observe-only or output-only: empty reaching-set, so one class and nothing to cover
-    return NEUTRAL, False, "", "", state_partition.EMPTY
+    return NEUTRAL, False, "", "", state_partition.EMPTY, 0
 
 
 # --------------------------------------------------------------------------
@@ -668,19 +675,19 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
     const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp is LANG_SPEC["python"] else None
     if const is not None:
         # An immutable constant has a one-value domain, so its partition is one class.
-        verdict, drives, silence, construct, partition = (*const, "", "", state_partition.EMPTY)
+        verdict, drives, silence, construct, partition, silence_line = (*const, "", "", state_partition.EMPTY, 0)
     else:
         # Computed ONCE over every reference and handed to each, because the bound is a
         # fact about the state and not about the reference being judged. Per-reference
         # judgement is what let a read report unbounded while the writes it reads from
         # could only ever fill two cells.
         cells = _write_key_bound(refs, sp, closed_sets)
-        verdict, drives, silence, construct, partition = _verdict(
-            [_categorize(r, sp, closed_sets, cells) for r in refs])
+        verdict, drives, silence, construct, partition, silence_line = _verdict(
+            [_categorize(r, sp, closed_sets, cells) for r in refs], refs)
         # An invoked slot earns NEUTRAL from the compositional rule; that rule has premises.
         if verdict == NEUTRAL and _injected_slot_premise_fails(refs, sp, instance):
-            verdict, drives, silence, construct, partition = (
-                UNRESOLVED, True, INJECTED_SLOT, "", state_partition.UNKNOWN)
+            verdict, drives, silence, construct, partition, silence_line = (
+                UNRESOLVED, True, INJECTED_SLOT, "", state_partition.UNKNOWN, 0)
     # Attribute-level false-positive filter: the per-reference verdict conflates unbounded
     # data with an unbounded decision. Clear a finding to NEUTRAL only when the attribute is
     # a provable write-once, memoization cache, carried-value or write-only-accumulator
@@ -689,7 +696,7 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
     # Python-only - so the language gate lives with the rules rather than at the call site,
     # where it used to withhold every rule from eight languages without saying so.
     if verdict != NEUTRAL and state_bounds_filters.is_false_positive(key, refs, verdict, sp):
-        verdict, drives, silence, construct, partition = NEUTRAL, False, "", "", state_partition.EMPTY
+        verdict, drives, silence, construct, partition, silence_line = NEUTRAL, False, "", "", state_partition.EMPTY, 0
     # THE READING WAS INCOMPLETE, and this is the last word on the finding for that reason.
     # `hidden` holds the names that appear inside a region the grammar handed back as tokens,
     # so a reference in one of them was never built and no walk above could have reached it.
@@ -698,10 +705,13 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
     # what was not looked at as what was read and found clean. It sits after the filter
     # rather than before it so that no rule can clear it back.
     if key.rsplit(".", 1)[-1] in hidden:
-        verdict, drives, silence, construct, partition = (
-            UNRESOLVED, True, state_partition.UNPARSED_REGION, "", state_partition.UNKNOWN)
+        verdict, drives, silence, construct, partition, silence_line = (
+            UNRESOLVED, True, state_partition.UNPARSED_REGION, "", state_partition.UNKNOWN, 0)
     return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel,
             "line": _binding_line(refs, sp), "silence": silence, "construct": construct,
+            # The reference the construct was read off, so the silence site can send the
+            # reader to the shape it names rather than to where the state was bound.
+            "silence_line": silence_line,
             "partition": partition}
 
 
