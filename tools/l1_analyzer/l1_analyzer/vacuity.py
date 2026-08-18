@@ -202,6 +202,20 @@ def _is_size(expr: ast.expr, scope: ast.AST, depth: int) -> bool:
         if defs:
             # ANY, not ALL. A counter is `n = 0` and then `n += <something>`, and demanding
             # every binding be a size read the increment as proof it was not a count.
+            #
+            # THE MISSING LINK test_absolute_paths_survives asks for is here, found
+            # 2026-08-18. A local bound from a call this module cannot follow is judged
+            # only by its right-hand side, while a PARAMETER falls through to
+            # `_used_as_quantity` below and is judged by what the body does with it. So
+            # `files, _ = _read_text_files(...)` is not a size, `if not files: raise`
+            # clears nothing, and the band below it is convicted.
+            #
+            # Closing it by giving locals the same fall-through was measured and NOT taken:
+            # it clears absolute_paths' two findings and adds seven elsewhere, in
+            # coverage_prove, python_coverage_prove and dead_code, where an honest refusal
+            # dict carrying `"attempted": 0` beside its prose starts reading as a
+            # fabricated affirmative. Two false positives traded for seven is a worse
+            # checker, and a noisy checker gets ignored. The link is named rather than cut.
             return any(_is_size(d, scope, depth + 1) for d in defs)
         # No local definition: a parameter is whatever the caller passed and may be an
         # empty tally - but only if the body treats it as one. `higher_is_better` is a

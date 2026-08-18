@@ -388,3 +388,52 @@ def test_a_count_passed_in_as_a_parameter_is_a_cardinality():
         "def summary(items, total):\n"
         "    return {'fraction': round(len(items) / total, 3) if total else 0.0}\n")
     assert len(found) == 1 and found[0]["field"] == "fraction"
+
+
+# --- `if not X: raise` is an emptiness guard --------------------------------
+
+_GUARD = ('def scan(r):\n'
+          '    files = read(r)\n'
+          '    if not files:\n'
+          '        raise incomplete.refuse("scan", "no file was read")\n')
+_BAND = '    c = len(files)\n    return {"band": "Healthy" if c == 0 else "Slop"}\n'
+
+
+def _findings(src):
+    return vacuity.scan_module(ast.parse(src), pathlib.Path("m.py"), src.split("\n"))
+
+
+def test_a_local_from_an_unfollowable_call_is_not_judged_by_what_the_body_does_with_it():
+    """The missing link `test_absolute_paths_survives` asks someone to find, named.
+
+    A PARAMETER whose definitions prove nothing falls through to `_used_as_quantity` and
+    is judged by what the body does with it. A LOCAL does not: `files, _ = read(repo)` is
+    judged only by its right-hand side, an unfollowable call, so it is not a size, so
+    `if not files: raise` clears nothing, and the band below that raise is convicted.
+    Which side of a function boundary a quantity arrived on decides whether its guard
+    counts.
+
+    This asserts the CURRENT behaviour, not the desired one, which is why it reads
+    backwards. Closing the link was measured on 2026-08-18 and not taken: giving locals
+    the same fall-through clears absolute_paths' two findings and adds seven elsewhere,
+    where an honest refusal dict carrying `"attempted": 0` beside its prose starts reading
+    as a fabricated affirmative. Two traded for seven is a worse checker.
+
+    Move this name when the seven have an answer, not before."""
+    assert _findings(_GUARD + _BAND), "behaviour changed; read the comment in _is_size"
+
+
+def test_the_same_band_without_the_guard_is_still_vacuous():
+    """The guard that keeps the rule worth having."""
+    assert _findings('def scan(r):\n    files = read(r)\n' + _BAND)
+
+
+def test_a_refusal_about_a_DIFFERENT_quantity_clears_nothing():
+    """The clearance is per quantity, not per function. Refusing because a language has
+    no scanner says nothing about a later count of findings, and closing the whole
+    function on the first refusal is the bug this module's own docstring warns about."""
+    src = ('def scan(r, lang):\n'
+           '    if not lang:\n'
+           '        raise incomplete.refuse("scan", "no language")\n'
+           '    files = read(r)\n' + _BAND)
+    assert _findings(src), "a refusal about `lang` must not clear a count over `files`"
