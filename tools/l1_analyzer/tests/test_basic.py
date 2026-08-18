@@ -829,3 +829,58 @@ def test_l1_8_ratio_moves_when_the_dotted_project_is_recognised(tmp_path):
     (tmp_path / "Src" / "Foo.Tests" / "WidgetTests.cs").write_text("x\ny\n")
     res = indicators._test_to_prod_ratio(tmp_path)
     assert res["details"] == "2 test / 3 production LOC"
+
+
+# --- L1.4 and L1.5 over a range that added nothing (slop-audit-9o5) --------------
+#
+# Found by vacuity.check, the self-audit module nothing in production imports. Both read
+# `(x / total_added * 100) if total_added > 0 else 0.0`, and 0.0 with higher_is_better=True
+# against thresholds of 25 and 5 lands BELOW 5, so it bands Slop. This is the empty-denominator
+# class fixed for L1.16, L1.17, L1.18 and absolute_paths, running the other way: it fabricates
+# a bad score rather than a clean one. It matters because L1.5 is one of the four indicators
+# that carried the separation in the 2026-08-17 validation run.
+
+def _repo_whose_range_only_deletes(tmp_path):
+    """A repository whose measured range contains a commit that adds no line at all.
+
+    Real git, real commits: the first adds a file and the second deletes it, and the range
+    starts after the first. A deletion-only range is ordinary in a cleanup or a revert.
+    """
+    import os
+    import subprocess
+
+    def run(*a, when=None):
+        env = {**os.environ}
+        if when is not None:
+            # BOTH dates. `git log --since` filters on the COMMITTER date, and `--date` sets
+            # only the author's, so setting one leaves every commit inside every range. The
+            # first version of this fixture did exactly that and put both commits in the
+            # range, which is why it measured 2 added lines rather than none.
+            env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = when
+        subprocess.run(["git", *a], cwd=tmp_path, capture_output=True, check=True, env=env)
+
+    run("init", "-q")
+    run("config", "user.email", "t@t")
+    run("config", "user.name", "t")
+    (tmp_path / "a.py").write_text("x = 1\ny = 2\n")
+    run("add", "-A")
+    run("-c", "commit.gpgsign=false", "commit", "-q", "-m", "add", when="2020-01-01T00:00:00")
+    (tmp_path / "a.py").unlink()
+    run("add", "-A")
+    run("-c", "commit.gpgsign=false", "commit", "-q", "-m", "remove", when="2026-01-01T00:00:00")
+    return tmp_path
+
+
+def test_l1_4_and_l1_5_refuse_over_a_range_that_added_nothing(tmp_path):
+    res = indicators.compute_git_indicators(_repo_whose_range_only_deletes(tmp_path), "2025-06-01", None)
+    for key in ("L1.4", "L1.5"):
+        assert res[key]["band"] == "n/a", f"{key} must not band a share of no lines"
+        assert res[key]["value"] == "n/a", f"{key} must not publish a number over nothing"
+        assert "INCOMPLETE CODE" in res[key]["details"], f"{key} must say why"
+
+
+def test_the_other_git_indicators_still_answer_over_the_same_range(tmp_path):
+    # The refusal is per indicator. A range with commits still measures everything that
+    # divides by the commit count, and only the two that divide by added lines refuse.
+    res = indicators.compute_git_indicators(_repo_whose_range_only_deletes(tmp_path), "2025-06-01", None)
+    assert res["L1.1"]["band"] != "n/a" and res["L1.6"]["band"] != "n/a"

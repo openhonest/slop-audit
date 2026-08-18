@@ -117,6 +117,18 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     Then it returns the reason the file is out of scope, or nothing at all when the file counts
     And the generated-code test lives here rather than in the shared scope rule, so excluding a machine-written file moves the god-file number and no other
 
+  Scenario: _doc_line_share reports L1.4, or refuses when nothing was added
+    Given the documentation lines added and the total lines added in the measured range
+    When _doc_line_share divides them
+    Then it returns the share and its band, higher being better
+    But a total of zero refuses, because a share of no added lines is absent and 0.0 would band Slop
+
+  Scenario: _delete_to_add_ratio reports L1.5, or refuses when nothing was added
+    Given the lines deleted and the lines added in the measured range
+    When _delete_to_add_ratio divides them
+    Then it returns the ratio and its band, higher being better
+    But a total of zero refuses rather than publishing a fabricated Slop over a range that added nothing
+
   Scenario: _measure runs one measure and turns its refusal to answer into a named n/a
     Given a measure that may raise IncompleteCode rather than publish a value it has no basis for
     When _measure runs it
