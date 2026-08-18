@@ -20,13 +20,10 @@ file did exactly that and looked green before the fix.
 Eleven of psf/requests' forty-five silent states are this one shape.
 """
 
-import pathlib
-import tempfile
-
-from tree_sitter import Parser
 
 from l1_analyzer import state_bounds
 from l1_analyzer.indicators import LANG_CFG
+from tree_sitter import Parser
 
 
 def _reach(src: str, line: int) -> dict:

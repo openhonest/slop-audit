@@ -565,14 +565,41 @@ def _shadowing_scope(node: Node, key: str, sp: LangSpec) -> Node | None:
     return None
 
 
+def _in_type_position(node: Node) -> bool:
+    """True when the identifier is naming a TYPE rather than referring to state.
+
+    `private static readonly Encoding Encoding = null;` names a type and then a field,
+    both `Encoding`. References are collected by matching identifier text, so the type
+    occurrence was collected as a reference to the field, and no dispatch row covers an
+    identifier in a declaration's type slot: it surfaced as `identifier in
+    variable_declaration`, which reads as a missing rule when the reference should never
+    have been collected at all.
+
+    The test is the grammar's own `type` field, which is the convention across every
+    grammar in the table rather than a per-language spelling, so this needs no vocabulary
+    entry. The walk is bounded to the enclosing type expression: a nullable, generic or
+    array type wraps the name in one or two more nodes before the field appears, and
+    stopping at the first non-type ancestor keeps `Foo.Bar` on the value side out of it."""
+    node_, parent = node, node.parent
+    while parent is not None:
+        field = parent.child_by_field_name("type")
+        if field is not None and field.id == node_.id:
+            return True
+        if "type" not in parent.type:
+            return False
+        node_, parent = parent, parent.parent
+    return False
+
+
 def _bound_to(refs: list[Node], key: str, sp: LangSpec) -> list[Node]:
-    """The references that actually denote `key`, dropping the two ways a matching name
-    does not: it names a package, or a nearer parameter binds it.
+    """The references that actually denote `key`, dropping the three ways a matching name
+    does not: it names a package, it names a type, or a nearer parameter binds it.
 
     Both collection sites go through this. Module state and class state used to collect
     references separately, so a filter applied to one silently missed the other."""
     return [n for n in refs
-            if not _under_import_path(n) and _shadowing_scope(n, key, sp) is None]
+            if not _under_import_path(n) and not _in_type_position(n)
+            and _shadowing_scope(n, key, sp) is None]
 
 
 def _state_refs(scope: Node, key: str, sp: LangSpec) -> list[Node]:

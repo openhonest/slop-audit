@@ -110,6 +110,13 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     Then it returns that function, and the reference is then known to belong to the parameter rather than the state
     And only the parameter list is consulted, because a local assignment shadows by rules that diverge per language while a parameter is unambiguous everywhere
 
+  Scenario: _in_type_position tells a type name from a reference to state
+    Given an identifier whose text matches a piece of state
+    When _in_type_position asks whether it fills the grammar's own type field, walking out through any wrapping type expression
+    Then it answers yes for the type half of `private static readonly Encoding Encoding = null`, so the declaration's type is not collected as a use of the field
+    And it reads the `type` field rather than a per-language spelling, because that field name is the convention across every grammar in the table
+    But it stops at the first ancestor that is not itself a type, so a name on the value side of a member access is left alone
+
   Scenario: _bound_to keeps only the references that really denote the state
     Given a list of name matches, the state key and the language spec
     When _bound_to drops the ones under an import path and the ones a nearer parameter binds
