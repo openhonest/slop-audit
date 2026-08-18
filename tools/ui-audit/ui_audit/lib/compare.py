@@ -4,7 +4,6 @@ Pure functions for comparing playground controls against enhance capabilities.
 No I/O, no side effects. Accepts extracted metadata, returns audit results.
 """
 
-import re
 
 
 def normalize_attr_to_opt(attr_name: str) -> str:
@@ -21,18 +20,6 @@ def normalize_attr_to_opt(attr_name: str) -> str:
 
     parts = attr_name.split('-')
     return parts[0] + ''.join(p.capitalize() for p in parts[1:])
-
-
-def normalize_opt_to_attr(opt_name: str) -> str:
-    """
-    Convert a camelCase opts property to kebab attribute name.
-
-    'hoverBg' -> 'hover-bg'
-    'bgColor' -> 'bg-color'  (but playground may emit as 'bg')
-    """
-    return re.sub(r'([a-z])([A-Z])', r'\1-\2', opt_name).lower()
-
-
 def compare_component(
     component_name: str,
     playground_data: dict,

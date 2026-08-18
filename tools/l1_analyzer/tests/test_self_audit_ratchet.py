@@ -45,7 +45,9 @@ def test_the_script_refuses_rather_than_passing_when_no_baseline_exists(tmp_path
     stub.write_text(SCRIPT.read_text().replace(
         'BASELINE = pathlib.Path(__file__).resolve().parent / "self-audit-baseline.json"',
         f'BASELINE = pathlib.Path({str(tmp_path / "absent.json")!r})'))
+    # check=False deliberately: a non-zero exit is the thing being asserted, so raising
+    # on it would turn the assertion into a crash.
     r = subprocess.run([sys.executable, str(stub)], capture_output=True, text=True,
-                       cwd=SCRIPT.parents[1])
+                       cwd=SCRIPT.parents[1], check=False)
     assert r.returncode == 2, r.stdout + r.stderr
     assert "no baseline" in r.stderr

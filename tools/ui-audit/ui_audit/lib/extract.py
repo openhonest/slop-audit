@@ -22,19 +22,6 @@ def _extract_brace_block(source: str, start: int) -> str:
                 return source[start:i + 1]
         i += 1
     return source[start:]
-
-
-def _kebab_to_camel(s: str) -> str:
-    """Convert kebab-case to camelCase: 'hover-bg' -> 'hoverBg'."""
-    parts = s.split('-')
-    return parts[0] + ''.join(p.capitalize() for p in parts[1:])
-
-
-def _camel_to_kebab(s: str) -> str:
-    """Convert camelCase to kebab-case: 'hoverBg' -> 'hover-bg'."""
-    return re.sub(r'([a-z])([A-Z])', r'\1-\2', s).lower()
-
-
 # ── Playground extraction ────────────────────────────────────────────
 
 def extract_playground_components(source: str, attr_prefix: str = 'ux-') -> dict[str, dict]:

@@ -8,35 +8,7 @@ Requires: playwright (optional dependency)
 """
 
 import asyncio
-import json
 from pathlib import Path
-
-
-# ── Control interaction dispatch table ───────────────────────────────
-
-CONTROL_ACTIONS = {
-    'select': '_interact_select',
-    'checkbox': '_interact_checkbox',
-    'color': '_interact_color',
-    'text': '_interact_text',
-    'number': '_interact_number',
-    'range': '_interact_range',
-}
-
-
-# ── Test value dispatch table ────────────────────────────────────────
-# For each control type, what value to set for visual verification
-
-TEST_VALUES = {
-    'select': lambda choices: choices[1]['value'] if len(choices) > 1 else choices[0]['value'],
-    'checkbox': lambda _: True,
-    'color': lambda _: '#ff0000',  # Bright red — obvious visual change
-    'text': lambda _: 'TEST_VALUE',
-    'number': lambda _: '99',
-    'range': lambda _: '75',
-}
-
-
 async def verify_components(
     url: str,
     components: list[dict],
