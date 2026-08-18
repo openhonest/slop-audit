@@ -57,6 +57,12 @@ from l1_analyzer.indicators import (
 )
 from l1_analyzer.lang_spec import _PY_MUTATING, COMPARISON_OPS, LANG_SPEC, LangSpec
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
+from l1_analyzer.state_cells import collect_closed_sets as _collect_closed_sets
+from l1_analyzer.state_cells import is_closed_set as _is_closed_set
+from l1_analyzer.state_cells import is_unbounded_value as _is_unbounded_value
+from l1_analyzer.state_cells import keyed_read as _keyed_read
+from l1_analyzer.state_cells import membership_operands as _membership_operands
+from l1_analyzer.state_cells import write_key_bound as _write_key_bound
 from l1_analyzer.state_partition import (
     DYNAMIC_DISPATCH,
     INJECTED_SLOT,
@@ -71,6 +77,7 @@ from l1_analyzer.ts_nodes import first_named as _first_named
 from l1_analyzer.ts_nodes import hidden_names as _hidden_names
 from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
 from l1_analyzer.ts_nodes import is_opaque_unary as _is_opaque_unary
+from l1_analyzer.ts_nodes import is_write_target as _is_write_target
 from l1_analyzer.ts_nodes import local_refs as _local_refs
 from l1_analyzer.ts_nodes import mutable_alias_value as _mutable_alias_value
 from l1_analyzer.ts_nodes import refs as _refs
@@ -128,71 +135,6 @@ def _callee_name(call: Node | None, sp: LangSpec) -> str:
 # count: a tuple of symbolic constants bounds the partition exactly as literals do.
 # --------------------------------------------------------------------------
 
-def _is_immutable_collection(rhs: Node | None) -> bool:
-    if rhs is None:
-        return False
-    if rhs.type == "tuple":
-        return True
-    if rhs.type == "call":
-        return _text(_field(rhs, "function")) == "frozenset"
-    return False
-
-
-# name -> member count, with None for a collection that is provably fixed and not countable.
-def _collect_closed_sets(root: Node) -> dict[str, int | None]:
-    names: dict[str, int | None] = {}
-
-    def walk(n: Node) -> None:
-        if n.type == "assignment":
-            left, rhs = _field(n, "left"), _field(n, "right")
-            if left is not None and _is_immutable_collection(rhs):
-                if left.type == "identifier":
-                    names[_text(left)] = state_partition.literal_size(rhs)
-                elif left.type == "attribute":
-                    attr = _field(left, "attribute")
-                    if attr is not None:
-                        names[_text(attr)] = state_partition.literal_size(rhs)
-        for c in n.children:
-            walk(c)
-
-    walk(root)
-    return names
-
-
-def _is_closed_set(node: Node | None, closed_sets: dict[str, int | None]) -> bool:
-    if node is None:
-        return False
-    if node.type in ("set", "tuple", "list"):
-        return True
-    if node.type == "call" and _text(_field(node, "function")) in ("frozenset", "set"):
-        return True
-    if node.type == "identifier":
-        return _text(node) in closed_sets
-    if node.type == "attribute":
-        attr = _field(node, "attribute")
-        return attr is not None and _text(attr) in closed_sets
-    return False
-
-
-def _unwrap_unary(node: Node | None, sp: LangSpec) -> Node | None:
-    """Peel unary operators off a value. A unary operator over a literal is itself one
-    compile-time value (`-1` is the last element, `+1` the second), so the wrapper must
-    not hide the literal underneath. Unwrapping rather than whitelisting the wrapper is
-    what keeps `-x` unbounded: it peels to an identifier, which is no literal. The loop
-    handles a stack of them (`- -1`). The operator token is unnamed in every grammar in
-    the table, so the first named child is the operand."""
-    while node is not None and node.type in sp.get("unary_types", ()):
-        node = _first_named(node)
-    return node
-
-
-def _is_unbounded_value(node: Node | None, sp: LangSpec) -> bool:
-    """A value used as a lookup key / index. Literals are bounded; anything else
-    (a parameter, a variable) ranges over an unbounded domain."""
-    node = _unwrap_unary(node, sp)
-    return node is not None and node.type not in sp["literal_types"]
-
-
 # --------------------------------------------------------------------------
 # Membership and comparison helpers.
 # --------------------------------------------------------------------------
@@ -202,22 +144,6 @@ def _is_unbounded_value(node: Node | None, sp: LangSpec) -> bool:
 # negated form entirely. It then fell through to the comparison arm and was graded finite
 # and ORDERED, which inverted the verdict: `key in store` graded the repository F and
 # `key not in store` graded it A. One word, semantics unchanged, and no disclosure.
-_MEMBERSHIP_TOKENS = frozenset({"in", "not in"})
-
-
-def _membership_operands(node: Node | None, sp: LangSpec) -> tuple[Node, Node] | None:
-    """(left, right) for an `in` / `not in` membership test, else None."""
-    style = sp["membership"]
-    if style == "comparison_in" and node.type == "comparison_operator":
-        if not any(c.type in _MEMBERSHIP_TOKENS for c in node.children):
-            return None
-        named = [c for c in node.children if c.is_named]
-        return (named[0], named[-1]) if len(named) >= 2 else None
-    if style == "binary_in" and node.type == "binary_expression" and _text(_field(node, "operator")) == "in":
-        return _field(node, "left"), _field(node, "right")
-    return None
-
-
 def _is_comparison(node: Node | None, sp: LangSpec) -> bool:
     if node.type == "comparison_operator":       # Python: always a comparison
         return True
@@ -227,44 +153,6 @@ def _is_comparison(node: Node | None, sp: LangSpec) -> bool:
 # --------------------------------------------------------------------------
 # Per-reference categorisation.
 # --------------------------------------------------------------------------
-
-def _is_binding_site(ref: Node, parent: Node, sp: LangSpec) -> bool:
-    """The reference is the DECLARED NAME in a declaration: `String[] stack;`,
-    `static int cache[4];`, `public int N { get; set; }`.
-
-    A declaration binds the state, it does not consume it, which is what an assignment
-    target does too - so this is the same row as `_is_write_target`, spelled the way a
-    grammar with declarations spells it. It is a separate predicate only because the node
-    is not an assignment in any of the nine and would never match `assign_types`.
-
-    Two facts make this a rule rather than a convenience. The enumerators ALREADY find state
-    by these very nodes (`field_decl_types`, and the census's FIELD_DECLARATION and
-    PROPERTY_DECLARATION site kinds), so the classifier reaching a declaration it cannot
-    name is the reader failing to recognise the site it arrived through. And the field is
-    checked, not just the node type: `int y = stack.length;` puts `stack` under a
-    variable_declarator too, in the VALUE, where it is read and not bound."""
-    field = sp["binding_sites"].get(parent.type)
-    return field is not None and _same(_field(parent, field), ref)
-
-
-def _is_write_target(ref: Node, parent: Node, sp: LangSpec) -> bool:
-    if _is_lvalue(ref, sp) or _is_binding_site(ref, parent, sp):
-        return True
-    # S[k] = v  -> ref (S) is the collection of a subscript that is the assign target
-    return parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref) and _is_lvalue(parent, sp)
-
-
-def _keyed_read(key_node: Node | None, sp: LangSpec) -> Reach:
-    """`S[k]` read. An unbounded key ranges over an unbounded domain; a literal key cuts
-    one more class out of it, and whether that class has a neighbour is the whole
-    ordered/unordered distinction: `S[3]` sits between `S[2]` and `S[4]`, `S["beta"]` sits
-    between nothing. Distinct literals are distinct discriminators, so d of them leave
-    d+1 classes."""
-    if _is_unbounded_value(key_node, sp):
-        return state_partition.unbounded()
-    key = _unwrap_unary(key_node, sp)
-    return state_partition.finite(2, key is not None and key.type in state_partition.ORDERED_LITERALS, f"key:{_text(key)}")
-
 
 def _reads_its_own_target(ref: Node, sp: LangSpec) -> bool:
     """The reference is the target of an assignment whose operator reads it before writing.
@@ -284,7 +172,7 @@ def _reads_its_own_target(ref: Node, sp: LangSpec) -> bool:
     return _text(_field(parent, "operator")) in sp["read_write_assign_ops"]
 
 
-def _categorize_read(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> Reach:
+def _categorize_read(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None) -> Reach:
     """How the READ half of a conditional assignment reaches a decision.
 
     A keyed target is a keyed read, so an open key is unbounded exactly as it is on the
@@ -293,11 +181,11 @@ def _categorize_read(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]
     """
     parent = ref.parent
     if parent is not None and parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
-        return _keyed_read(_sub_key(parent, sp), sp)
+        return _keyed_read(_sub_key(parent, sp), sp, cells)
     return state_partition.finite(2, True, "truthy")
 
 
-def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> Reach:
+def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None) -> Reach:
     """How this single reference to a state value is consumed."""
     parent = ref.parent
     if parent is None:
@@ -316,7 +204,7 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> 
         # JavaScript and TypeScript add `??=`, C# has `??=` alone, and the rest have none and
         # say so with an empty row rather than by omission.
         if _reads_its_own_target(ref, sp):
-            return _categorize_read(ref, sp, closed_sets)
+            return _categorize_read(ref, sp, closed_sets, cells)
         return state_partition.write()
 
     # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target
@@ -326,11 +214,11 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> 
     # checks that make this a proof rather than an assumption are per-attribute, and live in
     # _injected_slot_premise_fails.
     if not sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), ref):
-        return _flow(parent, sp, closed_sets)
+        return _flow(parent, sp, closed_sets, cells)
 
     # S[x] read : indexed by x. Unbounded key -> unbounded partition.
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
-        return _keyed_read(_sub_key(parent, sp), sp)
+        return _keyed_read(_sub_key(parent, sp), sp, cells)
 
     # S.attr : mutating method -> write; keyed map read -> subscript-like; else flows on.
     # Nested-call languages only; flat-call languages (Java, Ruby) handle receiver.method
@@ -344,10 +232,10 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> 
         if called and attr in sp["mutating"]:
             return state_partition.write()
         if called and attr in sp["keyed_read"]:
-            return _keyed_read(_first_arg(gp, sp), sp)
+            return _keyed_read(_first_arg(gp, sp), sp, cells)
         if called:
-            return _flow(gp, sp, closed_sets)     # method result flows on (.clone(), .len(), an accessor)
-        return _flow(parent, sp, closed_sets)     # plain field access: self.x.y
+            return _flow(gp, sp, closed_sets, cells)     # method result flows on (.clone(), .len(), an accessor)
+        return _flow(parent, sp, closed_sets, cells)     # plain field access: self.x.y
 
     # S.method(args) flattened (Java method_invocation / Ruby call with a receiver).
     if sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_recv"]), ref):
@@ -357,14 +245,14 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> 
         if name in sp["mutating"]:
             return state_partition.write()
         if name in sp["keyed_read"]:
-            return _keyed_read(_first_arg(parent, sp), sp)
-        return _flow(parent, sp, closed_sets)
+            return _keyed_read(_first_arg(parent, sp), sp, cells)
+        return _flow(parent, sp, closed_sets, cells)
 
     # f(..., S, ...) : argument to a call.
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
-            return _flow(parent.parent, sp, closed_sets)
+            return _flow(parent.parent, sp, closed_sets, cells)
         if fname in _EFFECT_CALLS:
             return state_partition.output()
         return state_partition.silence_kind(parent.parent, sp)
@@ -375,10 +263,10 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]) -> 
     # row that says "the host construct is transparent, follow the flow" - and `_flow`
     # below is where the table ends. It matters which of the two is the last one, because
     # only the last one can be the total handler and only one of them can be it.
-    return _flow(ref, sp, closed_sets)
+    return _flow(ref, sp, closed_sets, cells)
 
 
-def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -> Reach:
+def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None) -> Reach:
     """Categorise how a value derived from the state (node) reaches a decision."""
     parent = node.parent
     if parent is None:
@@ -401,7 +289,7 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
     # not app - so exclude nodes that are themselves a call.
     if (not sp["flat_call"] and node.type not in sp["call_types"]
             and parent.type in sp["call_types"] and _same(_field(parent, sp["call_fn"]), node)):
-        return _flow(parent, sp, closed_sets)
+        return _flow(parent, sp, closed_sets, cells)
     # THE TWO ROWS THE COMMENT ABOVE PROMISED AND NOBODY WROTE. It excludes the call form
     # deliberately and correctly, but excluding a shape from one row is not the same as
     # handling it, and until 2026-08-17 both forms fell through to the total row. That is why
@@ -463,13 +351,13 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
     # untouched, when what happens is that an element leaves the channel. Dropping the node
     # type from the list would take `-x` with it, so the operator is what decides.
     if parent.type in sp["passthrough_types"] and not _is_opaque_unary(parent, sp):
-        return _flow(parent, sp, closed_sets)
+        return _flow(parent, sp, closed_sets, cells)
     # The host WRITES this value where it stands: `n++`, `c.n++`, `@xs << x`. The host is
     # transparent for the flow, because it also produces a value and that value may still
     # reach a decision - `if (n++ > 3)` is a comparison whichever way the counter moves. The
     # row below settles what happens when nothing reads what the host produced.
     if _same(_written_in_place(parent, sp), node):
-        return _flow(parent, sp, closed_sets)
+        return _flow(parent, sp, closed_sets, cells)
     if parent.type in sp["comparison_types"]:
         mem = _membership_operands(parent, sp)
         if mem is not None:
@@ -489,7 +377,7 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
             # cuts leave n+1 intervals that boundary values reach. Keyed on the comparison
             # text so the same cut written twice is one cut, not two.
             return state_partition.finite(2, True, f"cmp:{_text(parent)}")
-        return _flow(parent, sp, closed_sets)   # arithmetic / logical: derived value flows on
+        return _flow(parent, sp, closed_sets, cells)   # arithmetic / logical: derived value flows on
     # Truthiness is the SAME two-class split wherever it is written, so every site shares
     # one key: `if S:` in fifty methods is two classes, not fifty-one.
     if parent.type in sp["branch_types"] and _same(_field(parent, sp["branch_cond"]), node):
@@ -505,12 +393,12 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None]) -
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
-            return _flow(parent.parent, sp, closed_sets)
+            return _flow(parent.parent, sp, closed_sets, cells)
         if fname in _EFFECT_CALLS:
             return state_partition.output()
         return state_partition.silence_kind(parent.parent, sp)
     if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), node):
-        return _keyed_read(_sub_key(parent, sp), sp)
+        return _keyed_read(_sub_key(parent, sp), sp, cells)
     # THE VALUE AN IN-PLACE WRITE PRODUCED, WHICH NOTHING READS. Every row above has now been
     # offered it and declined, so `c.n++` standing alone as a statement, and `@xs << x` in a
     # modifier arm, are writes and nothing more. This sits at the bottom rather than beside
@@ -769,8 +657,13 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
         # An immutable constant has a one-value domain, so its partition is one class.
         verdict, drives, silence, construct, partition = (*const, "", "", state_partition.EMPTY)
     else:
+        # Computed ONCE over every reference and handed to each, because the bound is a
+        # fact about the state and not about the reference being judged. Per-reference
+        # judgement is what let a read report unbounded while the writes it reads from
+        # could only ever fill two cells.
+        cells = _write_key_bound(refs, sp, closed_sets)
         verdict, drives, silence, construct, partition = _verdict(
-            [_categorize(r, sp, closed_sets) for r in refs])
+            [_categorize(r, sp, closed_sets, cells) for r in refs])
         # An invoked slot earns NEUTRAL from the compositional rule; that rule has premises.
         if verdict == NEUTRAL and _injected_slot_premise_fails(refs, sp, instance):
             verdict, drives, silence, construct, partition = (

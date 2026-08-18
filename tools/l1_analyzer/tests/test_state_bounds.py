@@ -271,3 +271,70 @@ def test_the_golden_itself_is_unchanged():
     assert hashlib.sha256(GOLDEN.read_bytes()).hexdigest() == _GOLDEN_SHA256, (
         "the golden moved. If that is deliberate, update _GOLDEN_SHA256 in the same commit "
         "and say in the message what behaviour changed and why the expectation follows it.")
+
+
+# --- the write side bounds the read side ------------------------------------
+# A subscripted state can only ever hold the cells its WRITES create. The classifier
+# judged each reference alone, so a read with an open key reported the state unbounded
+# however narrow the set of cells actually was. `promiscuous` is defined as "reaching
+# partition is provably unbounded (a proven finding)" and grades the repository F, so a
+# two-key cache read back in a truthiness test was handed the instrument's most severe
+# verdict on a false proof.
+
+def _verdict_of(tmp_path, src, state):
+    (tmp_path / "m.py").write_text(src)
+    r = state_bounds.classify(tmp_path, "python")
+    return next((f["verdict"] for f in r["findings"] if f["state"] == state), "absent")
+
+
+_READ_BACK = "def get(k):\n    if CACHE.get(k):\n        return 1\n    return 0\n"
+
+
+def test_a_cache_whose_writes_are_guarded_by_a_closed_set_is_bounded(tmp_path):
+    """Two keys from a declared frozenset and a literal value. The read's key is open and
+    stays open; it cannot observe a cell no write created."""
+    src = ('KINDS = frozenset({"buy", "sell"})\nCACHE = {}\n'
+           'def put(k):\n    if k in KINDS:\n        CACHE[k] = "open"\n' + _READ_BACK)
+    assert _verdict_of(tmp_path, src, "CACHE") == "neutral"
+
+
+def test_a_cache_written_under_literal_keys_alone_is_bounded(tmp_path):
+    src = 'CACHE = {}\ndef put():\n    CACHE["buy"] = 1\n    CACHE["sell"] = 2\n' + _READ_BACK
+    assert _verdict_of(tmp_path, src, "CACHE") == "neutral"
+
+
+def test_one_unguarded_store_leaves_the_cache_promiscuous(tmp_path):
+    """The bound is over EVERY write. One store with an open key and the cell set is
+    unbounded again, whatever the other stores do."""
+    src = ('KINDS = frozenset({"buy", "sell"})\nCACHE = {}\n'
+           'def put(k):\n    if k in KINDS:\n        CACHE[k] = "open"\n'
+           'def put_any(k, v):\n    CACHE[k] = v\n' + _READ_BACK)
+    assert _verdict_of(tmp_path, src, "CACHE") == "promiscuous"
+
+
+def test_a_store_guarded_by_a_set_that_is_not_declared_closed_stays_promiscuous(tmp_path):
+    """`KINDS` here is a mutable list, so nothing bounds how many keys reach the store."""
+    src = ('KINDS = ["buy", "sell"]\nCACHE = {}\n'
+           'def put(k):\n    if k in KINDS:\n        CACHE[k] = "open"\n' + _READ_BACK)
+    assert _verdict_of(tmp_path, src, "CACHE") == "promiscuous"
+
+
+def test_a_keyed_read_reached_through_a_flowing_expression_carries_the_cell_bound(tmp_path):
+    """The subscript row inside _flow, which no test reached. It referenced the cell bound
+    without receiving it, so the first repository to take that path would have died with a
+    NameError rather than returned a verdict. The state has to flow through something
+    before being subscripted for the walk to arrive there, which `CACHE.copy()[k]` does and
+    a plain `CACHE[k]` does not. Confirmed under a line trace: this input executes that row
+    and my first attempt, `len(CACHE[k])`, did not."""
+    src = ('KINDS = frozenset({"buy", "sell"})\nCACHE = {}\n'
+           'def put(k):\n    if k in KINDS:\n        CACHE[k] = "open"\n'
+           'def get(k):\n    if CACHE.copy()[k]:\n        return 1\n    return 0\n')
+    assert _verdict_of(tmp_path, src, "CACHE") == "neutral"
+
+
+def test_the_else_branch_of_a_membership_guard_bounds_nothing(tmp_path):
+    """A store on the rejected side is reached by the keys the test threw out, which the
+    declared set does not bound. Walking up from it must find no guard."""
+    src = ('KINDS = frozenset({"buy", "sell"})\nCACHE = {}\n'
+           'def put(k, v):\n    if k in KINDS:\n        pass\n    else:\n        CACHE[k] = v\n' + _READ_BACK)
+    assert _verdict_of(tmp_path, src, "CACHE") == "promiscuous"

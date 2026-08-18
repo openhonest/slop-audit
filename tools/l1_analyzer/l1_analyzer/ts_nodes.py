@@ -1,9 +1,9 @@
 """The tree-sitter node accessors every analysis module needs.
 
-They lived inside state_bounds, which meant a second module that wanted `_text` either
+They lived inside state_bounds, which meant a second module that wanted `text` either
 imported a private name across a module boundary or wrote its own copy. Both happened.
 Two copies of a one-line accessor are harmless until one of them learns something the
-other does not, and `_same` is exactly that case: node identity has a rule (compare ids,
+other does not, and `same` is exactly that case: node identity has a rule (compare ids,
 never `is`) that a re-implementation gets wrong on the first try.
 
 Nothing here knows what a state is or what a partition is. These read a parse tree.
@@ -218,3 +218,44 @@ def is_lvalue(node: Node | None, sp: LangSpec) -> bool:
     if wrapper and p is not None and p.type == wrapper:
         node, p = p, p.parent
     return p is not None and p.type in sp["assign_types"] and same(field(p, sp["assign_left"]), node)
+
+
+def is_binding_site(ref: Node, parent: Node, sp: LangSpec) -> bool:
+    """The reference is the DECLARED NAME in a declaration: `String[] stack;`,
+    `static int cache[4];`, `public int N { get; set; }`.
+
+    A declaration binds the state, it does not consume it, which is what an assignment
+    target does too - so this is the same row as `is_write_target`, spelled the way a
+    grammar with declarations spells it. It is a separate predicate only because the node
+    is not an assignment in any of the nine and would never match `assign_types`.
+
+    Two facts make this a rule rather than a convenience. The enumerators ALREADY find state
+    by these very nodes (`field_decl_types`, and the census's FIELD_DECLARATION and
+    PROPERTY_DECLARATION site kinds), so the classifier reaching a declaration it cannot
+    name is the reader failing to recognise the site it arrived through. And the field is
+    checked, not just the node type: `int y = stack.length;` puts `stack` under a
+    variable_declarator too, in the VALUE, where it is read and not bound."""
+    # Named `binding_field` and not `field`: this module's own accessor is called `field`,
+    # and the alias this body carried in from state_bounds was rewritten onto it, so the
+    # local was shadowing the function it then tried to call.
+    binding_field = sp["binding_sites"].get(parent.type)
+    return binding_field is not None and same(field(parent, binding_field), ref)
+
+
+def is_write_target(ref: Node, parent: Node, sp: LangSpec) -> bool:
+    if is_lvalue(ref, sp) or is_binding_site(ref, parent, sp):
+        return True
+    # S[k] = v  -> ref (S) is the collection of a subscript that is the assign target
+    return parent.type in sp["subscript_types"] and same(sub_collection(parent, sp), ref) and is_lvalue(parent, sp)
+
+
+def unwrap_unary(node: Node | None, sp: LangSpec) -> Node | None:
+    """Peel unary operators off a value. A unary operator over a literal is itself one
+    compile-time value (`-1` is the last element, `+1` the second), so the wrapper must
+    not hide the literal underneath. Unwrapping rather than whitelisting the wrapper is
+    what keeps `-x` unbounded: it peels to an identifier, which is no literal. The loop
+    handles a stack of them (`- -1`). The operator token is unnamed in every grammar in
+    the table, so the first named child is the operand."""
+    while node is not None and node.type in sp.get("unary_types", ()):
+        node = first_named(node)
+    return node

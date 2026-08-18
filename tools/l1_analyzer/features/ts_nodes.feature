@@ -117,3 +117,22 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
     When is_lvalue steps out through an optional target wrapper and compares the node against the assignment's target
     Then it is true when the node is what the assignment writes to
     And the wrapper step is what lets a grammar that puts targets in a list still be read
+
+  Scenario: is_binding_site decides whether a reference is the declared name of a declaration
+    Given a reference, the construct above it and the language spec
+    When is_binding_site looks the construct up in the spec's table of declarations and compares the named field
+    Then it is true for a field or property declaration naming the state, which binds it rather than consuming it
+    And the field is checked, not just the construct type, so a name read inside a declaration's value is not mistaken for the name being bound
+    But Python declares no such sites, so this rule never fires there
+
+  Scenario: is_write_target decides whether a reference is written to rather than read
+    Given a reference, the construct above it and the language spec
+    When is_write_target accepts an assignment target, a declared name, or the collection of an indexed store
+    Then it is true for all three ways the code puts a value in
+    And a keyed store counts, because the collection is being written through even though the reference is not itself the target
+
+  Scenario: unwrap_unary peels unary operators off a value
+    Given a value node and the language spec
+    When unwrap_unary steps down to the operand through each unary operator in turn
+    Then it returns the value underneath, so a negated literal is still one compile-time value
+    But a negated variable peels to a name, which is no literal, and stays unbounded

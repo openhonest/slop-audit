@@ -30,68 +30,11 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     Then it returns the callee's text, which the bounded and effect lists are matched against
     But a missing node, or a node that is not a call at all, yields the empty string, which matches no list
 
-  Scenario: _is_immutable_collection recognises a fixed collection on the right of an assignment
-    Given the right-hand side of an assignment
-    When _is_immutable_collection checks for a tuple, or for a frozen-set construction
-    Then it is true for those two shapes and nothing else
-    But a plain set or list is not accepted here, because either can still be mutated after it is built
-
-  Scenario: _collect_closed_sets builds the file's table of statically fixed collections
-    Given the parse tree of one file
-    When _collect_closed_sets walks every assignment whose right-hand side is a fixed collection
-    Then it returns a table from the bound name, or the bound attribute's name, to that collection's member count
-    And a collection whose size cannot be recovered is recorded with no count, which is not the same as a count of zero
-    But the same name bound twice keeps the last binding read, since the walk simply overwrites
-
-  Scenario: _is_closed_set decides whether a container is statically fixed
-    Given a container node and the file's table of fixed collections
-    When _is_closed_set accepts a collection written out in place, a set construction, or a name recorded in the table
-    Then it is true for a container whose membership cannot change while the program runs
-    But a name the table does not carry is not accepted, so a collection built elsewhere stays unproven
-
-  Scenario: _unwrap_unary peels unary operators off a value
-    Given a value node and the language spec
-    When _unwrap_unary steps down to the operand through each unary operator in turn
-    Then it returns the value underneath, so a negated literal is still one compile-time value
-    But a negated variable peels to a name, which is no literal, and stays unbounded
-
-  Scenario: _is_unbounded_value decides whether a value ranges over a domain nobody can enumerate
-    Given a value node and the language spec
-    When _is_unbounded_value unwraps it and tests it against the grammar's literal types
-    Then it is true for a parameter or a variable, and false for a literal
-    But a missing node counts as bounded, so an absent key never makes a read unbounded on its own
-
-  Scenario: _membership_operands splits a membership test into the value and the container
-    Given a node and the language spec
-    When _membership_operands matches the grammar's spelling of a membership test
-    Then it returns the value tested and the container tested against, in that order
-    And the negated form is matched too, because it is one token in this grammar rather than a negation wrapping the positive form
-    But any other node yields nothing, and the caller then falls on to the comparison rule
-
   Scenario: _is_comparison decides whether a construct compares its operands
     Given a node and the language spec
     When _is_comparison accepts any comparison node in Python, and elsewhere reads the operator
     Then it is true when the operator is one of the ordering or equality operators
     But it reads the node without checking that one was supplied, so an absent node is a caller error rather than a false answer
-
-  Scenario: _is_binding_site decides whether a reference is the declared name of a declaration
-    Given a reference, the construct above it and the language spec
-    When _is_binding_site looks the construct up in the spec's table of declarations and compares the named field
-    Then it is true for a field or property declaration naming the state, which binds it rather than consuming it
-    And the field is checked, not just the construct type, so a name read inside a declaration's value is not mistaken for the name being bound
-    But Python declares no such sites, so this rule never fires there
-
-  Scenario: _is_write_target decides whether a reference is written to rather than read
-    Given a reference, the construct above it and the language spec
-    When _is_write_target accepts an assignment target, a declared name, or the collection of an indexed store
-    Then it is true for all three ways the code puts a value in
-    And a keyed store counts, because the collection is being written through even though the reference is not itself the target
-
-  Scenario: _keyed_read grades a read of the collection at a key
-    Given the key node and the language spec
-    When _keyed_read tests whether the key is bounded
-    Then an unbounded key yields an unbounded partition, and a literal key yields a two-class split keyed on the literal's text
-    And the split is ordered only when the literal is numeric, because a numbered position has a neighbour and a named one does not
 
   Scenario: _reads_its_own_target says whether an assignment reads what it writes
     Given a reference standing as an assignment target, through a subscript or a member access
