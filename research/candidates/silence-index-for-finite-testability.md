@@ -119,6 +119,14 @@ This depends on the silence change and cannot ship before it. D is occupied. Unt
 
 ### Silence, and who owns it
 
+**Re-measured 2026-08-18, and not comparable.** The table below cannot be compared to a run made today, and the clearest proof is its own by-reason line: it names four reasons, unmodeled callee, external boundary, dynamic dispatch and injected slot, and they sum to its 667. `unmodeled_construct` does not appear because the category did not exist yet. A silence index computed before a reason was invented is not the same measure as one computed after it.
+
+Today the same sixteen repositories pool 1,303 silent states across six reasons: unmodeled construct 550, unmodeled callee 410, external boundary 296, dynamic dispatch 36, injected slot 11. Per repository: libuv 0.466, junit4 0.477, json-c 0.451, declaro 0.413, gson 0.399, slop-audit-web 0.333, RestSharp 0.318, multicardz 0.279, honest-framework 0.275, Newtonsoft.Json 0.218, open-vrm-app 0.033, umbra 0.750, and four at 0.000. Ten of the sixteen are unpinned working trees and every one was dirty when measured, which is the reproducibility failure recorded above for the cardinality table and recorded again here.
+
+Ten rules landed in the classifier on 2026-08-18 and every one of them moves this measure, mostly by teaching the reader constructs it previously reported as unread: a borrow wrapper, an expression-bodied member, a keyword argument, a ternary condition, a member named off another receiver, a value copied into a local, a switch subject, a declared constant, a C cast, and a sizeof. Against those the numbers below went UP rather than down, because the enumerators also grew on 2026-08-16 and now find far more state to be silent about. Numerator and denominator both moved and neither can be recovered.
+
+Nothing below has been edited. Tracked with the cardinality figure as slop-audit-43g.
+
 Per-repository silence, as a share of all state:
 
 | Repository | Silence | Repository | Silence |
