@@ -138,7 +138,8 @@ def _delete_to_add_ratio(total_deleted: int, total_added: int) -> L1Result:
     pct = ratio(total_deleted, total_added, "L1.5 delete-to-add ratio",
                 "no line was added in the measured range, so a ratio against them is absent "
                 "and not zero")
-    return {"value": round(pct, 1), "band": band(pct, 60, 30, higher_is_better=True)}
+    return {"value": round(pct, 1), "band": band(pct, 60, 30, higher_is_better=True),
+            "details": f"{total_deleted} deleted / {total_added} added lines"}
 
 
 def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> dict[str, L1Result]:
@@ -221,13 +222,19 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
     results: dict[str, L1Result] = {}
 
     l1 = doc_only / total_commits * 100
-    results["L1.1"] = {"value": round(l1, 1), "band": band(l1, 10, 1, higher_is_better=True)}
+    # Every one of these carries the counts behind it. Six published a bare percentage
+    # until 2026-08-18, and answering "why is this repository Slop on L1.5" meant
+    # re-deriving from git log what the analyzer had already counted and discarded.
+    results["L1.1"] = {"value": round(l1, 1), "band": band(l1, 10, 1, higher_is_better=True),
+                       "details": f"{doc_only} doc-only / {total_commits} commits"}
 
     l2 = code_only / total_commits * 100
-    results["L1.2"] = {"value": round(l2, 1), "band": band(l2, 70, 85, higher_is_better=False)}
+    results["L1.2"] = {"value": round(l2, 1), "band": band(l2, 70, 85, higher_is_better=False),
+                       "details": f"{code_only} code-only / {total_commits} commits"}
 
     l3 = mixed / total_commits * 100
-    results["L1.3"] = {"value": round(l3, 1), "band": band(l3, 12, 3, higher_is_better=True)}
+    results["L1.3"] = {"value": round(l3, 1), "band": band(l3, 12, 3, higher_is_better=True),
+                       "details": f"{mixed} mixed doc-and-code / {total_commits} commits"}
 
     # Through the one boundary, like every other measure. Both divide by added lines, so both
     # can meet a range that added none, and _measure is what turns the refusal into an n/a
@@ -236,10 +243,12 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
     results["L1.5"] = _measure(_delete_to_add_ratio, total_deleted, total_added)
 
     l6 = net_negative_commits / total_commits * 100
-    results["L1.6"] = {"value": round(l6, 1), "band": band(l6, 15, 5, higher_is_better=True)}
+    results["L1.6"] = {"value": round(l6, 1), "band": band(l6, 15, 5, higher_is_better=True),
+                       "details": f"{net_negative_commits} net-negative / {total_commits} commits"}
 
     l7 = high_delete_commits / total_commits * 100
-    results["L1.7"] = {"value": round(l7, 1), "band": band(l7, 20, 5, higher_is_better=True)}
+    results["L1.7"] = {"value": round(l7, 1), "band": band(l7, 20, 5, higher_is_better=True),
+                       "details": f"{high_delete_commits} delete-heavy / {total_commits} commits"}
 
     results["L1.8"] = _test_to_prod_ratio(repo)
 

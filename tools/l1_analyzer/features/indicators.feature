@@ -42,7 +42,7 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
   Scenario: compute_git_indicators reads the commit history into the first eight indicators
     Given a repository and the optional earliest and latest dates
     When compute_git_indicators reads the commit log with per-file line counts and closes each commit as it goes
-    Then it returns the eight results L1.1 through L1.8, six of them a value and a band with no detail line at all
+    Then it returns the eight results L1.1 through L1.8, each carrying the counts behind its number rather than a bare percentage
     And a commit that touched only files classified as other still raises the commit total while joining none of the three mix counts, so all three percentages are diluted by it
     But a merge commit carries no per-file lines in this log form and is invisible to every count here, and when the log fails or the date range holds no commits all eight come back as zero under the n/a band
 
