@@ -35,9 +35,20 @@ from l1_analyzer.scope import PRODUCTION
 # NO_SCANNER is "n/a", so the two cases arrive here as one string and the third branch could
 # never fire. That collision is real and is filed separately; it is not repaired by a default
 # that hides it.
+# The absent-verdict case, named so it stops colliding with NO_SCANNER. Both used to be
+# the bare string "n/a": thread_surface says "n/a" for a language it has no scanner for,
+# and `_verdict_of` said "n/a" for a panel entry carrying no verdict at all. The gate then
+# told an adopter their language has no scanner when what happened was that the meter
+# returned nothing, which sends them looking for a scanner that exists.
+#
+# Deliberately not "n/a". A distinct fact needs a distinct string, and reusing the token
+# with a comment saying which one it means is how the collision was written the first time.
+ABSENT_VERDICT = "absent-verdict"
+
 _UNMEASURED_THREAD_SURFACE = {
     thread_surface.UNREAD: "the meter read no source",
     thread_surface.NO_SCANNER: "no scanner for this language",
+    ABSENT_VERDICT: "the meter returned no verdict for this language",
 }
 
 
@@ -77,7 +88,11 @@ def _slack(actual: int, baseline: int, label: str) -> list[str]:
 
 
 def _verdict_of(result: object) -> str:
-    """A panel entry's verdict, or n/a when it carries none.
+    """A panel entry's verdict, or ABSENT_VERDICT when it carries none.
+
+    Not "n/a", which is what thread_surface says for a language it has no scanner for.
+    The two are different facts and shared one string until 2026-08-18, so the gate could
+    not tell them apart and printed the scanner sentence for both.
 
     The panel is typed `dict[str, L1Result]` and L1Result declares only value, band and
     details, so the richer results stored in it - the surface scan among them - are read
@@ -85,7 +100,7 @@ def _verdict_of(result: object) -> str:
     it is instead of widening it to Any or papering over it with a type: ignore, either of
     which this repository's own L1.15 ratchet counts against it.
     """
-    return str(result["verdict"]) if isinstance(result, dict) and "verdict" in result else "n/a"
+    return str(result["verdict"]) if isinstance(result, dict) and "verdict" in result else ABSENT_VERDICT
 
 
 def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_exposed: int | None) -> int:

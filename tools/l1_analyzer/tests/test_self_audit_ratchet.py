@@ -42,9 +42,18 @@ def test_the_script_refuses_rather_than_passing_when_no_baseline_exists(tmp_path
     """A missing baseline must be an error. The failure mode this guards is a CI job that
     goes green because the file it compares against was never written."""
     stub = tmp_path / "self_audit.py"
+    # BOTH paths are overridden, and the second one is why this test used to take minutes
+    # and sometimes never finish. `REPO` is derived from `__file__.parents[3]`, so a copy
+    # sitting in a pytest tmpdir resolved it to an ancestor of /private/var/folders and
+    # scanned whatever happened to be under it. The panel is not what this test is about;
+    # point it at a directory with one file in it.
+    (tmp_path / "tiny").mkdir()
+    (tmp_path / "tiny" / "a.py").write_text("def f():\n    return 1\n")
     stub.write_text(SCRIPT.read_text().replace(
         'BASELINE = pathlib.Path(__file__).resolve().parent / "self-audit-baseline.json"',
-        f'BASELINE = pathlib.Path({str(tmp_path / "absent.json")!r})'))
+        f'BASELINE = pathlib.Path({str(tmp_path / "absent.json")!r})').replace(
+        'REPO = pathlib.Path(__file__).resolve().parents[3]',
+        f'REPO = pathlib.Path({str(tmp_path / "tiny")!r})'))
     # check=False deliberately: a non-zero exit is the thing being asserted, so raising
     # on it would turn the assertion into a crash.
     r = subprocess.run([sys.executable, str(stub)], capture_output=True, text=True,
