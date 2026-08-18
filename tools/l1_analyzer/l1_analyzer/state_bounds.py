@@ -55,7 +55,7 @@ from l1_analyzer.indicators import (
     _read_source_bytes,
     bucketed_paths,
 )
-from l1_analyzer.lang_spec import _PY_MUTATING, COMPARISON_OPS, LANG_SPEC, LangSpec
+from l1_analyzer.lang_spec import COMPARISON_OPS, LANG_SPEC, LangSpec
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
 from l1_analyzer.state_cells import cell_key as _cell_key
 from l1_analyzer.state_cells import collect_closed_sets as _collect_closed_sets
@@ -64,9 +64,15 @@ from l1_analyzer.state_cells import is_unbounded_value as _is_unbounded_value
 from l1_analyzer.state_cells import keyed_read as _keyed_read
 from l1_analyzer.state_cells import membership_operands as _membership_operands
 from l1_analyzer.state_cells import write_key_bound as _write_key_bound
+from l1_analyzer.state_const import collect_immutable_ctors as _collect_immutable_ctors
+from l1_analyzer.state_const import declared_constant as _declared_constant
+from l1_analyzer.state_const import immutable_const_verdict as _immutable_const_verdict
 from l1_analyzer.state_partition import (
     DYNAMIC_DISPATCH,
     INJECTED_SLOT,
+    NEUTRAL,
+    PROMISCUOUS,
+    UNRESOLVED,
     Partition,
     Reach,
 )
@@ -89,10 +95,6 @@ from l1_analyzer.ts_nodes import sub_key as _sub_key
 from l1_analyzer.ts_nodes import text as _text
 from l1_analyzer.ts_nodes import unwrap_unary as _unwrap_unary
 from l1_analyzer.ts_nodes import written_in_place as _written_in_place
-
-NEUTRAL = "neutral"
-PROMISCUOUS = "promiscuous"
-UNRESOLVED = "unresolved"
 
 # Builtins that read a bounded feature of their argument (the value flows onward).
 _BOUNDED_BUILTINS = frozenset({"len", "isinstance", "bool", "id", "type", "hash", "ord", "abs"})
@@ -666,81 +668,6 @@ def _state_refs(scope: Node, key: str, sp: LangSpec) -> list[Node]:
 # MappingProxyType-wrapped table passed to a lookup) resolves on the evidence,
 # reading no framework declaration.
 
-_IMMUTABLE_WRAPPERS = frozenset({"MappingProxyType", "frozenset", "tuple", "bytes"})
-
-
-def _rhs_is_immutable(rhs: Node | None, immutable_ctors: set[str]) -> bool:
-    if rhs is None:
-        return False
-    if rhs.type in ("tuple", "true", "false", "none", "integer", "float", "string", "concatenated_string"):
-        return True
-    if rhs.type == "call":
-        fn = _text(_field(rhs, "function"))
-        return fn in _IMMUTABLE_WRAPPERS or fn in immutable_ctors
-    return False
-
-
-def _returns_immutable(func_node: Node) -> bool:
-    returns = _refs(func_node, lambda n: n.type == "return_statement")
-    if not returns:
-        return False
-    for r in returns:
-        val = _first_named(r)
-        if not _rhs_is_immutable(val, frozenset()):
-            return False
-    return True
-
-
-def _collect_immutable_ctors(root: Node) -> set[str]:
-    out: set[str] = set()
-    for fn in _refs(root, lambda n: n.type == "function_definition"):
-        name = _field(fn, "name")
-        if name is not None and _returns_immutable(fn):
-            out.add(_text(name))
-    return out
-
-
-def _reaches_decision(refs: list[Node], sp: LangSpec) -> bool:
-    for r in refs:
-        p = r.parent
-        if p is None or p.type in sp["return_types"]:
-            continue
-        if _is_write_target(r, p, sp):
-            continue
-        return True
-    return False
-
-
-def _immutable_const_verdict(refs: list[Node], immutable_ctors: set[str], sp: LangSpec) -> tuple[str, bool] | None:
-    """(NEUTRAL, drives) if the state is an immutable constant: assigned exactly once
-    from an immutable construction, never mutated, never called. Else None."""
-    assigns: list[Node] = []
-    for r in refs:
-        p = r.parent
-        if p is None:
-            continue
-        if p.type == "assignment" and _same(_field(p, "left"), r):
-            assigns.append(p)
-            continue
-        if p.type == "augmented_assignment" and _same(_field(p, "left"), r):
-            return None  # S += ... : reassignment
-        if p.type == "subscript" and _same(_field(p, "value"), r):
-            gp = p.parent
-            if gp is not None and gp.type in ("assignment", "augmented_assignment") and _same(_field(gp, "left"), p):
-                return None  # S[k] = v : mutation
-        if p.type == "call" and _same(_field(p, "function"), r):
-            return None  # called: dynamic dispatch, not a constant
-        if p.type == "attribute" and _same(_field(p, "object"), r):
-            gp = p.parent
-            if _text(_field(p, "attribute")) in _PY_MUTATING and gp is not None and gp.type == "call" and _same(_field(gp, "function"), p):
-                return None  # mutating method
-    if len(assigns) != 1:
-        return None
-    if not _rhs_is_immutable(_field(assigns[0], "right"), immutable_ctors):
-        return None
-    return NEUTRAL, _reaches_decision(refs, sp)
-
-
 def _binding_line(refs: list[Node], sp: LangSpec) -> int:
     """The line where the state is BOUND, not the first line its name appears on.
 
@@ -764,7 +691,17 @@ def _binding_line(refs: list[Node], sp: LangSpec) -> int:
 
 
 def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: dict[str, int | None], immutable_ctors: set[str], instance: bool, hidden: frozenset[str]) -> Finding:
-    const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp is LANG_SPEC["python"] else None
+    # A state the language DECLARES immutable is settled before any reach is read: one
+    # value, one class. This row replaced a `sp is LANG_SPEC["python"]` identity check,
+    # which is the language conditional welded into shared code that this project objects
+    # to elsewhere; the modifiers are a table row now and eight more languages get the rule.
+    if _declared_constant(refs, sp):
+        verdict, drives, silence, construct, partition, silence_line = (
+            NEUTRAL, False, "", "", state_partition.finite(1, False, f"const:{key}"), 0)
+        return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel,
+                "line": _binding_line(refs, sp), "silence": silence, "construct": construct,
+                "silence_line": silence_line, "partition": partition}
+    const = _immutable_const_verdict(refs, immutable_ctors, sp) if sp["immutable_ctor_rule"] else None
     if const is not None:
         # An immutable constant has a one-value domain, so its partition is one class.
         verdict, drives, silence, construct, partition, silence_line = (*const, "", "", state_partition.EMPTY, 0)

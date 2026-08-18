@@ -65,6 +65,13 @@ UNPARSED_REGION = "unparsed_region"
 # an alias no rule about this state's own references will ever see. Rust's `&mut self.v` is
 # the case in the table.
 MUTABLE_ALIAS = "mutable_alias"
+
+# The three verdicts a finding can carry. They live here rather than in state_bounds
+# because state_const reaches one of them too, and a second definition of a verdict name
+# is the drift this table exists to stop.
+NEUTRAL = "neutral"
+PROMISCUOUS = "promiscuous"
+UNRESOLVED = "unresolved"
 SILENCE_REASONS = (EXTERNAL_BOUNDARY, UNMODELED_CALLEE, DYNAMIC_DISPATCH, INJECTED_SLOT,
                    UNMODELED_CONSTRUCT, UNPARSED_REGION, MUTABLE_ALIAS)
 

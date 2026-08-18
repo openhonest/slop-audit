@@ -41,6 +41,8 @@ class LangSpec(TypedDict, total=False):
     member_name_field: str | None
     local_binding: dict[str, tuple[str, str | None]]
     switch_types: dict[str, tuple[str, str]]
+    immutable_modifiers: frozenset[str]
+    immutable_ctor_rule: bool
     mem_object: str
     mem_attr: str
     call_types: tuple[str, ...]
@@ -380,6 +382,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {},
+        "immutable_modifiers": frozenset(),
+        # The immutable-CONSTRUCTION rule, which follows a constructor one level to see
+        # whether its return can be mutated. Python only, and now declared here rather
+        # than by an identity check on the spec object in _finding.
+        "immutable_ctor_rule": True,
         "call_types": ("call",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -449,6 +456,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {},
+        "immutable_modifiers": frozenset({"const", "readonly"}),
+        "immutable_ctor_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
@@ -500,6 +509,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {},
+        "immutable_modifiers": frozenset({"const"}),
+        "immutable_ctor_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
@@ -551,6 +562,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": "field",
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {"switch_expression": ("condition", "switch_block_statement_group")},
+        "immutable_modifiers": frozenset({"final"}),
+        "immutable_ctor_rule": False,
         "call_types": ("method_invocation",), "flat_call": True,
         "call_fn": "name", "call_args": "arguments", "call_name": "name", "call_recv": "object",
         "arglist_types": ("argument_list",),
@@ -606,6 +619,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": "name",
         "local_binding": {"variable_declarator": ("name", None)},
         "switch_types": {"switch_statement": ("value", "switch_section")},
+        "immutable_modifiers": frozenset({"const", "readonly"}),
+        "immutable_ctor_rule": False,
         "call_types": ("invocation_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -674,6 +689,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "local_binding": {"let_declaration": ("pattern", "value")},
         "switch_types": {},
+        "immutable_modifiers": frozenset({"const", "static"}),
+        "immutable_ctor_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
@@ -734,6 +751,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {},
+        "immutable_modifiers": frozenset(),
+        "immutable_ctor_rule": False,
         "mem_object": "receiver", "mem_attr": "method",
         "call_types": ("call",), "flat_call": True,
         "call_fn": "method", "call_args": "arguments", "call_name": "method", "call_recv": "receiver",
@@ -799,6 +818,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": "field",
         "local_binding": {"init_declarator": ("declarator", "value")},
         "switch_types": {},
+        "immutable_modifiers": frozenset({"const"}),
+        "immutable_ctor_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -863,6 +884,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "local_binding": {"short_var_declaration": ("left", "right")},
         "switch_types": {"expression_switch_statement": ("value", "expression_case")},
+        "immutable_modifiers": frozenset({"const"}),
+        "immutable_ctor_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),

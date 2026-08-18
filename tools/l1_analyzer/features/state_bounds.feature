@@ -126,37 +126,6 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     Then it returns every reference within the scope, stopping at a nested class so an inner class's state is not swept in
     And only the plain-name spelling is filtered for imports and shadowing, since the other spellings cannot be shadowed by a parameter
 
-  Scenario: _rhs_is_immutable decides whether an assigned value can never change after it is built
-    Given the right-hand side of an assignment and the names of the repository's immutable constructors
-    When _rhs_is_immutable accepts a literal, a tuple, a known immutable wrapper, or a call to one of those constructors
-    Then it is true for a value no callee can mutate
-    But a missing right-hand side, and anything else at all, is not accepted
-
-  Scenario: _returns_immutable decides whether a function only ever hands back immutable values
-    Given a function's parse tree
-    When _returns_immutable requires every return in it to carry an immutable value
-    Then it is true only when the function is a constructor of constants, which lets a declared table resolve on the evidence
-    And a function with no return at all is not accepted, so the absence of returns is never read as a promise
-    But a bare return with no value also fails, since there is no value to prove immutable
-
-  Scenario: _collect_immutable_ctors names the repository's constructors of immutable values
-    Given the parse tree of one file
-    When _collect_immutable_ctors keeps every function whose returns are all immutable
-    Then it returns their names, which a one-level follow then uses to resolve a constant built by one of them
-    But it matches Python's spelling of a function definition only, so no other language contributes names
-
-  Scenario: _reaches_decision decides whether any reference to the state is consumed at all
-    Given every reference to one piece of state and the language spec
-    When _reaches_decision skips the references that are returned and the ones that are written to
-    Then it is true as soon as one reference is left, meaning the state is read somewhere that could turn on it
-    But a state that is only bound and only returned reaches no decision, and an empty reference list reaches none either
-
-  Scenario: _immutable_const_verdict clears a state that is a constant with a one-value domain
-    Given every reference, the repository's immutable constructors and the language spec
-    When _immutable_const_verdict requires exactly one plain assignment from an immutable construction, with no rebinding, no keyed store, no call and no mutating method
-    Then it returns neutral together with whether the constant reaches a decision
-    But any one of the four disqualifiers, or a count of assignments other than one, returns nothing and the ordinary classification runs instead
-
   Scenario: _binding_line reports the line where the state is bound, not where its name first appears
     Given every reference to one piece of state and the language spec
     When _binding_line takes the earliest reference that is an assignment target

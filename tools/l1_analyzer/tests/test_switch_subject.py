@@ -18,7 +18,6 @@ import pathlib
 import tempfile
 
 import pytest
-
 from l1_analyzer import state_bounds
 
 _CSHARP = """class A {
