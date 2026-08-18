@@ -16,10 +16,8 @@ is a sentence somebody can check against their own repository. `24.9` is not.
 
 import pathlib
 import subprocess
-import tempfile
 
 import pytest
-
 from l1_analyzer import indicators
 
 
