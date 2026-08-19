@@ -1,4 +1,4 @@
-"""The card reads a Finding by its contract, not by guessing at absent keys.
+"""The card and the report read a Finding by its contract, not by guessing at absent keys.
 
 `Finding` is a total TypedDict: state, verdict, drives_decision, file, line, silence,
 construct and partition are present on every finding the analyzer produces. The card read
@@ -17,9 +17,9 @@ finding is what has a contract.
 import pathlib
 import re
 
-from l1_analyzer import card
+from l1_analyzer import card, report
 
-_SOURCE = pathlib.Path(card.__file__).read_text()
+_MODULES = (card, report)
 
 _CONTRACT_FIELDS = ("state", "verdict", "drives_decision", "file", "line",
                     "silence", "construct", "partition", "classes")
@@ -27,9 +27,11 @@ _CONTRACT_FIELDS = ("state", "verdict", "drives_decision", "file", "line",
 
 def test_no_finding_field_is_read_with_a_fall_through_default():
     offenders = []
-    for number, line in enumerate(_SOURCE.split("\n"), start=1):
-        code = line.split("#", 1)[0]
-        for field in _CONTRACT_FIELDS:
-            if re.search(rf'\.get\(\s*"{field}"\s*,', code):
-                offenders.append(f"card.py:{number} {field}")
+    for module in _MODULES:
+        path = pathlib.Path(module.__file__)
+        for number, line in enumerate(path.read_text().split("\n"), start=1):
+            code = line.split("#", 1)[0]
+            for field in _CONTRACT_FIELDS:
+                if re.search(rf'\.get\(\s*"{field}"\s*,', code):
+                    offenders.append(f"{path.name}:{number} {field}")
     assert not offenders, f"contract fields read with a fabricated default: {offenders}"

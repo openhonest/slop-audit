@@ -35,6 +35,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer import incomplete
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -100,7 +101,15 @@ def _branch_totals(xml_text: str) -> tuple[int, int]:
     root = ET.fromstring(xml_text)
     for counter in root.findall("counter"):
         if counter.get("type") == "BRANCH":
-            return int(counter.get("covered", 0)), int(counter.get("missed", 0))
+            covered, missed = counter.get("covered"), counter.get("missed")
+            if covered is None or missed is None:
+                # Both are required attributes of a JaCoCo counter element. One missing is a
+                # malformed report, and defaulting it to zero would grade the project 0%
+                # covered rather than saying the report could not be read.
+                raise incomplete.refuse(
+                    "L1.19 decision-space coverage",
+                    "the JaCoCo BRANCH counter is missing its covered or missed attribute")
+            return int(covered), int(missed)
     return 0, 0
 
 

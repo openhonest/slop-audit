@@ -206,6 +206,16 @@ def _coverage_verdict(returncode: int, totals: dict, provenance: str) -> L1Resul
             return _na(why)
         return _na(f"the test suite did not complete a valid run ({why}); coverage not measured")
     num_branches = int(totals.get("num_branches", 0))
+    if num_branches and "covered_branches" not in totals:
+        # A total with no covered count is a malformed report, not a coverage of zero.
+        # coverage.py writes both fields together whenever branch coverage is on, so there
+        # is no shape a working tool produces that lands here. Grading it 0% would publish
+        # Slop for a repository whose coverage was never measured, which is the same lie as
+        # the zero denominator below and harder to spot: nothing looks like nothing, but
+        # 0% looks like a measurement.
+        raise incomplete.refuse(
+            "L1.19 decision-space coverage",
+            f"the coverage report carried {num_branches} branches but no covered count")
     covered = int(totals.get("covered_branches", 0))
     if num_branches == 0:
         # Raised rather than returned, now that the boundary covers this measure. A share of

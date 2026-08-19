@@ -220,7 +220,10 @@ def _basis(band: str, counts: dict, meter_ran: bool, census: object) -> str:
         return NO_SOURCE
     if census_unread(census):
         return UNREAD
-    if counts.get("promiscuous", 0) > 0:
+    # Subscripted. `counts` is either the analyzer's own, which carries all three verdicts,
+    # or the named complete fallback its caller builds; neither can be missing a key, and a
+    # default here would read a broken count as "none promiscuous".
+    if counts["promiscuous"] > 0:
         return MEASURED
     if silence_fraction(counts) > SILENCE_FLOOR:
         return SILENT
@@ -243,7 +246,7 @@ def _status(basis: str, counts: dict, coarse: bool) -> str:
     obscurity buys silence rather than a good letter."""
     if basis != MEASURED:
         return "na"
-    if counts.get("promiscuous", 0) > 0:
+    if counts["promiscuous"] > 0:
         return "cannot"
     # D, now that silence has vacated it: the reaching partition is finite and countable,
     # its members are unordered, and there are more of them than the bound. Limit testing
@@ -291,11 +294,13 @@ def coarse_states(l18b: dict, bound: int | None) -> list[dict]:
         return []
     flagged = [
         f for f in (l18b.get("findings") or [])
-        if f.get("verdict") == "neutral"
-        and state_partition.is_coarse(f.get("partition") or state_partition.UNKNOWN,
-                                      bool(f.get("drives_decision")), bound)
+        if f["verdict"] == "neutral"
+        and state_partition.is_coarse(f["partition"], bool(f["drives_decision"]), bound)
     ]
-    flagged.sort(key=lambda f: (-f["partition"]["classes"], f.get("file", ""), f.get("line", 0)))
+    # Finding is a total TypedDict, so every field here is present. The sort key already
+    # subscripted the partition; the other three defaulted, which would have ordered a
+    # broken finding to the top of the report as line 0 of file "".
+    flagged.sort(key=lambda f: (-f["partition"]["classes"], f["file"], f["line"]))
     return flagged
 
 
@@ -321,7 +326,7 @@ def grade_summary(results: dict, unordered_class_bound: int | None) -> GradeSumm
     rather than read from here: how many unordered cases are too many depends on who is
     doing the testing, and that answer belongs to whoever is publishing the grade."""
     l18 = results.get("L1.18") or {"band": "n/a"}
-    band = str(l18.get("band", "n/a"))
+    band = str(l18["band"])          # the `or` above already supplied the absent case
     l18b = results.get("L1.18b") or {}
     counts = (l18b.get("counts") if isinstance(l18b, dict) else None) or {"neutral": 0, "promiscuous": 0, "unresolved": 0}
     coarse = coarse_states(l18b if isinstance(l18b, dict) else {}, unordered_class_bound)
