@@ -548,10 +548,21 @@ def _get_parser(lang: str) -> Parser:
 def detect_primary_language(repo: Path) -> str:
     """Return the LANG_CFG key with the most files, or "unknown" when the repo
     contains no recognized source (callers report n/a rather than guess)."""
+    # THROUGH THE SAME SCOPE POLICY EVERY OTHER READER USES. This counted the whole tree
+    # with no build-artifact exclusion while the scopes in scope.py declare them, so a
+    # directory nobody would call source decided which grammar the whole audit ran.
+    #
+    # Reproduced on this repository's own Rust crate: thirteen .rs files outside target/,
+    # zero .c or .h outside it, and twenty-three vendored .c and .h inside it from the
+    # linked tree-sitter grammars. The crate detected as C, every source indicator then ran
+    # the C grammar over Rust, and the Rust-only interleaving meter returned n/a saying
+    # "c not supported yet". `--lang rust` gave the right answer throughout, so the
+    # measurement was right and only the detection was wrong.
     counts: Counter[str] = Counter()
     for lang, cfg in LANG_CFG.items():
         for ext in cfg["extensions"]:
-            counts[lang] += len(list(_rglob_files(repo, f"*{ext}")))
+            counts[lang] += sum(1 for f in _rglob_files(repo, f"*{ext}")
+                                if not _in_ignored_dir(f, ()))
     if not counts or counts.most_common(1)[0][1] == 0:
         return _LANGUAGE_UNKNOWN
     return counts.most_common(1)[0][0]
