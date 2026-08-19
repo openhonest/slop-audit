@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from l1_analyzer import coverage_gates, rust_facets, rust_trace
@@ -259,44 +260,59 @@ def _refine_incidental(repo: Path, module_relpath: str, gap: dict, body: str, ti
     return "invalid_fixture" if _fail_bucket(output, "proof", permuted, gap["return_type"]) != "incidental_panic" else "incidental_panic"
 
 
-def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, timeout_seconds: float) -> tuple[str, dict | None, str]:
+def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, timeout_seconds: float,
+               propose_fn: Callable[..., dict | None], repair_fn: Callable[..., dict | None],
+               run_fn: Callable[..., tuple[str, str]],
+               refine_fn: Callable[..., str]) -> tuple[str, dict | None, str]:
     """Propose -> run -> (repair -> run)* -> gate for one gap. Returns (bucket, proposal,
     test_source): a fail is resolved to one of _FAIL_BUCKETS (only `divergence` is retained);
-    a clean run is `pass`; `error` is did-not-compile even after repair; `skipped` is no reply."""
-    proposal = propose(gap)
+    a clean run is `pass`; `error` is did-not-compile even after repair; `skipped` is no reply.
+
+    The collaborators are parameters, as in `prove.prove` and the Python loop. They were
+    module-level lookups, so testing this orchestration meant patching the module's own
+    globals, and those tests went in the 2026-08-17 sweep for exactly that reason.
+    Required rather than defaulted: a default puts a real cargo invocation one forgotten
+    argument away from a test."""
+    proposal = propose_fn(gap)
     if proposal is None:
         return "skipped", None, ""
     source = render_module(proposal["body"])
-    status, output = _run_in_crate(repo, module_relpath, source, timeout_seconds)
+    status, output = run_fn(repo, module_relpath, source, timeout_seconds)
     rounds = 0
     while status == "error" and rounds < repair_rounds:
         rounds += 1
-        fixed = repair(gap, source, output)
+        fixed = repair_fn(gap, source, output)
         if fixed is None:
             break
         proposal = fixed
         source = render_module(fixed["body"])
-        status, output = _run_in_crate(repo, module_relpath, source, timeout_seconds)
+        status, output = run_fn(repo, module_relpath, source, timeout_seconds)
     if status != "fail":
         return status, proposal, source
     bucket = _fail_bucket(output, "proof", proposal["body"], gap["return_type"])
     if bucket == "incidental_panic":
-        bucket = _refine_incidental(repo, module_relpath, gap, proposal["body"], timeout_seconds)
+        # The fifth collaborator, and it re-runs the crate. Every fail output routes through
+        # here, so leaving it a module-level lookup would have kept the gating path
+        # untestable however many of the other four were injected.
+        bucket = refine_fn(repo, module_relpath, gap, proposal["body"], timeout_seconds)
     return bucket, proposal, source
 
 
 def _prove_module(repo: Path, module_relpath: str, gaps: list[dict], repair_rounds: int,
-                  timeout_seconds: float) -> tuple[list[dict], dict]:
+                  timeout_seconds: float, propose_fn: Callable[..., dict | None],
+                  repair_fn: Callable[..., dict | None], batch_run_fn: Callable[..., tuple[int, str]],
+                  run_fn: Callable[..., tuple[str, str]],
+                  refine_fn: Callable[..., str]) -> tuple[list[dict], dict]:
     """Prove all of one module's gaps. Fast path: batch every proposal into one compile and
     run once, then gate each failing test. If the batch does not compile (one bad test
     poisons it), fall back to per-gap with compiler-feedback repair. Returns (retained,
     outcomes). Only a `divergence` is retained; the noise buckets are counted, never hidden."""
     outcomes = {k: 0 for k in _OUTCOMES}
-    ready = [(g, p) for g in gaps for p in (propose(g),) if p is not None]
+    ready = [(g, p) for g in gaps for p in (propose_fn(g),) if p is not None]
     if not ready:
         return [], outcomes
-    rc, output = _append_and_run(repo, module_relpath, render_batch([p["body"] for _g, p in ready]),
-                                 _PROOF_MOD, timeout_seconds)
+    rc, output = batch_run_fn(repo, module_relpath, render_batch([p["body"] for _g, p in ready]),
+                              _PROOF_MOD, timeout_seconds)
     batch = {} if rc == 124 else _classify_batch(output)
     if batch:  # the module compiled: read each test's verdict, then gate the failures.
         retained = []
@@ -313,7 +329,9 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[dict], repair_roun
     # The batch did not compile: isolate, repair, and gate each gap individually.
     retained = []
     for gap in gaps:
-        bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
+        bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds,
+                                              timeout_seconds, propose_fn, repair_fn, run_fn,
+                                              refine_fn)
         if bucket == "skipped":
             continue
         outcomes[bucket] += 1
@@ -352,7 +370,10 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         modules += 1
         if progress:
             progress(relpath, len(gaps), len(retained))
-        module_retained, module_outcomes = _prove_module(repo, relpath, gaps, repair_rounds, timeout_seconds)
+        # The real four, named at the one place that knows which they are.
+        module_retained, module_outcomes = _prove_module(
+            repo, relpath, gaps, repair_rounds, timeout_seconds,
+            propose, repair, _append_and_run, _run_in_crate, _refine_incidental)
         retained.extend(module_retained)
         for k in outcomes:
             outcomes[k] += module_outcomes[k]
