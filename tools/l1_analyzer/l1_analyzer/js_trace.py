@@ -158,18 +158,37 @@ def _coverage_verdict(branches: dict, returncode: int, runtime: str) -> L1Result
     }
 
 
+def _toolchain(repo: Path) -> tuple[L1Result | None, dict | None]:
+    """Either a refusal or a usable toolchain, never a half-resolved one. Exactly one of the
+    two is None, so a caller that forgets the check gets a TypeError rather than a run
+    against a toolchain that was never found.
+
+    Both L1.19 and L1.20 carried these eight lines. Two copies is two sets of preconditions
+    that can drift: one indicator could learn a new one and the other keep running without
+    it, and the panel would then report n/a for coverage and a number for determinism on a
+    repo where neither could be measured."""
+    # Only node's PRESENCE is resolved, never its path: every command here runs through
+    # _wrap, which spells a bare `node` so nvm can select the repo's version. A field
+    # holding the path would be a value nobody reads.
+    if _node() is None:
+        return _na("needs Node.js (node) in PATH"), None
+    if not _node_modules_present(repo):
+        return _na("dependencies not installed (node_modules missing); run the project's "
+                   "install first"), None
+    pkg = _package_json(repo)
+    if pkg is None:
+        return _na("no readable package.json in the repo"), None
+    return None, pkg
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.19 for JS/TS: branch coverage from c8 (V8). Bands match the spec: >90% Healthy,
     60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a uniform harness
     signature and ignored: `node` on PATH is the runtime."""
-    node = _node()
-    if node is None:
-        return _na("needs Node.js (node) in PATH")
-    if not _node_modules_present(repo):
-        return _na("dependencies not installed (node_modules missing); run the project's install first")
-    pkg = _package_json(repo)
-    if pkg is None:
-        return _na("no readable package.json in the repo")
+    refusal, tools = _toolchain(repo)
+    if refusal is not None:
+        return refusal
+    pkg = tools
     test_cmd = _test_command(pkg)
     if test_cmd is None:
         return _na("no test command in package.json (scripts.test)")
@@ -301,14 +320,10 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     A run that does not execute (missing runner, build error, no tests) is not a determinism
     result, so return n/a with the reason rather than a misleading 0/5. When the suite runs
     but some tests fail, the failing seeds' reasons are surfaced in details."""
-    node = _node()
-    if node is None:
-        return _na("needs Node.js (node) in PATH")
-    if not _node_modules_present(repo):
-        return _na("dependencies not installed (node_modules missing); run the project's install first")
-    pkg = _package_json(repo)
-    if pkg is None:
-        return _na("no readable package.json in the repo")
+    refusal, tools = _toolchain(repo)
+    if refusal is not None:
+        return refusal
+    pkg = tools
     runner = _detect_runner(pkg)
     builder = _RUNNERS.get(runner or "")
     if builder is None:

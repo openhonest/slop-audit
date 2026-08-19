@@ -135,3 +135,10 @@ Feature: js_trace — running a JavaScript or TypeScript project's own suite to 
     Then it returns the passing count over the total, banded Healthy when all pass, Not Healthy when one short, and Slop below that, with the failing seeds' reasons in the detail line
     And the runtime override is accepted and ignored
     But a missing node, missing dependencies, an unreadable manifest, no runner it can randomize, a jest older than the version that accepts a seed, a run that times out, or a run whose suite never executed each returns a not-applicable naming that reason, rather than the misleading score of zero passes
+
+  Scenario: _toolchain resolves this repo's Node toolchain once, or refuses
+    Given a repository and the time budget for probing it
+    When _toolchain confirms node is on PATH, that node_modules is installed, and reads package.json
+    Then it returns a refusal and no package.json, or the parsed package.json and no refusal, so exactly one of the two is ever populated
+    And both L1.19 and L1.20 ask it, so the two indicators cannot come to hold different preconditions for the same repo
+

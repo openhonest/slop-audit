@@ -90,3 +90,10 @@ Feature: java_trace — running a Maven project's own test suite to measure bran
     Then it returns the passing count over the run count, banded Healthy when every run passes, Not Healthy at one short, and Slop below that
     And the runs that had failures are named in the detail line with their counts, up to three of them, so a low score carries its own explanation
     But an unsupported project, a missing build tool, a timed-out run, or any run that executed no tests at all returns not-applicable with the reason rather than a zero score that would read as flakiness; and unlike the other harnesses this one re-checks that tests ran on every run, not only the first
+
+  Scenario: _toolchain resolves this repo's Maven toolchain once, or refuses
+    Given a repository and the time budget for probing it
+    When _toolchain looks for Maven, pin a JDK and name it with its provenance
+    Then it returns a refusal and no tools, or tools and no refusal, so exactly one of the two is ever populated
+    And both L1.19 and L1.20 ask it, so the two indicators cannot come to hold different preconditions for the same repo
+

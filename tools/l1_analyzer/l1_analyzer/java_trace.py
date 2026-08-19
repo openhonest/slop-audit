@@ -33,6 +33,7 @@ import shutil
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TypedDict
 
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -140,16 +141,41 @@ def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, jdk: st
     }
 
 
+class JavaTools(TypedDict):
+    """A resolved Maven toolchain: the command to run, the environment that pins the JDK,
+    and the JDK's name with its provenance for the details line."""
+    maven: str
+    env: dict[str, str]
+    jdk: str
+
+
+def _toolchain(repo: Path, timeout_seconds: float) -> tuple[L1Result | None, JavaTools | None]:
+    """Either a refusal or a usable toolchain, never a half-resolved one. Exactly one of the
+    two is None, so a caller that forgets the check gets a TypeError rather than a run
+    against a toolchain that was never found.
+
+    Both L1.19 and L1.20 carried these six lines. Two copies is two sets of preconditions
+    that can drift: one indicator could learn a new one and the other keep running without
+    it, and the panel would then report n/a for coverage and a number for determinism on a
+    repo where neither could be measured."""
+    reason = _unsupported_reason(repo)
+    if reason is not None:
+        return _na(reason), None
+    # _unsupported_reason has already refused a repo with no Maven, so this cannot be None.
+    # Re-checking here would be a guard against a contract the line above already holds.
+    maven = _maven(repo)
+    env, prov = _pin_jdk(repo, timeout_seconds)
+    return None, {"maven": maven, "env": env, "jdk": _jdk(repo, timeout_seconds, env) + prov}
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.19 for Java: branch coverage from JaCoCo (`mvn test jacoco:report`). Bands match the
     spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a
     uniform harness signature and ignored: the project's build selects the runtime."""
-    reason = _unsupported_reason(repo)
-    if reason is not None:
-        return _na(reason)
-    maven = _maven(repo)
-    env, prov = _pin_jdk(repo, timeout_seconds)
-    jdk = _jdk(repo, timeout_seconds, env) + prov
+    refusal, tools = _toolchain(repo, timeout_seconds)
+    if refusal is not None:
+        return refusal
+    maven, env, jdk = tools["maven"], tools["env"], tools["jdk"]
     run = _run_untrusted([maven, "-q", "test", "jacoco:report"], cwd=repo, env=env, timeout_seconds=timeout_seconds)
     report = repo / "target" / "site" / "jacoco" / "jacoco.xml"
     if run.returncode == 124 or not report.exists():
@@ -220,12 +246,10 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     Healthy, <4/5 Slop. A run that does not build or runs no tests is not a determinism result,
     so return n/a with the reason rather than a misleading 0/5. When the suite runs but some
     tests fail, the failing seeds' Surefire counts are surfaced in `details`."""
-    reason = _unsupported_reason(repo)
-    if reason is not None:
-        return _na(reason)
-    maven = _maven(repo)
-    env, prov = _pin_jdk(repo, timeout_seconds)
-    jdk = _jdk(repo, timeout_seconds, env) + prov
+    refusal, tools = _toolchain(repo, timeout_seconds)
+    if refusal is not None:
+        return refusal
+    maven, env, jdk = tools["maven"], tools["env"], tools["jdk"]
 
     def outcomes() -> Iterable[tuple[int, str]]:
         # Lazy, so the verdict's return on a timed-out or never-run seed stops the rest.
