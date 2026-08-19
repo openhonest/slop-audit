@@ -18,11 +18,6 @@ Feature: python_facets — locating the Python decision branches no test ever re
     And the operator opts in for that run only, after the whole payload is printed rather than summarised
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
-  Scenario: _text reads the module source a node covers
-    Given the module source as bytes and a node that may be absent
-    When _text slices the source between the node's start and end
-    Then it returns that text, ignoring any byte the decoder cannot read
-    But an absent node yields nothing at all, which is how the callers tell "no such part" from an empty name
 
   Scenario: _first_block finds the body a branch construct guards
     Given a branch construct such as an if, an else, a loop or a case

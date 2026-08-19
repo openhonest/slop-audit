@@ -319,3 +319,14 @@ def c_declarator_name(node: Node | None) -> str:
     if node.type in ("init_declarator", "array_declarator", "pointer_declarator"):
         return c_declarator_name(field(node, "declarator"))
     return ""
+
+
+def slice_text(src: bytes, node: Node | None) -> str | None:
+    """A node's source text sliced out of the buffer, or nothing for an absent node.
+
+    The other reader. `text` decodes the node's own bytes and answers an absent node with
+    the empty string; this one slices the source and answers with None, which is what its
+    callers test for. Two questions, so two functions, rather than one function with a
+    flag: the facet readers were each carrying an identical private copy of this, and the
+    package carried three private copies of `text` besides."""
+    return None if node is None else src[node.start_byte:node.end_byte].decode("utf8", errors="ignore")

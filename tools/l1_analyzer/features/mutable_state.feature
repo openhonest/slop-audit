@@ -50,11 +50,6 @@ Feature: mutable_state — L1.18, the share of functions that reference unbounde
     Then it returns the names of only those declarations, read from the declaration's identifier child so the type token is never mistaken for the name
     But a constant and a plain immutable static are excluded on the merits, and a declaration carrying the keyword with no identifier child yields nothing
 
-  Scenario: _text reads the source text one node spans
-    Given any parse-tree node
-    When _text decodes the bytes that node covers
-    Then it returns that node's source text, replacing anything that will not decode rather than failing on it
-    But a node carrying no text at all returns the empty string
 
   Scenario: _deep_nodes collects nodes of given kinds at any depth
     Given a parse-tree root and the node kinds wanted

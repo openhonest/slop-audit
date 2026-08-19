@@ -74,6 +74,7 @@ from l1_analyzer.indicators import (
     bucketed_paths,
 )
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE, BucketedPaths
+from l1_analyzer.ts_nodes import text as _text
 
 # conformance/ and tests hold scaffolding and doubles, not production surface. The scope
 # is named rather than spelled out here, so scope.SCOPES lists this meter among the
@@ -130,8 +131,6 @@ class SurfaceResult(TypedDict):
     details: str
 
 
-def _text(node: Node | None) -> str:
-    return node.text.decode("utf8", errors="ignore") if node is not None and node.text else ""
 
 
 def _walk(node: Node) -> list[Node]:

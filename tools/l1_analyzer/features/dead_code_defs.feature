@@ -21,11 +21,6 @@ Feature: dead_code_defs — the per-language definition collectors that route ev
     And the operator opts in for that run only, after the whole payload is printed rather than summarised
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
-  Scenario: _text reads the source text of one syntax node
-    Given a syntax node, or nothing at all
-    When _text decodes the node's bytes
-    Then it returns the text as written in the source
-    But a missing node, and a node carrying no text, both return an empty string instead of failing
 
   Scenario: _named_child_of_type finds the first child of a wanted kind
     Given a node and the child types wanted

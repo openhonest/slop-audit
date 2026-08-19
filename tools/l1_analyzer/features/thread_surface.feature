@@ -18,11 +18,6 @@ Feature: thread_surface — the concurrency audit surface, every site where a la
     And the operator opts in for that run only, after the whole payload is printed rather than summarised
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
-  Scenario: _text reads the source text a parse node covers
-    Given a node, or nothing at all
-    When _text is asked for its text
-    Then it returns the decoded source, replacing any byte it cannot decode rather than failing
-    And nothing at all, and a node carrying no text, both come back as the empty string
 
   Scenario: _walk lists a node and everything under it
     Given the root of any subtree

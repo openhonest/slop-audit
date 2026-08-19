@@ -21,6 +21,7 @@ from typing import TypedDict
 from tree_sitter import Node
 
 from l1_analyzer.indicators import _get_parser
+from l1_analyzer.ts_nodes import slice_text as _text
 
 
 class PyParam(TypedDict):
@@ -42,8 +43,6 @@ class PyFunction(TypedDict):
     branches: list[PyBranch]
 
 
-def _text(src: bytes, node: Node | None) -> str | None:
-    return None if node is None else src[node.start_byte:node.end_byte].decode("utf8", errors="ignore")
 
 
 def _first_block(node: Node) -> Node | None:

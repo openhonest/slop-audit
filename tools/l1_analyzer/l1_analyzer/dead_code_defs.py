@@ -26,6 +26,8 @@ from typing import TypedDict
 
 from tree_sitter import Node
 
+from l1_analyzer.ts_nodes import text as _text
+
 CANDIDATE = "candidate"
 UNDECIDABLE = "undecidable"
 EXCLUDED = "excluded"
@@ -50,8 +52,6 @@ class RepoFacts(TypedDict):
     ruby_metaprogramming: str
 
 
-def _text(node: Node | None) -> str:
-    return node.text.decode("utf8", errors="ignore") if node is not None and node.text else ""
 
 
 def _named_child_of_type(node: Node, types: tuple[str, ...]) -> Node | None:

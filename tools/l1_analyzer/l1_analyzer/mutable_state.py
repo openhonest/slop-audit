@@ -65,6 +65,7 @@ from l1_analyzer.indicators import (
 )
 from l1_analyzer.lang_spec import LANG_SPEC
 from l1_analyzer.scope import PRODUCTION
+from l1_analyzer.ts_nodes import text as _text
 
 # ---------------------------------------------------------------------------
 # L1.18 Mutable state ratio (the key "any language" indicator, using tree-sitter)
@@ -156,8 +157,6 @@ def _module_mutables_by_specifier(candidates: list[Node]) -> set[str]:
     return mutables
 
 
-def _text(node: Node) -> str:
-    return node.text.decode("utf8", errors="ignore") if node.text else ""
 
 
 def _deep_nodes(root: Node, node_types: tuple[str, ...]) -> list[Node]:

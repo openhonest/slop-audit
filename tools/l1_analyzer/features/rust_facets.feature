@@ -32,12 +32,6 @@ Feature: rust_facets — turning a Rust coverage run into named, provable decisi
     And a node nothing gates yields no condition at all
     But this is what lets a branch that the host platform never compiles be spotted before any effort is spent proving it
 
-  Scenario: _text reads the source text a node spans
-    Given the source bytes and a node, or nothing
-    When _text slices the bytes the node covers and decodes them
-    Then it returns that text
-    And bytes that will not decode are dropped rather than raising, so a file with stray encoding never stops the walk
-    But being handed nothing yields nothing, which is how every caller here distinguishes an absent part of the tree from an empty one
 
   Scenario: _is_test_scoped decides whether a function is test code rather than a subject
     Given the source bytes and a function node

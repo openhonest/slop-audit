@@ -150,3 +150,9 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
     Then it returns that identifier's text
     But it returns nothing for a function declarator, because a function is not a state binding, and nothing for an absent node
 
+  Scenario: slice_text cuts a node's text out of the source buffer
+    Given the source bytes and a node, or nothing at all
+    When slice_text takes the node's byte range
+    Then it returns that text decoded
+    But it returns nothing for an absent node, which is what its callers test for, unlike text, which answers the empty string
+

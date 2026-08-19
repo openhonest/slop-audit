@@ -18,6 +18,7 @@ from typing import TypedDict
 from tree_sitter import Node
 
 from l1_analyzer.indicators import _get_parser
+from l1_analyzer.ts_nodes import slice_text as _text
 
 _BRANCH_BODY = {
     "if_expression": ("consequence",),
@@ -84,8 +85,6 @@ class RustFunction(TypedDict):
     branches: list[RustBranch]
 
 
-def _text(src: bytes, node: Node | None) -> str | None:
-    return None if node is None else src[node.start_byte:node.end_byte].decode("utf8", errors="ignore")
 
 
 def _is_test_scoped(src: bytes, node: Node) -> bool:
