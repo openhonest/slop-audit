@@ -230,6 +230,7 @@ def _batch_status(batch: dict[int, str], index: int) -> str:
     finish the batch. One silent test does not justify abandoning the other forty, and a
     bucket nobody can confuse with a compile error is what keeps the count readable."""
 
+    # Ruff's SIM401 offers `batch.get(index, "unreported")`, which is the exact
     # shape this function exists to remove. The subscript and the explicit miss are the
     # point, and collapsing them back into a default puts the open input one keyword away
     # from returning whatever the next reader thinks is a reasonable answer.
