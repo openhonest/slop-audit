@@ -35,6 +35,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from l1_analyzer import coverage_gates, rust_facets, rust_trace
+from l1_analyzer import model_call as llm
 
 # The retention buckets, in report order. Only `divergence` is a proven bug and retained;
 # the rest name why a failing test is the tool's own noise, surfaced and never hidden.
@@ -71,7 +72,9 @@ _PROOF_MOD = "l1_coverage_proof"
 
 
 def model_available() -> bool:
-    return bool(os.getenv("ANTHROPIC_API_KEY"))
+    """Re-exported from the one reader of the variable's NAME, so a rename cannot
+    leave a second copy checking the old one."""
+    return llm.model_available()
 
 
 def host_cfg() -> frozenset[str]:
@@ -94,21 +97,15 @@ def _live_gaps(gaps: list[dict], host: frozenset[str]) -> list[dict]:
 def _call_model(instruction: str, payload: str) -> dict | None:
     """One structured model call. Returns the parsed JSON object, or None on any failure -
     an unusable reply never becomes a false proof."""
-    if not model_available():
+    # Through the one boundary. Only the TAIL differed between this and prove.generate:
+    # that one wants the text with its fences stripped, this one wants it parsed as JSON,
+    # and the preamble they shared had already drifted on the token limit.
+    reply = llm.call(instruction, payload, max_tokens=2048)
+    if reply is None:
         return None
     try:
-        from anthropic import Anthropic
-    except ImportError:
-        return None
-    try:
-        response = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]).messages.create(
-            model="claude-sonnet-5", max_tokens=2048,
-            system=instruction,
-            messages=[{"role": "user", "content": payload}],
-        )
-        raw = re.sub(r"^```(?:json)?\n|```$", "", response.content[0].text.strip(), flags=re.MULTILINE)
-        data = json.loads(raw)
-    except Exception:  # noqa: BLE001 - any failure yields no proposal, never a false claim
+        data = json.loads(re.sub(r"^```(?:json)?\n|```$", "", reply.strip(), flags=re.MULTILINE))
+    except Exception:  # noqa: BLE001 - a malformed reply yields no proposal, never a false claim
         return None
     return data if isinstance(data, dict) else None
 

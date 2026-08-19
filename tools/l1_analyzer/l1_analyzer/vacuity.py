@@ -78,7 +78,12 @@ from typing import TypedDict
 # 1 of 9 languages" is a different sentence from "no vacuous path", and the reader is
 # owed the second number.
 REFUSED = ("rust", "go", "java", "csharp", "c", "ruby", "javascript", "typescript")
-LANGUAGES_TOTAL = 9
+# DERIVED, not written twice. This was the literal 9, and it agreed with REFUSED because
+# eight refused plus the one language this checker reads is nine. Nothing said so, so a
+# tenth grammar would have left the reach reporting one of nine while the checker refused
+# nine of ten. Deriving it also gives REFUSED a real reader: its only one was a test
+# asserting its contents, which is a declaration kept alive by the test that checks it.
+LANGUAGES_TOTAL = len(REFUSED) + 1
 
 # Constants that decline to assert. A branch reaching one of these did not manufacture a
 # measurement, it refused to make one, and that is the repair this check must not convict.

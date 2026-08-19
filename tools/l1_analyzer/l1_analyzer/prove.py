@@ -20,6 +20,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypedDict
 
+from l1_analyzer import model_call as llm
+
 DEMONSTRATED = "demonstrated"           # generated, run, and it fired a race (retained)
 NOT_DEMONSTRATED = "not-demonstrated"   # generated and run, but no race fired (NOT claimed)
 NOT_GENERATED = "not-generated"         # the model was unavailable or declined
@@ -124,9 +126,12 @@ _PROVE_CRATE_DEPS = 'crossbeam-skiplist = "0.1"\ncrossbeam-utils = "0.8"\ncrossb
 
 
 def model_available() -> bool:
-    """Whether a generation model can be called (an Anthropic key is present)."""
-    import os
-    return bool(os.getenv("ANTHROPIC_API_KEY"))
+    """Whether a generation model can be called (an Anthropic key is present).
+
+    Re-exported from the one reader of the variable's NAME, so a rename cannot leave a
+    second copy checking the old one. Three modules asked this question and two of them
+    spelled the answer themselves."""
+    return llm.model_available()
 
 
 def _strip_fences(code: str) -> str:
@@ -139,23 +144,10 @@ def generate(request: ProofRequest) -> str | None:
     reproduces the located hazard as a failing, nondeterministic race. Returns None when
     no model / anthropic is available - the loop then reports not-generated, never a false
     claim. The execution gate, not this call, decides whether the proof stands."""
-    import os
-    if not model_available():
-        return None
-    try:
-        from anthropic import Anthropic
-    except ImportError:
-        return None
-    try:
-        response = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]).messages.create(
-            model="claude-sonnet-5",
-            max_tokens=4096,
-            system=_CONCURRENCY_INSTRUCTION,
-            messages=[{"role": "user", "content": request["context"]}],
-        )
-    except Exception:  # noqa: BLE001 - any generation failure yields no proof, never a false claim
-        return None
-    return _strip_fences(response.content[0].text)
+    # Through the one boundary. `model_call` is taken as a PARAMETER by `prove` above,
+    # so the module is imported under a name that cannot shadow it.
+    reply = llm.call(_CONCURRENCY_INSTRUCTION, request["context"], max_tokens=4096)
+    return None if reply is None else _strip_fences(reply)
 
 
 def write_crate_and_stress(test_source: str, work_dir: str, runs: int, timeout_seconds: float) -> RunResult:

@@ -437,3 +437,19 @@ def test_a_refusal_about_a_DIFFERENT_quantity_clears_nothing():
            '        raise incomplete.refuse("scan", "no language")\n'
            '    files = read(r)\n' + _BAND)
     assert _findings(src), "a refusal about `lang` must not clear a count over `files`"
+
+
+def test_the_language_total_is_derived_from_the_languages_refused():
+    """Two declarations of one fact, agreeing by coincidence.
+
+    `REFUSED` names the eight languages this checker declines and `LANGUAGES_TOTAL` was
+    the literal 9. They agree because eight refused plus the one read is nine, and nothing
+    said so: adding a tenth grammar to the analyzer leaves the reach reporting one of nine
+    while the checker refuses nine of ten.
+
+    It also made `REFUSED` test-only. Its single reader was an assertion about its
+    contents, which L1.12 reports as `referenced only from the test tree` and which is a
+    declaration kept alive by the test that checks it.
+    """
+    assert vacuity.LANGUAGES_TOTAL == len(vacuity.REFUSED) + 1, (
+        "the total must be derived from the refusals, not written beside them")
