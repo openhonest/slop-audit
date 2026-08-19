@@ -131,6 +131,7 @@ from l1_analyzer.state_sites import (
 from l1_analyzer.state_sites import (
     owner_name as _owner_name,
 )
+from l1_analyzer.ts_nodes import c_declarator_name as _c_declarator_name
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import local_refs as _local_refs
 from l1_analyzer.ts_nodes import refs as _refs
@@ -385,19 +386,6 @@ def _go_toplevel(root: Node) -> list[Site]:
     return sites
 
 
-def _c_declarator_name(node: Node | None) -> str:
-    """The identifier a C declarator binds, unwrapping init / array / pointer declarators.
-    Deliberately re-derived here rather than imported from state_bounds: the census is the
-    second reading, and a shared helper is a shared blind spot."""
-    if node is None:
-        return ""
-    if node.type == "identifier":
-        return _text(node)
-    if node.type == "function_declarator":
-        return ""
-    if node.type in ("init_declarator", "array_declarator", "pointer_declarator"):
-        return _c_declarator_name(_field(node, "declarator"))
-    return ""
 
 
 def _c_toplevel(root: Node) -> list[Site]:

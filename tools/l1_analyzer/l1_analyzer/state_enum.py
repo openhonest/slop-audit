@@ -37,6 +37,7 @@ from l1_analyzer.indicators import LangCfg, _find_module_mutable_names
 from l1_analyzer.lang_spec import LangSpec
 from l1_analyzer.mutable_state import shallow_candidates
 from l1_analyzer.state_sites import Site
+from l1_analyzer.ts_nodes import c_declarator_name as _c_declarator_name
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import local_refs as _local_refs
 from l1_analyzer.ts_nodes import refs as _refs
@@ -81,18 +82,6 @@ def sites_of(cands: Cands, key: str) -> set[Site]:
 # function is a local and never reaches here.
 # --------------------------------------------------------------------------
 
-def _c_declarator_name(node: Node | None) -> str:
-    """The identifier a C declarator binds, unwrapping init/array/pointer declarators.
-    The empty string for a function declarator (not a variable) or a non-declarator node."""
-    if node is None:
-        return ""
-    if node.type == "identifier":
-        return _text(node)
-    if node.type == "function_declarator":
-        return ""
-    if node.type in ("init_declarator", "array_declarator", "pointer_declarator"):
-        return _c_declarator_name(_field(node, "declarator"))
-    return ""
 
 
 def _py_module(root: Node, cfg: LangCfg) -> Cands:

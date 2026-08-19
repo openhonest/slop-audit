@@ -109,9 +109,9 @@ Feature: dead_code_defs — the per-language definition collectors that route ev
     And a named export from a file the package declares as an entry point is undecidable too
     But everything else, exported or not, is a candidate
 
-  Scenario: _c_declarator_name digs the identifier out of a C declarator
+  Scenario: _c_declared_identifier digs the identifier out of a C declarator
     Given a C declarator, which may be wrapped in pointer, array or function syntax
-    When _c_declarator_name descends through the wrappers
+    When _c_declared_identifier descends through the wrappers
     Then it returns the identifier the declaration names
     But it returns nothing when the chain runs out without one, and that declaration is then collected not at all
 

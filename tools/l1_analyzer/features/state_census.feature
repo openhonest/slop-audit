@@ -88,12 +88,6 @@ Feature: state_census — the second, independent count of declaration sites, th
     Then it returns one module-binding site per specification
     But it takes the first name only, so a single specification naming several variables at once contributes one site instead of several, and a package-level constant is a different node kind and is not counted
 
-  Scenario: _c_declarator_name unwraps a C declarator to the identifier it binds
-    Given a child of a C file-scope declaration
-    When _c_declarator_name peels the initialiser, array and pointer declarators
-    Then it returns the identifier being declared
-    And it is re-derived here rather than borrowed from the classifier, because the census is the second reading and a shared helper would be a shared blind spot
-    But a function declarator declares no slot and returns the empty string
 
   Scenario: _c_toplevel counts C's file-scope variables
     Given a parsed C file

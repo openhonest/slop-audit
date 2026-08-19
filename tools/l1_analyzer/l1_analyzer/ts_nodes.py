@@ -295,3 +295,27 @@ def unwrap_unary(node: Node | None, sp: LangSpec) -> Node | None:
 
 def first_arg(call: Node | None, sp: LangSpec) -> Node | None:
     return arg_value(first_named(field(call, sp["call_args"])))
+
+
+def c_declarator_name(node: Node | None) -> str:
+    """The identifier a C declarator binds, unwrapping init / array / pointer declarators.
+    The empty string for a function declarator (a function, not a variable) or for any
+    other node.
+
+    Three modules asked this and two spelled it themselves. The census's copy carried a
+    note saying it was deliberately re-derived, "the census is the second reading, and a
+    shared helper is a shared blind spot". The two bodies were byte-identical, so the
+    second reading agreed with the first by being a copy of it. That is not independence;
+    it is the cost of two copies with none of the benefit, and the note is what stopped
+    anyone asking. Unwrapping `init_declarator` to its `declarator` field is a fact about
+    the C grammar rather than a judgement, so two copies of it cannot disagree honestly,
+    only drift."""
+    if node is None:
+        return ""
+    if node.type == "identifier":
+        return text(node)
+    if node.type == "function_declarator":
+        return ""
+    if node.type in ("init_declarator", "array_declarator", "pointer_declarator"):
+        return c_declarator_name(field(node, "declarator"))
+    return ""

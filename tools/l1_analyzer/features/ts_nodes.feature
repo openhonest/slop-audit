@@ -143,3 +143,10 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
     When _first_arg finds the argument list, takes its first named entry and unwraps a named-argument wrapper
     Then it returns the value passed
     But a missing call, a missing argument list or an empty one all yield nothing, since every step passes an absence straight through
+
+  Scenario: c_declarator_name names the variable a C declarator binds
+    Given a C declarator node, or nothing at all
+    When c_declarator_name unwraps init, array and pointer declarators to the identifier
+    Then it returns that identifier's text
+    But it returns nothing for a function declarator, because a function is not a state binding, and nothing for an absent node
+

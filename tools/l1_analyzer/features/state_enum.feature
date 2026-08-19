@@ -38,11 +38,6 @@ Feature: state_enum — which declarations the classifier's reader walks, and wh
     And crediting only one of them would report the others as unread
     But a key nothing yielded returns an empty set rather than raising
 
-  Scenario: _c_declarator_name unwraps a C declarator to the identifier it binds
-    Given a declarator node from a C declaration
-    When _c_declarator_name peels the initialiser, array and pointer forms
-    Then it returns the identifier the declarator binds
-    But a function declarator binds no variable and returns the empty string, as does any node that is not a declarator at all
 
   # The candidate list comes from the shared shallow walk, so anything bound below a root child and one level under it is never enumerated here.
   Scenario: _py_module records every Python module binding the mutability rule was run over

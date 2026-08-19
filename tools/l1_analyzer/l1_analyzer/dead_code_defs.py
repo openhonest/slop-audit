@@ -445,8 +445,15 @@ def _js(root: Node, src: bytes, relpath: str, facts: RepoFacts) -> list[Definiti
 # C
 # ---------------------------------------------------------------------------
 
-def _c_declarator_name(node: Node) -> Node | None:
-    """Descend a C declarator (pointer, array, function) to the identifier it names."""
+def _c_declared_identifier(node: Node) -> Node | None:
+    """Descend a C declarator (pointer, array, function) to the identifier NODE it names.
+
+    Named apart from ts_nodes.c_declarator_name, which it used to share a name with. They
+    answer different questions and must: this one descends THROUGH a function_declarator to
+    reach the function's name, because a definition is what L1.12 is enumerating; that one
+    returns nothing for a function_declarator, because a function is not a state binding.
+    One name over two rules is how a caller reaches for the wrong one and gets a plausible
+    answer."""
     current: Node | None = node
     while current is not None:
         if current.type == "identifier":
@@ -462,11 +469,11 @@ def _c(root: Node, src: bytes, relpath: str, facts: RepoFacts) -> list[Definitio
     out: list[Definition] = []
     for item in root.named_children:
         if item.type == "function_definition":
-            name_node = _c_declarator_name(item.child_by_field_name("declarator"))
+            name_node = _c_declared_identifier(item.child_by_field_name("declarator"))
             kind = "function"
         elif item.type == "declaration":
             declarator = _named_child_of_type(item, ("init_declarator",))
-            name_node = _c_declarator_name(declarator) if declarator is not None else None
+            name_node = _c_declared_identifier(declarator) if declarator is not None else None
             kind = "variable"
         else:
             continue
