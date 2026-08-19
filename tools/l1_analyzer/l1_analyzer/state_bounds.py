@@ -365,6 +365,14 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
         if holder is not None and _same(_unwrap_unary(_field(holder, subject_field), sp), ref):
             return _switch_partition(ref, holder, arm_type)
 
+    # ITERATING THE STATE reads every cell it holds, so its reach is the cell set and
+    # nothing wider. `for k := range s.m` had no row anywhere and came back as a construct
+    # with no rule, which inflated Go's silence on the plainest loop the language has.
+    if parent.type in sp["iterate_types"]:
+        if cells is not None:
+            return state_partition.finite(cells + 1, False, "cells")
+        return state_partition.unbounded()
+
     # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target
     # position is compositional exactly as return position is, and the meter neither
     # fail-closes nor assumes: it follows the call RESULT like any other call result (spec
@@ -415,6 +423,8 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
     # f(..., S, ...) : argument to a call.
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
+        if fname in sp["writing_builtins"]:
+            return state_partition.write()      # `delete(m, k)`: removes and returns nothing
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
             return _flow(parent.parent, sp, closed_sets, cells, depth)
         if fname in _EFFECT_CALLS:
@@ -582,6 +592,8 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
         return state_partition.finite(2, True, "truthy")
     if parent.type in sp["arglist_types"]:
         fname = _callee_name(parent.parent, sp)
+        if fname in sp["writing_builtins"]:
+            return state_partition.write()      # `delete(m, k)`: removes and returns nothing
         if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
             return _flow(parent.parent, sp, closed_sets, cells, depth)
         if fname in _EFFECT_CALLS:

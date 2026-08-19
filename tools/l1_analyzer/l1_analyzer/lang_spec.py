@@ -42,6 +42,8 @@ class LangSpec(TypedDict, total=False):
     out_argument_types: tuple[str, ...]
     key_removal_types: tuple[str, ...]
     cond_at_index: dict[str, int]
+    writing_builtins: frozenset[str]
+    iterate_types: tuple[str, ...]
     local_binding: dict[str, tuple[str, str | None]]
     switch_types: dict[str, tuple[str, str]]
     immutable_modifiers: frozenset[str]
@@ -396,6 +398,15 @@ LANG_SPEC: dict[str, LangSpec] = {
         # neither the `condition` key the other six use nor the first-named-child rule
         # Go needs can find it. The other eight declare an empty map.
         "cond_at_index": {"conditional_expression": 1},
+        "writing_builtins": frozenset(),
+        # EMPTY, and not because Python lacks the shape. `for x in self.items` and
+        # `[x for x in self.items]` read every cell exactly as Go's range does, and the
+        # row would land. It is left out because that comprehension is the fixture
+        # test_unmeasured_constructs uses to hold its property, that a construct with no
+        # dispatch row is unmeasured rather than clean, and giving it a row makes the
+        # example stale rather than the property wrong. Replacing that fixture needs a
+        # construct still unread today, which is its own small piece of work.
+        "iterate_types": (),
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {},
         "immutable_modifiers": frozenset(),
@@ -474,6 +485,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "out_argument_types": (),
         "key_removal_types": ("unary_expression",),
         "cond_at_index": {},
+        "writing_builtins": frozenset(),
+        "iterate_types": (),
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const", "readonly"}),
@@ -531,6 +544,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "out_argument_types": (),
         "key_removal_types": ("unary_expression",),
         "cond_at_index": {},
+        "writing_builtins": frozenset(),
+        "iterate_types": (),
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const"}),
@@ -588,6 +603,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "out_argument_types": (),
         "key_removal_types": (),
         "cond_at_index": {},
+        "writing_builtins": frozenset(),
+        "iterate_types": (),
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {"switch_expression": ("condition", "switch_block_statement_group")},
         "immutable_modifiers": frozenset({"final"}),
@@ -649,6 +666,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "out_argument_types": ("declaration_expression",),
         "key_removal_types": (),
         "cond_at_index": {},
+        "writing_builtins": frozenset(),
+        "iterate_types": (),
         "local_binding": {"variable_declarator": ("name", None)},
         "switch_types": {"switch_statement": ("value", "switch_section")},
         "immutable_modifiers": frozenset({"const", "readonly"}),
@@ -723,6 +742,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "out_argument_types": (),
         "key_removal_types": (),
         "cond_at_index": {},
+        "writing_builtins": frozenset(),
+        "iterate_types": (),
         "local_binding": {"let_declaration": ("pattern", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const", "static"}),
@@ -789,6 +810,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "out_argument_types": (),
         "key_removal_types": (),
         "cond_at_index": {},
+        "writing_builtins": frozenset(),
+        "iterate_types": (),
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {},
         "immutable_modifiers": frozenset(),
@@ -860,6 +883,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "out_argument_types": (),
         "key_removal_types": (),
         "cond_at_index": {},
+        "writing_builtins": frozenset(),
+        "iterate_types": (),
         "local_binding": {"init_declarator": ("declarator", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const"}),
@@ -935,6 +960,13 @@ LANG_SPEC: dict[str, LangSpec] = {
         "out_argument_types": (),
         "key_removal_types": (),
         "cond_at_index": {},
+        # Builtins that WRITE the argument they are handed, rather than returning a
+        # value derived from it. `delete(m, k)` removes a key and returns nothing, and
+        # it is the plainest key removal Go has; it read as an unmodelled callee
+        # because it is not in extra_bounded, which is the list of builtins whose
+        # RESULT flows on. Different question, so a different row.
+        "writing_builtins": frozenset({"delete", "clear"}),
+        "iterate_types": ("range_clause",),
         "local_binding": {"short_var_declaration": ("left", "right")},
         "switch_types": {"expression_switch_statement": ("value", "expression_case")},
         "immutable_modifiers": frozenset({"const"}),
