@@ -42,6 +42,7 @@ from l1_analyzer import (
 )
 from l1_analyzer.incomplete import IncompleteCode, ratio
 from l1_analyzer.lang_spec import DECISION_NODE_TYPES
+from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.scope import (  # noqa: F401
     _IGNORE_DIRS,
     _TEST_DIR_MARKERS,
@@ -70,11 +71,10 @@ from l1_analyzer.scope import (  # noqa: F401
 # Data shape + pure scoring
 # ---------------------------------------------------------------------------
 
-class L1Result(TypedDict, total=False):
-    value: float | int | str
-    band: str  # Healthy / Not Healthy / Slop / n/a
-    details: str
-
+# Imported, not redeclared. Two definitions of the published result type stood in this
+# package and disagreed: pytest_trace's and this one, both named L1Result, both describing
+# the same dict, and only one of them was ever made total. A reader typed against this copy
+# was allowed to omit the details line that the other copy required.
 def band(value: float, healthy: float, slop: float, *, higher_is_better: bool) -> str:
     """Pure map from a numeric value to a threshold band.
 
@@ -305,10 +305,30 @@ def compute_config_indicators(repo: Path) -> dict[str, L1Result]:
     ci_count = len(ci_files)
     has_docker = (repo / "Dockerfile").exists() or (repo / "docker-compose.yml").exists()
 
+    # Each carries a details line naming what was looked for and where. These three shipped
+    # a band and a value with no sentence, so a reader got Slop for the pre-commit indicator
+    # with nothing saying what was searched. Every other indicator in the panel says it, and
+    # the sentence is the difference between a grade and a measurement.
     return {
-        "L1.9": {"value": "present" if has_precommit else "absent", "band": "Healthy" if has_precommit else "Slop"},
-        "L1.10": {"value": ci_count, "band": band(ci_count, 5, 1, higher_is_better=True)},
-        "L1.11": {"value": "present and parameterized" if has_docker else "absent", "band": "Healthy" if has_docker else "Slop"},
+        "L1.9": {
+            "value": "present" if has_precommit else "absent",
+            "band": "Healthy" if has_precommit else "Slop",
+            "details": ("a pre-commit hook config is present" if has_precommit else
+                        "no .pre-commit-config.yaml and no .husky directory at the repository root"),
+        },
+        "L1.10": {
+            "value": ci_count,
+            "band": band(ci_count, 5, 1, higher_is_better=True),
+            "details": (f"{ci_count} workflow file(s) in .github/workflows" if ci_count else
+                        "no .yml or .yaml workflow files in .github/workflows"),
+        },
+        "L1.11": {
+            "value": "present and parameterized" if has_docker else "absent",
+            "band": "Healthy" if has_docker else "Slop",
+            "details": ("a Dockerfile or docker-compose.yml is present at the repository root"
+                        if has_docker else
+                        "no Dockerfile and no docker-compose.yml at the repository root"),
+        },
     }
 from l1_analyzer.lang_cfg import (  # noqa: F401 - re-exported: every reader imports these from here
     LANG_CFG,

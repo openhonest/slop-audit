@@ -39,7 +39,15 @@ from typing import TypedDict
 from l1_analyzer import incomplete
 
 
-class L1Result(TypedDict, total=False):
+class L1Result(TypedDict):
+    """One indicator's published reading: what it measured, how that grades, and the
+    sentence saying what was read.
+
+    Total, and it was `total=False` until 2026-08-19. Under that declaration a producer
+    could ship a band with no details and nothing said so, and three did: L1.9, L1.10 and
+    L1.11 published a grade with no sentence naming what was looked for or where. The
+    details line is the difference between a grade and a measurement, so it is required
+    rather than optional."""
     value: float | int | str
     band: str
     details: str
