@@ -25,9 +25,15 @@ A methodology that has not been validated is a methodology that nobody can defen
 **Branch:** `honest-conversion`
 **Why this is the positive control:** This branch is the canonical example of a codebase that was deliberately built (and partially converted) under the structured AI SDLC documented in Wasserman 2026. It is the same class of system as Application A in the paper. By construction, it should score in the *Structured* band on Layer 1 and score *Present* on most or all of the 18 dimensions on Layer 2 and Layer 3. If it does not, the methodology has a calibration problem.
 
-**Availability.** As of 2026-04-09, the `honest-conversion` branch is expected to be complete within three weeks (by 2026-04-30 at the latest, probably sooner). The positive-control audit should be run immediately upon branch stabilization. This date is the gating prerequisite for the Paper 2 drafting effort (see `project_peer_review_strategy.md` in the user's auto-memory).
+**Availability: SUSPENDED INDEFINITELY, 2026-08-19.** The conversion is suspended and the branch will not reach the finished state this section assumed. The note that stood here said the branch was expected complete within three weeks of 2026-04-09; that date passed four months ago and the expectation is withdrawn rather than left to age.
 
-**Expected outcome.** Layer 1 slop signal count ≤ 3 of the panel (see the note below on what the denominator is). Layer 2 dimensions scoring *Present*: ≥ 14 of 18. Layer 3 markers in aggregate scoring *Present*: ≥ 70%.
+What survives the suspension is the Layer 1 run. The branch was measured as it stands on 2026-08-17 and scored 2 slop signals of 17, recorded in `results/2026-08-17-negative-control.md` beside both negative controls. Layer 1 therefore has a positive control and a validated separation.
+
+What does not survive is the Layer 2 and Layer 3 calibration. Those layers were to be scored against a completed conversion, and no completed conversion exists. The expected outcomes below are consequently **proposed values, never validated**, and the sections that state them say so.
+
+**Expected outcome.** Layer 1 slop signal count ≤ 3 of the panel (see the note below on what the denominator is). **Met: 2 of 17, measured 2026-08-17.**
+
+Layer 2 dimensions scoring *Present*: ≥ 14 of 18. Layer 3 markers in aggregate scoring *Present*: ≥ 70%. **Both are PROPOSED VALUES and neither has been measured.** They were written before any Layer 2 or Layer 3 run and were to be checked against a completed conversion that no longer exists. Read them as the calibration this methodology intends, not as a calibration it has demonstrated. Anyone citing the instrument at Layer 2 or Layer 3 is citing an uncalibrated instrument, and the honest statement of its status is on the v1 line below.
 
 **If the result deviates from the expected outcome:** investigate before changing the methodology. The deviation may be a real finding (the branch has actually drifted), or it may be a methodology calibration problem. Determine which before adjusting anything.
 
@@ -68,8 +74,10 @@ The first run is recorded in `results/2026-08-17-layer1.md`. Read the deviation 
 
 ### Step 1 — Positive control run
 
+**Step 1.2 is done. Steps 1.3 to 1.6 are suspended with the branch**, which is frozen part-converted. Run them against it as it stands only if you accept that a part-converted codebase is a weaker positive control than the protocol asked for, and say so in the result.
+
 1. Clone the `idd` repository at the `honest-conversion` branch to a fresh working directory. Confirm full git history (no shallow clone).
-2. Run the Layer 1 reference indicators (twenty of them, per methodology Section 3). Record the results in `validation/results/positive-control-layer1.md`.
+2. Run the Layer 1 reference indicators (twenty of them, per methodology Section 3). Record the results in `validation/results/positive-control-layer1.md`. **Done 2026-08-17: 2 of 17, in `results/2026-08-17-negative-control.md`.**
 3. Run the Layer 2 inspection procedures for all 18 dimensions, per methodology Section 4. Record scores and evidence in `validation/results/positive-control-layer2.md`.
 4. Run the Layer 3 marker assessments for all 18 dimensions. Record scores in `validation/results/positive-control-layer3.md`.
 5. Compute the combined dimension scores per the rubric in each Section 4 entry. Record in `validation/results/positive-control-combined.md`.
@@ -99,6 +107,8 @@ Based on the discrimination analysis:
 - Section 4 entries are revised in place; the v0 entries are preserved in git history
 
 The output is a v1 methodology document.
+
+**What v1 may claim, given the suspension.** Layer 1 is validated in both directions: a positive control at 2 slop signals of 17 and a negative control at 10 of 17, against a threshold of 10. Layers 2 and 3 are uncalibrated. No dimension has been scored by an assessor against either control, so the discrimination analysis in Step 3 has no input and the thresholds in the Controls section are proposals. v1 ships saying that on its face. A methodology that names the half of itself nobody has checked is defensible in front of a hostile auditor; one that lets a reader assume all three layers were validated because one was is not.
 
 ### Step 5 — Cross-rater run
 
