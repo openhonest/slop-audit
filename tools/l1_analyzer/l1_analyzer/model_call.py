@@ -43,11 +43,26 @@ WHY = {
 }
 
 
+# How much of a failure's own words to keep. Enough to name a context-window overflow or a
+# rate limit; short enough that a sweep's record stays readable.
+CAUSE_LIMIT = 300
+
+
 class ModelReply(TypedDict):
-    """A reply, or the named reason there is none. Exactly one of the two is meaningful:
-    `text` is None whenever `reason` is set, and `reason` is empty when text arrived."""
+    """A reply, or the named reason there is none.
+
+    `text` is None whenever `reason` is set, and `reason` is empty when text arrived.
+    `cause` carries the exception's type and message, and ONLY for a failed request: no key
+    and no SDK are decisions about this machine rather than failures of a request, and a
+    cause on either would invent an interaction that never happened.
+
+    Swallowing the exception is right, because an unusable reply must never become a false
+    proof. Not recording it was not. The first real live run reported a failed request five
+    times with no way to tell whether it was the key, a rate limit, a payload over the
+    context window, a dropped connection or a wrong model name."""
     text: str | None
     reason: str
+    cause: str
 
 
 def model_available() -> bool:
@@ -83,18 +98,40 @@ def _import_client() -> Callable[..., object] | None:
     return Anthropic
 
 
+def _first_text(blocks: object) -> str | None:
+    """The first content block that carries text, or nothing.
+
+    `content[0].text` assumed the first block IS text. It is not: a thinking-capable model
+    puts a ThinkingBlock first, so every call raised AttributeError and was swallowed as a
+    failed request. A short probe against the same key and model succeeded, because it
+    asked a question that produced no thinking block, which is why the failure read as a
+    configuration problem and was not."""
+    for block in blocks or ():
+        text = getattr(block, "text", None)
+        if text is not None:
+            return str(text)
+    return None
+
+
 def call(system: str, user: str, max_tokens: int) -> ModelReply:
     """One model call: the reply text, or the named reason there is none."""
     if not os.getenv("ANTHROPIC_API_KEY"):
-        return {"text": None, "reason": NO_KEY}
+        return {"text": None, "reason": NO_KEY, "cause": ""}
     client = _import_client()
     if client is None:
-        return {"text": None, "reason": NO_SDK}
+        return {"text": None, "reason": NO_SDK, "cause": ""}
     try:
         response = client(api_key=os.environ["ANTHROPIC_API_KEY"]).messages.create(
             model=MODEL, max_tokens=max_tokens,
             system=system, messages=[{"role": "user", "content": user}],
         )
-        return {"text": str(response.content[0].text), "reason": ANSWERED}
-    except Exception:  # noqa: BLE001 - any failure yields no proof, never a false claim
-        return {"text": None, "reason": CALL_FAILED}
+        text = _first_text(response.content)
+        if text is None:
+            # It arrived and held nothing sayable. That is the model declining, not a
+            # failed request: calling it a failure sends a reader to the network for a
+            # thing the model did.
+            return {"text": None, "reason": DECLINED, "cause": ""}
+        return {"text": text, "reason": ANSWERED, "cause": ""}
+    except Exception as failure:  # noqa: BLE001 - any failure yields no proof, never a false claim
+        return {"text": None, "reason": CALL_FAILED,
+                "cause": f"{type(failure).__name__}: {failure}"[:CAUSE_LIMIT]}

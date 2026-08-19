@@ -48,3 +48,10 @@ Feature: model_call — the package's one construction of the generation model c
     When _import_client tries the import
     Then it returns the constructor when anthropic is installed
     But it returns nothing when it is not, so the absence is a value this module can name rather than an exception caught beside every other failure
+
+  Scenario: _first_text finds the reply in the first block that carries text
+    Given the content blocks of a model response
+    When _first_text walks them in order
+    Then it returns the text of the first block that has any
+    But it returns nothing when no block does, which the caller reports as the model declining rather than as a failed request, since a reply that arrived and held nothing sayable is a thing the model did and not a thing the network did
+

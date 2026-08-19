@@ -251,7 +251,8 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     attempted = sum(outcomes.values())
     ran = attempted - outcomes["declined"]
     detail = sweep_detail(len(retained), modules, located, outcomes, provenance,
-                          coverage_prove.LAST_REFUSAL["reason"])
+                          coverage_prove.LAST_REFUSAL["reason"],
+                          coverage_prove.LAST_REFUSAL["cause"])
     if ran:
         detail += (f"Of {ran} generated tests: {outcomes['divergence']} retained as "
                    f"behavioural divergences (bug proven), {outcomes['pass']} passed (branch correct), "

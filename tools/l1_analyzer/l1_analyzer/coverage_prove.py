@@ -78,7 +78,7 @@ _PROOF_MOD = "l1_coverage_proof"
 # only the sweep wants the reason; threading it through four signatures to reach one reader
 # would be the wrong trade. It is written on every call, so it is never stale by more than
 # one, and the sweep reads it once at the end.
-LAST_REFUSAL = {"reason": ""}
+LAST_REFUSAL = {"reason": "", "cause": ""}
 
 
 def model_available() -> bool:
@@ -116,11 +116,13 @@ def _call_model(instruction: str, payload: str) -> dict | None:
         # a missing SDK into "the model declined" is how the first live sweep reported a
         # model answering twice when no request had gone out.
         LAST_REFUSAL["reason"] = reply["reason"]
+        LAST_REFUSAL["cause"] = reply["cause"]
         return None
     try:
         data = json.loads(re.sub(r"^```(?:json)?\n|```$", "", reply["text"].strip(), flags=re.MULTILINE))
     except Exception:  # noqa: BLE001 - a malformed reply yields no proposal, never a false claim
         LAST_REFUSAL["reason"] = llm.DECLINED
+        LAST_REFUSAL["cause"] = ""
         return None
     if not isinstance(data, dict):
         LAST_REFUSAL["reason"] = llm.DECLINED
@@ -436,7 +438,8 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     # `attempted` is every gap handed to a model, declines included: that is the unit that
     # cost money, and a budget that did not count the declines could not be reconciled.
     attempted = sum(outcomes.values())
-    detail = sweep_detail(len(retained), modules, located, outcomes, "cargo", LAST_REFUSAL["reason"])
+    detail = sweep_detail(len(retained), modules, located, outcomes, "cargo",
+                          LAST_REFUSAL["reason"], LAST_REFUSAL["cause"])
     if attempted - outcomes["declined"]:
         detail += _outcome_detail(outcomes)
     detail += ceiling_detail(attempted_gaps, located, max_attempts)
@@ -444,7 +447,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
 
 
 def sweep_detail(retained: int, modules: int, located: int, outcomes: dict, provenance: str,
-                 reason: str = "") -> str:
+                 reason: str = "", cause: str = "") -> str:
     """What a finished sweep says, in the three cases it can be in.
 
     The middle case was missing. A sweep that located gaps, handed some to a model and got
@@ -465,6 +468,8 @@ def sweep_detail(retained: int, modules: int, located: int, outcomes: dict, prov
         # asked, and printing a number beside it would invent an interaction.
         why = (f"the model replied with nothing usable for {declined} of them"
                if reason in (llm.DECLINED, "") else llm.WHY[reason])
+        if cause:
+            why += f" [{cause}]"
         return (f"{located} uncovered branches located across {modules} modules and none was proven: "
                 f"{why} (ran under {provenance})")
     return (f"{retained} coverage proofs retained across {modules} modules with uncovered branches "
