@@ -45,7 +45,9 @@ _FAIL_BUCKETS = ("divergence", "wrong_channel", "invalid_fixture", "incidental_p
 # error is something the runner TOLD us; an unreported index is something it did not, so
 # the test was generated and run and the analyzer then lost track of it. Counting one as
 # the other made a run whose totals do not add up look like a run with noise in it.
-_OUTCOMES = (*_FAIL_BUCKETS, "pass", "error", "unreported")
+_OUTCOMES = (*_FAIL_BUCKETS, "pass", "error", "unreported", "declined")
+# The empty tally, named once so a reader and a test can ask what buckets exist.
+EMPTY_OUTCOMES = {k: 0 for k in _OUTCOMES}
 
 _PROPOSE_INSTRUCTION = (
     "You are given ONE Rust function and one of its decision branches that no test ever reached. "
@@ -70,6 +72,13 @@ _REPAIR_INSTRUCTION = (
 )
 
 _PROOF_MOD = "l1_coverage_proof"
+
+# Why the last model call produced nothing, for the sweep's report. A single cell rather
+# than a return-value change because every caller of _call_model wants the parsed dict and
+# only the sweep wants the reason; threading it through four signatures to reach one reader
+# would be the wrong trade. It is written on every call, so it is never stale by more than
+# one, and the sweep reads it once at the end.
+LAST_REFUSAL = {"reason": ""}
 
 
 def model_available() -> bool:
@@ -102,13 +111,22 @@ def _call_model(instruction: str, payload: str) -> dict | None:
     # that one wants the text with its fences stripped, this one wants it parsed as JSON,
     # and the preamble they shared had already drifted on the token limit.
     reply = llm.call(instruction, payload, max_tokens=2048)
-    if reply is None:
+    if reply["text"] is None:
+        # The reason travels on the module so a sweep can say WHICH refusal it hit. Folding
+        # a missing SDK into "the model declined" is how the first live sweep reported a
+        # model answering twice when no request had gone out.
+        LAST_REFUSAL["reason"] = reply["reason"]
         return None
     try:
-        data = json.loads(re.sub(r"^```(?:json)?\n|```$", "", reply.strip(), flags=re.MULTILINE))
+        data = json.loads(re.sub(r"^```(?:json)?\n|```$", "", reply["text"].strip(), flags=re.MULTILINE))
     except Exception:  # noqa: BLE001 - a malformed reply yields no proposal, never a false claim
+        LAST_REFUSAL["reason"] = llm.DECLINED
         return None
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        LAST_REFUSAL["reason"] = llm.DECLINED
+        return None
+    LAST_REFUSAL["reason"] = llm.ANSWERED
+    return data
 
 
 def _signature(gap: dict) -> str:
@@ -276,7 +294,7 @@ def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, t
                refine_fn: Callable[..., str]) -> tuple[str, dict | None, str]:
     """Propose -> run -> (repair -> run)* -> gate for one gap. Returns (bucket, proposal,
     test_source): a fail is resolved to one of _FAIL_BUCKETS (only `divergence` is retained);
-    a clean run is `pass`; `error` is did-not-compile even after repair; `skipped` is no reply.
+    a clean run is `pass`; `error` is did-not-compile even after repair; `declined` is no reply, and it is COUNTED: a model call that produced nothing still cost money.
 
     The collaborators are parameters, as in `prove.prove` and the Python loop. They were
     module-level lookups, so testing this orchestration meant patching the module's own
@@ -285,7 +303,7 @@ def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, t
     argument away from a test."""
     proposal = propose_fn(gap)
     if proposal is None:
-        return "skipped", None, ""
+        return "declined", None, ""
     source = render_module(proposal["body"])
     status, output = run_fn(repo, module_relpath, source, timeout_seconds)
     rounds = 0
@@ -342,8 +360,6 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[dict], repair_roun
         bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds,
                                               timeout_seconds, propose_fn, repair_fn, run_fn,
                                               refine_fn)
-        if bucket == "skipped":
-            continue
         outcomes[bucket] += 1
         if bucket == "divergence":
             retained.append(_retained_entry(module_relpath, gap, proposal, source))
@@ -380,7 +396,8 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     if not rust_trace._cargo():
         return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
     if not model_available():
-        return {"retained": [], "attempted": 0, "detail": "needs ANTHROPIC_API_KEY to generate coverage proofs"}
+        return {"retained": [], "attempted": 0,
+                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason()]}"}
     cov = rust_trace.repo_uncovered_lines(repo, timeout_seconds)
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
@@ -416,11 +433,42 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         retained.extend(module_retained)
         for k in outcomes:
             outcomes[k] += module_outcomes[k]
+    # `attempted` is every gap handed to a model, declines included: that is the unit that
+    # cost money, and a budget that did not count the declines could not be reconciled.
     attempted = sum(outcomes.values())
-    detail = (f"{len(retained)} coverage proofs retained across {modules} modules with uncovered branches. "
-              + _outcome_detail(outcomes)) if attempted else f"no proof-ready uncovered branches located across {modules} modules"
+    detail = sweep_detail(len(retained), modules, located, outcomes, "cargo", LAST_REFUSAL["reason"])
+    if attempted - outcomes["declined"]:
+        detail += _outcome_detail(outcomes)
     detail += ceiling_detail(attempted_gaps, located, max_attempts)
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
+
+
+def sweep_detail(retained: int, modules: int, located: int, outcomes: dict, provenance: str,
+                 reason: str = "") -> str:
+    """What a finished sweep says, in the three cases it can be in.
+
+    The middle case was missing. A sweep that located gaps, handed some to a model and got
+    nothing usable back fell through to the sentence it prints when it found nothing at
+    all. The first live run, on 2026-08-19, printed "no proof-ready uncovered branches
+    located across 1 modules" beside "2 of 154 located gaps were attempted": both halves of
+    one report contradicting each other. A measure that located 154 uncovered branches and
+    told a reader there were none is publishing a claim it never earned."""
+    ran = sum(v for k, v in outcomes.items() if k != "declined")
+    declined = outcomes.get("declined", 0)
+    if not located:
+        return f"no proof-ready uncovered branches located across {modules} modules"
+    if not ran:
+        # Which refusal, not just that there was one. "The model returned nothing usable"
+        # over a run that never reached a model is the claim this function was built to stop.
+        # Only the decline carries a count: it is the one reason where HOW MANY the model
+        # was asked is a fact about the model. A missing SDK declined nothing; it was never
+        # asked, and printing a number beside it would invent an interaction.
+        why = (f"the model replied with nothing usable for {declined} of them"
+               if reason in (llm.DECLINED, "") else llm.WHY[reason])
+        return (f"{located} uncovered branches located across {modules} modules and none was proven: "
+                f"{why} (ran under {provenance})")
+    return (f"{retained} coverage proofs retained across {modules} modules with uncovered branches "
+            f"(ran under {provenance}). ")
 
 
 def _outcome_detail(outcomes: dict) -> str:
@@ -442,7 +490,8 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
     if not rust_trace._cargo():
         return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
     if not model_available():
-        return {"retained": [], "attempted": 0, "detail": "needs ANTHROPIC_API_KEY to generate coverage proofs"}
+        return {"retained": [], "attempted": 0,
+                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason()]}"}
 
     cov = rust_trace.module_uncovered_lines(repo, module_relpath, timeout_seconds)
     if not cov["measured"]:
@@ -458,8 +507,6 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
     outcomes = {k: 0 for k in _OUTCOMES}
     for gap in gaps:
         bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
-        if bucket == "skipped":
-            continue
         outcomes[bucket] += 1
         if bucket == "divergence":
             retained.append({

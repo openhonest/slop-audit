@@ -27,14 +27,14 @@ def _proposal(body="assert!(false);"):
     return {"body": body, "explanation": "why"}
 
 
-def test_a_proposal_nobody_returns_is_skipped():
+def test_a_proposal_nobody_returns_is_declined():
     bucket, proposal, source = cp._prove_one(
         pathlib.Path("."), "src/m.rs", _GAP, 3, 1.0,
         propose_fn=lambda gap: None,
         repair_fn=lambda *a: None,
         run_fn=lambda *a: ("pass", ""),
         refine_fn=lambda *a: "divergence")
-    assert (bucket, proposal, source) == ("skipped", None, "")
+    assert (bucket, proposal, source) == ("declined", None, "")
 
 
 def test_a_compile_error_is_repaired_and_then_gated():

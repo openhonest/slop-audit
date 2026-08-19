@@ -175,7 +175,7 @@ def generate(request: ProofRequest) -> str | None:
     # Through the one boundary. `model_call` is taken as a PARAMETER by `prove` above,
     # so the module is imported under a name that cannot shadow it.
     reply = llm.call(_CONCURRENCY_INSTRUCTION, request["context"], max_tokens=4096)
-    return None if reply is None else _strip_fences(reply)
+    return None if reply["text"] is None else _strip_fences(reply["text"])
 
 
 def write_crate_and_stress(test_source: str, work_dir: str, runs: int, timeout_seconds: float) -> RunResult:

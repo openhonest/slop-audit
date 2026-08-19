@@ -25,7 +25,9 @@ _PKG = pathlib.Path(prove.__file__).parent
 
 def test_the_sdk_client_is_constructed_in_exactly_one_place():
     source = "\n".join(p.read_text() for p in _PKG.glob("*.py"))
-    sites = re.findall(r"Anthropic\(api_key", source)
+    # The construction, however the constructor is named locally: model_call holds it in
+    # `client` so that a missing SDK is a value it can name rather than an exception.
+    sites = re.findall(r"\w+\(api_key=os\.environ", source)
     assert len(sites) == 1, f"{len(sites)} client constructions; the refusal can drift between them"
 
 

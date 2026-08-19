@@ -175,3 +175,9 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
     Then it names both numbers and the ceiling, so the gaps nobody measured are not read as clean
     But it says nothing when the ceiling did not bite, because saying so on every sweep would train a reader to skip the sentence on the one sweep where it matters
 
+  Scenario: sweep_detail says which of three things a finished sweep found
+    Given how many proofs were retained, how many modules and gaps were located, and the tally
+    When sweep_detail picks its sentence
+    Then a sweep that located nothing says so, and a sweep whose tests ran reports the retained count
+    But a sweep that located gaps and ran none of them says that instead, naming how many the model declined, because it used to fall through to the nothing-located sentence and tell a reader there were no uncovered branches over a module with 154
+

@@ -27,13 +27,15 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from l1_analyzer import pytest_trace, python_facets
+from l1_analyzer import coverage_prove, pytest_trace, python_facets
+from l1_analyzer import model_call as llm
 from l1_analyzer.coverage_prove import (
     CoverageProof,
     _call_model,
     _valid,
     ceiling_detail,
     model_available,
+    sweep_detail,
 )
 
 _PROPOSE_INSTRUCTION = (
@@ -130,13 +132,17 @@ def _run(repo: Path, interpreter: str, test_source: str, timeout_seconds: float)
     return run.returncode, (run.stdout or "") + (run.stderr or "")
 
 
+EMPTY_OUTCOMES = {"divergence": 0, "incidental": 0, "pass": 0, "error": 0, "declined": 0}
+
+
 def _prove_one(repo: Path, interpreter: str, gap: dict, import_path: str,
                repair_rounds: int, timeout_seconds: float,
                propose_fn: Callable[..., dict | None],
                repair_fn: Callable[..., dict | None],
                run_fn: Callable[..., tuple[int, str]]) -> tuple[str, dict | None, str]:
     """Propose -> run -> (repair -> run)* for one gap. Returns (bucket, proposal, test_source):
-    divergence (retained), pass, incidental (setup error), error (timeout), or skipped (no reply).
+    divergence (retained), pass, incidental (setup error), error (timeout), or declined
+    (no reply, and counted: a model call that produced nothing still cost money).
 
     THE THREE COLLABORATORS ARE PARAMETERS, as `prove.prove` already takes `model_call` and
     `run_generated`. They were module-level lookups, so the only way to test this loop was
@@ -149,7 +155,7 @@ def _prove_one(repo: Path, interpreter: str, gap: dict, import_path: str,
     repository refuses everywhere else."""
     proposal = propose_fn(gap, import_path)
     if proposal is None:
-        return "skipped", None, ""
+        return "declined", None, ""
     source = render_test(proposal["body"])
     rc, output = run_fn(repo, interpreter, source, timeout_seconds)
     bucket = _classify(output, rc)
@@ -173,14 +179,12 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[dict],
                   run_fn: Callable[..., tuple[int, str]]) -> tuple[list[dict], dict]:
     """Every gap in one module. Threads the three collaborators through rather than
     reaching for the module's globals, for the reason `_prove_one` gives."""
-    outcomes = {"divergence": 0, "incidental": 0, "pass": 0, "error": 0}
+    outcomes = dict(EMPTY_OUTCOMES)
     import_path = _import_path(repo, repo / relpath)
     retained: list[dict] = []
     for gap in gaps:
         bucket, proposal, source = _prove_one(repo, interpreter, gap, import_path, repair_rounds,
                                               timeout_seconds, propose_fn, repair_fn, run_fn)
-        if bucket == "skipped":
-            continue
         outcomes[bucket] += 1
         if bucket == "divergence":
             entry: CoverageProof = {
@@ -204,7 +208,8 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         return {"retained": [], "attempted": 0, "outcomes": {}, "modules": 0,
                 "detail": f"attempted nothing: the ceiling is {max_attempts}"}
     if not model_available():
-        return {"retained": [], "attempted": 0, "detail": "needs ANTHROPIC_API_KEY to generate coverage proofs"}
+        return {"retained": [], "attempted": 0,
+                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason()]}"}
     interpreter, provenance = pytest_trace.resolve_interpreter(repo, python_executable)
     if not pytest_trace._module_available("pytest", interpreter) or not pytest_trace._module_available("coverage", interpreter):
         return {"retained": [], "attempted": 0, "detail": f"needs pytest and coverage.py in the target environment ({provenance})"}
@@ -213,7 +218,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
     retained: list[dict] = []
-    outcomes = {"divergence": 0, "incidental": 0, "pass": 0, "error": 0}
+    outcomes = dict(EMPTY_OUTCOMES)
     modules = 0
     located = 0            # every gap the sweep found, whether or not the ceiling let it try
     attempted_gaps = 0     # every gap the sweep handed to a model
@@ -240,12 +245,18 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         retained.extend(module_retained)
         for k in outcomes:
             outcomes[k] += module_outcomes[k]
+    # `attempted` is every gap handed to a model, declines included: that is the unit that
+    # cost money, and a budget that did not count the declines could not be reconciled.
+    # `ran` is the subset that produced a test to execute, which is what the breakdown counts.
     attempted = sum(outcomes.values())
-    detail = (f"{len(retained)} coverage proofs retained across {modules} modules with uncovered branches "
-              f"(ran under {provenance}). Of {attempted} generated tests: {outcomes['divergence']} retained as "
-              f"behavioural divergences (bug proven), {outcomes['pass']} passed (branch correct), "
-              f"{outcomes['incidental']} errored on setup (kept out of findings), {outcomes['error']} timed out."
-              ) if attempted else f"no proof-ready uncovered branches located across {modules} modules"
+    ran = attempted - outcomes["declined"]
+    detail = sweep_detail(len(retained), modules, located, outcomes, provenance,
+                          coverage_prove.LAST_REFUSAL["reason"])
+    if ran:
+        detail += (f"Of {ran} generated tests: {outcomes['divergence']} retained as "
+                   f"behavioural divergences (bug proven), {outcomes['pass']} passed (branch correct), "
+                   f"{outcomes['incidental']} errored on setup (kept out of findings), "
+                   f"{outcomes['error']} timed out.")
     detail += ceiling_detail(attempted_gaps, located, max_attempts)
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 

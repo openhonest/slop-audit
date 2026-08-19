@@ -38,13 +38,19 @@ def _proposal(body="assert False"):
     return {"body": body, "explanation": "why"}
 
 
-def test_a_proposal_nobody_returns_is_skipped_and_counted_nowhere():
+def test_a_proposal_nobody_returns_is_declined_and_counted():
+    """It used to be "skipped" and counted nowhere, which this test asserted by name.
+
+    The first live sweep, 2026-08-19, found what that cost. Two gaps were handed to a model
+    that returned nothing usable, both were dropped before the tally, and the run reported
+    "no proof-ready uncovered branches located" over a module with 154 of them. A model
+    call that produced nothing still cost money, so it lands in a bucket."""
     bucket, proposal, source = pcp._prove_one(
         pathlib.Path("."), "python3", _GAP, "m", 3, 1.0,
         propose_fn=lambda gap, path: None,
         repair_fn=lambda *a: None,
         run_fn=lambda *a: (0, ""))
-    assert (bucket, proposal, source) == ("skipped", None, "")
+    assert (bucket, proposal, source) == ("declined", None, "")
 
 
 def test_a_divergence_is_retained_on_the_first_run():

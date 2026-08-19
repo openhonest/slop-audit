@@ -31,8 +31,20 @@ Feature: model_call — the package's one construction of the generation model c
     Then it is true when an Anthropic key is present and false when it is absent
     And it is the only place in the package that reads that variable's name, so a rename cannot leave a second copy checking the old one
 
-  Scenario: call returns the model's reply text, or nothing at all
+  Scenario: call returns the model's reply text, or the named reason there is none
     Given a system instruction, a user payload and a token limit
     When call runs
     Then it returns the reply text when the key is present, the SDK imports and the request succeeds
-    But it returns nothing when the key is absent, when anthropic is not installed, or when the request raises, so a caller can never mistake a failure for an answer
+    But when there is no reply it names which of four things happened, because no key, no SDK, a failed request and a model with nothing to say are four different repairs and one of them is not about the model at all
+
+  Scenario: unavailable_reason says which half of the requirement is missing
+    Given the process environment and whatever is installed
+    When unavailable_reason is asked why no model can be called
+    Then it names the absent key, or the absent SDK, or nothing at all when a model can be called
+    But it never reports one as the other, since a machine that has a key and lacks the optional extra was sent to the wrong file by the sentence that stood here
+
+  Scenario: _import_client hands back the Anthropic constructor, or nothing
+    Given an interpreter that may or may not have the optional extra installed
+    When _import_client tries the import
+    Then it returns the constructor when anthropic is installed
+    But it returns nothing when it is not, so the absence is a value this module can name rather than an exception caught beside every other failure
