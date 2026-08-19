@@ -152,6 +152,10 @@ def is_opaque_unary(node: Node | None, sp: LangSpec) -> bool:
 def bare_condition(node: Node | None, sp: LangSpec) -> Node | None:
     """The condition of a branch that holds it POSITIONALLY, or None.
 
+    Two positional forms, because two grammars need different ones. An INDEX names which
+    named child is the condition, which is what Python's ternary needs. The first-named-child
+    rule with an exclusion list is what Go's `for` needs.
+
     Go's `for` is the only one in the table. It gives its condition no field at all -
     `for_statement` names only `body` - so reading `branch_cond` there returns nothing
     however the node type is declared, and `for p.running {}` was a loop on a bool field that
@@ -159,7 +163,16 @@ def bare_condition(node: Node | None, sp: LangSpec) -> Node | None:
     spec excludes, which is what tells the three real forms apart: `for {}` has only a body,
     `for k := range m {}` has a range clause, and `for i := 0; c; i++ {}` has a for_clause
     that names its own condition field."""
-    if node is None or node.type not in sp["bare_cond_types"]:
+    if node is None:
+        return None
+    # An INDEX first, for a node that holds its condition positionally but not first.
+    # Python's `X if C else Y` reads as [X, C, Y], so the first-named-child rule below
+    # would take the consequence and test the value being returned.
+    index = sp["cond_at_index"].get(node.type)
+    if index is not None:
+        kids = node.named_children
+        return kids[index] if len(kids) > index else None
+    if node.type not in sp["bare_cond_types"]:
         return None
     excluded = sp["bare_cond_types"][node.type]
     return next((c for c in node.named_children if c.type not in excluded), None)

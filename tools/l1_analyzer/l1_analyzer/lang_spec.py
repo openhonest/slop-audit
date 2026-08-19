@@ -41,6 +41,7 @@ class LangSpec(TypedDict, total=False):
     member_name_field: str | None
     out_argument_types: tuple[str, ...]
     key_removal_types: tuple[str, ...]
+    cond_at_index: dict[str, int]
     local_binding: dict[str, tuple[str, str | None]]
     switch_types: dict[str, tuple[str, str]]
     immutable_modifiers: frozenset[str]
@@ -390,6 +391,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         # METHOD, `d.Remove(k)` and its kin, which `mutating` already covers, so they
         # declare an empty row rather than being omitted.
         "key_removal_types": ("delete_statement",),
+        # A condition held POSITIONALLY at an index. Python's ternary names no field at
+        # all and puts the CONSEQUENCE first: `X if C else Y` reads as [X, C, Y], so
+        # neither the `condition` key the other six use nor the first-named-child rule
+        # Go needs can find it. The other eight declare an empty map.
+        "cond_at_index": {"conditional_expression": 1},
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {},
         "immutable_modifiers": frozenset(),
@@ -401,7 +407,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
         "return_types": ("return_statement",),
-        "branch_types": ("if_statement", "while_statement"), "branch_cond": "condition",
+        "branch_types": ("if_statement", "while_statement", "conditional_expression"), "branch_cond": "condition",
         "elif_types": ("elif_clause",),
         # `await X` is a transparent wrapper around X's value: an awaited call result reaches
         # the same decision the bare call result would, so it must not stop the flow walk.
@@ -467,6 +473,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "out_argument_types": (),
         "key_removal_types": ("unary_expression",),
+        "cond_at_index": {},
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const", "readonly"}),
@@ -523,6 +530,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "out_argument_types": (),
         "key_removal_types": ("unary_expression",),
+        "cond_at_index": {},
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const"}),
@@ -579,6 +587,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": "field",
         "out_argument_types": (),
         "key_removal_types": (),
+        "cond_at_index": {},
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {"switch_expression": ("condition", "switch_block_statement_group")},
         "immutable_modifiers": frozenset({"final"}),
@@ -639,6 +648,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": "name",
         "out_argument_types": ("declaration_expression",),
         "key_removal_types": (),
+        "cond_at_index": {},
         "local_binding": {"variable_declarator": ("name", None)},
         "switch_types": {"switch_statement": ("value", "switch_section")},
         "immutable_modifiers": frozenset({"const", "readonly"}),
@@ -712,6 +722,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "out_argument_types": (),
         "key_removal_types": (),
+        "cond_at_index": {},
         "local_binding": {"let_declaration": ("pattern", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const", "static"}),
@@ -777,6 +788,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "out_argument_types": (),
         "key_removal_types": (),
+        "cond_at_index": {},
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {},
         "immutable_modifiers": frozenset(),
@@ -847,6 +859,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": "field",
         "out_argument_types": (),
         "key_removal_types": (),
+        "cond_at_index": {},
         "local_binding": {"init_declarator": ("declarator", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const"}),
@@ -921,6 +934,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "member_name_field": None,
         "out_argument_types": (),
         "key_removal_types": (),
+        "cond_at_index": {},
         "local_binding": {"short_var_declaration": ("left", "right")},
         "switch_types": {"expression_switch_statement": ("value", "expression_case")},
         "immutable_modifiers": frozenset({"const"}),
