@@ -259,6 +259,10 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         return all_na("no commits in range");
     }
 
+    // Each indicator states what it counted and over what, the same sentence the reference
+    // prints. A panel row with no details is a grade with no statement of what was read,
+    // and the port emitted an empty string on six of these until 2026-08-19, which nothing
+    // could see because the corpus had no repository for five of the nine languages.
     let tc = total_commits as f64;
     let mut out_ind: Vec<Indicator> = Vec::with_capacity(8);
 
@@ -268,7 +272,7 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         label: GIT_LABELS[0].into(),
         value: py_num(l1, 1),
         band: band(l1, 10.0, 1.0, true).into(),
-        details: String::new(),
+        details: format!("{doc_only} doc-only / {total_commits} commits"),
     });
 
     let l2 = code_only as f64 / tc * 100.0;
@@ -277,7 +281,7 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         label: GIT_LABELS[1].into(),
         value: py_num(l2, 1),
         band: band(l2, 70.0, 85.0, false).into(),
-        details: String::new(),
+        details: format!("{code_only} code-only / {total_commits} commits"),
     });
 
     let l3 = mixed as f64 / tc * 100.0;
@@ -286,7 +290,7 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         label: GIT_LABELS[2].into(),
         value: py_num(l3, 1),
         band: band(l3, 12.0, 3.0, true).into(),
-        details: String::new(),
+        details: format!("{mixed} mixed doc-and-code / {total_commits} commits"),
     });
 
     let l4 = if total_added > 0 {
@@ -312,7 +316,7 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         label: GIT_LABELS[4].into(),
         value: py_num(l5, 1),
         band: band(l5, 60.0, 30.0, true).into(),
-        details: String::new(),
+        details: format!("{total_deleted} deleted / {total_added} added lines"),
     });
 
     let l6 = net_negative_commits as f64 / tc * 100.0;
@@ -321,7 +325,7 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         label: GIT_LABELS[5].into(),
         value: py_num(l6, 1),
         band: band(l6, 15.0, 5.0, true).into(),
-        details: String::new(),
+        details: format!("{net_negative_commits} net-negative / {total_commits} commits"),
     });
 
     let l7 = high_delete_commits as f64 / tc * 100.0;
@@ -330,7 +334,7 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         label: GIT_LABELS[6].into(),
         value: py_num(l7, 1),
         band: band(l7, 20.0, 5.0, true).into(),
-        details: String::new(),
+        details: format!("{high_delete_commits} delete-heavy / {total_commits} commits"),
     });
 
     out_ind.push(test_to_prod_ratio(repo));

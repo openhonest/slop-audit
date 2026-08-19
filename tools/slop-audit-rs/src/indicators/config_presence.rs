@@ -17,7 +17,15 @@ pub fn l1_09(repo: &Path) -> Indicator {
         label: "pre-commit hooks".into(),
         value: (if has_precommit { "present" } else { "absent" }).into(),
         band: (if has_precommit { "Healthy" } else { "Slop" }).into(),
-        details: String::new(),
+        // These three shipped a band and a value with no sentence, in both tools, until the
+        // reference's result type was made total on 2026-08-19. A reader got Slop with
+        // nothing saying what was looked for or where.
+        details: (if has_precommit {
+            "a pre-commit hook config is present"
+        } else {
+            "no .pre-commit-config.yaml and no .husky directory at the repository root"
+        })
+        .into(),
     }
 }
 
@@ -43,7 +51,11 @@ pub fn l1_10(repo: &Path) -> Indicator {
         label: "CI/CD pipelines".into(),
         value: ci_count.to_string(),
         band: band(ci_count as f64, 5.0, 1.0, true).into(),
-        details: String::new(),
+        details: if ci_count > 0 {
+            format!("{ci_count} workflow file(s) in .github/workflows")
+        } else {
+            "no .yml or .yaml workflow files in .github/workflows".into()
+        },
     }
 }
 
@@ -55,6 +67,11 @@ pub fn l1_11(repo: &Path) -> Indicator {
         label: "containerization".into(),
         value: (if has_docker { "present and parameterized" } else { "absent" }).into(),
         band: (if has_docker { "Healthy" } else { "Slop" }).into(),
-        details: String::new(),
+        details: (if has_docker {
+            "a Dockerfile or docker-compose.yml is present at the repository root"
+        } else {
+            "no Dockerfile and no docker-compose.yml at the repository root"
+        })
+        .into(),
     }
 }
