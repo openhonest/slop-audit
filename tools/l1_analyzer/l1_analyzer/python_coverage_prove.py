@@ -28,7 +28,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from l1_analyzer import pytest_trace, python_facets
-from l1_analyzer.coverage_prove import _call_model, model_available
+from l1_analyzer.coverage_prove import _call_model, _valid, model_available
 
 _PROPOSE_INSTRUCTION = (
     "You are given ONE Python function and one of its decision branches that no test ever reached. "
@@ -68,11 +68,6 @@ def _signature(gap: dict) -> str:
     params = ", ".join(p["name"] + (f": {p['annotation']}" if p["annotation"] else "") for p in gap["parameters"])
     return f"def {gap['function']}({params})"
 
-
-def _valid(data: dict | None) -> dict | None:
-    if data is None or not isinstance(data.get("body"), str) or not data["body"].strip():
-        return None
-    return {"body": data["body"].strip(), "explanation": str(data.get("explanation", ""))}
 
 
 def propose(gap: dict, import_path: str) -> dict | None:

@@ -33,11 +33,6 @@ Feature: python_coverage_prove — the pytest coverage-gap prove loop, where an 
     When _signature joins them
     Then it returns the def line, and a parameter with no annotation appears as a bare name
 
-  Scenario: _valid accepts a model reply only when it carries a usable test body
-    Given whatever the model returned
-    When _valid inspects it
-    Then a non-blank string body comes back trimmed, with the explanation coerced to text
-    But no reply, a body that is not a string, and a blank body are all rejected, so an unusable reply never becomes a proof
 
   Scenario: propose asks for the first pytest test that exercises one uncovered branch
     Given one located gap and the module's dotted import path
