@@ -181,13 +181,17 @@ def _culprits(l18b: dict, status: str, coarse: list[dict]) -> tuple[list[dict], 
     if status == "coarse":
         flagged = coarse
     elif status == "cannot":
-        flagged = [f for f in (l18b.get("findings") or []) if f.get("verdict") == "promiscuous"]
-        flagged.sort(key=lambda f: (not f.get("drives_decision", False), f.get("file", ""), f.get("line", 0)))
+        flagged = [f for f in (l18b.get("findings") or []) if f["verdict"] == "promiscuous"]
+        flagged.sort(key=lambda f: (not f["drives_decision"], f["file"], f["line"]))
     else:
         return [], 0
-    shown = [{"file": f.get("file", ""), "line": f.get("line", 0), "state": f.get("state", "?"),
-              "verdict": f.get("verdict", ""), "drives_decision": bool(f.get("drives_decision", False)),
-              "classes": (f.get("partition") or {}).get("classes", 0)}
+    # Subscripted, not defaulted. Finding is a total TypedDict, so every one of these is
+    # present on every finding the analyzer produces; a default here would defend a
+    # contract the signature already holds, and would render a fabricated line 0 at file
+    # "" if the contract ever did break. An absent field must stop the render.
+    shown = [{"file": f["file"], "line": f["line"], "state": f["state"],
+              "verdict": f["verdict"], "drives_decision": bool(f["drives_decision"]),
+              "classes": f["partition"]["classes"]}
              for f in flagged[:_CULPRIT_CAP]]
     return shown, max(0, len(flagged) - _CULPRIT_CAP)
 
@@ -214,7 +218,11 @@ def _interleaving_robustness(results: dict) -> dict | None:
     test_every_panel_key_is_rendered.py is the invariant that keeps the next section from
     going the same way: a published key is on the card or on a named exclusion list."""
     ir = results.get("interleaving_robustness")
-    if not isinstance(ir, dict) or str(ir.get("verdict", "n/a")) == "n/a":
+    # The isinstance guard is what handles absence: an indicator that did not run is not
+    # in the panel at all. Past it, InterleavingRobustnessResult is a total TypedDict and
+    # `verdict` is present, so it is subscripted rather than defaulted to "n/a" - a default
+    # there would report not-measured for a result that was measured and malformed.
+    if not isinstance(ir, dict) or str(ir["verdict"]) == "n/a":
         return None
     unmodeled = ir.get("unmodeled") if isinstance(ir.get("unmodeled"), list) else []
     blurb = (_t("interleaving.blurb.clean") if not unmodeled
@@ -229,8 +237,8 @@ def _thread_surface(lang: str, results: dict) -> dict | None:
     ts = results.get("thread_surface")
     if not isinstance(ts, dict):
         return None
-    verdict = str(ts.get("verdict", "n/a"))
-    counts = ts.get("counts") or {}
+    verdict = str(ts["verdict"])          # SurfaceResult is total; the guard above is absence
+    counts = ts["counts"]
     if verdict == "n/a":
         blurb = _t("thread.blurb.na", lang=lang)
     else:
@@ -241,9 +249,12 @@ def _thread_surface(lang: str, results: dict) -> dict | None:
                    review=counts.get("review", 0), candidate=counts.get("candidate", 0),
                    read=ts.get("files_read", 0), parsed=ts.get("files_parsed", 0))
     findings = ts.get("findings") if isinstance(ts.get("findings"), list) else []
-    sites = [{"file": f.get("file", ""), "line": f.get("line", 0),
-              "kind": _THREAD_KINDS.get(f.get("kind", ""), f.get("kind", "")),
-              "symbol": f.get("symbol", ""), "severity": f.get("severity", "")} for f in findings[:_THREAD_CAP]]
+    # thread_surface.Finding is total too, so a site's fields are subscripted. Only the
+    # kind's DISPLAY name defaults, and to the kind itself: a kind with no copy yet is shown
+    # as the analyzer named it rather than as an empty cell.
+    sites = [{"file": f["file"], "line": f["line"],
+              "kind": _THREAD_KINDS.get(f["kind"], f["kind"]),
+              "symbol": f["symbol"], "severity": f["severity"]} for f in findings[:_THREAD_CAP]]
     return {"verdict": verdict, "exposed": counts.get("exposed", 0), "review": counts.get("review", 0),
             "blurb": blurb, "sites": sites, "sites_more": max(0, len(findings) - _THREAD_CAP)}
 
