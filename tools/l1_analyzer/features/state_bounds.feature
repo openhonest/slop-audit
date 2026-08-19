@@ -18,12 +18,6 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     And the operator opts in for that run only, after the whole payload is printed rather than summarised
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
-  Scenario: _first_arg reads the value of the first argument at a call site
-    Given a call node and the language spec
-    When _first_arg finds the argument list, takes its first named entry and unwraps a named-argument wrapper
-    Then it returns the value passed
-    But a missing call, a missing argument list or an empty one all yield nothing, since every step passes an absence straight through
-
   Scenario: _callee_name reads the name of what is being called
     Given a call node and the language spec
     When _callee_name reads the receiver-and-name field in a flat-call grammar, or the function field elsewhere

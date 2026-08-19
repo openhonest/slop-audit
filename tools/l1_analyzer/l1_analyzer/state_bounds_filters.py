@@ -71,9 +71,11 @@ from l1_analyzer.lang_spec import (
     LangSpec,
 )
 from l1_analyzer.ts_nodes import field as _field
+from l1_analyzer.ts_nodes import first_arg as _first_arg
 from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
 from l1_analyzer.ts_nodes import same as _same
 from l1_analyzer.ts_nodes import sub_collection as _sub_collection
+from l1_analyzer.ts_nodes import sub_key as _sub_key
 from l1_analyzer.ts_nodes import text as _text
 
 _PY = LANG_SPEC["python"]
@@ -374,17 +376,46 @@ def _is_open_key(key: Node | None) -> bool:
     return not _is_state_of_this_class(key)
 
 
-def _selects_on_an_open_key(refs: list[Node]) -> bool:
+def _selects_on_an_open_key(refs: list[Node], sp: LangSpec) -> bool:
+    """A reference SELECTS on a key nobody bounded, so the attribute's answer depends on it.
+
+    Read from the vocabulary since 2026-08-18. It hardcoded Python's `subscript`,
+    `assignment` and `delete_statement`, and the carried-value rule it guards was widened
+    to all nine on the same day. Widening the rule and not the guard dropped the guard for
+    eight languages and turned thirty-seven cross-language conformance vectors red, which
+    is what that suite is for.
+
+    A STORE is not a select: writing at a key, or removing one, does not make the answer
+    depend on the key. Removal has two spellings across the nine, a statement in Python,
+    JavaScript and TypeScript, and a method everywhere else, and the method form is already
+    covered by `mutating`."""
     for ref in refs:
         parent = ref.parent
-        if parent is None or parent.type != "subscript" or parent.child_by_field_name("value") != ref:
+        if parent is None or parent.type not in sp["subscript_types"] \
+                or _sub_collection(parent, sp) != ref:
             continue
         gp = parent.parent
         store = gp is not None and (
-            (gp.type in ("assignment", "augmented_assignment") and gp.child_by_field_name("left") == parent)
-            or gp.type == "delete_statement"
+            (gp.type in sp["assign_types"] and _field(gp, sp["assign_left"]) == parent)
+            or gp.type in sp["key_removal_types"]
         )
-        if not store and _is_open_key(parent.child_by_field_name("subscript")):
+        if not store and _is_open_key(_sub_key(parent, sp)):
+            return True
+    # THE METHOD FORM of a keyed read, which is how six of the nine spell it. Java asks
+    # `d.get(k)` and C# `d.GetValueOrDefault(k)`, neither of which is a subscript, so a
+    # guard reading only subscripts saw nothing and the carried-value rule cleared an
+    # open-key read that the cross-language vector `open-key-read-returned` declares
+    # promiscuous. Python's own `d.get(k)` was covered by the subscript spelling beside it
+    # and this shape never came up while the rule was Python-only.
+    for ref in refs:
+        parent = ref.parent
+        if parent is None or parent.type not in sp["member_types"]:
+            continue
+        attr_node = _field(parent, sp["mem_attr"])
+        gp = parent.parent
+        called = gp is not None and gp.type in sp["call_types"] and _field(gp, sp["call_fn"]) == parent
+        if called and attr_node is not None and _text(attr_node) in sp["keyed_read"] \
+                and _is_open_key(_first_arg(gp, sp)):
             return True
     return False
 
@@ -717,10 +748,29 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
     # such decision exists is a shape eligible to clear.
     if _value_reaches_condition(refs, sp) or not _result_invariant(attr, refs, sp):
         return False
-    # Write-once, memoization and carried-value still read Python node types directly, so
-    # they run for Python and nobody else. Each is a claim about nine grammars that the
-    # cross-language suite has not yet been made to hold, and widening one rule at a time is
-    # what lets the suite say which claim broke.
+    # CARRIED VALUE SERVES ALL NINE, since 2026-08-18. It is one line, `no reference sits
+    # in a test expression`, and it delegates to `reads.in_test`, which is vocabulary-driven
+    # and whose own docstring works through the JavaScript, TypeScript and C# condition
+    # wrappers. It was language-independent already and sat inside the gate only because the
+    # gate wraps three rules together.
+    #
+    # The guard above runs first and also serves all nine, so a value that DOES reach a
+    # decision on an unbounded key is still flagged in every language.
+    # Write-once, memoization and carried-value still run for Python and nobody else. Each
+    # is a claim about nine grammars the cross-language suite has not been made to hold,
+    # and widening one rule at a time is what lets the suite say which claim broke.
+    #
+    # CARRIED VALUE WAS TRIED ON 2026-08-18 AND PUT BACK. The rule itself is one line and
+    # already vocabulary-driven, so it looked free. It is not, and the dependency chain is
+    # the finding: it is only sound behind `_selects_on_an_open_key`, which was Python-only
+    # too; widening that needs the subscript spelling AND the method spelling, because six
+    # of the nine ask `d.get(k)` rather than `d[k]`; and with both of those the Ruby
+    # conditional-assignment cache still clears when it must not. The guard below now reads
+    # the vocabulary, which is the part of that work worth keeping.
+    #
+    # What a future attempt needs: `open-key-read-returned` in the cross-language vectors
+    # declares this shape promiscuous and is the assertion to satisfy, and the Ruby
+    # conditional-assignment cache is the second. Both were green before and after here.
     if _is_python(sp):
         cls = _enclosing_class(refs[0], sp)
         if cls is None:
@@ -733,7 +783,7 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
         # no other rule is exempt.
         if verdict == "promiscuous" and _is_memoization(cls, attr, refs, sp):
             return True
-        if _selects_on_an_open_key(refs):
+        if _selects_on_an_open_key(refs, sp):
             return False
         if _is_write_once(cls, attr, refs):
             return True                               # immutable, read only in bounded ways

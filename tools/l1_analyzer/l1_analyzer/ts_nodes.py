@@ -278,3 +278,7 @@ def unwrap_unary(node: Node | None, sp: LangSpec) -> Node | None:
     while node is not None and node.type in sp["value_wrapper_types"]:
         node = first_named(node)
     return node
+
+
+def first_arg(call: Node | None, sp: LangSpec) -> Node | None:
+    return arg_value(first_named(field(call, sp["call_args"])))

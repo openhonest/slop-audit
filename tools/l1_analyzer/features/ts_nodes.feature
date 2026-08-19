@@ -137,3 +137,9 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
     Then it returns the value underneath, so a negated, borrowed, parenthesised or cast literal is still one compile-time value
     And the vocabulary is its own key and not the flow walker's passthrough set, which carries boolean and try wrappers that do not preserve a literal, so a key written as one value or another stays unbounded
     But a negated or borrowed variable peels to a name, which is no literal, and stays unbounded
+
+  Scenario: first_arg reads the value of the first argument at a call site
+    Given a call node and the language spec
+    When _first_arg finds the argument list, takes its first named entry and unwraps a named-argument wrapper
+    Then it returns the value passed
+    But a missing call, a missing argument list or an empty one all yield nothing, since every step passes an absence straight through

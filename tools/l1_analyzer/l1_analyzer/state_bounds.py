@@ -78,10 +78,9 @@ from l1_analyzer.state_partition import (
 )
 from l1_analyzer.state_refs import bound_to as _bound_to
 from l1_analyzer.state_sites import Site
-from l1_analyzer.ts_nodes import arg_value as _arg_value
 from l1_analyzer.ts_nodes import bare_condition as _bare_condition
 from l1_analyzer.ts_nodes import field as _field
-from l1_analyzer.ts_nodes import first_named as _first_named
+from l1_analyzer.ts_nodes import first_arg as _first_arg
 from l1_analyzer.ts_nodes import hidden_names as _hidden_names
 from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
 from l1_analyzer.ts_nodes import is_opaque_unary as _is_opaque_unary
@@ -122,10 +121,6 @@ class Finding(TypedDict):
     silence: str
     construct: str
     partition: Partition
-
-
-def _first_arg(call: Node | None, sp: LangSpec) -> Node | None:
-    return _arg_value(_first_named(_field(call, sp["call_args"])))
 
 
 def _callee_name(call: Node | None, sp: LangSpec) -> str:
