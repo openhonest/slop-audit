@@ -77,3 +77,48 @@ lang = "python"
 commit = "b2e30a175449cfda909ee4fbf4a29a6a071cad53"
 license = "BSD-3-Clause"
 note = "Python at 8.4.2. Decorator-heavy with dispatch tables at module level, which exercises the declaration kinds the census counts and the island rule reads."
+
+# Added 2026-08-19 to close slop-audit-958. Four of the nine supported languages had no
+# entry, so no classifier change to javascript, typescript, go, ruby or rust could have its
+# blast radius measured the way changes to the other four could. That gap was found the hard
+# way: a TypeScript function expression was not counted as a function, and the fix had to be
+# measured against two ad-hoc repositories nobody else can reproduce.
+#
+# Each was cloned and its license read from the file rather than assumed, and each was run
+# through the analyzer to confirm it detects as the language claimed and produces a panel
+# with real variation rather than a column of n/a.
+
+[[repo]]
+slug = "sindresorhus/ky"
+lang = "typescript"
+commit = "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f"
+license = "MIT"
+note = "Real TypeScript source, not a JavaScript package with typings beside it: 53 .ts files and no .d.ts-only shape. Chalk and query-string were measured first and rejected for exactly that, and chalk vendors its dependencies as well."
+
+[[repo]]
+slug = "google/go-cmp"
+lang = "go"
+commit = "b133f1f1932e48f466f597a3346ce6f5a49a0dc1"
+license = "BSD-3-Clause"
+note = "Go, and reflection-heavy, so L1.15 has something to count: 12.02% type escapes against 0% for the C entries."
+
+[[repo]]
+slug = "sinatra/mustermann"
+lang = "ruby"
+commit = "507eb155a7f106bd14a6b5458b088ea96ae6af2e"
+license = "MIT"
+note = "Ruby, a pattern-matching library with 15 promiscuous and 60 unresolved states, which is the widest L1.18b spread in the corpus."
+
+[[repo]]
+slug = "uuid-rs/uuid"
+lang = "rust"
+commit = "2ea38af9f226cad4b50b560cbc18e38927a0a58d"
+license = "MIT OR Apache-2.0"
+note = "Rust. Chosen over BurntSushi/byteorder, which was measured first and classified 2 states where this one classifies 56, so it exercises the state analysis and byteorder barely does."
+
+[[repo]]
+slug = "expressjs/express"
+lang = "javascript"
+commit = "a3714473feb3d2908add734d340e7755fd85e0a3"
+license = "MIT"
+note = "JavaScript, and it earns its place beside the TypeScript entry now that the TypeScript table is DERIVED from the JavaScript one: a change to the base reaches both, and only a repository of each catches it. query-string was measured first and rejected because every indicator came back zero, so it could never catch a regression."
