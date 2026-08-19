@@ -52,11 +52,81 @@ fn annotation_name<'a>(node: Node<'a>, src: &[u8]) -> String {
 /// however many warnings it names.
 /// The whole vocabulary travels in `cfg`, as it does in the reference: unpacking it at
 /// each call site is how a new vocabulary silently splits the measure in two.
+/// True when a matching token sits somewhere its language says is not a type: an import
+/// or using declaration that names the symbol, or an object key spelled like it.
+///
+/// `from typing import Any` makes a symbol available and types nothing. Without this,
+/// every statically-typed Python file carried a floor of one escape, and a file that
+/// imported the name without using it was charged for the import alone. The reference has
+/// had this rule; the port did not, and counted 179 escapes where the reference counted
+/// 167 on the same tree.
+fn in_non_type_position(leaf: Node, nonpositions: &[&str]) -> bool {
+    let mut parent = leaf.parent();
+    while let Some(node) = parent {
+        if nonpositions.contains(&node.kind()) {
+            return true;
+        }
+        parent = node.parent();
+    }
+    false
+}
+
+/// The escape tokens named inside a cast's STRING first argument.
+///
+/// `cast("dict[str, Any]", ctx)` names a type, and the leaf walk drops it with every other
+/// string. `("Any",)` in a pattern table does not name a type, and the call name is what
+/// separates them. Without this the same code scored 2 unquoted and 1 quoted, so a reader
+/// could move the number by adding quotation marks.
+///
+/// A language declaring no cast calls gets no walk, which is every language but Python.
+fn count_cast_type_strings(node: Node, src: &[u8], cfg: &lang::LangCfg) -> usize {
+    if cfg.type_cast_calls.is_empty() {
+        return 0;
+    }
+    let mut count = 0usize;
+    if node.kind() == "call" {
+        let named = node.child_by_field_name("function").map(|f| {
+            String::from_utf8_lossy(&src[f.byte_range()]).into_owned()
+        });
+        if named.is_some_and(|n| cfg.type_cast_calls.contains(&n.as_str())) {
+            let first = node
+                .child_by_field_name("arguments")
+                .and_then(|a| a.named_child(0));
+            if let Some(arg) = first {
+                if arg.kind().contains("string") {
+                    let text = String::from_utf8_lossy(&src[arg.byte_range()]);
+                    // One count per escape token NAMED in the type, matching the
+                    // reference's word-boundary search over the string's own text.
+                    for token in cfg.type_escape_patterns {
+                        count += text
+                            .match_indices(token)
+                            .filter(|(i, _)| {
+                                let before = text[..*i].chars().next_back();
+                                let after = text[i + token.len()..].chars().next();
+                                !before.is_some_and(|c| c.is_alphanumeric() || c == '_')
+                                    && !after.is_some_and(|c| c.is_alphanumeric() || c == '_')
+                            })
+                            .count();
+                    }
+                }
+            }
+        }
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        count += count_cast_type_strings(child, src, cfg);
+    }
+    count
+}
+
 fn count_escapes_in_tree(node: Node, src: &[u8], cfg: &lang::LangCfg) -> usize {
     let mut count = 0usize;
     if node.child_count() == 0 {
         let text = String::from_utf8_lossy(&src[node.byte_range()]);
-        if cfg.type_escape_patterns.contains(&text.as_ref()) && !in_string(node) {
+        if cfg.type_escape_patterns.contains(&text.as_ref())
+            && !in_string(node)
+            && !in_non_type_position(node, cfg.type_escape_nonpositions)
+        {
             count += 1;
         }
     }
@@ -130,7 +200,8 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
         };
         total_loc += splitlines_count_str(&String::from_utf8_lossy(&src));
         if let Some(tree) = parser.parse(&src, None) {
-            escape_count += count_escapes_in_tree(tree.root_node(), &src, cfg);
+            escape_count += count_escapes_in_tree(tree.root_node(), &src, cfg)
+                + count_cast_type_strings(tree.root_node(), &src, cfg);
         }
     }
 
@@ -185,6 +256,7 @@ mod tests {
         let src = source.as_bytes();
         let tree = parser.parse(src, None).expect("parse");
         count_escapes_in_tree(tree.root_node(), src, cfg)
+            + count_cast_type_strings(tree.root_node(), src, cfg)
     }
 
     /// Java's suppression marker parses as an `annotation` node, so the comment arm never
