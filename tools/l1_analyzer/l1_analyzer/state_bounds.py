@@ -190,6 +190,32 @@ def _categorize_read(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]
     return state_partition.finite(2, True, "truthy")
 
 
+def _out_argument_local(call: Node, sp: LangSpec) -> Node | None:
+    """The local an `out` argument of this call binds, or None.
+
+    `_d.Remove(k, out var v)` hands the stored value back through `v`. `Remove` is a
+    mutating method, so the reference read as a write and stopped, and the value leaving
+    through the out argument was never followed: the dictionary came back neutral and
+    observe-only on a source that branches on the removed value.
+
+    A rule watching the invocation's own value cannot see it, because the invocation
+    returns a bool. The value goes out through a declaration_expression inside the
+    argument, which binds a local, and following a local is machinery this module has.
+
+    C# alone of the nine spells this; the other eight declare an empty vocabulary."""
+    kinds = sp["out_argument_types"]
+    if not kinds:
+        return None
+    for node in _refs(call, lambda n: n.type in kinds):
+        # The NAME, not the first named child. `out var v` parses as an implicit_type
+        # `var` followed by the identifier, so taking the first named child took the type
+        # and the rule silently did nothing.
+        for child in node.named_children:
+            if child.type == "identifier":
+                return child
+    return None
+
+
 def _local_binding_name(ref: Node, sp: LangSpec) -> Node | None:
     """The local this reference is being bound INTO, or None.
 
@@ -367,6 +393,12 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
         if called and attr in sp.get("dispatch_methods", frozenset()):
             return state_partition.undecided(DYNAMIC_DISPATCH)   # a stored callable: unbounded target
         if called and attr in sp["mutating"]:
+            # A mutating call can still hand the value OUT. `_d.Remove(k, out var v)`
+            # writes the dictionary AND returns the removed value through `v`, so a rule
+            # that stops at the write never sees the branch on it.
+            out_local = _out_argument_local(gp, sp)
+            if out_local is not None:
+                return _follow_local(ref, out_local, sp, closed_sets, cells, depth)
             return state_partition.write()
         if called and attr in sp["keyed_read"]:
             return _keyed_read(_first_arg(gp, sp), sp, cells)

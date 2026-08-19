@@ -39,6 +39,7 @@ class LangSpec(TypedDict, total=False):
     destructuring_types: tuple[str, ...]
     member_types: tuple[str, ...]
     member_name_field: str | None
+    out_argument_types: tuple[str, ...]
     local_binding: dict[str, tuple[str, str | None]]
     switch_types: dict[str, tuple[str, str]]
     immutable_modifiers: frozenset[str]
@@ -381,6 +382,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("decorator",),
         "member_types": ("attribute",), "mem_object": "object", "mem_attr": "attribute",
         "member_name_field": None,
+        "out_argument_types": (),
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {},
         "immutable_modifiers": frozenset(),
@@ -456,6 +458,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("decorator",),
         "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
         "member_name_field": None,
+        "out_argument_types": (),
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const", "readonly"}),
@@ -510,6 +513,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("decorator",),
         "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
         "member_name_field": None,
+        "out_argument_types": (),
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const"}),
@@ -564,6 +568,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("annotation",),
         "member_types": ("field_access",), "mem_object": "object", "mem_attr": "field",
         "member_name_field": "field",
+        "out_argument_types": (),
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {"switch_expression": ("condition", "switch_block_statement_group")},
         "immutable_modifiers": frozenset({"final"}),
@@ -622,6 +627,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("attribute",),  # C# member access is member_access_expression, so no clash
         "member_types": ("member_access_expression",), "mem_object": "expression", "mem_attr": "name",
         "member_name_field": "name",
+        "out_argument_types": ("declaration_expression",),
         "local_binding": {"variable_declarator": ("name", None)},
         "switch_types": {"switch_statement": ("value", "switch_section")},
         "immutable_modifiers": frozenset({"const", "readonly"}),
@@ -693,6 +699,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": ("attribute",),  # Rust member access is field_expression, so no clash
         "member_types": ("field_expression",), "mem_object": "value", "mem_attr": "field",
         "member_name_field": None,
+        "out_argument_types": (),
         "local_binding": {"let_declaration": ("pattern", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const", "static"}),
@@ -756,6 +763,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": (),    # the language has no decorator syntax
         "member_types": ("call",),   # unused for ivar state, but keep valid node types
         "member_name_field": None,
+        "out_argument_types": (),
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {},
         "immutable_modifiers": frozenset(),
@@ -824,6 +832,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": (),       # the language has no decorator syntax
         "member_types": ("field_expression",), "mem_object": "argument", "mem_attr": "field",
         "member_name_field": "field",
+        "out_argument_types": (),
         "local_binding": {"init_declarator": ("declarator", "value")},
         "switch_types": {},
         "immutable_modifiers": frozenset({"const"}),
@@ -896,6 +905,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "decorator_types": (),      # the language has no decorator syntax
         "member_types": ("selector_expression",), "mem_object": "operand", "mem_attr": "field",
         "member_name_field": None,
+        "out_argument_types": (),
         "local_binding": {"short_var_declaration": ("left", "right")},
         "switch_types": {"expression_switch_statement": ("value", "expression_case")},
         "immutable_modifiers": frozenset({"const"}),

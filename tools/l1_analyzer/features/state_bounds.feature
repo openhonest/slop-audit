@@ -49,6 +49,13 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     Then a keyed target is a keyed read, so an open key is unbounded exactly as on the right-hand side
     But a bare name is the value meeting a presence test, which is the two-class split any truthiness test makes
 
+  Scenario: _out_argument_local finds the local a call hands a value back through
+    Given a call node and the language's out-argument vocabulary
+    When _out_argument_local looks inside the argument list for a declaration the call binds
+    Then it returns the name being bound, so a mutating call that also hands the value out is followed rather than stopped at the write
+    And it reads the identifier rather than the first named child, because `out var v` puts the type first and taking that made the rule do nothing at all
+    But a language declaring no out-argument spelling gets nothing, which is eight of the nine
+
   Scenario: _local_binding_name finds the local a reference is being bound into
     Given a reference and the language's local-binding vocabulary
     When _local_binding_name checks whether the reference fills the binding's value slot
