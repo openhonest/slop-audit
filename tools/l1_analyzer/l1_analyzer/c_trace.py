@@ -29,7 +29,13 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
+from l1_analyzer.pytest_trace import (
+    L1Result,
+    _first_line,
+    _na,
+    _run_untrusted,
+    coverage_band,
+)
 
 _MAKEFILES = ("Makefile", "makefile", "GNUmakefile")
 _TEST_TARGETS = ("test", "check")
@@ -107,7 +113,7 @@ def _coverage_verdict(summary_text: str, build_returncode: int, build_output: st
 
     pct = float(match.group(1))
     covered = int(match.group(2))
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
+    result_band = coverage_band(pct)
     suite = f"make {target} passed" if build_returncode == 0 else f"make {target} exit {build_returncode}"
     return {
         "value": round(pct, 1),

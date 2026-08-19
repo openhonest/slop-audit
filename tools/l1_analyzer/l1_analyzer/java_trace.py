@@ -39,6 +39,8 @@ from l1_analyzer.pytest_trace import (
     _first_line,
     _na,
     _run_untrusted,
+    coverage_band,
+    determinism_band,
     resolve_via_shim,
 )
 
@@ -132,7 +134,7 @@ def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, jdk: st
     suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
     return {
         "value": round(pct, 1),
-        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "band": coverage_band(pct),
         "details": f"{covered}/{total} decision branches exercised by tests "
                    f"(JaCoCo BRANCH counters; {suite}; ran under {jdk})",
     }
@@ -205,7 +207,7 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str) -> L1Res
 
     if made == 0:
         return _na("no randomized-order runs were made; determinism not measured")
-    result_band = "Healthy" if passing == made else ("Not Healthy" if passing == made - 1 else "Slop")
+    result_band = determinism_band(passing, made)
     details = f"{passing} of {made} randomized-order runs passed cleanly (under {jdk})"
     if failing:
         details += f"; runs with failures: {'; '.join(failing[:3])}"

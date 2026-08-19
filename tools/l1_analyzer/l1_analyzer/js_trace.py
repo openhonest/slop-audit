@@ -31,7 +31,14 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
+from l1_analyzer.pytest_trace import (
+    L1Result,
+    _first_line,
+    _na,
+    _run_untrusted,
+    coverage_band,
+    determinism_band,
+)
 
 # The default `npm init` test script; a real command, but it runs no tests.
 _NO_TEST_SCRIPT = "no test specified"
@@ -146,7 +153,7 @@ def _coverage_verdict(branches: dict, returncode: int, runtime: str) -> L1Result
     suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
     return {
         "value": round(pct, 1),
-        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "band": coverage_band(pct),
         "details": f"{pct}% branch coverage from c8 (V8) ({suite}; ran under {runtime})",
     }
 
@@ -280,7 +287,7 @@ def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runtime: 
         details += f"; runs with failures: {'; '.join(failing[:3])}"
     return {
         "value": f"{passing}/{runs}",
-        "band": "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop"),
+        "band": determinism_band(passing, runs),
         "details": details,
     }
 

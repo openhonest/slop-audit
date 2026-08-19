@@ -146,6 +146,21 @@ def _module_available(module: str, python_executable: str | None = None) -> bool
         return False
 
 
+def coverage_band(pct: float) -> str:
+    """The published L1.19 band: strictly above 90 is Healthy, at or above 60 is Not
+    Healthy, below that is Slop. One rule for every language, because comparing languages
+    is what the meter claims to do, and eight copies of a threshold is eight places for
+    one language to start grading the same evidence differently from the rest."""
+    return "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
+
+
+def determinism_band(passing: int, runs: int) -> str:
+    """The published L1.20 band: every run clean is Healthy, exactly one short is Not
+    Healthy, worse is Slop. The caller refuses a zero denominator before it reaches here,
+    since zero clean out of zero satisfies "every run passed" and would band Healthy."""
+    return "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
+
+
 def _na(reason: str) -> L1Result:
     return {"value": "n/a", "band": "n/a", "details": reason}
 
@@ -203,7 +218,7 @@ def _coverage_verdict(returncode: int, totals: dict, provenance: str) -> L1Resul
     suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
     return {
         "value": round(pct, 1),
-        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "band": coverage_band(pct),
         "details": f"{covered}/{num_branches} decision branches exercised by tests "
                    f"({suite}; ran under {provenance})",
     }
@@ -305,7 +320,7 @@ def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float,
         else:  # exit 1: the suite ran, but not every test passed
             failing.append(f"seed {seed}: {_pytest_summary((run.stdout or '') + (run.stderr or ''))}")
 
-    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
+    result_band = determinism_band(passing, runs)
     details = f"{passing} of {runs} randomized-order runs passed cleanly (under {provenance})"
     if failing:
         details += f"; runs with failures: {'; '.join(failing[:3])}"

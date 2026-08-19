@@ -23,7 +23,14 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
+from l1_analyzer.pytest_trace import (
+    L1Result,
+    _first_line,
+    _na,
+    _run_untrusted,
+    coverage_band,
+    determinism_band,
+)
 
 _TOTAL = re.compile(r"total:\s+\(statements\)\s+([\d.]+)%")
 _RAN = ("ok  ", "--- FAIL", "FAIL", "PASS")
@@ -73,7 +80,7 @@ def _coverage_verdict(func_output: str, profile_written: bool, run_returncode: i
         return _na("coverage profile had no statement total")
 
     pct = float(match.group(1))
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
+    result_band = coverage_band(pct)
     suite = "suite passed" if run_returncode == 0 else f"suite exit {run_returncode}"
     return {
         "value": round(pct, 1),
@@ -153,7 +160,7 @@ def _determinism_verdict(outcomes: list[tuple[int, int, str]], runs: int, toolch
         return _na(f"only {len(outcomes)} of {runs} shuffled-order runs produced an outcome; "
                    f"determinism not measured (under {toolchain})")
 
-    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
+    result_band = determinism_band(passing, runs)
     details = f"{passing} of {runs} shuffled-order runs passed cleanly (under {toolchain})"
     if failing:
         details += f"; runs with failures: {'; '.join(failing[:3])}"

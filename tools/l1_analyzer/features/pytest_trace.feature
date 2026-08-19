@@ -99,3 +99,15 @@ Feature: pytest_trace — running a Python repository's own test suite to measur
     Then it returns the passing count over the run count, banded Healthy when every run passes, Not Healthy at one short, and Slop below that
     And the seeds whose runs had failures are named in the detail line, up to three of them, so a low score carries its own explanation
     But any language other than Python, a missing test runner, a missing order-randomizing plugin, a suite that collected no tests, a timed-out run, or a run that ended in an interruption, internal error or usage error returns not-applicable with the reason, rather than a zero score that would read as flakiness
+
+  Scenario: coverage_band applies the one published L1.19 rule to a percentage
+    Given a coverage percentage
+    When coverage_band reads it
+    Then strictly above 90 is Healthy, at or above 60 is Not Healthy, and below that is Slop
+    And every language tracer asks this one function, so no two languages can grade the same evidence differently
+
+  Scenario: determinism_band applies the one published L1.20 rule to a count of clean runs
+    Given how many runs passed cleanly and how many were made
+    When determinism_band reads them
+    Then all clean is Healthy, exactly one short is Not Healthy, and worse than that is Slop
+    But the caller refuses a zero denominator before reaching here, since zero clean out of zero would satisfy "every run passed" and band Healthy

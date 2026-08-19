@@ -27,7 +27,14 @@ import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 
-from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
+from l1_analyzer.pytest_trace import (
+    L1Result,
+    _first_line,
+    _na,
+    _run_untrusted,
+    coverage_band,
+    determinism_band,
+)
 
 _BRANCHES_VALID = re.compile(r"<coverage[^>]*\bbranches-valid=\"(\d+)\"")
 _BRANCHES_COVERED = re.compile(r"<coverage[^>]*\bbranches-covered=\"(\d+)\"")
@@ -81,7 +88,7 @@ def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, sdk: st
     suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
     return {
         "value": round(pct, 1),
-        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "band": coverage_band(pct),
         "details": f"{covered}/{valid} branches exercised by tests from `dotnet test --collect "
                    f"\"XPlat Code Coverage\"` ({suite}; ran under {sdk})",
     }
@@ -151,7 +158,7 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], sdk: str) -> L1Res
 
     if made == 0:
         return _na("no `dotnet test` runs were made; determinism not measured")
-    result_band = "Healthy" if passing == made else ("Not Healthy" if passing == made - 1 else "Slop")
+    result_band = determinism_band(passing, made)
     details = (f"{passing} of {made} `dotnet test` runs passed cleanly (order is scheduler-varied, "
                f"not seed-controlled; under {sdk})")
     if failing:

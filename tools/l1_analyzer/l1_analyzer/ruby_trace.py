@@ -34,6 +34,8 @@ from l1_analyzer.pytest_trace import (
     _first_line,
     _na,
     _run_untrusted,
+    coverage_band,
+    determinism_band,
     resolve_via_shim,
 )
 
@@ -160,7 +162,7 @@ def _coverage_verdict(covered: int, total: int, returncode: int, version: str) -
     suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
     return {
         "value": round(pct, 1),
-        "band": "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop"),
+        "band": coverage_band(pct),
         "details": f"{covered}/{total} SimpleCov branches exercised by tests "
                    f"({suite}; ran under {version})",
     }
@@ -233,7 +235,7 @@ def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runs: int
         details += f"; runs with failures: {'; '.join(failing[:3])}"
     return {
         "value": f"{passing}/{runs}",
-        "band": "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop"),
+        "band": determinism_band(passing, runs),
         "details": details,
     }
 

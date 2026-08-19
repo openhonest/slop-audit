@@ -28,7 +28,14 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from l1_analyzer.pytest_trace import L1Result, _first_line, _na, _run_untrusted
+from l1_analyzer.pytest_trace import (
+    L1Result,
+    _first_line,
+    _na,
+    _run_untrusted,
+    coverage_band,
+    determinism_band,
+)
 
 # "test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"
 _RESULT = re.compile(r"test result:.*?(\d+) passed;\s*(\d+) failed;\s*(\d+) ignored")
@@ -176,7 +183,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:
         return _na("no coverage regions found (did the suite run any tests?)")
 
     pct = covered / count * 100
-    result_band = "Healthy" if pct > 90 else ("Not Healthy" if pct >= 60 else "Slop")
+    result_band = coverage_band(pct)
     suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
     return {
         "value": round(pct, 1),
@@ -209,7 +216,7 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float) -> L1Result:
         if run.returncode == 0 and total > 0:
             passing += 1
 
-    result_band = "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
+    result_band = determinism_band(passing, runs)
     return {
         "value": f"{passing}/{runs}",
         "band": result_band,
