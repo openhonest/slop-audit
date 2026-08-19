@@ -10,6 +10,13 @@ Feature: scope — deciding which files are the code under audit and which are s
   # and for a directory whose test convention no marker names, so a JavaScript __tests__ tree or
   # a Ruby spec tree is measured as production code and the disclosure records no judgment at all.
   @undecidable @not-implemented
+  Scenario: under_symlinked_dir decides symlinked trees rather than leaving it to the interpreter
+    Given a path below the repository root
+    When under_symlinked_dir walks up looking for a symlinked directory
+    Then it answers yes for anything inside one, so a tree that is not in this commit is not measured
+    And the answer is the same on every Python, because pathlib stopped following them in 3.13 and the Rust port's walkdir never did, and agreeing by version is not agreeing
+    But a symlinked FILE is unaffected, since is_file follows symlinks on purpose and one file is not a tree
+
   Scenario: undecidable a test-directory convention no marker in the scope names
     Given a repository whose tests sit in a directory named by a convention outside the two markers, such as a JavaScript __tests__ tree, a Ruby spec tree, or a Cucumber features tree
     When _bucket_reason tests that path against the vendored list, the scope's markers, the docs directory, the tooling names and the loose-root-script rule

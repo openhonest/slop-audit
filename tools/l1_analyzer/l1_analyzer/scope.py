@@ -220,6 +220,29 @@ def _in_ignored_dir(path: Path, extra: tuple[str, ...]) -> bool:
     return bool(parts & _IGNORE_DIRS) or _extra_reason(parts, extra, path) is not None
 
 
+def under_symlinked_dir(path: Path, root: Path) -> bool:
+    """True when `path` is, or sits under, a symlinked directory below `root`.
+
+    BY DECISION, NOT BY VERSION. The two tools agreed on symlinked trees by coincidence:
+    pathlib's `**` stopped following symlinked directories in Python 3.13, and walkdir,
+    which the Rust port uses, has never followed them. A run under 3.12 would descend into
+    a tree the port skips and the panels would diverge on any repository that has one.
+
+    The decision is the one already written for nested checkouts a few lines down:
+    measuring a tree that is not in this commit reports code the commit does not carry. A
+    symlinked directory points at exactly that, and it can point at itself.
+
+    A symlinked FILE is unaffected. `is_file()` follows symlinks deliberately, and one file
+    is not a tree."""
+    current = path
+    while True:
+        if current == root or root not in current.parents:
+            return current != root and current.is_symlink() and current.is_dir()
+        if current.is_symlink() and current.is_dir():
+            return True
+        current = current.parent
+
+
 def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
     """Every FILE under `repo` matching `pattern`. The single entry point for every
     scan in this module, so no reader has to remember what `rglob` yields.
@@ -261,7 +284,9 @@ def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
 
     return (
         p for p in repo.rglob(pattern)
-        if p.is_file() and not under_nested_checkout(p.parent.resolve())
+        if p.is_file()
+        and not under_symlinked_dir(p.parent, repo)
+        and not under_nested_checkout(p.parent.resolve())
     )
 
 
