@@ -28,7 +28,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 from l1_analyzer import pytest_trace, python_facets
-from l1_analyzer.coverage_prove import _call_model, _valid, model_available
+from l1_analyzer.coverage_prove import (
+    CoverageProof,
+    _call_model,
+    _valid,
+    model_available,
+)
 
 _PROPOSE_INSTRUCTION = (
     "You are given ONE Python function and one of its decision branches that no test ever reached. "
@@ -177,11 +182,12 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[dict],
             continue
         outcomes[bucket] += 1
         if bucket == "divergence":
-            retained.append({
+            entry: CoverageProof = {
                 "function": gap["function"], "language": "python",
                 "location": f"{relpath}:{gap['line']}",
                 "explanation": proposal["explanation"], "test_source": source.strip(),
-            })
+            }
+            retained.append(entry)
     return retained, outcomes
 
 

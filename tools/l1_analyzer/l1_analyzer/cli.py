@@ -17,6 +17,7 @@ from l1_analyzer import (
     card,
     indicators,
     interleaving_robustness,
+    prove,
     report,
     thread_surface,
 )
@@ -138,13 +139,16 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
     audited_lang = _audited_language(results, lang, repo)
     problems: list[str] = []
 
-    l17 = results.get("L1.17", {})
-    if isinstance(l17.get("value"), (int, float)) and l17["value"] > 0:
-        problems.append(f"god-file (L1.17): {l17.get('details', '')}")
+    # `results.get` is the real absence: an indicator the source pass did not run is not in
+    # the panel. Past that, L1Result is total and the analyzer's verdict counts carry all
+    # three verdicts, so the fields are subscripted rather than defaulted.
+    l17 = results.get("L1.17")
+    if isinstance(l17, dict) and isinstance(l17["value"], (int, float)) and l17["value"] > 0:
+        problems.append(f"god-file (L1.17): {l17['details']}")
 
-    l18b = results.get("L1.18b", {})
-    counts = l18b.get("counts", {}) if isinstance(l18b, dict) else {}
-    if counts.get("promiscuous", 0) > 0:
+    l18b = results.get("L1.18b")
+    counts = l18b["counts"] if isinstance(l18b, dict) else {"promiscuous": 0}
+    if counts["promiscuous"] > 0:
         problems.append(
             f"finite-testability (L1.18b): {counts['promiscuous']} promiscuous piece(s) of state "
             "- the code is no longer exhaustively testable"
@@ -267,17 +271,23 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
     if not prove.model_available():
         return {"verdict": "n/a", "detail": "needs ANTHROPIC_API_KEY to generate proofs", "demonstrated": 0, "outcomes": []}
     ts = thread_surface_result if isinstance(thread_surface_result, dict) else thread_surface.scan(repo, lang)
-    candidates = [f for f in ts.get("findings", []) if f.get("severity") == "review"][:prove_max]
+    # SurfaceResult and its Finding are both total, and `ts` above is either a scan result
+    # or a fresh scan, so both reads are guaranteed. A default here would have quietly
+    # proven nothing on a malformed surface rather than saying it could not read one.
+    candidates = [f for f in ts["findings"] if f["severity"] == "review"][:prove_max]
     work_root = Path(tempfile.mkdtemp(prefix="l1-prove-"))
-    outcomes: list[dict[str, object]] = []
+    outcomes: list[prove.ProofRecord] = []
     for i, f in enumerate(candidates):
         request = prove.proof_request(f, _hazard_context(repo, f))
         outcome = prove.prove_hazard(request, str(work_root / f"proof-{i}"), timeout_seconds=timeout)
         # Keep the generated test on the outcome so the card can expose a retained (demonstrated)
         # proof as an adoptable test - the runnable repro, not just a verdict line.
-        outcomes.append({"file": f["file"], "line": f["line"], "symbol": f["symbol"],
-                         "verdict": outcome["verdict"], "detail": outcome["detail"],
-                         "generated_test": outcome.get("generated_test")})
+        recorded: prove.ProofRecord = {
+            "file": f["file"], "line": f["line"], "symbol": f["symbol"],
+            "verdict": outcome["verdict"], "detail": outcome["detail"],
+            "generated_test": outcome.get("generated_test"),
+        }
+        outcomes.append(recorded)
     demonstrated = sum(o["verdict"] == prove.DEMONSTRATED for o in outcomes)
     return {"verdict": "demonstrated" if demonstrated else "none",
             "demonstrated": demonstrated, "attempted": len(outcomes), "outcomes": outcomes}
@@ -473,7 +483,10 @@ def main(argv: list[str] | None = None) -> int:
         from l1_analyzer import race_harness
         lang = _audited_language(results, args.lang, args.repo)
         race = race_harness.detect_races(args.repo, lang, args.timeout)
-        surface_files = {f["file"] for f in results.get("thread_surface", {}).get("findings", [])}
+        surface = results.get("thread_surface")
+        # The panel may not carry a surface scan at all, which is a real absence; a scan
+        # that IS there carries its findings, so only the first step defaults.
+        surface_files = {f["file"] for f in surface["findings"]} if isinstance(surface, dict) else set()
         race["confirmed_surface"] = race_harness.confirmed_surface(race["findings"], surface_files)
         results["race"] = race
 

@@ -6,7 +6,11 @@ from l1_analyzer import card
 
 _BASE = {
     "L1.18": {"value": 5.0, "band": "Healthy"},
-    "L1.18b": {"counts": {"neutral": 4, "promiscuous": 0, "unresolved": 0}, "resolvable_fraction": 1.0, "findings": []},
+    # Complete, because the analyzer's L1.18b always carries these. A fixture missing the
+    # bucketed section or the silence summary is testing a shape state_bounds cannot emit,
+    # and the card raised on it the moment those reads stopped defaulting.
+    "L1.18b": {"counts": {"neutral": 4, "promiscuous": 0, "unresolved": 0}, "resolvable_fraction": 1.0,
+               "findings": [], "bucketed": {"counts": {}, "paths": []}, "silence": None},
 }
 
 

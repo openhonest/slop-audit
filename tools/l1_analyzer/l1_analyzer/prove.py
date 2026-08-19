@@ -37,6 +37,34 @@ class ProofRequest(TypedDict):
     context: str
 
 
+class ProofRecord(TypedDict):
+    """One attempted concurrency proof as the CLI RECORDS it and the card renders it.
+
+    Not ProofOutcome, which is below and is what prove_hazard returns: that one carries the
+    request it was made from, this one carries the located hazard flattened into a file, a
+    line and a symbol. Two shapes, so two names. Writing this one as ProofOutcome first
+    silently shadowed the other, which is the collision the separate names exist to stop.
+
+    Declared because the card was reading these by guess: `o.get("symbol", "?")` over a
+    `dict[str, object]`, with nothing to hold the producer to. A retained proof whose
+    symbol went missing rendered as a question mark beside a real test source, which reads
+    as a proof of something nobody can name rather than as a broken record.
+
+    `generated_test` is None when the model produced nothing; that absence is a real case
+    and the card tests for it before exposing the proof.
+
+    Declared because the card was reading these by guess, `o.get("symbol", "?")` over a
+    `dict[str, object]`, with nothing to hold the producer to. A proof whose symbol went
+    missing rendered as a question mark beside a real test source, which reads as a proof
+    of something nobody can name rather than as a broken record."""
+    file: str
+    line: int
+    symbol: str
+    verdict: str
+    detail: str
+    generated_test: str | None
+
+
 class RunResult(TypedDict):
     """What a concurrency runner reports back about a generated test."""
     verdict: str        # a race_harness verdict: race-observed / no-race-* / n/a
@@ -163,7 +191,10 @@ def write_crate_and_stress(test_source: str, work_dir: str, runs: int, timeout_s
     )
     (crate / "src" / "lib.rs").write_text(test_source)
     result = race_harness.stress_races(crate, "rust", runs, timeout_seconds)
-    return {"verdict": result["verdict"], "detail": result.get("details", result.get("value", ""))}
+    # RaceResult is total, so details is there. The chain that stood here fell through to
+    # the value and then to the empty string, two fallbacks for a field that cannot be
+    # missing, and an empty detail would have read as a proof that explained nothing.
+    return {"verdict": result["verdict"], "detail": result["details"]}
 
 
 def prove_hazard(

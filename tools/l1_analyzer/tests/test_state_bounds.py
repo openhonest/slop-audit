@@ -39,6 +39,17 @@ from pathlib import Path
 
 from l1_analyzer import indicators, state_bounds
 
+
+def _band(word: str) -> dict:
+    """A complete panel entry with the given band.
+
+    Written out rather than `{"band": word}` because L1Result is total: the analyzer never
+    produces an entry without a value and a details line, so a fixture that does is testing
+    a shape the tool cannot emit. The card raised a KeyError on these the moment the type
+    was tightened, which is the fixture being wrong and not the card.
+    """
+    return {"value": "n/a", "band": word, "details": f"fixture: {word}"}
+
 GOLDEN = Path(__file__).parent / "golden" / "py_repo.json"
 # The golden's own content, pinned. Without this a re-capture is invisible: the diff that
 # would have shown a behaviour change is committed as the new expectation and nothing is red.
@@ -149,17 +160,17 @@ def test_unsupported_language_is_na_not_guessed(tmp_path):
 def test_grade_summary_is_the_single_source_of_the_published_grade():
     from l1_analyzer import report
     base = {
-        "L1.18": {"band": "Healthy"},
+        "L1.18": _band("Healthy"),
         "L1.18b": {"counts": {"neutral": 8, "promiscuous": 0, "unresolved": 0}, "resolvable_fraction": 1.0, "findings": []},
     }
-    healthy = {k: {"band": "Healthy"} for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")}
+    healthy = {k: _band("Healthy") for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")}
     # every audit check Healthy -> hygiene 1.0 -> grade A (verdict CAN)
     assert report.grade_summary({**base, **healthy}, report.UNORDERED_CLASS_BOUND)["hygiene"] == 1.0
     assert report.grade_summary({**base, **healthy}, report.UNORDERED_CLASS_BOUND)["grade"] == "A"
     # L1.15 (weight 3 of 11) at Slop -> 8/11 hygiene (>= 0.60) -> B
-    assert report.grade_summary({**base, **healthy, "L1.15": {"band": "Slop"}}, report.UNORDERED_CLASS_BOUND)["grade"] == "B"
+    assert report.grade_summary({**base, **healthy, "L1.15": _band("Slop")}, report.UNORDERED_CLASS_BOUND)["grade"] == "B"
     # L1.15 + L1.17 both Slop -> 5/11 hygiene (< 0.60) -> C
-    assert report.grade_summary({**base, **healthy, "L1.15": {"band": "Slop"}, "L1.17": {"band": "Slop"}}, report.UNORDERED_CLASS_BOUND)["grade"] == "C"
+    assert report.grade_summary({**base, **healthy, "L1.15": _band("Slop"), "L1.17": _band("Slop")}, report.UNORDERED_CLASS_BOUND)["grade"] == "C"
     # the verdict gates the tier regardless of hygiene
     cannot = {**base, "L1.18b": {"counts": {"neutral": 5, "promiscuous": 2, "unresolved": 0}, "resolvable_fraction": 0.7, "findings": []}}
     assert report.grade_summary(cannot, report.UNORDERED_CLASS_BOUND)["grade"] == "F"
@@ -175,7 +186,7 @@ def test_grade_summary_is_the_single_source_of_the_published_grade():
     assert report.grade_summary({**hidden, **healthy}, report.UNORDERED_CLASS_BOUND)["status"] == "na"
     assert report.grade_summary({**hidden, **healthy}, report.UNORDERED_CLASS_BOUND)["grade"] is None
     # an audit check with no band is excluded, not penalized
-    assert report.grade_summary({**base, "L1.17": {"band": "Healthy"}, "L1.15": {"band": "n/a"}}, report.UNORDERED_CLASS_BOUND)["hygiene"] == 1.0
+    assert report.grade_summary({**base, "L1.17": _band("Healthy"), "L1.15": _band("n/a")}, report.UNORDERED_CLASS_BOUND)["hygiene"] == 1.0
 
 
 # --- attribution: the finding must point at the binding, not the first text match ------

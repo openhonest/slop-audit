@@ -28,8 +28,19 @@ from __future__ import annotations
 from l1_analyzer import card, report, state_bounds
 from l1_analyzer.indicators import L1Result
 
+
+def _band(word: str) -> dict:
+    """A complete panel entry with the given band.
+
+    Written out rather than `{"band": word}` because L1Result is total: the analyzer never
+    produces an entry without a value and a details line, so a fixture that does is testing
+    a shape the tool cannot emit. The card raised a KeyError on these the moment the type
+    was tightened, which is the fixture being wrong and not the card.
+    """
+    return {"value": "n/a", "band": word, "details": f"fixture: {word}"}
+
 _HEALTHY: dict[str, L1Result] = {
-    k: {"band": "Healthy"} for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")
+    k: _band("Healthy") for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")
 }
 
 # The shipped configuration carries NO bound: measured over the pinned corpus and nine
@@ -50,7 +61,7 @@ def _partition(result: dict, state: str) -> dict:
 
 
 def _panel(l18b: dict) -> dict[str, L1Result]:
-    return {"L1.18": {"band": "Healthy"}, "L1.18b": l18b, **_HEALTHY}
+    return {"L1.18": _band("Healthy"), "L1.18b": l18b, **_HEALTHY}
 
 
 def test_a_comparison_chain_of_n_operators_gives_n_plus_one_ordered_classes(tmp_path):

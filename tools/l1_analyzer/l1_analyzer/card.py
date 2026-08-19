@@ -123,6 +123,13 @@ _BAND_WORD = {"Healthy": "Clean", "Not Healthy": "Caution", "Slop": "Slop", "n/a
 _WANT = {"cannot": "promiscuous", "coarse": "coarse"}
 _CULPRIT_CAP = 25
 _ZERO = {"neutral": 0, "promiscuous": 0, "unresolved": 0}
+
+# The one absent-indicator result. Complete, because L1Result is total: a stand-in for a
+# reading that never happened still has to say so in its details line, the same as every
+# reading that did. Written once so the next `results.get(key, {...})` cannot invent a
+# differently-shaped absence.
+ABSENT_INDICATOR = {"value": "n/a", "band": "n/a",
+                    "details": "this indicator was not in the panel"}
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
 # The core (verifiability) metrics and the audit checks, with their framework mappings.
@@ -157,12 +164,15 @@ def _t(key: str, **f: object) -> str:
 
 
 def _value_str(result: dict, unit: str) -> str:
-    v = result.get("value", "n/a")
+    # Subscripted. L1Result is total and its only caller passes a panel entry it has
+    # already found by key, so a default here would print n/a for a result that measured
+    # something and lost the field on the way.
+    v = result["value"]
     return "n/a" if v == "n/a" else f"{v}{unit}"
 
 
 def _metric(spec: dict, result: dict, group: str) -> dict:
-    band = str(result.get("band", "n/a"))
+    band = str(result["band"])
     k = spec["key"]
     return {"label": _t(f"label.{k}"), "tech": _t(f"tech.{k}"), "value": _value_str(result, spec["unit"]),
             "band": band, "band_word": _BAND_WORD.get(band, "No data"), "meaning": _t(f"meaning.{k}"),
@@ -173,7 +183,7 @@ def _metrics(specs: tuple, results: dict, group: str) -> list[dict]:
     return [_metric(s, results[s["key"]], group) for s in specs if s["key"] in results]
 
 
-def _culprits(l18b: dict, status: str, coarse: list[dict]) -> tuple[list[dict], int]:
+def _culprits(l18b: dict | None, status: str, coarse: list[dict]) -> tuple[list[dict], int]:
     """What limits the grade. CANNOT is limited by proven unbounded state, COARSE by finite
     state with too many unordered cases. The two lists are selected by different rules - one
     reads the verdict, the other reads the cardinality against a bound - so they cannot
@@ -181,7 +191,7 @@ def _culprits(l18b: dict, status: str, coarse: list[dict]) -> tuple[list[dict], 
     if status == "coarse":
         flagged = coarse
     elif status == "cannot":
-        flagged = [f for f in (l18b.get("findings") or []) if f["verdict"] == "promiscuous"]
+        flagged = [f for f in (l18b["findings"] if l18b else []) if f["verdict"] == "promiscuous"]
         flagged.sort(key=lambda f: (not f["drives_decision"], f["file"], f["line"]))
     else:
         return [], 0
@@ -196,10 +206,15 @@ def _culprits(l18b: dict, status: str, coarse: list[dict]) -> tuple[list[dict], 
     return shown, max(0, len(flagged) - _CULPRIT_CAP)
 
 
-def _scoped_out(l18b: dict) -> dict | None:
-    bucketed = l18b.get("bucketed", {}) if isinstance(l18b, dict) else {}
-    counts = bucketed.get("counts", {}) or {}
-    paths = [p["path"] for p in bucketed.get("paths", [])]
+def _scoped_out(l18b: dict | None) -> dict | None:
+    # The isinstance guard is the absence: L1.18b may not be in the panel at all. Past it
+    # the analyzer always writes a bucketed section carrying its counts and paths, even
+    # when both are empty, so those two are subscripted.
+    if l18b is None:
+        return None
+    bucketed = l18b["bucketed"]
+    counts = bucketed["counts"]
+    paths = [p["path"] for p in bucketed["paths"]]
     total = sum(counts.values())
     if not total:
         return None
@@ -247,7 +262,7 @@ def _thread_surface(lang: str, results: dict) -> dict | None:
         # place a new verdict can KeyError on a card the reader is looking at.
         blurb = _t(f"thread.blurb.{verdict}", exposed=counts.get("exposed", 0),
                    review=counts.get("review", 0), candidate=counts.get("candidate", 0),
-                   read=ts.get("files_read", 0), parsed=ts.get("files_parsed", 0))
+                   read=ts["files_read"], parsed=ts["files_parsed"])
     findings = ts.get("findings") if isinstance(ts.get("findings"), list) else []
     # thread_surface.Finding is total too, so a site's fields are subscripted. Only the
     # kind's DISPLAY name defaults, and to the kind itself: a kind with no copy yet is shown
@@ -319,27 +334,30 @@ def _proofs(results: dict) -> list[dict]:
 
     concurrency = results.get("proofs")
     if isinstance(concurrency, dict):
-        for o in concurrency.get("outcomes", []):
-            if o.get("verdict") == "demonstrated" and o.get("generated_test"):
+        # ProofOutcome is declared, so every field but generated_test is guaranteed. That
+        # one is None when the model produced nothing, which is a real case and the reason
+        # this loop tests it before exposing anything.
+        for o in concurrency["outcomes"]:
+            if o["verdict"] == "demonstrated" and o["generated_test"]:
                 out.append({
                     "layer": "concurrency", "language": "rust",
-                    "target": o.get("symbol", "?"),
-                    "location": f"{o.get('file', '?')}:{o.get('line', 0)}",
+                    "target": o["symbol"],
+                    "location": f"{o['file']}:{o['line']}",
                     "blurb": _t("proofs.blurb.concurrency"),
-                    "detail": o.get("detail", ""),
+                    "detail": o["detail"],
                     "test_source": o["generated_test"].rstrip(),
                 })
 
     coverage = results.get("coverage_proofs")
     if isinstance(coverage, dict):
-        for p in coverage.get("retained", []):
-            if p.get("test_source"):
+        for p in coverage["retained"]:
+            if p["test_source"]:
                 out.append({
-                    "layer": "coverage", "language": p.get("language", "python"),
-                    "target": p.get("function", "?"),
-                    "location": p.get("location", ""),
+                    "layer": "coverage", "language": p["language"],
+                    "target": p["function"],
+                    "location": p["location"],
                     "blurb": _t("proofs.blurb.coverage"),
-                    "detail": p.get("explanation", ""),
+                    "detail": p["explanation"],
                     "test_source": p["test_source"].rstrip(),
                 })
     return out[:_PROOF_CAP]
@@ -349,10 +367,14 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
     """The full scorecard model, identical to the site's. ran_tests=True (the CLI) adds
     the measured runtime metrics (L1.19 coverage, L1.20 determinism); False (the site) omits
     them and the footer says the code was never executed."""
-    l18 = results.get("L1.18", {"value": "n/a", "band": "n/a"})
-    band = str(l18.get("band", "n/a"))
-    l18b = results.get("L1.18b") if isinstance(results.get("L1.18b"), dict) else {}
-    counts = l18b.get("counts") or _ZERO
+    l18 = results.get("L1.18", ABSENT_INDICATOR)
+    band = str(l18["band"])
+    # None, not an empty dict. The empty dict was a SECOND spelling of absent, and it was
+    # the one that got past every `isinstance(l18b, dict)` guard downstream: the readers
+    # then subscripted a result that was never there. Absence has one spelling here.
+    l18b = results.get("L1.18b")
+    l18b = l18b if isinstance(l18b, dict) else None
+    counts = l18b["counts"] if l18b else _ZERO
     # The site and CLI are the boundary, so the configured bound is resolved here.
     g = grade_summary(results, UNORDERED_CLASS_BOUND)
     status, pct, grade = g["status"], g["testable_pct"], g["grade"]
@@ -369,7 +391,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
     # support this language yet (Rust and the rest), so L1.19/L1.20 read n/a. The footer says
     # which. The site (ran_tests=False) is a third case: it never runs code at all.
     l20 = results.get("L1.20")
-    tests_measured = ran_tests and isinstance(l20, dict) and str(l20.get("band", "n/a")) != "n/a"
+    tests_measured = ran_tests and isinstance(l20, dict) and str(l20["band"]) != "n/a"
     return {
         "slug": slug, "lang": lang, "question": _t("question"), "status": status, "grade": grade,
         "grade_pct": pct, "ran_tests": ran_tests, "tests_measured": tests_measured,
@@ -385,7 +407,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "culprits_heading": _t(f"culprits.heading.{status}") if status in _WANT else "",
         "culprits_note": _t(f"culprits.note.{status}") if status in _WANT else "",
         "culprits": culprits, "culprits_more": culprits_more,
-        "silence": l18b.get("silence") if isinstance(l18b.get("silence"), dict) else None,
+        "silence": l18b["silence"] if l18b and isinstance(l18b["silence"], dict) else None,
         "silence_note": _t("silence.note"), "compose_note": _t("compose.note"),
         "silence_sites": _silence_sites(l18b),
         "scoped_out": _scoped_out(l18b),
@@ -419,11 +441,11 @@ def card_html(card: dict) -> str:
     )
 
 
-def _silence_sites(l18b: dict) -> list[dict]:
+def _silence_sites(l18b: dict | None) -> list[dict]:
     """Every site the analyzer stopped at, with the reason in the reader's words, for the
     HTML card. The model carried `silence` and the template rendered none of it, so the site
     published a grade and named not one place it stopped."""
-    sil = l18b.get("silence") if isinstance(l18b, dict) else None
+    sil = l18b["silence"] if l18b else None
     if not isinstance(sil, dict):
         return []
     return [{"file": s["file"], "line": s["line"], "state": s["state"],

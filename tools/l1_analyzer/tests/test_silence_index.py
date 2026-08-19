@@ -25,6 +25,17 @@ from __future__ import annotations
 
 from l1_analyzer import card, report, state_bounds, state_partition
 
+
+def _band(word: str) -> dict:
+    """A complete panel entry with the given band.
+
+    Written out rather than `{"band": word}` because L1Result is total: the analyzer never
+    produces an entry without a value and a details line, so a fixture that does is testing
+    a shape the tool cannot emit. The card raised a KeyError on these the moment the type
+    was tightened, which is the fixture being wrong and not the card.
+    """
+    return {"value": "n/a", "band": word, "details": f"fixture: {word}"}
+
 # One class, one piece of state, and one call the analyzer cannot follow. The state is
 # never compared to anything unbounded and never used as an unbounded key, so nothing
 # here is evidence that the code is untestable - only that the meter stopped reading.
@@ -63,11 +74,11 @@ MOSTLY_DECIDED = ONE_SILENT_STATE + (
     "        return 0\n"
 )
 
-_HEALTHY = {k: {"band": "Healthy"} for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")}
+_HEALTHY = {k: _band("Healthy") for k in ("L1.17", "L1.15", "L1.10", "L1.11", "L1.9", "L1.16")}
 
 
 def _panel(l18b: dict) -> dict:
-    return {"L1.18": {"band": "Healthy"}, "L1.18b": l18b, **_HEALTHY}
+    return {"L1.18": _band("Healthy"), "L1.18b": l18b, **_HEALTHY}
 
 
 def _classify(tmp_path, src: str) -> dict:

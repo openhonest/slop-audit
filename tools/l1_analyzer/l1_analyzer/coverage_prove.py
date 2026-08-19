@@ -33,6 +33,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypedDict
 
 from l1_analyzer import coverage_gates, rust_facets, rust_trace
 from l1_analyzer import model_call as llm
@@ -235,7 +236,19 @@ def _batch_status(batch: dict[int, str], index: int) -> str:
     return batch[index] if index in batch else "unreported"  # noqa: SIM401
 
 
-def _retained_entry(module_relpath: str, gap: dict, proposal: dict, source: str) -> dict:
+class CoverageProof(TypedDict):
+    """One retained coverage proof, as the card renders it.
+
+    Both producers, this one for Rust and python_coverage_prove for Python, built the
+    entry by hand from five keys. They agreed, and nothing held them to it."""
+    function: str
+    language: str
+    location: str
+    explanation: str
+    test_source: str
+
+
+def _retained_entry(module_relpath: str, gap: dict, proposal: dict, source: str) -> CoverageProof:
     return {
         "function": gap["function"], "language": "rust",
         "location": f"{module_relpath}:{gap['line']}",
