@@ -59,6 +59,13 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
     Then it returns the total, the reasons in one phrase, and the first twelve paths with a count of the rest
     But a zero total returns nothing at all, so the card shows no scoped-out section rather than an empty one
 
+  Scenario: _interleaving_robustness gives the check a section a reader can see
+    Given a panel that may carry the interleaving-robustness result
+    When _interleaving_robustness reads its verdict and the files no model checker touches
+    Then it returns the section's verdict, blurb and file list, so the finding reaches the card rather than only the JSON
+    And a check that did not run, or returned n/a, gives nothing, because a heading over no reading is worse than no heading
+    But the file list is capped like the thread sites, and the count it dropped is published beside it
+
   Scenario: _thread_surface builds the thread-safety section from the measured verdict
     Given the language and the analyzer results
     When _thread_surface reads the thread-surface verdict, its counts and its findings

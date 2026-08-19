@@ -101,6 +101,10 @@ CARD_COPY: dict[str, str] = {
     "label.L1.9": "Checks that run before every commit",
     "tech.L1.9": "L1.9 · pre-commit hooks",
     "meaning.L1.9": "Whether automated checks run before code can even be committed, the first gate that catches AI output before a human ever sees it.",
+    "interleaving.heading": "Concurrency the model checkers do not cover",
+    "interleaving.blurb": "Of the files carrying an exposed thread-safety surface, these are the ones no loom or shuttle model touches: {unmodeled} of {surface}. Each is a place where the compiler's guarantee was set aside by hand and nothing systematically explores the interleavings.",
+    "interleaving.blurb.clean": "Every file carrying an exposed thread-safety surface is touched by a loom or shuttle model.",
+    "interleaving.note": "Static: it reads which files a model checker names, never whether the model is adequate. A covered file can still hold an unexplored interleaving.",
     "thread.heading": "Thread-safety surface",
     "thread.blurb.exposed": "Places where the compiler's thread-safety guarantee is overridden by hand or absent, with no visible guard: {exposed}. Each is a site to verify under free-threading, not a proven race.",
     "thread.blurb.review": "No hand-overrides of the thread-safety guarantee. Lower-severity footguns worth a look (relaxed atomic ordering, mutable default arguments, shared state that sits behind a lock we could not tie to it): {review}.",
@@ -197,6 +201,28 @@ def _scoped_out(l18b: dict) -> dict | None:
         return None
     return {"total": total, "reasons": ", ".join(f"{n} {r}" for r, n in sorted(counts.items())),
             "paths": paths[:12], "paths_more": max(0, len(paths) - 12)}
+
+
+def _interleaving_robustness(results: dict) -> dict | None:
+    """The card's view of the interleaving-robustness check, or None when it did not run.
+
+    It was computed in cli.py, published into the JSON panel, and mentioned nowhere here,
+    so a Rust repository with unmodeled concurrency surface showed the finding only to a
+    reader who parses `--format json`. The section it had been written for lived on a
+    renderer with no caller outside the test suite, which has since been deleted.
+
+    test_every_panel_key_is_rendered.py is the invariant that keeps the next section from
+    going the same way: a published key is on the card or on a named exclusion list."""
+    ir = results.get("interleaving_robustness")
+    if not isinstance(ir, dict) or str(ir.get("verdict", "n/a")) == "n/a":
+        return None
+    unmodeled = ir.get("unmodeled") if isinstance(ir.get("unmodeled"), list) else []
+    blurb = (_t("interleaving.blurb.clean") if not unmodeled
+             else _t("interleaving.blurb", unmodeled=len(unmodeled),
+                     surface=ir.get("surface_files", len(unmodeled))))
+    return {"verdict": str(ir.get("verdict")), "blurb": blurb,
+            "files": [str(f) for f in unmodeled[:_THREAD_CAP]],
+            "files_more": max(0, len(unmodeled) - _THREAD_CAP)}
 
 
 def _thread_surface(lang: str, results: dict) -> dict | None:
@@ -355,6 +381,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "core": _metrics(core_specs, results, "core"),
         "audit": _metrics(_AUDIT, results, "audit"),
         "thread_surface": _thread_surface(lang, results),
+        "interleaving_robustness": _interleaving_robustness(results),
         "proofs": _proofs(results),
         "share_text": _t(f"share.{status}", slug=slug),
     }
@@ -462,6 +489,14 @@ def card_markdown(card: dict) -> str:
         for s in ts["sites"]:
             lines.append(f"- `{s['file']}:{s['line']}` — {s['kind']} ({s['severity']}) `{s['symbol']}`")
         lines += ["", "> " + strip.sub("", _t("thread.note"))]
+    ir = card.get("interleaving_robustness")
+    if ir:
+        lines += ["", f"## {_t('interleaving.heading')} — {ir['verdict']}", "", strip.sub("", ir["blurb"])]
+        for f in ir["files"]:
+            lines.append(f"- `{f}`")
+        if ir["files_more"]:
+            lines.append(f"- and {ir['files_more']} more")
+        lines += ["", "> " + strip.sub("", _t("interleaving.note"))]
     proofs = card.get("proofs") or []
     if proofs:
         lines += ["", f"## {_t('proofs.heading')}", "", strip.sub("", _t("proofs.note"))]
