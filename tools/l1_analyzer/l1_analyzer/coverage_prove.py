@@ -350,11 +350,33 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[dict], repair_roun
     return retained, outcomes
 
 
+def ceiling_detail(attempted: int, located: int, ceiling: int) -> str:
+    """What a truncated sweep owes its reader, or nothing when it was not truncated.
+
+    A result reading "attempted 5, retained 1" with no further word reads as a codebase
+    with five uncovered branches, when it may have had five hundred. That is the
+    unmeasured-read-as-clean shape this instrument exists to refuse, wearing a budget for a
+    disguise. So a sweep that stopped at its ceiling names both numbers.
+
+    It speaks only when the ceiling bit. Saying so on every sweep would train a reader to
+    skip the sentence on the one sweep where it matters."""
+    if located <= attempted or ceiling <= 0:
+        return ""
+    return (f" STOPPED AT THE CEILING: {attempted} of {located} located gaps were attempted "
+            f"(ceiling {ceiling}). The rest were not measured and are not counted clean.")
+
+
 def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int = 3,
-                        timeout_seconds: float = 600.0, progress=None) -> dict:
+                        timeout_seconds: float = 600.0, progress=None,
+                        max_attempts: int = 5) -> dict:
     """Sweep the WHOLE crate: one coverage build, then every module with uncovered branches is
     proven (batched, with per-gap repair fallback). Retained proofs are aggregated across the
     codebase. `progress(relpath, n_gaps, running_retained)` is called before each module."""
+    # Read before anything else, so a ceiling of zero costs nothing: no toolchain probe, no
+    # coverage build, no key, no network. A budget of nothing must be free to honour.
+    if max_attempts <= 0:
+        return {"retained": [], "attempted": 0, "outcomes": {k: 0 for k in _OUTCOMES}, "modules": 0,
+                "detail": f"attempted nothing: the ceiling is {max_attempts}"}
     if not rust_trace._cargo():
         return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
     if not model_available():
@@ -367,6 +389,8 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     retained: list[dict] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     modules = 0
+    located = 0            # every gap the sweep found, whether or not the ceiling let it try
+    attempted_gaps = 0     # every gap the sweep handed to a model
     for relpath, lines in sorted(cov["files"].items()):
         if not relpath.endswith(".rs"):
             continue
@@ -374,7 +398,12 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
             functions = rust_facets.module_functions((repo / relpath).read_text(errors="ignore"))
         except OSError:
             continue
-        gaps = _live_gaps(rust_facets.uncovered_gaps(functions, lines), host)[:cap_per_module]
+        module_gaps = _live_gaps(rust_facets.uncovered_gaps(functions, lines), host)[:cap_per_module]
+        located += len(module_gaps)
+        # The repo-wide ceiling, applied after `located` counts the whole gap so the report
+        # can say what was left. Truncating before counting would hide the size of the miss.
+        gaps = module_gaps[:max(0, max_attempts - attempted_gaps)]
+        attempted_gaps += len(gaps)
         if not gaps:
             continue
         modules += 1
@@ -390,6 +419,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     attempted = sum(outcomes.values())
     detail = (f"{len(retained)} coverage proofs retained across {modules} modules with uncovered branches. "
               + _outcome_detail(outcomes)) if attempted else f"no proof-ready uncovered branches located across {modules} modules"
+    detail += ceiling_detail(attempted_gaps, located, max_attempts)
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 

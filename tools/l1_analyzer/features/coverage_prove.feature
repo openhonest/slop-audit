@@ -168,3 +168,10 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
     When prove_coverage locates the module's uncovered branches, drops the host-dead ones, caps the rest and proves each
     Then it returns the retained divergences, the attempts, the outcome buckets and the repair budget used
     But every path that runs nothing carries its own reason — no cargo, no API key, coverage not measured, or no proof-ready branch located — instead of an empty result that reads as success
+
+  Scenario: ceiling_detail says what a truncated sweep did not attempt
+    Given how many gaps were attempted, how many were located, and the ceiling
+    When ceiling_detail compares them
+    Then it names both numbers and the ceiling, so the gaps nobody measured are not read as clean
+    But it says nothing when the ceiling did not bite, because saying so on every sweep would train a reader to skip the sentence on the one sweep where it matters
+

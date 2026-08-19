@@ -32,6 +32,7 @@ from l1_analyzer.coverage_prove import (
     CoverageProof,
     _call_model,
     _valid,
+    ceiling_detail,
     model_available,
 )
 
@@ -192,10 +193,16 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[dict],
 
 
 def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int = 3,
-                        timeout_seconds: float = 600.0, python_executable: str | None = None, progress=None) -> dict:
+                        timeout_seconds: float = 600.0, python_executable: str | None = None,
+                        progress=None, max_attempts: int = 5) -> dict:
     """Sweep the whole package: one coverage run to locate uncovered branches, then every module
     with uncovered branches is proven. Retained proofs (assertion-divergences) aggregate across
     the package. Directory-insensitive: the suite runs under the target's own interpreter."""
+    # Read before anything else, so a ceiling of zero costs nothing: no interpreter probe,
+    # no coverage run, no key, no network. A budget of nothing must be free to honour.
+    if max_attempts <= 0:
+        return {"retained": [], "attempted": 0, "outcomes": {}, "modules": 0,
+                "detail": f"attempted nothing: the ceiling is {max_attempts}"}
     if not model_available():
         return {"retained": [], "attempted": 0, "detail": "needs ANTHROPIC_API_KEY to generate coverage proofs"}
     interpreter, provenance = pytest_trace.resolve_interpreter(repo, python_executable)
@@ -208,12 +215,19 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
     retained: list[dict] = []
     outcomes = {"divergence": 0, "incidental": 0, "pass": 0, "error": 0}
     modules = 0
+    located = 0            # every gap the sweep found, whether or not the ceiling let it try
+    attempted_gaps = 0     # every gap the sweep handed to a model
     for relpath, lines in sorted(cov["files"].items()):
         try:
             functions = python_facets.module_functions((repo / relpath).read_text(errors="ignore"))
         except OSError:
             continue
-        gaps = python_facets.uncovered_gaps(functions, lines)[:cap_per_module]
+        module_gaps = python_facets.uncovered_gaps(functions, lines)[:cap_per_module]
+        located += len(module_gaps)
+        # The repo-wide ceiling, applied after `located` counts the whole gap so the report
+        # can say what was left. Truncating before counting would hide the size of the miss.
+        gaps = module_gaps[:max(0, max_attempts - attempted_gaps)]
+        attempted_gaps += len(gaps)
         if not gaps:
             continue
         modules += 1
@@ -232,6 +246,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
               f"behavioural divergences (bug proven), {outcomes['pass']} passed (branch correct), "
               f"{outcomes['incidental']} errored on setup (kept out of findings), {outcomes['error']} timed out."
               ) if attempted else f"no proof-ready uncovered branches located across {modules} modules"
+    detail += ceiling_detail(attempted_gaps, located, max_attempts)
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 
