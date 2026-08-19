@@ -253,7 +253,7 @@ Each indicator is presented as two rows: a full-width lay-description row that e
     <tr>
       <td>L1.17</td>
       <td>God-file count (large-file concentration)</td>
-      <td>Percentage of production files exceeding 1000 lines of code. Computed by <code>find . -type f \( -name '*.py' -o -name '*.js' -o ... \) -exec wc -l {} +</code> filtered to the production tree. Excludes generated files (parsers, schema bindings, lockfiles, migration archives).</td>
+      <td>Percentage of production files exceeding 1000 lines of code. Computed by <code>find . -type f \( -name '*.py' -o -name '*.js' -o ... \) -exec wc -l {} +</code> filtered to the production tree. Excludes generated files (parsers, schema bindings, lockfiles, migration archives). <strong>Counts LOGIC lines.</strong> A large data literal is discounted, because a god-file is a pile of logic: nobody hand-piles into a lookup table and it carries no merge-conflict surface. A large block of TYPE DECLARATIONS is not discounted, and is not meant to be. The remedy for it is the remedy for a large data table: separate data from code and import it. Mixing the two is fine in a 400-line file, and this rule only bites at god-file scale, which is exactly the scale at which separating them is the standard answer. So a file whose LOGIC exceeds a thousand lines is a god-file however much declaration sits beside it, and a file that crosses the line only because its type shapes live inline should move them to a sibling module rather than ask for a discount.</td>
       <td>&lt;0.5% of files</td>
       <td>0.5–2% of files</td>
       <td>&gt;2% of files, OR any file &gt;4000 lines</td>
