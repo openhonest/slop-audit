@@ -39,7 +39,6 @@ class Definition(TypedDict):
     end_line: int      # 1-based last line
     start_byte: int
     end_byte: int
-    name_byte: int     # byte offset of the name token, so its own site is not a reference
     status: str        # CANDIDATE / UNDECIDABLE / EXCLUDED
     reason: str
 
@@ -70,7 +69,6 @@ def _mk(name_node: Node, item: Node, kind: str, status: str, reason: str) -> Def
         "end_line": item.end_point[0] + 1,
         "start_byte": item.start_byte,
         "end_byte": item.end_byte,
-        "name_byte": name_node.start_byte,
         "status": status,
         "reason": reason,
     }
