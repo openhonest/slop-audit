@@ -472,8 +472,15 @@ def sweep_detail(retained: int, modules: int, located: int, outcomes: dict, prov
             why += f" [{cause}]"
         return (f"{located} uncovered branches located across {modules} modules and none was proven: "
                 f"{why} (ran under {provenance})")
+    # The declines are named here too, not only when nothing ran. A sweep of 20 attempts
+    # printed "Of 15 generated tests" and said nothing about the other five, so a reader
+    # reconciling the run against its bill was five short with nothing to explain the gap.
+    # It speaks only when there were any: a zero in every report is noise a reader learns to
+    # skip, which is how the one report that mattered would be missed.
+    aside = (f"The model declined {declined} further gap(s), which cost the same and produced "
+             f"no test. " if declined else "")
     return (f"{retained} coverage proofs retained across {modules} modules with uncovered branches "
-            f"(ran under {provenance}). ")
+            f"(ran under {provenance}). {aside}")
 
 
 def _outcome_detail(outcomes: dict) -> str:
