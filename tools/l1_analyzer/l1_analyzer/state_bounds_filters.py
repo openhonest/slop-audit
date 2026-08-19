@@ -301,14 +301,28 @@ def _descendants(node: Node):
         yield from _descendants(c)
 
 
-def _result_invariant(attr: str, refs: list[Node], sp: LangSpec) -> bool:
+def _result_invariant(attr: str, refs: list[Node], sp: LangSpec) -> bool | None:
     """The presence of a key does not change the answer. Scoped to the ACCESSOR methods -
     those that contain a presence test on the attribute - every return is the keyed value
     `self.attr[k]` or a bare return. A method that returns a different value by presence
     (`return None` on a miss, `return False` for a dedup) is result-VARIANT: the presence IS
     the answer, a genuine decision, and it stays flagged. A setter in a different method that
-    returns the stored value is irrelevant - only the presence-gated method is checked."""
-    for fn in {_enclosing_function(r, sp) for r in refs if reads.is_presence_test(r, sp)}:
+    returns the stored value is irrelevant - only the presence-gated method is checked.
+
+    NONE WHEN THERE IS NOTHING TO EXAMINE. This returned True when no method contained a
+    presence test on the attribute, which is a claim about a question that was never put:
+    the loop body never ran and the function fell through to a bare `return True`. Two
+    rules downstream read that vacuous affirmative as evidence.
+
+    The caller compares against False rather than truthiness, so behaviour is unchanged:
+    an attribute nobody gates on presence does not have presence deciding its answer, and
+    this guard is right not to block it. What changed is that the answer says which of the
+    two it is. empty_input.feature stated this in 2026-08-15 and had no step definitions
+    to enforce it until 2026-08-18."""
+    gated = {_enclosing_function(r, sp) for r in refs if reads.is_presence_test(r, sp)}
+    if not any(fn is not None for fn in gated):
+        return None                      # no presence test to examine: the question does not apply
+    for fn in gated:
         if fn is None:
             continue
         for ret in (n for n in _descendants(fn) if n.type in sp["return_types"]):
@@ -746,7 +760,9 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
     # true of it. That is exactly the value-inspected magnitude test (_first_failure_time),
     # the dedup set, and the value-indexed lookup that returns None on a miss. Only once no
     # such decision exists is a shape eligible to clear.
-    if _value_reaches_condition(refs, sp) or not _result_invariant(attr, refs, sp):
+    # `is False` and not `not`: the predicate answers None when no method gates on
+    # presence, and None means the question does not apply rather than "presence decides".
+    if _value_reaches_condition(refs, sp) or _result_invariant(attr, refs, sp) is False:
         return False
     # CARRIED VALUE SERVES ALL NINE, since 2026-08-18. It is one line, `no reference sits
     # in a test expression`, and it delegates to `reads.in_test`, which is vocabulary-driven

@@ -878,7 +878,14 @@ def check(root: Path) -> VacuityResult:
     reach: Reach = {"rules": RULES, "emission_points": counters["emission_points"],
                     "files_read": read, "files_unparsed": unparsed,
                     "fields_declined": counters["fields_declined"],
-                    "languages_read": 1, "languages_total": LANGUAGES_TOTAL}
+                    # MEASURED, not asserted. This was the constant 1, so a check that
+                    # opened no file reported having read one of nine languages, and the
+                    # reach exists precisely to stop a zero being read as a pass. It was
+                    # the one number in it that was never measured. This reader parses
+                    # Python and nothing else, so the count is one when it read a file and
+                    # zero when it did not.
+                    "languages_read": 1 if read else 0,
+                    "languages_total": LANGUAGES_TOTAL}
     return {"findings": findings, "reach": reach}
 
 
