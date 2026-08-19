@@ -104,6 +104,13 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
     Then a whole-codebase sweep costs about one build per module instead of one per gap
     But one body that will not compile poisons every proof in the batch, which is what the per-gap fallback exists for
 
+  Scenario: _batch_status names the test the classifier never reported
+    Given the batch classifier's verdicts and one test's index
+    When _batch_status reads that index by subscript
+    Then it returns the verdict for a test the runner reported
+    And it returns `unreported` for one the runner never mentioned, which is a different fact from a compile error and gets its own bucket
+    But it names the miss rather than raising, because the caller is a counting loop that has to finish the batch and one silent test does not justify abandoning the rest
+
   Scenario: _classify_batch reads each numbered proof's verdict out of one batched run
     Given the output of a batched run
     When _classify_batch reads every proof result line

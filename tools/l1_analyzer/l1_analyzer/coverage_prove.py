@@ -38,7 +38,11 @@ from l1_analyzer import coverage_gates, rust_facets, rust_trace
 # The retention buckets, in report order. Only `divergence` is a proven bug and retained;
 # the rest name why a failing test is the tool's own noise, surfaced and never hidden.
 _FAIL_BUCKETS = ("divergence", "wrong_channel", "invalid_fixture", "incidental_panic")
-_OUTCOMES = (*_FAIL_BUCKETS, "pass", "error")
+# `unreported` is its own bucket and deliberately not folded into `error`. A compile
+# error is something the runner TOLD us; an unreported index is something it did not, so
+# the test was generated and run and the analyzer then lost track of it. Counting one as
+# the other made a run whose totals do not add up look like a run with noise in it.
+_OUTCOMES = (*_FAIL_BUCKETS, "pass", "error", "unreported")
 
 _PROPOSE_INSTRUCTION = (
     "You are given ONE Rust function and one of its decision branches that no test ever reached. "
@@ -214,6 +218,24 @@ def _classify_batch(output: str) -> dict[int, str]:
     return {int(m.group(1)): ("fail" if m.group(2) == "FAILED" else "pass") for m in _BATCH_LINE.finditer(output)}
 
 
+def _batch_status(batch: dict[int, str], index: int) -> str:
+    """This test's verdict, or `unreported` when the classifier never mentioned it.
+
+    Read by subscript with a NAMED miss rather than by `.get(i, "error")`, which is the
+    open-input default Honest Code rule 14 refuses: it answered a question about a test
+    the runner said nothing about with the answer written for a test that failed to
+    compile.
+
+    A named miss rather than a raise, because the caller is a counting loop that has to
+    finish the batch. One silent test does not justify abandoning the other forty, and a
+    bucket nobody can confuse with a compile error is what keeps the count readable."""
+
+    # shape this function exists to remove. The subscript and the explicit miss are the
+    # point, and collapsing them back into a default puts the open input one keyword away
+    # from returning whatever the next reader thinks is a reasonable answer.
+    return batch[index] if index in batch else "unreported"  # noqa: SIM401
+
+
 def _retained_entry(module_relpath: str, gap: dict, proposal: dict, source: str) -> dict:
     return {
         "function": gap["function"], "language": "rust",
@@ -278,7 +300,7 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[dict], repair_roun
     if batch:  # the module compiled: read each test's verdict, then gate the failures.
         retained = []
         for i, (gap, proposal) in enumerate(ready):
-            status = batch.get(i, "error")
+            status = _batch_status(batch, i)
             if status != "fail":
                 outcomes[status] += 1
                 continue
