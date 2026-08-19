@@ -331,7 +331,6 @@ class LangCfg(TypedDict, total=False):
     language: Language
     extensions: tuple[str, ...]
     function_types: tuple[str, ...]
-    class_types: tuple[str, ...]
     member_access: str
     this_ident: frozenset[str]
     module_level_assign: tuple[str, ...]
@@ -355,7 +354,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_python.language()),
         "extensions": (".py",),
         "function_types": ("function_definition",),
-        "class_types": ("class_definition",),
         "member_access": "attribute",
         "this_ident": {"self"},
         "module_level_assign": ("assignment", "augmented_assignment"),
@@ -372,7 +370,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_rust.language()),
         "extensions": (".rs",),
         "function_types": ("function_item",),
-        "class_types": ("struct_item", "enum_item", "trait_item"),
         "member_access": "field_expression",
         # A Rust method is a `function_item` carrying a `self_parameter`; `self.field`
         # is a `field_expression` reading "self.<field>". Treating `self` as the
@@ -398,7 +395,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_c.language()),
         "extensions": (".c", ".h"),
         "function_types": ("function_definition",),
-        "class_types": ("struct_specifier", "union_specifier"),
         "member_access": "field_expression",
         "this_ident": set(),
         "module_level_assign": ("declaration", "init_declarator"),
@@ -416,7 +412,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_java.language()),
         "extensions": (".java",),
         "function_types": ("method_declaration", "constructor_declaration"),
-        "class_types": ("class_declaration", "interface_declaration", "enum_declaration", "record_declaration"),
         "member_access": "field_access",
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_variable_declaration"),
@@ -440,7 +435,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_typescript.language_typescript()),
         "extensions": (".ts", ".tsx"),
         "function_types": ("function_declaration", "method_definition", "arrow_function"),
-        "class_types": ("class_declaration", "interface_declaration", "enum_declaration"),
         "member_access": "member_expression",
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
@@ -460,7 +454,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_c_sharp.language()),
         "extensions": (".cs",),
         "function_types": ("method_declaration", "constructor_declaration"),
-        "class_types": ("class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"),
         "member_access": "member_access_expression",
         "this_ident": {"this"},
         "module_level_assign": ("field_declaration", "local_declaration_statement"),
@@ -477,7 +470,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_javascript.language()),
         "extensions": (".js", ".jsx", ".mjs", ".cjs"),
         "function_types": ("function_declaration", "function_expression", "generator_function_declaration", "method_definition", "arrow_function"),
-        "class_types": ("class_declaration", "class"),
         "member_access": "member_expression",
         "this_ident": {"this"},
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
@@ -494,7 +486,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_ruby.language()),
         "extensions": (".rb",),
         "function_types": ("method", "singleton_method"),
-        "class_types": ("class", "module", "singleton_class"),
         "member_access": "call",
         "this_ident": {"self"},
         # Ruby signals external mutable state through @instance and $global variables,
@@ -516,7 +507,6 @@ LANG_CFG: dict[str, LangCfg] = {
         "language": Language(tree_sitter_go.language()),
         "extensions": (".go",),
         "function_types": ("function_declaration", "method_declaration"),
-        "class_types": ("type_declaration",),
         "member_access": "selector_expression",
         # Go has no fixed receiver keyword; the receiver name is parsed per method.
         "this_ident": set(),

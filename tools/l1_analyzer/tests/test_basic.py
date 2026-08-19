@@ -62,7 +62,11 @@ def test_unknown_language_is_na_not_guessed(tmp_path):
 # --- config integrity: direct cfg[...] access is safe -----------------------
 
 def test_every_language_config_has_required_keys():
-    required = ("language", "extensions", "function_types", "class_types",
+    # `class_types` was here and was removed on 2026-08-18: LANG_CFG declared it nine
+    # times and nothing read it through LANG_CFG, so this list was enforcing a declaration
+    # nobody consumed and making an unread key look like covered surface. LANG_SPEC has its
+    # own class_types with real readers, and the shared name is what hid it.
+    required = ("language", "extensions", "function_types",
                "member_access", "this_ident", "module_level_assign", "type_escape_patterns")
     for lang, cfg in indicators.LANG_CFG.items():
         for key in required:
