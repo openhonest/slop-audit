@@ -472,65 +472,6 @@ LANG_SPEC: dict[str, LangSpec] = {
             "if_clause": "all",                   # comprehension guard: the node IS a test
         },
     },
-    "typescript": {
-        "class_types": ("class_declaration",),
-        "func_types": ("function_declaration", "method_definition", "arrow_function"),
-        "assign_types": ("assignment_expression", "augmented_assignment_expression"),
-        "assign_left": "left", "assign_right": "right",
-        "subscript_types": ("subscript_expression",), "sub_value": "object", "sub_index": "index", "sub_positional": False,
-        "destructuring_types": ("array_pattern", "object_pattern"),
-        "decorator_types": ("decorator",),
-        "member_types": ("member_expression",), "mem_object": "object", "mem_attr": "property",
-        "member_name_field": None,
-        "out_argument_types": (),
-        "key_removal_types": ("unary_expression",),
-        "cond_at_index": {},
-        "writing_builtins": frozenset(),
-        "iterate_types": (),
-        "local_binding": {"variable_declarator": ("name", "value")},
-        "switch_types": {},
-        "immutable_modifiers": frozenset({"const", "readonly"}),
-        "immutable_ctor_rule": False,
-        "call_types": ("call_expression",), "flat_call": False,
-        "call_fn": "function", "call_args": "arguments", "call_name": None,
-        "arglist_types": ("arguments",),
-        "return_types": ("return_statement",),
-        "branch_types": ("if_statement", "while_statement", "ternary_expression"), "branch_cond": "condition",
-        "elif_types": (),
-        "passthrough_types": ("parenthesized_expression", "unary_expression", "non_null_expression", "as_expression"),
-        "comparison_types": ("binary_expression",),
-        "membership": "binary_in",
-        "this_idents": frozenset({"this"}),
-        "instance_ref_style": "member",
-        "instance_enum": "member",
-        "binding_sites": {"public_field_definition": "name", "variable_declarator": "name"},
-        "sink_types": ("expression_statement",),
-        "field_decl_types": ("public_field_definition",),
-        "record_enum": "none",
-        "key_prefix": "this.",
-        "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
-        "literal_types": _JS_LITERALS,
-        "unary_types": ("unary_expression",),
-        "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'non_null_expression', 'as_expression'),
-        "unread_operand_types": (),
-        "module_enum": "js",
-        "lvalue_wrapper": "",
-        "presence_methods": frozenset({"has"}),   # `k in o` is declared by `membership` too
-        "write_methods": frozenset({"set", "add", "clear", "fill", "copyWithin", "sort", "push", "unshift"}),
-        "value_preserving_methods": frozenset(),
-        "discard_types": ("expression_statement",),
-        "presence_bind_types": (), "blank_idents": frozenset(),
-        "gate_fields": ("condition",),
-        "gate_body_types": ("statement_block", "else_clause"),
-        "delete_stmt_types": (),                  # `delete o[k]` is a unary_expression
-        "read_write_assign_ops": ("||=", "&&=", "??="),
-        "write_in_place_ops": {"update_expression": ("++", "--")},
-        "opaque_unary_ops": frozenset(),
-        "bare_cond_types": {},
-        "alias_types": {}, "alias_marker": "",
-        "opaque_region_types": (),
-        "extra_test_positions": {"ternary_expression": "field"},
-    },
     "javascript": {
         "class_types": ("class_declaration",),
         "func_types": ("function_declaration", "method_definition", "arrow_function", "function_expression", "generator_function_declaration"),
@@ -1025,3 +966,46 @@ LANG_SPEC: dict[str, LangSpec] = {
         "extra_test_positions": {},               # no ternary, no assert expression
     },
 }
+
+
+# --------------------------------------------------------------------------
+# TypeScript follows JavaScript, and diverges only where it is declared to.
+#
+# The two tables used to be written out separately and agreed on 64 of their 70 fields. A
+# rule added to JavaScript reached TypeScript only if whoever added it remembered the
+# second copy, and nothing said whether they had. Every defect fixed in this package this
+# week was that shape: a construct read under one spelling and missed under another.
+#
+# Deriving it also settled one that had already happened. TypeScript's func_types listed
+# three node types where JavaScript listed five, so a TypeScript `const f = function(){}`
+# or `function* g(){}` was not a function to any rule keyed on that field. The
+# tree-sitter-typescript grammar produces both node types; the omission was a copy that
+# never caught up, not a grammar difference, so func_types is NOT overridden below.
+#
+# Each override names a real difference in the TypeScript grammar, with the reason.
+# --------------------------------------------------------------------------
+
+_TYPESCRIPT: LangSpec = {**LANG_SPEC["javascript"]}
+
+# A class field parses as `public_field_definition` in TypeScript and `field_definition`
+# in JavaScript, and the name sits in a different field.
+_TYPESCRIPT["binding_sites"] = {"public_field_definition": "name", "variable_declarator": "name"}
+_TYPESCRIPT["field_decl_types"] = ("public_field_definition",)
+# `readonly x = 1` is TypeScript's own immutability marker; JavaScript has only `const`.
+_TYPESCRIPT["immutable_modifiers"] = frozenset({"const", "readonly"})
+# `x!` and `x as T` are TypeScript-only wrappers, and both are transparent: the value under
+# them is the value. A walk that stopped at either would lose the operand.
+_TYPESCRIPT["passthrough_types"] = ("parenthesized_expression", "unary_expression",
+                                    "non_null_expression", "as_expression")
+_TYPESCRIPT["value_wrapper_types"] = ("unary_expression", "parenthesized_expression",
+                                      "non_null_expression", "as_expression")
+
+# The overridden keys, named once so a test can assert that nothing ELSE diverged. Written
+# out per key above rather than merged from a dict of object, so each value is checked
+# against the field it lands in instead of being waved past the checker with an ignore.
+TYPESCRIPT_OVERRIDES = frozenset({
+    "binding_sites", "field_decl_types", "immutable_modifiers",
+    "passthrough_types", "value_wrapper_types",
+})
+
+LANG_SPEC["typescript"] = _TYPESCRIPT
