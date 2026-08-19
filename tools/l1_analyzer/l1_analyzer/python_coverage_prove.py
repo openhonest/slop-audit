@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from l1_analyzer import pytest_trace, python_facets
@@ -129,35 +130,54 @@ def _run(repo: Path, interpreter: str, test_source: str, timeout_seconds: float)
 
 
 def _prove_one(repo: Path, interpreter: str, gap: dict, import_path: str,
-               repair_rounds: int, timeout_seconds: float) -> tuple[str, dict | None, str]:
+               repair_rounds: int, timeout_seconds: float,
+               propose_fn: Callable[..., dict | None],
+               repair_fn: Callable[..., dict | None],
+               run_fn: Callable[..., tuple[int, str]]) -> tuple[str, dict | None, str]:
     """Propose -> run -> (repair -> run)* for one gap. Returns (bucket, proposal, test_source):
-    divergence (retained), pass, incidental (setup error), error (timeout), or skipped (no reply)."""
-    proposal = propose(gap, import_path)
+    divergence (retained), pass, incidental (setup error), error (timeout), or skipped (no reply).
+
+    THE THREE COLLABORATORS ARE PARAMETERS, as `prove.prove` already takes `model_call` and
+    `run_generated`. They were module-level lookups, so the only way to test this loop was
+    to patch the module's own globals, and a test that reaches in to replace what it is
+    testing asserts against its own fixture. Those tests went in the 2026-08-17 sweep and
+    the orchestration has been uncovered since.
+
+    Required, not defaulted. A default would put the real model call and a real subprocess
+    one forgotten argument away from a test, which is the open-input failure this
+    repository refuses everywhere else."""
+    proposal = propose_fn(gap, import_path)
     if proposal is None:
         return "skipped", None, ""
     source = render_test(proposal["body"])
-    rc, output = _run(repo, interpreter, source, timeout_seconds)
+    rc, output = run_fn(repo, interpreter, source, timeout_seconds)
     bucket = _classify(output, rc)
     rounds = 0
     while bucket == "incidental" and rounds < repair_rounds:
         rounds += 1
-        fixed = repair(gap, import_path, source, output)
+        fixed = repair_fn(gap, import_path, source, output)
         if fixed is None:
             break
         proposal = fixed
         source = render_test(fixed["body"])
-        rc, output = _run(repo, interpreter, source, timeout_seconds)
+        rc, output = run_fn(repo, interpreter, source, timeout_seconds)
         bucket = _classify(output, rc)
     return bucket, proposal, source
 
 
 def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[dict],
-                  repair_rounds: int, timeout_seconds: float) -> tuple[list[dict], dict]:
+                  repair_rounds: int, timeout_seconds: float,
+                  propose_fn: Callable[..., dict | None],
+                  repair_fn: Callable[..., dict | None],
+                  run_fn: Callable[..., tuple[int, str]]) -> tuple[list[dict], dict]:
+    """Every gap in one module. Threads the three collaborators through rather than
+    reaching for the module's globals, for the reason `_prove_one` gives."""
     outcomes = {"divergence": 0, "incidental": 0, "pass": 0, "error": 0}
     import_path = _import_path(repo, repo / relpath)
     retained: list[dict] = []
     for gap in gaps:
-        bucket, proposal, source = _prove_one(repo, interpreter, gap, import_path, repair_rounds, timeout_seconds)
+        bucket, proposal, source = _prove_one(repo, interpreter, gap, import_path, repair_rounds,
+                                              timeout_seconds, propose_fn, repair_fn, run_fn)
         if bucket == "skipped":
             continue
         outcomes[bucket] += 1
@@ -198,7 +218,10 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         modules += 1
         if progress:
             progress(relpath, len(gaps), len(retained))
-        module_retained, module_outcomes = _prove_module(repo, relpath, interpreter, gaps, repair_rounds, timeout_seconds)
+        # The real three, named at the one place that knows which they are.
+        module_retained, module_outcomes = _prove_module(
+            repo, relpath, interpreter, gaps, repair_rounds, timeout_seconds,
+            propose, repair, _run)
         retained.extend(module_retained)
         for k in outcomes:
             outcomes[k] += module_outcomes[k]
