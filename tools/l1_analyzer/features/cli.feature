@@ -66,3 +66,11 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     Then it prints the scorecard, or the JSON envelope recording whether the additive state-bounds classifier was on, and returns zero
     And a path that does not exist, and a path that is a file rather than a repository root, each print a plain message and return two rather than crashing inside the coverage runner
     But the stages that generate and run code — the race run and the two prove modes — happen only when explicitly asked for, never by default
+
+  Scenario: _audited_language settles the language the audit actually read
+    Given the results of a run, the language that was requested, and the repository
+    When _audited_language is asked which language was audited
+    Then it returns the language the source pass settled on, whatever was requested
+    And it settles an unrequested language the same way the source pass would, when no source pass ran
+    But an explicit request with no source pass stands, because that is an instruction and not a guess
+

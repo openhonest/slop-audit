@@ -21,6 +21,7 @@ from l1_analyzer import (
     thread_surface,
 )
 from l1_analyzer.incomplete import IncompleteCode
+from l1_analyzer.indicators import detect_primary_language
 from l1_analyzer.scope import PRODUCTION
 
 # Why the thread-safety meter has no reading, by the verdict it returned instead of one. A
@@ -103,6 +104,25 @@ def _verdict_of(result: object) -> str:
     return str(result["verdict"]) if isinstance(result, dict) and "verdict" in result else ABSENT_VERDICT
 
 
+def _audited_language(results: dict, requested: str, repo: Path) -> str:
+    """The language the audit actually read, settled once.
+
+    Six places spelled `str(results.get("lang", requested))`. Two things were wrong with
+    the copy. It is six spellings of one question, so a change to how the language is
+    settled reaches only the ones somebody remembers. And its fall-through is the
+    REQUESTED language, which is `auto` by default: a run that skipped the source pass
+    handed the literal string "auto" to the race harness and the prove loop, which then
+    reported that "auto" is a language they do not support yet.
+
+    detect_primary_language is what settles it, and the source pass already calls it. When
+    no source pass ran, this calls it too. An explicit `--lang rust` with no source pass is
+    an instruction rather than a guess, so it stands."""
+    settled = results.get("lang")
+    if settled is not None:
+        return str(settled)
+    return detect_primary_language(repo) if requested == "auto" else requested
+
+
 def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_exposed: int | None) -> int:
     """Dogfood gate for a pre-commit hook: run the source indicators against the repo
     and fail the commit if the tool would flag its own code. Bright-line invariants:
@@ -115,7 +135,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
     results = indicators.compute_source_indicators(
         repo, lang=lang, exec_tests=False, timeout_seconds=5.0, classify_state_bounds=True
     )
-    audited_lang = str(results.get("lang", lang))
+    audited_lang = _audited_language(results, lang, repo)
     problems: list[str] = []
 
     l17 = results.get("L1.17", {})
@@ -445,13 +465,13 @@ def main(argv: list[str] | None = None) -> int:
         # than for silence, which this instrument reserves for what the analyzer could
         # not read.
         results["interleaving_robustness"] = interleaving_robustness.analyze(
-            args.repo, str(results.get("lang", args.lang)))
+            args.repo, _audited_language(results, args.lang, args.repo))
 
     # Runtime thread-safety (opt-in): the dynamic counterpart to the static surface
     # meter. Runs untrusted code, so only on explicit --race, never by default.
     if args.race:
         from l1_analyzer import race_harness
-        lang = str(results.get("lang", args.lang))
+        lang = _audited_language(results, args.lang, args.repo)
         race = race_harness.detect_races(args.repo, lang, args.timeout)
         surface_files = {f["file"] for f in results.get("thread_surface", {}).get("findings", [])}
         race["confirmed_surface"] = race_harness.confirmed_surface(race["findings"], surface_files)
@@ -460,7 +480,7 @@ def main(argv: list[str] | None = None) -> int:
     # Prove (opt-in): locate -> generate -> run -> retain, in one command. Generates and
     # runs code, so CLI-only and explicit.
     if args.prove:
-        results["proofs"] = _run_prove(args.repo, str(results.get("lang", args.lang)),
+        results["proofs"] = _run_prove(args.repo, _audited_language(results, args.lang, args.repo),
                                        results.get("thread_surface"), args.prove_max, args.timeout)
 
     # Coverage-gap proofs (opt-in): locate -> propose -> render -> run in-crate -> retain.
@@ -470,7 +490,7 @@ def main(argv: list[str] | None = None) -> int:
         def _cov_progress(relpath: str, n_gaps: int, retained: int) -> None:
             print(f"[prove-coverage] {relpath}: {n_gaps} gap(s), retained so far {retained}",
                   file=sys.stderr, flush=True)
-        if str(results.get("lang", args.lang)) == "python":
+        if _audited_language(results, args.lang, args.repo) == "python":
             from l1_analyzer import python_coverage_prove
             results["coverage_proofs"] = python_coverage_prove.prove_coverage_repo(
                 args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
@@ -498,7 +518,7 @@ def main(argv: list[str] | None = None) -> int:
     # measures raise is that every earlier attempt to render "we read nothing" ended up
     # rendering it as "we read everything and it was clean". Exit 2: not a crash, not a pass.
     try:
-        model = card.build_card(slug, str(results.get("lang", args.lang)), results, ran_tests=ran_tests)
+        model = card.build_card(slug, _audited_language(results, args.lang, args.repo), results, ran_tests=ran_tests)
     except IncompleteCode as refusal:
         print(f"\n{refusal}\n\nNo grade is issued. The analyzer has no rule for what this "
               f"repository contains, so any letter it printed would be about its own blind "
