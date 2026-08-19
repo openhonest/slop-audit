@@ -77,7 +77,7 @@ def shadowing_scope(node: Node, key: str, sp: LangSpec) -> Node | None:
     while parent is not None:
         if parent.type in sp["func_types"]:
             for params in parent.children:
-                if params.type not in sp.get("arglist_types", ()) and "param" not in params.type:
+                if params.type not in sp["arglist_types"] and "param" not in params.type:
                     continue
                 for declared in _refs(params, lambda n: n.type == "identifier"):
                     if _text(declared) == key:

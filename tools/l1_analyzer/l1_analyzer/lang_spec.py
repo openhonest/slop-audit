@@ -471,6 +471,16 @@ LANG_SPEC: dict[str, LangSpec] = {
             "assert_statement": "first",
             "if_clause": "all",                   # comprehension guard: the node IS a test
         },
+        # Calls here are not flat, so there is no receiver field on the call node; the
+                # receiver is reached through member_types instead. Guarded by flat_call, and
+                # written out rather than left absent so no reader has to default it.
+        "call_recv": "",
+        # No dynamic-dispatch spelling in this grammar.
+        "dispatch_methods": frozenset(),
+        # No language builtins beyond the shared bounded set.
+        "extra_bounded": frozenset(),
+        # State does not span methods by receiver type here.
+        "scope_by_receiver": False,
     },
     "javascript": {
         "class_types": ("class_declaration",),
@@ -530,6 +540,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
         "extra_test_positions": {"ternary_expression": "field"},
+        # Calls here are not flat, so there is no receiver field on the call node; the
+                # receiver is reached through member_types instead. Guarded by flat_call, and
+                # written out rather than left absent so no reader has to default it.
+        "call_recv": "",
+        # No dynamic-dispatch spelling in this grammar.
+        "dispatch_methods": frozenset(),
+        # No language builtins beyond the shared bounded set.
+        "extra_bounded": frozenset(),
+        # State does not span methods by receiver type here.
+        "scope_by_receiver": False,
     },
     "java": {
         "class_types": ("class_declaration",),
@@ -593,6 +613,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
         "extra_test_positions": {"ternary_expression": "field", "assert_statement": "first"},
+        # No dynamic-dispatch spelling in this grammar.
+        "dispatch_methods": frozenset(),
+        # No language builtins beyond the shared bounded set.
+        "extra_bounded": frozenset(),
+        # State does not span methods by receiver type here.
+        "scope_by_receiver": False,
     },
     "csharp": {
         "class_types": ("class_declaration",),
@@ -666,6 +692,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
         "extra_test_positions": {"conditional_expression": "field"},
+        # Calls here are not flat, so there is no receiver field on the call node; the
+                # receiver is reached through member_types instead. Guarded by flat_call, and
+                # written out rather than left absent so no reader has to default it.
+        "call_recv": "",
+        # No dynamic-dispatch spelling in this grammar.
+        "dispatch_methods": frozenset(),
+        # No language builtins beyond the shared bounded set.
+        "extra_bounded": frozenset(),
+        # State does not span methods by receiver type here.
+        "scope_by_receiver": False,
     },
     "rust": {
         # No classes: state is struct fields used as self.<field> inside a separate
@@ -736,6 +772,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "alias_types": {"reference_expression": "value"}, "alias_marker": "mutable_specifier",
         "opaque_region_types": ("macro_invocation",),
         "extra_test_positions": {},               # `if` is an expression, already in branch_types
+        # Calls here are not flat, so there is no receiver field on the call node; the
+                # receiver is reached through member_types instead. Guarded by flat_call, and
+                # written out rather than left absent so no reader has to default it.
+        "call_recv": "",
+        # No dynamic-dispatch spelling in this grammar.
+        "dispatch_methods": frozenset(),
+        # No language builtins beyond the shared bounded set.
+        "extra_bounded": frozenset(),
+        # State does not span methods by receiver type here.
+        "scope_by_receiver": False,
     },
     "ruby": {
         "class_types": ("class", "module"),
@@ -809,6 +855,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
         "extra_test_positions": {"conditional": "field"},
+        # No language builtins beyond the shared bounded set.
+        "extra_bounded": frozenset(),
+        # State does not span methods by receiver type here.
+        "scope_by_receiver": False,
     },
     "c": {
         # No classes or methods: state is file-scope variables only (module_enum: c).
@@ -878,6 +928,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
         "extra_test_positions": {"conditional_expression": "field"},
+        # Calls here are not flat, so there is no receiver field on the call node; the
+                # receiver is reached through member_types instead. Guarded by flat_call, and
+                # written out rather than left absent so no reader has to default it.
+        "call_recv": "",
+        # No dynamic-dispatch spelling in this grammar.
+        "dispatch_methods": frozenset(),
+        # No language builtins beyond the shared bounded set.
+        "extra_bounded": frozenset(),
+        # State does not span methods by receiver type here.
+        "scope_by_receiver": False,
     },
     "go": {
         # No classes: state is struct fields, methods bound by a named receiver. State
@@ -964,6 +1024,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
         "extra_test_positions": {},               # no ternary, no assert expression
+        # Calls here are not flat, so there is no receiver field on the call node; the
+                # receiver is reached through member_types instead. Guarded by flat_call, and
+                # written out rather than left absent so no reader has to default it.
+        "call_recv": "",
+        # No dynamic-dispatch spelling in this grammar.
+        "dispatch_methods": frozenset(),
     },
 }
 

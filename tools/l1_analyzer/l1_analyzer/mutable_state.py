@@ -394,8 +394,8 @@ def _count_mutable_refs(
     count = 0
     member_type = cfg["member_access"]
     member_op = cfg["member_op"]
-    instance_field_types = cfg.get("instance_field_types", ())
-    raw_mut_patterns = cfg.get("raw_mut_patterns", ())
+    instance_field_types = cfg["instance_field_types"]
+    raw_mut_patterns = cfg["raw_mut_patterns"]
 
     def walk(n: Node):
         nonlocal count

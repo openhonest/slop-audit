@@ -717,8 +717,8 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
     escape_tokens = frozenset(cfg["type_escape_patterns"])
     nonpositions = frozenset(cfg["type_escape_nonpositions"])
     cast_calls = frozenset(cfg["type_cast_calls"])
-    annotation_nodes = frozenset(cfg.get("annotation_escape_nodes", ()))
-    annotation_names = frozenset(cfg.get("annotation_escape_names", ()))
+    annotation_nodes = frozenset(cfg["annotation_escape_nodes"])
+    annotation_names = frozenset(cfg["annotation_escape_names"])
     count = 0
 
     def in_string(n: Node) -> bool:

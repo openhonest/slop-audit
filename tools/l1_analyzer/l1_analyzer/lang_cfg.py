@@ -69,6 +69,18 @@ LANG_CFG: dict[str, LangCfg] = {
         "member_op": ".",
         "receiver_scan": "fixed",
         "module_scan": "python_fields",
+        # No annotation can suppress a type check in this language.
+        "annotation_escape_names": (),
+        "annotation_escape_nodes": (),
+        # No keyword makes a module binding immutable here.
+        "const_keywords": (),
+        # Class fields are not how module state is spelled here.
+        "field_decl_types": (),
+        "immutable_modifiers": frozenset(),
+        # No instance- or global-variable sigil in this grammar.
+        "instance_field_types": (),
+        # No text-level mutability marker to look for.
+        "raw_mut_patterns": (),
     },
     "rust": {
         "language": Language(tree_sitter_rust.language()),
@@ -94,6 +106,16 @@ LANG_CFG: dict[str, LangCfg] = {
         # Retained per ../../../research/amendments/amendment-2026-07-31-rust-raw-pattern-scope.md; structural
         # detection above now carries the load, and these never fire inside a body.
         "raw_mut_patterns": ("static mut", "&mut self", "mut self"),
+        # No annotation can suppress a type check in this language.
+        "annotation_escape_names": (),
+        "annotation_escape_nodes": (),
+        # No keyword makes a module binding immutable here.
+        "const_keywords": (),
+        # Class fields are not how module state is spelled here.
+        "field_decl_types": (),
+        "immutable_modifiers": frozenset(),
+        # No instance- or global-variable sigil in this grammar.
+        "instance_field_types": (),
     },
     "c": {
         "language": Language(tree_sitter_c.language()),
@@ -111,6 +133,16 @@ LANG_CFG: dict[str, LangCfg] = {
         # C's only immutability keyword. It used to inherit a shared default carrying
         # `let `, `val ` and `readonly `, none of which are C.
         "const_keywords": ("const ",),
+        # No annotation can suppress a type check in this language.
+        "annotation_escape_names": (),
+        "annotation_escape_nodes": (),
+        # Class fields are not how module state is spelled here.
+        "field_decl_types": (),
+        "immutable_modifiers": frozenset(),
+        # No instance- or global-variable sigil in this grammar.
+        "instance_field_types": (),
+        # No text-level mutability marker to look for.
+        "raw_mut_patterns": (),
     },
     "java": {
         "language": Language(tree_sitter_java.language()),
@@ -134,6 +166,12 @@ LANG_CFG: dict[str, LangCfg] = {
         "module_scan": "class_fields",
         "field_decl_types": ("field_declaration",),
         "immutable_modifiers": frozenset({"final"}),
+        # No keyword makes a module binding immutable here.
+        "const_keywords": (),
+        # No instance- or global-variable sigil in this grammar.
+        "instance_field_types": (),
+        # No text-level mutability marker to look for.
+        "raw_mut_patterns": (),
     },
     "csharp": {
         "language": Language(tree_sitter_c_sharp.language()),
@@ -150,6 +188,15 @@ LANG_CFG: dict[str, LangCfg] = {
         "module_scan": "class_fields",
         "field_decl_types": ("field_declaration",),
         "immutable_modifiers": frozenset({"readonly", "const"}),
+        # No annotation can suppress a type check in this language.
+        "annotation_escape_names": (),
+        "annotation_escape_nodes": (),
+        # No keyword makes a module binding immutable here.
+        "const_keywords": (),
+        # No instance- or global-variable sigil in this grammar.
+        "instance_field_types": (),
+        # No text-level mutability marker to look for.
+        "raw_mut_patterns": (),
     },
     "javascript": {
         "language": Language(tree_sitter_javascript.language()),
@@ -166,6 +213,16 @@ LANG_CFG: dict[str, LangCfg] = {
         "module_scan": "text",
         # `const` bindings are immutable; `let`/`var` are mutable module state
         "const_keywords": ("const ",),
+        # No annotation can suppress a type check in this language.
+        "annotation_escape_names": (),
+        "annotation_escape_nodes": (),
+        # Class fields are not how module state is spelled here.
+        "field_decl_types": (),
+        "immutable_modifiers": frozenset(),
+        # No instance- or global-variable sigil in this grammar.
+        "instance_field_types": (),
+        # No text-level mutability marker to look for.
+        "raw_mut_patterns": (),
     },
     "ruby": {
         "language": Language(tree_sitter_ruby.language()),
@@ -187,6 +244,14 @@ LANG_CFG: dict[str, LangCfg] = {
         # the scan already honours. The empty tuple says so; it used to inherit a
         # default whose words (`let `, `val `, `final `) are not Ruby at all.
         "const_keywords": (),
+        # No annotation can suppress a type check in this language.
+        "annotation_escape_names": (),
+        "annotation_escape_nodes": (),
+        # Class fields are not how module state is spelled here.
+        "field_decl_types": (),
+        "immutable_modifiers": frozenset(),
+        # No text-level mutability marker to look for.
+        "raw_mut_patterns": (),
     },
     "go": {
         "language": Language(tree_sitter_go.language()),
@@ -203,6 +268,16 @@ LANG_CFG: dict[str, LangCfg] = {
         "receiver_scan": "go_method_receiver",
         "module_scan": "text",
         "const_keywords": ("const ",),
+        # No annotation can suppress a type check in this language.
+        "annotation_escape_names": (),
+        "annotation_escape_nodes": (),
+        # Class fields are not how module state is spelled here.
+        "field_decl_types": (),
+        "immutable_modifiers": frozenset(),
+        # No instance- or global-variable sigil in this grammar.
+        "instance_field_types": (),
+        # No text-level mutability marker to look for.
+        "raw_mut_patterns": (),
     },
 }
 

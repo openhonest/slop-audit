@@ -393,7 +393,7 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
         attr = _text(_field(parent, sp["mem_attr"]))
         gp = parent.parent
         called = gp is not None and gp.type in sp["call_types"] and _same(_field(gp, sp["call_fn"]), parent)
-        if called and attr in sp.get("dispatch_methods", frozenset()):
+        if called and attr in sp["dispatch_methods"]:
             return state_partition.undecided(DYNAMIC_DISPATCH)   # a stored callable: unbounded target
         if called and attr in sp["mutating"]:
             # A mutating call can still hand the value OUT. `_d.Remove(k, out var v)`
@@ -412,7 +412,7 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
     # S.method(args) flattened (Java method_invocation / Ruby call with a receiver).
     if sp["flat_call"] and parent.type in sp["call_types"] and _same(_field(parent, sp["call_recv"]), ref):
         name = _text(_field(parent, sp["call_name"]))
-        if name in sp.get("dispatch_methods", frozenset()):
+        if name in sp["dispatch_methods"]:
             return state_partition.undecided(DYNAMIC_DISPATCH)
         if name in sp["mutating"]:
             return state_partition.write()
@@ -425,7 +425,7 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
         fname = _callee_name(parent.parent, sp)
         if fname in sp["writing_builtins"]:
             return state_partition.write()      # `delete(m, k)`: removes and returns nothing
-        if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
+        if fname in _BOUNDED_BUILTINS or fname in sp["extra_bounded"]:
             return _flow(parent.parent, sp, closed_sets, cells, depth)
         if fname in _EFFECT_CALLS:
             return state_partition.output()
@@ -594,7 +594,7 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
         fname = _callee_name(parent.parent, sp)
         if fname in sp["writing_builtins"]:
             return state_partition.write()      # `delete(m, k)`: removes and returns nothing
-        if fname in _BOUNDED_BUILTINS or fname in sp.get("extra_bounded", frozenset()):
+        if fname in _BOUNDED_BUILTINS or fname in sp["extra_bounded"]:
             return _flow(parent.parent, sp, closed_sets, cells, depth)
         if fname in _EFFECT_CALLS:
             return state_partition.output()
@@ -825,7 +825,7 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
                                      instance=False, hidden=hidden))
             judged |= state_enum.sites_of(module, name)
 
-    if sp.get("scope_by_receiver"):    # Go: state spans methods, grouped by receiver type
+    if sp["scope_by_receiver"]:    # Go: state spans methods, grouped by receiver type
         for slot in state_enum.go_slots(root):
             findings.append(_finding(slot["state"], slot["refs"], rel, sp, closed_sets,
                                      immutable_ctors, instance=slot["writers_enumerable"],
