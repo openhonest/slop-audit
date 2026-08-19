@@ -20,30 +20,9 @@ Feature: vacuity — paths where a check publishes a property it never measured,
 
   # The docstring says "plain and augmented". The body collects a third form as well:
   # an annotated assignment, which is how `findings: list[Finding] = []` is picked up.
-  Scenario: _assignments gathers every expression bound to one name inside a scope
-    Given a function body and the name to look for
-    When _assignments walks the whole body
-    Then it returns the right-hand side of each plain, augmented and annotated assignment to that name
-    But an augmented or annotated assignment with no value on the right is skipped, since there is nothing to read
 
-  Scenario: _is_size decides whether an empty input can drive a quantity to zero
-    Given an expression, the function it sits in, and how deep the recursion already is
-    When _is_size reads how the quantity is built rather than what it is called
-    Then a length, a sum, a comprehension, a container literal, a container constructor and a numeric literal all count as sizes
-    And a name is a size when any one of its local bindings is, because a counter starts at zero and is then added to, and a parameter is a size only when the body indexes, iterates over or does arithmetic with it
-    But an attribute read with no local definition is not, which is what keeps a comparison of a process exit status against zero out of the finding list, and the recursion gives up past three levels
 
-  Scenario: _used_as_quantity looks for the evidence that a parameter is a tally
-    Given a parameter name and the function body
-    When _used_as_quantity searches for the name in arithmetic, in a subscript, as the thing a loop walks, or as the argument of a sizing or container call
-    Then any one of those is enough to call it a quantity
-    But a name the body only ever tests for truth is a flag, and reading a flag as a tally once put a finding on every check that asks whether higher is better
 
-  Scenario: _parameters lists the names a function declares as arguments
-    Given a scope, which may or may not be a function
-    When _parameters reads the argument list
-    Then it returns every positional, keyword and star argument name
-    And a scope with no argument list at all returns nothing rather than failing
 
   Scenario: _threshold_branch settles which arm a size takes against a numeric literal
     Given a comparison and the function it sits in
@@ -91,11 +70,6 @@ Feature: vacuity — paths where a check publishes a property it never measured,
     Then it keeps the upper-case names of more than one letter that are bound to a plain string or number
     But a boolean is excluded, and so is a constant bound to a list or a dict, because that is a table and not a verdict
 
-  Scenario: _bound_names lists the names an assignment binds
-    Given an assignment statement
-    When _bound_names walks its targets
-    Then it returns every name appearing in them, so a tuple unpacking yields all of its names
-    But it does not tell a bare name from a subscript target, so the caller has to ask that separately
 
   Scenario: _writes_a_container tells filling a tally apart from binding a name
     Given an assignment statement
@@ -192,10 +166,6 @@ Feature: vacuity — paths where a check publishes a property it never measured,
     Then it returns the name of each call made through a bare name
     But a call through an attribute is not a bare name and does not appear
 
-  Scenario: _referenced_names lists every name mentioned in a node
-    Given any node
-    When _referenced_names walks it
-    Then it returns each name it finds, with no regard for whether the name is read or written
 
   Scenario: _returned_names lists the names a function hands straight back
     Given a function
@@ -281,3 +251,24 @@ Feature: vacuity — paths where a check publishes a property it never measured,
     Then zero findings renders as a negation carrying its own reach, saying how many rules, emission points, files and languages were looked at, and stating outright that this is the reach of the search rather than a statement about the code
     And a finding renders as a withdrawal, naming the output that cannot be relied on when the input is empty and printing the guard line beneath it, never as a fault
     But the declined prose fields and the unparsed files are printed either way, because they are what a silence is worth
+
+  Scenario: _is_sentinel recognises a value that discloses nothing was done
+    Given a published field's value
+    When _is_sentinel reads it
+    Then a zero, an empty string or a negative-one exit status is a disclosure
+    But a non-zero count is not, because a refusal reporting that it did three of something is asserting
+
+  Scenario: _is_empty_shell recognises the result a refusal did not produce
+    Given a published field's value
+    When _is_empty_shell reads it
+    Then an empty list, set, tuple or dict is the absent result shown rather than described
+    And a tally of nothing, whether written out per bucket or as a comprehension, is the same statement
+
+  Scenario: _is_zero separates a tally of nothing from the other sentinels
+    Given a published field's value
+    When _is_zero reads it
+    Then only the number zero counts
+    But the empty string does not, because a tally of nothing is a bucket mapped to zero and never to an empty string
+
+
+

@@ -8,7 +8,7 @@
   "L1.14": "Slop",
   "L1.15": "Healthy",
   "L1.16": "Healthy",
-  "L1.17": "Healthy",
+  "L1.17": "Not Healthy",
   "L1.18": "Healthy",
   "L1.19": "n/a",
   "L1.2": "Healthy",
@@ -26,5 +26,5 @@
   "L1.5",
   "L1.6"
  ],
- "vacuity": 8
+ "vacuity": 6
 }

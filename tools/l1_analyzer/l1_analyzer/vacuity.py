@@ -74,6 +74,22 @@ import ast
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer.vacuity_size import (  # noqa: F401 - re-exported: the tests read these
+    _CONTAINER_CALLS,
+    _SIZE_CALLS,
+    _SIZE_EXPR,
+    _SIZE_METHODS,
+    _TRANSPARENT_CALLS,
+    _assignments,
+    _bound_names,
+    _is_size,
+    _is_the_iterable,
+    _parameters,
+    _read_as_a_number,
+    _referenced_names,
+    _used_as_quantity,
+)
+
 # The eight grammars this rule declines. Named rather than skipped: "no vacuous path in
 # 1 of 9 languages" is a different sentence from "no vacuous path", and the reader is
 # owed the second number.
@@ -97,13 +113,6 @@ _REFUSAL_NAMES = frozenset({"NA", "UNREAD", "UNKNOWN", "UNMEASURED", "NOT_RUN", 
 # Calls whose result is a size, and calls that build a container. A quantity assembled
 # from one of these can be driven to zero by an empty input; a status code or a flag
 # cannot, and treating one as a cardinality is where a finding stops being a proof.
-_SIZE_CALLS = frozenset({"len", "sum", "count"})
-# Numeric coercions pass the question through: `int(totals.get("branches", 0))` is a count,
-# `float(match.group(1))` is a parsed percentage and no empty input can move it.
-_TRANSPARENT_CALLS = frozenset({"int", "float", "round", "abs", "min", "max"})
-_CONTAINER_CALLS = frozenset({"list", "dict", "set", "tuple", "sorted", "frozenset", "Counter"})
-_SIZE_METHODS = frozenset({"count", "values", "keys", "items", "split", "splitlines",
-                           "findall", "finditer", "readlines", "get"})
 
 _RULE_NAMES = ("threshold", "truthiness", "negation", "compound", "handler",
                "nested-conditional", "fall-through", "call-hop")
@@ -139,131 +148,6 @@ class VacuityResult(TypedDict):
     `band`, no `verdict` and no `value`: see the module docstring."""
     findings: list[VacuousPath]
     reach: Reach
-
-
-# --- is the quantity a size ----------------------------------------------------------
-
-def _assignments(scope: ast.AST, name: str) -> list[ast.expr]:
-    """Every expression bound to `name` inside `scope`, plain and augmented."""
-    out: list[ast.expr] = []
-    for node in ast.walk(scope):
-        if isinstance(node, ast.Assign) and name in _bound_names(node) or isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name) \
-                and node.target.id == name and node.value is not None:
-            out.append(node.value)
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) \
-                and node.target.id == name and node.value is not None:
-            out.append(node.value)          # `findings: list[Finding] = []` builds a size
-    return out
-
-
-
-
-_SIZE_EXPR: dict[type, str] = {
-    ast.ListComp: "container", ast.SetComp: "container", ast.DictComp: "container",
-    ast.GeneratorExp: "container", ast.List: "container", ast.Dict: "container",
-    ast.Set: "container", ast.Tuple: "container",
-}
-
-
-def _is_size(expr: ast.expr, scope: ast.AST, depth: int) -> bool:
-    """The quantity can be driven to zero by an empty input.
-
-    Decided from construction, never from the name: a counter initialised to zero and
-    incremented, a `len`, a `sum`, a comprehension, a container literal. An attribute
-    read with no local definition is not a size, which is what keeps `run.returncode == 0`
-    out of the finding list - it compares against zero and means the opposite thing."""
-    if depth > 3:
-        return False
-    if type(expr) in _SIZE_EXPR:
-        return True
-    if isinstance(expr, ast.Call):
-        func = expr.func
-        if isinstance(func, ast.Name):
-            if func.id in _TRANSPARENT_CALLS:
-                return any(_is_size(a, scope, depth + 1) for a in expr.args)
-            return func.id in (_SIZE_CALLS | _CONTAINER_CALLS)
-        return isinstance(func, ast.Attribute) and func.attr in _SIZE_METHODS
-    if isinstance(expr, ast.Constant):
-        return isinstance(expr.value, (int, float)) and not isinstance(expr.value, bool)
-    if isinstance(expr, ast.BinOp):
-        # A literal operand does not make the expression a size. `0` alone is a counter
-        # being initialised, but the `100` in `covered / total * 100` is a scale factor,
-        # and counting it made every arithmetic expression in the tree look like a count.
-        return any(_is_size(operand, scope, depth + 1)
-                   for operand in (expr.left, expr.right)
-                   if not isinstance(operand, ast.Constant))
-    if isinstance(expr, ast.UnaryOp):
-        # `parsed += not root.has_error` is the counter idiom for "how many succeeded".
-        return isinstance(expr.op, (ast.Not, ast.USub, ast.UAdd))
-    if isinstance(expr, ast.Subscript):
-        # Indexing a size gives a size: a tally read as `counts["promiscuous"]` is one.
-        # Indexing a module table is NOT - `cfg["type_escape_patterns"]` asks whether the
-        # language has a rule, which no empty repository can change. Reading every
-        # subscript as a size made a config guard look like a refusal and cut a live
-        # finding out of the list.
-        return _is_size(expr.value, scope, depth + 1)
-    if isinstance(expr, ast.Name):
-        defs = _assignments(scope, expr.id)
-        if defs:
-            # ANY, not ALL. A counter is `n = 0` and then `n += <something>`, and demanding
-            # every binding be a size read the increment as proof it was not a count.
-            #
-            # THE MISSING LINK test_absolute_paths_survives asks for is here, found
-            # 2026-08-18. A local bound from a call this module cannot follow is judged
-            # only by its right-hand side, while a PARAMETER falls through to
-            # `_used_as_quantity` below and is judged by what the body does with it. So
-            # `files, _ = _read_text_files(...)` is not a size, `if not files: raise`
-            # clears nothing, and the band below it is convicted.
-            #
-            # Closing it by giving locals the same fall-through was measured and NOT taken:
-            # it clears absolute_paths' two findings and adds seven elsewhere, in
-            # coverage_prove, python_coverage_prove and dead_code, where an honest refusal
-            # dict carrying `"attempted": 0` beside its prose starts reading as a
-            # fabricated affirmative. Two false positives traded for seven is a worse
-            # checker, and a noisy checker gets ignored. The link is named rather than cut.
-            return any(_is_size(d, scope, depth + 1) for d in defs)
-        # No local definition: a parameter is whatever the caller passed and may be an
-        # empty tally - but only if the body treats it as one. `higher_is_better` is a
-        # flag, and reading it as a size made `band()` itself look like it published a
-        # constant from nothing, which put a finding on every indicator that calls it.
-        return expr.id in _parameters(scope) and _used_as_quantity(expr.id, scope)
-    return False
-
-
-def _used_as_quantity(name: str, scope: ast.AST) -> bool:
-    """The body indexes, iterates, measures or does arithmetic with this name.
-
-    That is the evidence an empty input can drive it to zero. A name the body only ever
-    tests for truth is a flag - `higher_is_better` reads exactly like a tally otherwise,
-    and treating it as one put a finding on every indicator that calls `band()`. The
-    arithmetic arm matters just as much: a count handed in as a parameter and divided by
-    is a size even though the body never indexes it."""
-    for node in ast.walk(scope):
-        if isinstance(node, ast.BinOp) and name in (_referenced_names(node.left)
-                                                    | _referenced_names(node.right)):
-            return True
-        if isinstance(node, ast.Subscript) and name in _referenced_names(node.value):
-            return True
-        if isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)) \
-                and name in _referenced_names(node.iter):
-            return True
-        if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id in (_SIZE_CALLS | _CONTAINER_CALLS) \
-                    and any(name in _referenced_names(a) for a in node.args):
-                return True
-            if isinstance(node.func, ast.Attribute) and node.func.attr in _SIZE_METHODS \
-                    and name in _referenced_names(node.func.value):
-                return True
-    return False
-
-
-def _parameters(scope: ast.AST) -> frozenset[str]:
-    args = getattr(scope, "args", None)
-    if args is None:
-        return frozenset()
-    every = list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs)
-    every += [a for a in (args.vararg, args.kwarg) if a is not None]
-    return frozenset(a.arg for a in every)
 
 
 # --- which branch an empty input takes -----------------------------------------------
@@ -423,8 +307,6 @@ class _Context(TypedDict):
     returned_names: frozenset[str]
 
 
-def _bound_names(node: ast.Assign) -> list[str]:
-    return [n.id for t in node.targets for n in ast.walk(t) if isinstance(n, ast.Name)]
 
 
 def _writes_a_container(node: ast.Assign) -> bool:
@@ -544,8 +426,58 @@ def _is_refusal_dict(node: ast.expr, scope: ast.AST) -> bool:
     # "At least one refusal and no obvious measurement" was too loose: a full result dict
     # carrying `"band": "n/a"` beside a fabricated fraction read as a refusal whole, and
     # the fraction escaped. A refusal dict measures NOTHING.
-    return any(_is_refusal_constant(v) for v in node.values) and all(
-        _is_refusal_constant(v) or _is_prose(v) or _is_reason(v, scope) for v in node.values)
+    # A count of zero is part of the refusal SHAPE only when the dict shows the result it
+    # did not produce and says why. An honest refusal reads "here is nothing, here is how
+    # much work produced it, here is the reason": the empty collection is the tell that the
+    # zero counts work rather than measuring something.
+    #
+    # Both signals are required, and prose alone is the case that would have broken it.
+    # `{"value": 0.0, "band": "n/a", "details": "coverage not measured"}` carries a sentence
+    # and still fabricates the zero, so it stays convicted: it has no empty collection
+    # anywhere, because it never had a result to be empty.
+    shows_absence = (any(_is_empty_shell(v) for v in node.values)
+                     and any(_is_prose(v) for v in node.values))
+    # Showing the absence IS a refusal, with or without an "n/a" token. A dict that hands
+    # back an empty result and a sentence saying why has declined to assert, and requiring
+    # a token as well would convict every refusal that names its reason in English.
+    refuses = any(_is_refusal_constant(v) for v in node.values) or shows_absence
+    # `_is_empty_shell` is here as well as in `shows_absence` because a tally of nothing
+    # written as a comprehension, `{bucket: 0 for bucket in BUCKETS}`, is the same statement
+    # as `{}` and `_is_reason` only knows the literal spellings.
+    return refuses and all(
+        _is_refusal_constant(v) or _is_prose(v) or _is_reason(v, scope) or _is_empty_shell(v)
+        or (shows_absence and _is_sentinel(v)) for v in node.values)
+
+
+def _is_sentinel(node: ast.expr) -> bool:
+    """A value that discloses nothing-was-done: zero, the empty string, a -1 exit status.
+
+    Only these. A refusal reporting that it did three of something is asserting, so a
+    non-zero count is never part of the shape."""
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        return _is_sentinel(node.operand)
+    return (isinstance(node, ast.Constant) and not isinstance(node.value, bool)
+            and node.value in (0, 0.0, "", 1))
+
+
+def _is_zero(node: ast.expr) -> bool:
+    """Zero exactly, for the empty-tally test. Separate from _is_sentinel because a tally
+    of nothing is `{bucket: 0}` and never `{bucket: ""}`."""
+    return isinstance(node, ast.Constant) and not isinstance(node.value, bool) and node.value in (0, 0.0)
+
+
+def _is_empty_shell(node: ast.expr) -> bool:
+    """An empty collection literal, or one built from an empty comprehension over a fixed
+    set of keys: the result the refusal did not produce, shown rather than described."""
+    if isinstance(node, (ast.List, ast.Set, ast.Tuple)):
+        return not node.elts
+    if isinstance(node, ast.Dict):
+        # `{}` is the shell; `{k: 0 for k in KEYS}` is a tally of nothing, which is the
+        # same statement written out per bucket.
+        return not node.values or all(_is_zero(v) for v in node.values)
+    if isinstance(node, ast.DictComp):
+        return _is_zero(node.value)
+    return False
 
 
 def _is_reason(node: ast.expr, scope: ast.AST) -> bool:
@@ -555,12 +487,13 @@ def _is_reason(node: ast.expr, scope: ast.AST) -> bool:
         return node.id in _parameters(scope)
     if isinstance(node, (ast.List, ast.Dict, ast.Set, ast.Tuple)):
         return True
-    if isinstance(node, ast.Constant) and node.value in (0, "", -1):
-        # A sentinel beside an explicit refusal - zero files parsed, a -1 exit - discloses
-        # that nothing was measured. This is the one place the check trades a miss for a
-        # false positive on purpose: a half-repair that publishes 0.0 beside `band: n/a`
-        # reads as a refusal here and is NOT reported.
-        return True
+    # THE UNCONDITIONAL SENTINEL IS GONE, 2026-08-19. A bare 0, "" or -1 used to be read
+    # as disclosure wherever it appeared, and the comment here said so: "the one place the
+    # check trades a miss for a false positive on purpose: a half-repair that publishes 0.0
+    # beside `band: n/a` reads as a refusal here and is NOT reported." That trade is no
+    # longer needed. `_is_refusal_dict` now accepts a sentinel only where the dict SHOWS the
+    # result it did not produce and says why, which acquits the honest refusals the trade
+    # was protecting and convicts the half-repair it was letting through.
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
         return _is_reason(node.operand, scope)
     # A refusal spells its detail with a helper as often as with a literal. The
@@ -740,8 +673,6 @@ def _called_names(node: ast.AST) -> set[str]:
             and isinstance(c.func, ast.Name)}
 
 
-def _referenced_names(node: ast.AST) -> set[str]:
-    return {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
 
 
 def _returned_names(fn: ast.AST) -> frozenset[str]:

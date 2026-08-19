@@ -292,8 +292,11 @@ def test_two_of_the_three_labelled_paths_are_gone_and_the_third_is_a_reach_limit
                  ("indicators.py", "_god_files"),                 # L1.17
                  ("mutable_state.py", "analyze_mutable_state")):  # L1.18
         assert gone not in hit, f"the rule still finds {gone}, so the repair did not cut it"
-    assert ("absolute_paths.py", "scan") in hit, (
-        "still convicted, but no longer for the raise: see the next two tests")
+    # Gone too, 2026-08-19. It survived because a local bound from an unfollowable call
+    # was judged only by its right-hand side, so `if not files: raise` cleared nothing.
+    # Locals now fall through to `_used_as_quantity` the way parameters always did.
+    assert ("absolute_paths.py", "scan") not in hit, (
+        "the rule still finds absolute_paths.scan; the local fall-through did not cut it")
 
 
 def test_the_rule_reads_a_raise_as_a_refusal_the_same_as_a_return():
@@ -316,16 +319,18 @@ def test_the_rule_reads_a_raise_as_a_refusal_the_same_as_a_return():
     assert raised == []
 
 
-def test_absolute_paths_survives_for_a_reason_the_raise_fix_does_not_touch():
-    """Why the survivor above is still a survivor, stated as behaviour.
+def test_both_refusal_spellings_clear_a_count_derived_from_the_guarded_quantity():
+    """The derivation gap this used to assert, now closed, and still spelling-blind.
 
-    It is not the raise. Bisected on 2026-08-16: the same function shape with the guard
-    spelled as a `return` is convicted identically, so the spelling is not what decides it.
-    The rule loses the derivation somewhere between the guarded quantity and the ternary
-    that reads a count derived from it, and it loses it only in the fuller shape: a
-    comprehension alone does not lose it, and a tuple unpack alone does not lose it.
+    Bisected on 2026-08-16, the survivor was not the raise: the same shape with the guard
+    written as a `return` was convicted identically, so the spelling never decided it. What
+    decided it was that `files` came from an unfollowable call and so was not a size, which
+    left `if not files` deciding nothing and every constant below it convicted.
 
-    Asserted rather than excused, so whoever finds the missing link has to move the name."""
+    Both halves are still asserted. The two spellings must stay equal, because a rule that
+    reads a return and not a raise would be a spelling gap wearing a derivation gap's
+    clothes, and the count must clear, because the guard above it rules the empty input
+    out."""
     convicted_with_raise = _scan(
         "def scan(repo):\n"
         "    files, _skipped = read(repo)\n"
@@ -340,15 +345,34 @@ def test_absolute_paths_survives_for_a_reason_the_raise_fix_does_not_touch():
         "def scan(repo):\n"
         "    files, _skipped = read(repo)\n"
         "    if not files:\n"
-        "        return {'verdict': 'n/a', 'band': 'n/a', 'n': 0}\n"
+        "        return {'verdict': 'n/a', 'band': 'n/a', 'findings': [], 'n': 0,\n"
+        "                'details': 'nothing was read, so nothing was searched'}\n"
         "    findings = [{'file': p} for p, t in files]\n"
         "    count = len(findings)\n"
         "    hit = len({f['file'] for f in findings})\n"
         "    band = 'Healthy' if count == 0 else 'Slop'\n"
         "    return {'verdict': 'clean' if count == 0 else 'flagged', 'band': band, 'n': hit}\n")
-    assert len(convicted_with_raise) == len(convicted_with_return) == 2, (
-        "both spellings are convicted equally, so the survivor is a derivation gap and not "
-        "a refusal-spelling gap")
+    assert len(convicted_with_raise) == len(convicted_with_return) == 0, (
+        "a count derived from a guarded quantity is cleared, whichever way the guard "
+        f"refuses: raise={convicted_with_raise}, return={convicted_with_return}")
+
+
+def test_a_returned_refusal_that_explains_nothing_is_still_convicted():
+    """The other half of the tightened refusal rule, and why the fixture above gained a
+    sentence on 2026-08-19.
+
+    `{'verdict': 'n/a', 'band': 'n/a', 'n': 0}` publishes a bare zero beside two refusal
+    tokens and says nothing about why. A reader cannot tell that count from a real count of
+    none. It used to be acquitted, because any bare 0 was read as disclosure wherever it
+    appeared; a zero is now part of the refusal shape only where the dict shows the result
+    it did not produce and says why."""
+    found = _scan(
+        "def scan(repo):\n"
+        "    files, _skipped = read(repo)\n"
+        "    if not files:\n"
+        "        return {'verdict': 'n/a', 'band': 'n/a', 'n': 0}\n"
+        "    return {'n': len(files)}\n")
+    assert [f["field"] for f in found] == ["n"], found
 
 
 def test_the_l1_15_path_is_gone_and_the_checker_is_what_says_so():
@@ -403,24 +427,24 @@ def _findings(src):
     return vacuity.scan_module(ast.parse(src), pathlib.Path("m.py"), src.split("\n"))
 
 
-def test_a_local_from_an_unfollowable_call_is_not_judged_by_what_the_body_does_with_it():
-    """The missing link `test_absolute_paths_survives` asks someone to find, named.
+def test_a_local_from_an_unfollowable_call_is_judged_by_what_the_body_does_with_it():
+    """The missing link, closed 2026-08-19. This test used to read backwards and assert
+    the defect.
 
-    A PARAMETER whose definitions prove nothing falls through to `_used_as_quantity` and
-    is judged by what the body does with it. A LOCAL does not: `files, _ = read(repo)` is
-    judged only by its right-hand side, an unfollowable call, so it is not a size, so
-    `if not files: raise` clears nothing, and the band below that raise is convicted.
-    Which side of a function boundary a quantity arrived on decides whether its guard
-    counts.
+    A parameter whose definitions prove nothing has always fallen through to
+    `_used_as_quantity` and been judged by what the body does with it. A local did not:
+    `files, _ = read(repo)` was judged only by its right-hand side, an unfollowable call,
+    so it was not a size, so `if not files: raise` cleared nothing, and every constant
+    below that raise was convicted. Which side of a function boundary a quantity arrived
+    on decided whether its guard counted.
 
-    This asserts the CURRENT behaviour, not the desired one, which is why it reads
-    backwards. Closing the link was measured on 2026-08-18 and not taken: giving locals
-    the same fall-through clears absolute_paths' two findings and adds seven elsewhere,
-    where an honest refusal dict carrying `"attempted": 0` beside its prose starts reading
-    as a fabricated affirmative. Two traded for seven is a worse checker.
-
-    Move this name when the seven have an answer, not before."""
-    assert _findings(_GUARD + _BAND), "behaviour changed; read the comment in _is_size"
+    Closing it was measured and declined on 2026-08-18 at a cost of seven new findings.
+    Those seven were three separate faults elsewhere, each fixed on its own terms, and none
+    of them in this rule: a refusal dict that shows the result it did not produce is now
+    acquitted, a subscript counts as measuring only when its result is read as a number
+    rather than tested for truth, and a name that merely appears inside an iterable
+    expression is no longer read as the thing being iterated."""
+    assert not _findings(_GUARD + _BAND), "the guard above the band should clear it"
 
 
 def test_the_same_band_without_the_guard_is_still_vacuous():
