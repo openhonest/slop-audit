@@ -660,9 +660,13 @@ def _injected_slot_premise_fails(refs: list[Node], sp: LangSpec, instance: bool)
     return any(_written_through(r, sp) for r in refs)
 
 
-def _verdict(reaches: list[Reach], refs: list[Node] | None = None) -> tuple[str, bool, str, str, Partition, int]:
+def _verdict(reaches: list[Reach], refs: list[Node]) -> tuple[str, bool, str, str, Partition, int]:
     """Combine per-reference reaches into (verdict, drives_decision, silence, construct,
     partition).
+
+    `refs` is required. It defaulted to None, the one production caller always passes it,
+    and no test took the default: a second path kept alive by its own signature, and the
+    one where the silence reason has no reference to point at.
 
     The silence reason reported is the FIRST undecided reference in source order, not the
     worst of them by some ranking.

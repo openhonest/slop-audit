@@ -37,6 +37,8 @@ from l1_analyzer.pytest_trace import _run_untrusted
 
 RACE_OBSERVED = "race-observed"
 NO_RACE_IN_TESTS = "no-race-in-tests"
+TSAN = "tsan"      # the ThreadSanitizer arm
+STRESS = "stress"   # the contention-stress arm
 NA = "n/a"
 
 
@@ -103,7 +105,13 @@ def _verdict(findings: list[RaceFinding]) -> tuple[str, str, str]:
     return NO_RACE_IN_TESTS, "Healthy", "no data race observed (bounded by the test suite)"
 
 
-def _na(reason: str, tool: str = "tsan") -> RaceResult:
+def _na(reason: str, tool: str) -> RaceResult:
+    """A refusal that names the instrument which produced no reading.
+
+    `tool` is required. It defaulted to "tsan" and this module has two instruments,
+    ThreadSanitizer and the stress runner: a stress-path refusal that forgot the argument
+    told a reader ThreadSanitizer had produced nothing, and ThreadSanitizer was never
+    started. The function could not tell "chose tsan" from "forgot to say"."""
     return {"verdict": NA, "value": "n/a", "band": "n/a", "tool": tool, "findings": [], "details": reason}
 
 
@@ -144,13 +152,13 @@ def detect_races(repo: Path, lang: str, timeout_seconds: float) -> RaceResult:
     the suite, never a proof of safety - the details say so.
     """
     if lang != "rust":
-        return _na(f"runtime race harness is Rust/ThreadSanitizer only; {lang} not supported yet")
+        return _na(f"runtime race harness is Rust/ThreadSanitizer only; {lang} not supported yet", tool=TSAN)
     reason = _rust_toolchain_reason()
     if reason is not None:
-        return _na(reason)
+        return _na(reason, tool=TSAN)
     target = _host_target()
     if target is None:
-        return _na("could not determine the host target triple for the sanitizer")
+        return _na("could not determine the host target triple for the sanitizer", tool=TSAN)
 
     run = _run_untrusted(
         _rust_tsan_command(target), cwd=repo,
@@ -165,9 +173,9 @@ def detect_races(repo: Path, lang: str, timeout_seconds: float) -> RaceResult:
             verdict, band, value = _verdict(found)
             return {"verdict": verdict, "value": value, "band": band, "tool": "tsan", "findings": found,
                     "details": f"{value}; suite timed out before completing (partial run)"}
-        return _na("suite timed out under ThreadSanitizer before any result")
+        return _na("suite timed out under ThreadSanitizer before any result", tool=TSAN)
     if _RACE_BANNER not in output and ("error[" in output or "could not compile" in output or "error: " in output):
-        return _na(f"could not build the suite under ThreadSanitizer: {_first_error(output)}")
+        return _na(f"could not build the suite under ThreadSanitizer: {_first_error(output)}", tool=TSAN)
 
     findings = parse_tsan(output)
     verdict, band, value = _verdict(findings)
@@ -238,10 +246,10 @@ def stress_races(repo: Path, lang: str, runs: int, timeout_seconds: float) -> Ra
     run fails the same way -> n/a (a deterministic failure, not a stress-caught race).
     """
     if lang != "rust":
-        return _na(f"stress runner is Rust-only for now; {lang} not supported yet", tool="stress")
+        return _na(f"stress runner is Rust-only for now; {lang} not supported yet", tool=STRESS)
     reason = _cargo_available()
     if reason is not None:
-        return _na(reason, tool="stress")
+        return _na(reason, tool=STRESS)
 
     passed = 0
     panics: list[PanicFinding] = []
@@ -251,20 +259,20 @@ def stress_races(repo: Path, lang: str, runs: int, timeout_seconds: float) -> Ra
         )
         output = (run.stderr or "") + "\n" + (run.stdout or "")
         if run.returncode == 124:
-            return _na("a stress run timed out; concurrency not measured", tool="stress")
+            return _na("a stress run timed out; concurrency not measured", tool=STRESS)
         if run.returncode == 0:
             passed += 1
         else:
             hit = parse_panic(output)
             if not hit and ("error[" in output or "could not compile" in output):
-                return _na(f"could not build the suite: {_first_error(output)}", tool="stress")
+                return _na(f"could not build the suite: {_first_error(output)}", tool=STRESS)
             panics.extend(hit)
 
     if passed == runs:
         return {"verdict": NO_RACE_IN_STRESS, "value": f"{runs}/{runs} stress runs passed", "band": "Healthy",
                 "tool": "stress", "findings": [], "details": f"no panic across {runs} contended runs (bounded by the suite)"}
     if passed == 0:
-        return _na(f"every run failed the same way ({runs}/{runs}) - a deterministic failure, not a stress-caught race", tool="stress")
+        return _na(f"every run failed the same way ({runs}/{runs}) - a deterministic failure, not a stress-caught race", tool=STRESS)
     # Mixed: proven nondeterministic. Report the panic(s), attributed to file:line.
     deduped = {(p["file"], p["line"]): p for p in panics}
     findings: list[RaceFinding] = [
