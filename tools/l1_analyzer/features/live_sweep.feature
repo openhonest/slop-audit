@@ -48,11 +48,12 @@ Feature: live_sweep — the one boundary that spends money, and what it owes a r
     But it names nothing when neither is present, which is reported as an outcome rather than dropped
 
   Scenario: sweep runs the coverage proof over several repositories under one budget
-    Given a list of repositories, a key, a run ceiling and a per-repository cap
+    Given a list of repositories, a key, a run ceiling, a per-repository cap and the sweeps to run
     When sweep works through them in order
     Then every repository offered appears in the result with what it attempted and retained
     And a repository that refused for a missing toolchain, an unrecognised language or an exhausted ceiling appears saying which
     But with no key nothing is swept at all, because a run whose cost nobody authorised must not start
+    And the sweeps are handed in rather than reached for, since reaching for the module's own table left every line below the no-key refusal unreachable in a test
 
   Scenario: fair_share divides the run ceiling so every repository gets a turn
     Given the run ceiling and how many repositories are being swept

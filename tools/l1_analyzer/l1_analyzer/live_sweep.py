@@ -26,6 +26,7 @@ its output is a dated record, the same as a validation run.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from l1_analyzer import coverage_prove, python_coverage_prove
@@ -94,11 +95,22 @@ def language_of(repo: Path) -> str | None:
     return None
 
 
-def sweep(repos: list[Path], key: str | None, run_ceiling: int, per_repo: int) -> dict:
+def sweep(repos: list[Path], key: str | None, run_ceiling: int, per_repo: int,
+          sweeps: dict[str, Callable[..., dict]]) -> dict:
     """Run the coverage-proof sweep over several repositories under one budget.
 
     Returns every repository that was offered, in order, each with what it attempted and
-    what it retained or why it did neither."""
+    what it retained or why it did neither.
+
+    `sweeps` is required, and reaching for the module's own SWEEPS table instead is what
+    made everything below the no-key refusal unreachable in a test: driving it would have
+    meant overwriting a name in the module under test, which this package forbids. The body
+    sat at 51% and the arithmetic that decides what a run spends had never been executed
+    outside three live runs that spent real money.
+
+    Fourth appearance of one lesson, and the first found by coverage rather than by
+    reading. `_prove_one`, `prove_hazard` and `model_call.call` each reached for a
+    collaborator and each now asks for one."""
     if key is None:
         return {"detail": f"no {_KEY} was read, so no repository was swept",
                 "spent": 0, "run_ceiling": run_ceiling,
@@ -109,7 +121,7 @@ def sweep(repos: list[Path], key: str | None, run_ceiling: int, per_repo: int) -
     reports: list[dict] = []
     spent = 0
     for repo in repos:
-        language = language_of(repo)
+        language = language_of(repo) if language_of(repo) in sweeps else None
         allowance = share(run_ceiling, per_repo, spent)
         if language is None:
             reports.append({"repo": str(repo), "language": None, "attempted": 0, "retained": 0,
@@ -119,7 +131,7 @@ def sweep(repos: list[Path], key: str | None, run_ceiling: int, per_repo: int) -
             reports.append({"repo": str(repo), "language": language, "attempted": 0, "retained": 0,
                             "detail": f"not swept: the run ceiling of {run_ceiling} was already spent"})
             continue
-        result = SWEEPS[language](repo, max_attempts=allowance)
+        result = sweeps[language](repo, max_attempts=allowance)
         spent += int(result["attempted"])
         reports.append({"repo": str(repo), "language": language,
                         "attempted": int(result["attempted"]),

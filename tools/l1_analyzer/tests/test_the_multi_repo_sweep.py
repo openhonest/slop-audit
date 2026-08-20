@@ -52,7 +52,8 @@ def test_the_run_budget_bounds_the_whole_sweep_not_each_repo():
 def test_a_repository_that_refused_still_appears_in_the_run(tmp_path):
     """A repo dropped for a missing toolchain leaves a run that swept four of six looking
     like a run that swept four."""
-    result = live_sweep.sweep([tmp_path], key=None, run_ceiling=5, per_repo=5)
+    result = live_sweep.sweep([tmp_path], key=None, run_ceiling=5, per_repo=5,
+                              sweeps=live_sweep.SWEEPS)
     assert len(result["repos"]) == 1
     assert result["repos"][0]["attempted"] == 0
     assert result["repos"][0]["detail"]
@@ -60,7 +61,8 @@ def test_a_repository_that_refused_still_appears_in_the_run(tmp_path):
 
 
 def test_no_key_refuses_the_whole_run_before_touching_a_repository(tmp_path):
-    result = live_sweep.sweep([tmp_path], key=None, run_ceiling=5, per_repo=5)
+    result = live_sweep.sweep([tmp_path], key=None, run_ceiling=5, per_repo=5,
+                              sweeps=live_sweep.SWEEPS)
     assert "no ANTHROPIC_API_KEY" in result["detail"]
     assert result["spent"] == 0
 

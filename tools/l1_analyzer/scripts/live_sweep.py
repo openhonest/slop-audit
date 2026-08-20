@@ -54,7 +54,8 @@ def main(argv: list[str]) -> int:
         print(f"worst case: {spent} model-backed attempts")
         return 0
 
-    record = live_sweep.sweep(args.repos, key, args.ceiling, per_repo)
+    # The real sweeps, named here because this is the boundary that means to spend money.
+    record = live_sweep.sweep(args.repos, key, args.ceiling, per_repo, live_sweep.SWEEPS)
     print(record["detail"])
     for report in record["repos"]:
         print(f"  {report['repo']}: attempted {report['attempted']}, "
