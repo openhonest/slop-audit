@@ -270,5 +270,9 @@ Feature: vacuity — paths where a check publishes a property it never measured,
     Then only the number zero counts
     But the empty string does not, because a tally of nothing is a bucket mapped to zero and never to an empty string
 
-
+  Scenario: _panel_row carries the dict a published expression is built out of
+    Given a returned or assigned expression
+    When _panel_row reads it
+    Then a dict literal is that dict, and a dict comprehension is the row each of its entries is
+    But anything else carries no published dict, and reading the comprehension is what the checker could not do: it had a rule for a panel refused row by row and no way to reach one, so eight published results in a single statement were walked past
 

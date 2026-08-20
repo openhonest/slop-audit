@@ -578,11 +578,29 @@ def _emit(node: ast.Dict, guarded: bool, refused: frozenset[str], ctx: _Context,
 def _published_dict(stmt: ast.stmt, ctx: _Context) -> ast.Dict | None:
     """The dict this statement publishes, if any. A panel entry assigned as
     `results["L1.17"] = {...}` is published exactly as a returned literal is."""
-    if isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Dict):
-        return stmt.value
-    if (isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Dict)
-            and (_writes_a_container(stmt) or set(_bound_names(stmt)) & ctx["returned_names"])):
-        return stmt.value
+    published = _panel_row(stmt.value) if isinstance(stmt, ast.Return) else None
+    if published is not None:
+        return published
+    if isinstance(stmt, ast.Assign) and (
+            _writes_a_container(stmt) or set(_bound_names(stmt)) & ctx["returned_names"]):
+        return _panel_row(stmt.value)
+    return None
+
+
+def _panel_row(value: ast.expr | None) -> ast.Dict | None:
+    """The dict a published expression carries: the literal itself, or the row a whole
+    panel is built out of.
+
+    `{f"L1.{i}": {...} for i in range(1, 9)}` is eight published results in one statement,
+    and it was walked past entirely. That is exactly how compute_git_indicators refuses
+    when git cannot be read, and the zero it published there rendered as 0% on the card for
+    L1.1 through L1.8. `_is_refusal_dict` already read a comprehension on the same
+    reasoning, so the checker had a rule for the shape and no way to reach it; the defect
+    was found by reading every exception handler in the package by hand instead."""
+    if isinstance(value, ast.Dict):
+        return value
+    if isinstance(value, ast.DictComp):
+        return _panel_row(value.value)
     return None
 
 
