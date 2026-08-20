@@ -33,6 +33,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TypedDict
 
@@ -167,6 +168,63 @@ def determinism_band(passing: int, runs: int) -> str:
     Healthy, worse is Slop. The caller refuses a zero denominator before it reaches here,
     since zero clean out of zero satisfies "every run passed" and would band Healthy."""
     return "Healthy" if passing == runs else ("Not Healthy" if passing == runs - 1 else "Slop")
+
+
+class RunWords(TypedDict):
+    """The vocabulary one language uses for a determinism run.
+
+    Data, not behaviour. Java randomizes by seed, so run three is seed three; `dotnet test`
+    has no seed CLI and varies by scheduler, so run three is just run three. A C# reader
+    must not be told about seeds. The words differ and the RULES do not, which is why the
+    words travel as a value and the rules live in one function."""
+    unit: str            # what one attempt is called: "run", "seed"
+    never_ran: str       # why a suite that produced no tests did not run, under this toolchain
+    no_runs: str         # the sentence for zero attempts
+    describe: str        # the tail of the details line, after "N of M "
+
+
+def determinism_tally(outcomes: Iterable[tuple[int, str]], words: RunWords,
+                      ran_tests: Callable[[str], bool],
+                      summarise: Callable[[str], str]) -> L1Result:
+    """L1.20 from a sequence of finished runs. No I/O, so it can be asserted as a value.
+
+    C# and Java spelled this out separately and the two were byte-identical statement for
+    statement, differing only in their parameter name and their strings. L1.13 found it,
+    on the first measurement of this package that indicator has ever produced.
+
+    The count comes from the outcomes rather than from a requested number of runs, so the
+    value reports what actually happened. No outcomes at all is n/a: zero clean out of zero
+    satisfies "every run passed" and would band Healthy, which is the zero-denominator lie
+    this package exists to refuse.
+
+    `outcomes` is consumed lazily, so a caller may hand over a generator that runs the
+    suite one attempt at a time. Returning on the first terminal outcome is then what stops
+    the remaining attempts from each burning a full timeout.
+
+    Go, JavaScript and Ruby are NOT this shape and keep their own tallies. Forcing them in
+    would need a callback per message, which is machinery invented for a problem the right
+    shape does not have."""
+    passing = 0
+    made = 0
+    failing: list[str] = []
+    for returncode, output in outcomes:
+        made += 1
+        if returncode == 124:
+            return _na(f"a {words['unit']} timed out ({words['unit']} {made}); determinism not measured")
+        if not ran_tests(output):
+            return _na(f"the suite did not run ({words['unit']} {made}: {words['never_ran']}); "
+                       "determinism not measured")
+        if returncode == 0:
+            passing += 1
+        else:
+            failing.append(f"{words['unit']} {made}: {summarise(output)}")
+
+    if made == 0:
+        return _na(words["no_runs"])
+    details = f"{passing} of {made} {words['describe']}"
+    if failing:
+        details += f"; runs with failures: {'; '.join(failing[:3])}"
+    return {"value": f"{passing}/{made}", "band": determinism_band(passing, made), "details": details}
 
 
 def _na(reason: str) -> L1Result:

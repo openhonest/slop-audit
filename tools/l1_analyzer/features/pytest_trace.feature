@@ -111,3 +111,11 @@ Feature: pytest_trace — running a Python repository's own test suite to measur
     When determinism_band reads them
     Then all clean is Healthy, exactly one short is Not Healthy, and worse than that is Slop
     But the caller refuses a zero denominator before reaching here, since zero clean out of zero would satisfy "every run passed" and band Healthy
+
+  Scenario: determinism_tally counts finished runs and refuses what it cannot count
+    Given a sequence of finished runs, the language's words for them, and how to read an output
+    When determinism_tally walks the sequence
+    Then it counts the clean runs, quotes up to three failing ones, and bands the share
+    And it refuses on the first run that timed out or whose suite never executed, so the remaining runs do not each burn a timeout
+    But no runs at all is refused rather than banded, since zero clean out of zero satisfies "every run passed" and would read Healthy
+

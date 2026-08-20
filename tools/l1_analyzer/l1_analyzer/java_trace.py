@@ -42,7 +42,7 @@ from l1_analyzer.pytest_trace import (
     _na,
     _run_untrusted,
     coverage_band,
-    determinism_band,
+    determinism_tally,
     resolve_via_shim,
 )
 
@@ -211,43 +211,18 @@ def _surefire_summary(output: str) -> str:
 
 
 def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str) -> L1Result:
-    """L1.20 from the outcome of every randomized-order run. Each outcome is one run's exit
-    status and its combined output, in the order the runs were made; the position is the seed.
-    No I/O, so it can be asserted as a value.
-
-    The count comes from the outcomes rather than from a requested number of runs, so the
-    value reports what actually happened. No outcomes at all is n/a: zero clean out of zero
-    satisfies "every run passed" and would band Healthy, which is the zero-denominator lie
-    this package exists to refuse.
-
-    `outcomes` is consumed lazily, so a caller may hand over a generator that runs Maven one
-    seed at a time. Returning here on the first terminal outcome is then what stops the
-    remaining seeds from each burning a full timeout, which is how the loop this replaced
-    behaved.
-    """
-    passing = 0
-    made = 0
-    failing: list[str] = []
-    for returncode, output in outcomes:
-        made += 1
-        if returncode == 124:
-            return _na(f"a randomized run timed out (seed {made}); determinism not measured")
-        if not _ran_tests(output):
-            return _na(f"the suite did not run (seed {made}: no tests executed under {jdk}); "
-                       "determinism not measured")
-        if returncode == 0:
-            passing += 1
-        else:
-            failing.append(f"seed {made}: {_surefire_summary(output)}")
-
-    if made == 0:
-        return _na("no randomized-order runs were made; determinism not measured")
-    result_band = determinism_band(passing, made)
-    details = f"{passing} of {made} randomized-order runs passed cleanly (under {jdk})"
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {"value": f"{passing}/{made}", "band": result_band, "details": details}
-
+    """L1.20 for Java from finished randomized-order Maven runs. See
+    pytest_trace.determinism_tally for the rules; only the words are here. Surefire takes a
+    seed, so the position in the sequence IS the seed and is named as one."""
+    return determinism_tally(
+        outcomes,
+        {"unit": "seed",
+         "never_ran": f"no tests executed under {jdk}",
+         "no_runs": "no randomized-order runs were made; determinism not measured",
+         "describe": f"randomized-order runs passed cleanly (under {jdk})"},
+        _ran_tests,
+        _surefire_summary,
+    )
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.20 for Java: `mvn -Dsurefire.runOrder=random test` run `runs` times, counting the

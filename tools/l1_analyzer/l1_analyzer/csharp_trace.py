@@ -33,7 +33,7 @@ from l1_analyzer.pytest_trace import (
     _na,
     _run_untrusted,
     coverage_band,
-    determinism_band,
+    determinism_tally,
 )
 
 _BRANCHES_VALID = re.compile(r"<coverage[^>]*\bbranches-valid=\"(\d+)\"")
@@ -128,43 +128,19 @@ def _ran_tests(output: str) -> bool:
 
 
 def _determinism_verdict(outcomes: Iterable[tuple[int, str]], sdk: str) -> L1Result:
-    """L1.20 from the outcome of every repeated run. Each outcome is one run's exit status and
-    its combined output, in the order the runs were made. No I/O, so it can be asserted as a
-    value.
-
-    The count comes from the outcomes rather than from a requested number of runs, so the value
-    reports what actually happened. No outcomes at all is n/a: zero clean out of zero satisfies
-    "every run passed" and would band Healthy, which is the zero-denominator lie this package
-    exists to refuse.
-
-    `outcomes` is consumed lazily, so a caller may hand over a generator that runs the suite one
-    attempt at a time. Returning here on the first terminal outcome is then what stops the
-    remaining runs from each burning a full timeout, which is how the loop this replaced behaved.
-    """
-    passing = 0
-    made = 0
-    failing: list[str] = []
-    for returncode, output in outcomes:
-        made += 1
-        if returncode == 124:
-            return _na(f"a run timed out (run {made}); determinism not measured")
-        if not _ran_tests(output):
-            return _na(f"the suite did not run (run {made}: no test project built or executed under "
-                       f"{sdk}); determinism not measured")
-        if returncode == 0:
-            passing += 1
-        else:
-            failing.append(f"run {made}: {_first_line(output)}")
-
-    if made == 0:
-        return _na("no `dotnet test` runs were made; determinism not measured")
-    result_band = determinism_band(passing, made)
-    details = (f"{passing} of {made} `dotnet test` runs passed cleanly (order is scheduler-varied, "
-               f"not seed-controlled; under {sdk})")
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {"value": f"{passing}/{made}", "band": result_band, "details": details}
-
+    """L1.20 for C# from finished `dotnet test` runs. See pytest_trace.determinism_tally for
+    the rules; only the words are here, and they are C#'s own. `dotnet test` has no seed CLI,
+    so an attempt is a run whose order the scheduler varied, never a seed."""
+    return determinism_tally(
+        outcomes,
+        {"unit": "run",
+         "never_ran": f"no test project built or executed under {sdk}",
+         "no_runs": "no `dotnet test` runs were made; determinism not measured",
+         "describe": f"`dotnet test` runs passed cleanly (order is scheduler-varied, "
+                     f"not seed-controlled; under {sdk})"},
+        _ran_tests,
+        _first_line,
+    )
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
     """L1.20 for C#: `dotnet test` `runs` times, counting the runs where the whole suite passes.
