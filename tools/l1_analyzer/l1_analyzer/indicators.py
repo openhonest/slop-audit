@@ -149,7 +149,17 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
     try:
         out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
     except (subprocess.CalledProcessError, FileNotFoundError) as error:
-        return {f"L1.{i}": {"value": 0, "band": "n/a", "details": f"git log failed: {error}"} for i in range(1, 9)}
+        # "n/a", not 0. The band said nothing was measured and the value said zero, and the
+        # card renders the value, so a directory that is not a git working copy produced
+        # eight rows reading 0%. Zero is not neutral on this panel: L1.5 is deleted over
+        # added lines, so 0% is the Slop end of its own scale, and the shares of commits
+        # read the same way. A reader taking in the number before the band - the order the
+        # card puts them in - read a repository nobody could measure as one that measured
+        # terribly. The half-repair this package's own vacuity checker exists to convict,
+        # sitting inside an exception handler where nothing looked until the handlers were
+        # swept on 2026-08-19.
+        return {f"L1.{i}": {"value": "n/a", "band": "n/a", "details": f"git log failed: {error}"}
+                for i in range(1, 9)}
 
     total_commits = 0
     doc_only = code_only = mixed = 0

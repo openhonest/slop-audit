@@ -146,13 +146,20 @@ const GIT_LABELS: [&str; 8] = [
 ];
 
 /// Build the eight n/a results used for both the git-failure and no-commits branches.
-/// Mirrors the Python dict comprehensions (value 0, band n/a, shared details).
+/// The eight git indicators when git could not be read at all.
+///
+/// `value: "n/a"`, not "0". It was "0" here and in the reference, and the card renders the
+/// VALUE: a directory that is not a git working copy produced eight rows reading 0%. Zero
+/// is not neutral on this panel. L1.5 is deleted over added lines, so 0% is the Slop end of
+/// its own scale, and the shares of commits read the same way. A reader taking in the
+/// number before the band read a repository nobody could measure as one that measured
+/// terribly.
 fn all_na(details: &str) -> Vec<Indicator> {
     (1..=8)
         .map(|i| Indicator {
             code: format!("L1.{i}"),
             label: GIT_LABELS[i - 1].into(),
-            value: "0".into(),
+            value: "n/a".into(),
             band: "n/a".into(),
             details: details.into(),
         })
