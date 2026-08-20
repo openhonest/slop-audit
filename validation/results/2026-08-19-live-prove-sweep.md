@@ -17,6 +17,12 @@ The loop works. Given an uncovered branch, a model writes a test, the test compi
 
 Every generated test passed. On this package, over these branches, the model could not write an assertion the code failed. That is a weak positive signal about the code and a strong one about the loop: fifteen tests that compile and run against real production code, generated from nothing but the function source and the branch location.
 
+**Correction, 2026-08-19, later the same day.** Read those pass counts as an upper bound, not a measurement. At the time of these runs the loop could not tell a test that asserted and held from one that asserted nothing: a body whose assertion sat inside a nested function nobody calls ran green and was filed under `pass`, whose report reads "branch correct." The loop asks for the BODY of a test, and a whole test module is the shape every pytest file a model has read actually has, so the wrong shape was the more familiar one.
+
+The tool now refuses such a body at the proposal, in both languages, and a refused proposal is counted as a decline rather than a pass. These runs predate that. The passing test sources are not kept, only the retained ones, so nothing here can say how many of the thirty passes evaluated an assertion. A re-run under the fixed tool would settle it and has not been made.
+
+Two of the swept trees were checked against the other fault found the same day: `l1_analyzer` and `requests` both carry `__init__.py`, so the module path handed to the model was correct for both and the namespace-package defect did not touch these runs.
+
 ## Four defects the run found, none findable without it
 
 Each was shipped, and each was invisible to a suite that stubs the model.
