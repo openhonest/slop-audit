@@ -81,8 +81,11 @@ SCOPES: dict[str, Scope] = {
         # tests call is disclosed rather than called dead. L1.14 counts the whole tree,
         # the way `gitleaks --no-git` does, but splits the count the same way: a fixture
         # credential and a production credential are not the same finding to an auditor.
-        # Both read this rule, so both are declared here.
-        "indicators": ("L1.12", "L1.14", "L1.15", "L1.18", "L1.19", "path_cover",
+        # Both read this rule, so both are declared here. L1.13 joined them on 2026-08-19
+        # when it stopped shelling out to jscpd: it now reads production source and divides
+        # by production LOC, and a duplication figure that counted the test tree would
+        # measure the fixtures, which repeat by design.
+        "indicators": ("L1.12", "L1.13", "L1.14", "L1.15", "L1.18", "L1.19", "path_cover",
                        "absolute_paths", "gate:type-escapes"),
     },
     # The same, and conformance/ as well. A conformance directory holds law and spec

@@ -58,7 +58,10 @@ GOLDEN = Path(__file__).parent / "golden" / "py_repo.json"
 # single `if self.enabled:`, and the old shared node set matched both the if_statement and
 # the unnamed `if` keyword token inside it, so every `if` counted twice. 1 is the number a
 # reader gives. Nothing else in the golden moved.
-_GOLDEN_SHA256 = "162ce98db057df588658a0a17c155780dbe1de99adb82d0cf2f94d3f79a0491d"
+# Re-captured 2026-08-19 for one field only: L1.13 moved from n/a to 0.0 Healthy. It had
+# said "install jscpd to compute L1.13" and now measures natively, so the empty PATH this
+# test sets no longer decides whether the indicator reports at all. Nothing else moved.
+_GOLDEN_SHA256 = "36c4eb7656bde08942160034c536fd54717fb33135d2a1f3f0e9e4cc44db52cb"
 
 # A deliberately-sloppy sample: pure function + reads of dict/list/str/int/bool
 # state, plus one bounded projection (len). Written to tmp_path per test. Kept
@@ -107,7 +110,12 @@ def _fixture(tmp_path):
 # working indicator is absent. L1.12 and L1.14 were listed while they depended on vulture
 # and gitleaks, which is also how they reported Healthy on a repository holding live
 # secrets: the tool exits non-zero WHEN IT FINDS SOMETHING, and that exit was swallowed.
-OPTIONAL_TOOL_INDICATORS = ("L1.13",)
+# Empty since 2026-08-19, and kept rather than deleted. L1.12, L1.13 and L1.14 each
+# delegated to a tool nobody had installed, and each reported n/a until it went native;
+# L1.13 was the last. The guard below now asserts a property the panel HAS rather than one
+# it is working toward, and it still fails the moment a new indicator starts depending on
+# a binary being present, which is the failure it was written for.
+OPTIONAL_TOOL_INDICATORS: tuple[str, ...] = ()
 
 
 def test_frozen_mode_matches_registered_golden_byte_for_byte(tmp_path, monkeypatch):
@@ -132,6 +140,10 @@ def test_golden_records_no_optional_tool_as_installed():
     Healthy/0 there and n/a everywhere else. Byte-for-byte equality then held only on
     that one machine. This assertion is environment-independent: it reads the committed
     file, so re-capturing on a tooled machine fails here rather than six CI runs later.
+
+    The list is empty now that L1.13 measures natively, which is the outcome this test
+    was pushing toward rather than its defeat: no indicator's value depends on what is
+    installed on the machine that captured it.
     """
     golden = json.loads(GOLDEN.read_text())
     installed = {k: golden[k] for k in OPTIONAL_TOOL_INDICATORS if golden[k]["band"] != "n/a"}

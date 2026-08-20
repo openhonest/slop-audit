@@ -21,7 +21,6 @@ Honest Code shape (enforced, not aspirational):
 from __future__ import annotations
 
 import re
-import shutil
 import subprocess
 from collections import Counter
 from collections.abc import Callable
@@ -919,29 +918,23 @@ def _compute_decision_space(repo: Path, lang: str) -> L1Result:
     return {"value": decision_points, "band": "n/a", "details": _with_skipped(detail, skipped)}
 
 def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
-    """L1.13, the one indicator still delegated to an external tool. It reports an honest
-    `n/a` when jscpd is not installed, rather than a fabricated number or a misleading
-    "Healthy" that only means "nothing ran".
+    """L1.13 near-duplicate code, measured here since 2026-08-19 rather than shelled out.
 
-    L1.12 and L1.14 used to live here, delegated to vulture and gitleaks. They are now
-    native (dead_code.py, secret_scan.py): six ecosystems' toolchains cannot be asked of
-    an auditor at a client site, and while the tools were absent both indicators reported
-    n/a, which is most machines and all of CI.
+    It was delegated to jscpd, which was installed on no machine that ever ran this panel,
+    so L1.13 reported n/a on every repository this instrument has measured, both validation
+    controls included. An indicator that has never produced a number is not a lenient
+    indicator: it is a column in a published panel nobody has read, and since n/a is
+    excluded from both halves of the slop fraction, the panel measured nineteen things
+    while saying twenty.
+
+    L1.12 and L1.14 left the same way, for the same reason: six ecosystems' toolchains
+    cannot be asked of an auditor at a client site, and while a tool is absent its
+    indicator says nothing. The function keeps its name because the panel's shape is what
+    callers depend on; nothing external is left in it.
     """
-    if not shutil.which("jscpd"):
-        return {"L1.13": {"value": "n/a", "band": "n/a", "details": "install jscpd to compute L1.13"}}
+    from l1_analyzer import clone_detect
 
-    # jscpd exits non-zero when duplication crosses its threshold, so the exit status is
-    # read, never used to discard the output. See ExternalRun.
-    run = _run_external(["jscpd", "--mode", "weak", "--min-tokens", "50", "--reporters", "console", "."], repo)
-    match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", run["output"])
-    if match is None:
-        reason = ("jscpd produced no parseable duplication percentage"
-                  if run["ran"] else "jscpd is on PATH but could not be executed")
-        return {"L1.13": {"value": "n/a", "band": "n/a", "details": reason}}
-    clone_pct = float(match.group(1))
-    return {"L1.13": {"value": clone_pct, "band": band(clone_pct, 3, 10, higher_is_better=False),
-                      "details": "jscpd duplication percentage"}}
+    return {"L1.13": clone_detect.analyze(repo, lang)}
 
 
 # L1.18 mutable-state analysis lives in mutable_state.py; re-exported here so the

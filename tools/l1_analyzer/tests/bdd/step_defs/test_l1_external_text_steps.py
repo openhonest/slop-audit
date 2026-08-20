@@ -60,11 +60,35 @@ def given_unreferenced(dead, total, tmp_path) -> Codebase:
     return {"repo": tmp_path, "lang": "python"}
 
 
-@given(parsers.parse("the clone detector reports {pct:f}% duplication"), target_fixture="codebase")
-def given_clones(pct, tmp_path, monkeypatch) -> Codebase:
-    (tmp_path / "a.py").write_text("x = 1\n")
-    _stub(tmp_path / "bin", "jscpd", f"echo 'Total duplication: {pct} %'")
-    _on_path(monkeypatch, tmp_path / "bin")
+@given("a codebase whose one block is copied with every name changed", target_fixture="codebase")
+def given_renamed_copy(tmp_path) -> Codebase:
+    """A Type-2 clone: same shape, different names and numbers throughout. Normalizing
+    identifiers and literals is exactly what makes this match, and comparing raw text is
+    what would miss it."""
+    first = "\n".join(f"    value_{i} = compute(source_{i}, {i})" for i in range(40))
+    second = "\n".join(f"    other_{i} = compute(origin_{i}, {i + 500})" for i in range(40))
+    (tmp_path / "a.py").write_text(f"def first():\n{first}\n\n\ndef second():\n{second}\n")
+    return {"repo": tmp_path, "lang": "python"}
+
+
+@given("a codebase where no block repeats", target_fixture="codebase")
+def given_no_repeats(tmp_path) -> Codebase:
+    """Every line a different SHAPE. Names and literals are what normalization removes, so
+    a fixture that varies only its names is duplication and not a clean bill."""
+    (tmp_path / "a.py").write_text(
+        "def only(seed):\n"
+        "    total = 0\n"
+        "    for item in seed:\n"
+        "        total += 1\n"
+        "    while total > 10:\n"
+        "        total //= 2\n"
+        "    mapping = {'a': [total], 'b': (total,)}\n"
+        "    if mapping:\n"
+        "        del mapping['a']\n"
+        "    try:\n"
+        "        return sorted(mapping.items(), key=lambda pair: pair[1])\n"
+        "    except TypeError as exc:\n"
+        "        raise RuntimeError('no') from exc\n")
     return {"repo": tmp_path, "lang": "python"}
 
 
@@ -122,10 +146,9 @@ def given_one_god(size, tree, tmp_path) -> Codebase:
 
 # --- when / then ------------------------------------------------------------
 
-# L1.12 and L1.14 are produced by their own modules, exactly as indicators.py:548-549
-# calls them; only L1.13 is left inside _compute_external_indicators. Calling that
-# function for all three is what this step used to do, and it went unnoticed because
-# this suite lived outside CI.
+# Each indicator is produced by its own module, exactly as the panel calls it. L1.13
+# joined them on 2026-08-19; nothing here shells out any more, and _compute_external_
+# indicators keeps its name only because the panel's shape is what callers depend on.
 _COMPUTE = {
     12: lambda repo, lang: dead_code.analyze(repo, lang),
     13: lambda repo, lang: indicators._compute_external_indicators(repo, lang)["L1.13"],

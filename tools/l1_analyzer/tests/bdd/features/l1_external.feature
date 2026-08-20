@@ -11,8 +11,11 @@ Feature: L1.12-L1.14 dead code, clones and secrets
   not been true since. L1.14 is a count, and in a regulated enterprise any non-zero
   count is disqualifying.
 
-  L1.13 still delegates, to jscpd, so its scenario keeps the stub and is the one
-  place in this feature where an external tool is genuinely exercised.
+  L1.13 went native on 2026-08-19 and nothing in this feature delegates any more. It
+  had shelled out to jscpd, which was installed on no machine that ever ran the panel,
+  so the indicator reported n/a on every repository this instrument has measured. Its
+  scenario stubbed jscpd and asserted the stub's own echo, which proved that a number
+  printed by a shell script could be parsed and nothing about duplication.
 
   Scenario: Every definition referenced is Healthy
     Given a codebase where every definition is referenced
@@ -26,11 +29,16 @@ Feature: L1.12-L1.14 dead code, clones and secrets
     Then L1.12 is 22.22
     And the band is Slop
 
-  Scenario: 12% fuzzy near-duplicate blocks is Slop
-    Given the clone detector reports 12.0% duplication
+  Scenario: A block repeated under different names is Slop
+    Given a codebase whose one block is copied with every name changed
     When I compute L1.13
-    Then L1.13 is 12.0
-    And the band is Slop
+    Then the band is Slop
+
+  Scenario: Code that repeats nothing is Healthy
+    Given a codebase where no block repeats
+    When I compute L1.13
+    Then L1.13 is 0.0
+    And the band is Healthy
 
   Scenario: Zero secret hits is Healthy
     Given a codebase carrying 0 credential-shaped strings
