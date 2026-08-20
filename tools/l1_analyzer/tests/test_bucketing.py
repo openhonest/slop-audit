@@ -47,6 +47,39 @@ def test_root_scripts_docs_tooling_are_bucketed_and_disclosed(tmp_path):
     assert not any(f["file"] == "main.py" for f in r["findings"])
 
 
+def test_scripts_and_seed_dirs_are_bucketed_and_disclosed(tmp_path):
+    # A `scripts/` directory is the directory-level counterpart to a loose root
+    # script: dev/ops/entry-point tooling, not the library under test. `seed/`
+    # holds data-population scripts. Both are scoped out (and disclosed), while the
+    # package module beside them is still analyzed.
+    repo = _mkrepo(tmp_path, {
+        "pkg/__init__.py": "",
+        "pkg/mod.py": (
+            "class C:\n"
+            "    def __init__(self):\n"
+            "        self.cache = {}\n"
+            "    def get(self, k):\n"
+            "        return self.cache[k]\n"
+        ),
+        "scripts/nightly/monitor.py": (
+            "class M:\n"
+            "    def __init__(self):\n"
+            "        self.metrics = []\n"
+            "    def run(self):\n"
+            "        return self.metrics[0]\n"
+        ),
+        "seed/seeder.py": "class S:\n    def __init__(self):\n        self.rows = {}\n    def go(self, k):\n        return self.rows[k]\n",
+    })
+    r = state_bounds.classify(repo, "python")
+    reasons = {b["path"]: b["reason"] for b in r["bucketed"]["paths"]}
+    assert reasons.get("scripts/nightly/monitor.py") == "scripts"
+    assert reasons.get("seed/seeder.py") == "scripts"
+    # tooling state is NOT counted...
+    assert not any(f["file"].startswith("scripts/") or f["file"].startswith("seed/") for f in r["findings"])
+    # ...but the package module beside them still is (not over-scoped).
+    assert any(f["file"] == "pkg/mod.py" for f in r["findings"])
+
+
 def test_flat_script_only_repo_keeps_its_root_scripts(tmp_path):
     # No packages anywhere: root .py are the code, not tooling. No root-script bucket.
     repo = _mkrepo(tmp_path, {
