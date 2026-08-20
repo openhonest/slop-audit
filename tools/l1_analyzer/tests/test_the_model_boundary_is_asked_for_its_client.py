@@ -67,17 +67,9 @@ def test_the_client_maker_is_a_required_argument():
         )
 
 
-def test_no_test_in_this_package_patches_the_boundary():
-    """The property the change buys, counted rather than promised."""
-    import pathlib
-    import re
-
-    offenders = []
-    for path in sorted(pathlib.Path(__file__).parent.glob("*.py")):
-        for number, line in enumerate(path.read_text().split("\n"), start=1):
-            if re.search(r"monkeypatch\.setattr\(\s*model_call", line.split("#", 1)[0]):
-                offenders.append(f"{path.name}:{number}")
-    assert not offenders, f"tests still replace the boundary's own names: {offenders}"
+# The count of patches was asserted here first, for this one module. It is now
+# test_no_test_replaces_what_it_tests.py, over the whole package, because the same class of
+# defect landed three times and a per-module guard would have caught only the third.
 
 
 def test_a_missing_sdk_is_named_without_patching_anything():
