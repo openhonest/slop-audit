@@ -18,9 +18,16 @@ import pytest
 from l1_analyzer import coverage_prove, model_call, python_coverage_prove
 
 
+def _never_asked():
+    """A client maker the boundary must not reach for. No key means no request, so nothing
+    should be constructed, and handing this in is how that order is asserted rather than
+    assumed."""
+    raise AssertionError("the client maker was asked for even though there is no key")
+
+
 def test_no_key_names_the_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    reply = model_call.call("system", "user", max_tokens=16)
+    reply = model_call.call("system", "user", 16, _never_asked)
     assert reply["text"] is None
     assert reply["reason"] == model_call.NO_KEY
 
@@ -28,8 +35,8 @@ def test_no_key_names_the_key(monkeypatch):
 def test_a_missing_sdk_names_the_sdk_not_the_model(monkeypatch):
     """The case that lied. An optional extra nobody installed is not a model declining."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-a-real-key")
-    monkeypatch.setattr(model_call, "_import_client", lambda: None)
-    reply = model_call.call("system", "user", max_tokens=16)
+    _sdk = lambda: None
+    reply = model_call.call("system", "user",  16, _sdk)
     assert reply["text"] is None
     assert reply["reason"] == model_call.NO_SDK
     assert "extra" in model_call.WHY[model_call.NO_SDK]
@@ -41,8 +48,8 @@ def test_a_raised_request_names_the_request(monkeypatch):
     def _boom():
         raise RuntimeError("connection reset")
 
-    monkeypatch.setattr(model_call, "_import_client", lambda: _boom)
-    reply = model_call.call("system", "user", max_tokens=16)
+    _sdk = lambda: _boom
+    reply = model_call.call("system", "user",  16, _sdk)
     assert reply["text"] is None
     assert reply["reason"] == model_call.CALL_FAILED
 

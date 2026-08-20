@@ -24,8 +24,8 @@ def test_a_failed_request_records_the_exception_type_and_message(monkeypatch):
         def __init__(self, **kwargs):
             raise RuntimeError("context window exceeded: 250000 > 200000")
 
-    monkeypatch.setattr(model_call, "_import_client", lambda: _Boom)
-    reply = model_call.call("system", "user", max_tokens=16)
+    _sdk = lambda: _Boom
+    reply = model_call.call("system", "user",  16, _sdk)
     assert reply["text"] is None
     assert reply["reason"] == model_call.CALL_FAILED
     assert "RuntimeError" in reply["cause"]
@@ -39,15 +39,17 @@ def test_the_cause_is_bounded_so_a_report_stays_readable(monkeypatch):
         def __init__(self, **kwargs):
             raise RuntimeError("x" * 5000)
 
-    monkeypatch.setattr(model_call, "_import_client", lambda: _Boom)
-    assert len(model_call.call("s", "u", max_tokens=16)["cause"]) <= model_call.CAUSE_LIMIT
+    _sdk = lambda: _Boom
+    assert len(model_call.call("s", "u",  16, _sdk)["cause"]) <= model_call.CAUSE_LIMIT
 
 
 def test_the_refusals_that_never_made_a_request_carry_no_cause(monkeypatch):
     """No key and no SDK are decisions about this machine, not failures of a request.
     A cause on either would invent an interaction that never happened."""
+    def _never_asked():
+        raise AssertionError("no key, so the client maker must not be reached for")
+
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    assert model_call.call("s", "u", max_tokens=16)["cause"] == ""
+    assert model_call.call("s", "u", 16, _never_asked)["cause"] == ""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-a-real-key")
-    monkeypatch.setattr(model_call, "_import_client", lambda: None)
-    assert model_call.call("s", "u", max_tokens=16)["cause"] == ""
+    assert model_call.call("s", "u", 16, lambda: None)["cause"] == ""

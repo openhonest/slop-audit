@@ -159,7 +159,7 @@ def model_available() -> bool:
     Re-exported from the one reader of the variable's NAME, so a rename cannot leave a
     second copy checking the old one. Three modules asked this question and two of them
     spelled the answer themselves."""
-    return llm.model_available()
+    return llm.model_available(llm.anthropic_sdk)
 
 
 def _strip_fences(code: str) -> str:
@@ -174,7 +174,7 @@ def generate(request: ProofRequest) -> str | None:
     claim. The execution gate, not this call, decides whether the proof stands."""
     # Through the one boundary. `model_call` is taken as a PARAMETER by `prove` above,
     # so the module is imported under a name that cannot shadow it.
-    reply = llm.call(_CONCURRENCY_INSTRUCTION, request["context"], max_tokens=4096)
+    reply = llm.call(_CONCURRENCY_INSTRUCTION, request["context"], 4096, llm.anthropic_sdk)
     return None if reply["text"] is None else _strip_fences(reply["text"])
 
 

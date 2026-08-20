@@ -65,15 +65,37 @@ class ModelReply(TypedDict):
     cause: str
 
 
-def model_available() -> bool:
+# What makes a client. Asked for rather than reached for: `_prove_one` learned this first
+# and says so at its own site, `prove_hazard` learned it second, and this module reaching
+# for a module-level import was the third appearance. Eight tests had to overwrite that
+# name to exercise a missing SDK, a raised request or a thinking-block reply, which is a
+# test asserting against its own fixture.
+SdkMaker = Callable[[], Callable[..., object] | None]
+
+
+def anthropic_sdk() -> Callable[..., object] | None:
+    """The Anthropic constructor, or nothing when the optional extra is not installed.
+
+    The production maker, named at each of the two callers that mean to spend money, the
+    way cli.py names the real generator and the real stress runner. The absence is a value
+    this module can report rather than an exception it has to catch beside every other
+    failure."""
+    try:
+        from anthropic import Anthropic
+    except ImportError:
+        return None
+    return Anthropic
+
+
+def model_available(sdk: SdkMaker) -> bool:
     """Whether a generation model can be called: a key is present AND the SDK is installed.
 
     Both halves, because either one missing means no request goes out. The key alone was
     the old test, which is why a sweep with a key and no SDK reported a live run."""
-    return unavailable_reason() == ANSWERED
+    return unavailable_reason(sdk) == ANSWERED
 
 
-def unavailable_reason() -> str:
+def unavailable_reason(sdk: SdkMaker) -> str:
     """Why no model can be called, or the empty string when one can.
 
     NO_KEY and NO_SDK are different repairs and must not share a sentence. A sweep that
@@ -81,21 +103,11 @@ def unavailable_reason() -> str:
     sent its reader to the wrong file."""
     if not os.getenv("ANTHROPIC_API_KEY"):
         return NO_KEY
-    if _import_client() is None:
+    if sdk() is None:
         return NO_SDK
     return ANSWERED
 
 
-def _import_client() -> Callable[..., object] | None:
-    """The Anthropic constructor, or nothing when the optional extra is not installed.
-
-    Split out so the absence is a value this module can name rather than an exception it
-    has to catch alongside every other failure."""
-    try:
-        from anthropic import Anthropic
-    except ImportError:
-        return None
-    return Anthropic
 
 
 def _first_text(blocks: object) -> str | None:
@@ -113,11 +125,15 @@ def _first_text(blocks: object) -> str | None:
     return None
 
 
-def call(system: str, user: str, max_tokens: int) -> ModelReply:
-    """One model call: the reply text, or the named reason there is none."""
+def call(system: str, user: str, max_tokens: int, sdk: SdkMaker) -> ModelReply:
+    """One model call: the reply text, or the named reason there is none.
+
+    The key stays environment and is read here, because its absence is a fact about the
+    machine and there is nothing to inject. It is read FIRST, so no key means the maker is
+    never even asked."""
     if not os.getenv("ANTHROPIC_API_KEY"):
         return {"text": None, "reason": NO_KEY, "cause": ""}
-    client = _import_client()
+    client = sdk()
     if client is None:
         return {"text": None, "reason": NO_SDK, "cause": ""}
     try:

@@ -279,7 +279,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
                 "detail": f"attempted nothing: the ceiling is {max_attempts}"}
     if not model_available():
         return {"retained": [], "attempted": 0,
-                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason()]}"}
+                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason(llm.anthropic_sdk)]}"}
     interpreter, provenance = pytest_trace.resolve_interpreter(repo, python_executable)
     if not pytest_trace._module_available("pytest", interpreter) or not pytest_trace._module_available("coverage", interpreter):
         return {"retained": [], "attempted": 0, "detail": f"needs pytest and coverage.py in the target environment ({provenance})"}

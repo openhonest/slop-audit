@@ -84,7 +84,7 @@ LAST_REFUSAL = {"reason": "", "cause": ""}
 def model_available() -> bool:
     """Re-exported from the one reader of the variable's NAME, so a rename cannot
     leave a second copy checking the old one."""
-    return llm.model_available()
+    return llm.model_available(llm.anthropic_sdk)
 
 
 def host_cfg() -> frozenset[str]:
@@ -110,7 +110,7 @@ def _call_model(instruction: str, payload: str) -> dict | None:
     # Through the one boundary. Only the TAIL differed between this and prove.generate:
     # that one wants the text with its fences stripped, this one wants it parsed as JSON,
     # and the preamble they shared had already drifted on the token limit.
-    reply = llm.call(instruction, payload, max_tokens=2048)
+    reply = llm.call(instruction, payload, 2048, llm.anthropic_sdk)
     if reply["text"] is None:
         # The reason travels on the module so a sweep can say WHICH refusal it hit. Folding
         # a missing SDK into "the model declined" is how the first live sweep reported a
@@ -460,7 +460,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
     if not model_available():
         return {"retained": [], "attempted": 0,
-                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason()]}"}
+                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason(llm.anthropic_sdk)]}"}
     cov = rust_trace.repo_uncovered_lines(repo, timeout_seconds)
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
@@ -564,7 +564,7 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_second
         return {"retained": [], "attempted": 0, "detail": "needs a Rust toolchain (cargo) in PATH"}
     if not model_available():
         return {"retained": [], "attempted": 0,
-                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason()]}"}
+                "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason(llm.anthropic_sdk)]}"}
 
     cov = rust_trace.module_uncovered_lines(repo, module_relpath, timeout_seconds)
     if not cov["measured"]:

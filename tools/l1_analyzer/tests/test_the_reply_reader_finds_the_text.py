@@ -44,23 +44,21 @@ def _key(monkeypatch):
 
 
 def test_a_reply_whose_first_block_is_thinking_still_yields_its_text(monkeypatch):
-    monkeypatch.setattr(model_call, "_import_client",
-                        lambda: _client_returning([_Block(), _Block("the answer")]))
-    reply = model_call.call("system", "user", max_tokens=16)
+    _sdk = lambda: _client_returning([_Block(), _Block("the answer")])
+    reply = model_call.call("system", "user",  16, _sdk)
     assert reply["text"] == "the answer"
     assert reply["reason"] == model_call.ANSWERED
 
 
 def test_a_reply_with_no_thinking_block_is_unchanged(monkeypatch):
-    monkeypatch.setattr(model_call, "_import_client",
-                        lambda: _client_returning([_Block("the answer")]))
-    assert model_call.call("system", "user", max_tokens=16)["text"] == "the answer"
+    _sdk = lambda: _client_returning([_Block("the answer")])
+    assert model_call.call("system", "user",  16, _sdk)["text"] == "the answer"
 
 
 def test_a_reply_carrying_no_text_at_all_is_a_decline_not_a_failure(monkeypatch):
     """A reply that arrived and held nothing sayable is the model declining. Calling it a
     failed request would send a reader to the network for a thing the model did."""
-    monkeypatch.setattr(model_call, "_import_client", lambda: _client_returning([_Block()]))
-    reply = model_call.call("system", "user", max_tokens=16)
+    _sdk = lambda: _client_returning([_Block()])
+    reply = model_call.call("system", "user",  16, _sdk)
     assert reply["text"] is None
     assert reply["reason"] == model_call.DECLINED

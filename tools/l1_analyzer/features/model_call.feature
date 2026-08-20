@@ -43,11 +43,12 @@ Feature: model_call — the package's one construction of the generation model c
     Then it names the absent key, or the absent SDK, or nothing at all when a model can be called
     But it never reports one as the other, since a machine that has a key and lacks the optional extra was sent to the wrong file by the sentence that stood here
 
-  Scenario: _import_client hands back the Anthropic constructor, or nothing
+  Scenario: anthropic_sdk hands back the Anthropic constructor, or nothing
     Given an interpreter that may or may not have the optional extra installed
-    When _import_client tries the import
+    When anthropic_sdk tries the import
     Then it returns the constructor when anthropic is installed
-    But it returns nothing when it is not, so the absence is a value this module can name rather than an exception caught beside every other failure
+    But it returns nothing when it is not, so the absence is a value this module can report rather than an exception caught beside every other failure
+    And it is passed IN to the boundary rather than reached for, because eight tests had to overwrite that name to exercise a missing SDK, a raised request or a thinking-block reply, which is a test asserting against its own fixture
 
   Scenario: _first_text finds the reply in the first block that carries text
     Given the content blocks of a model response
