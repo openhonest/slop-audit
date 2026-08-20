@@ -217,7 +217,11 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
     close_commit()
 
     if total_commits == 0:
-        return {f"L1.{i}": {"value": 0, "band": "n/a", "details": "no commits in range"} for i in range(1, 9)}
+        # The same refusal as the unreadable-git one above, and for the same reason: a range
+        # that holds no commit measured nothing, and 0% is the Slop end of L1.5's scale.
+        # `--since` narrower than the history is an ordinary way to reach here.
+        return {f"L1.{i}": {"value": "n/a", "band": "n/a", "details": "no commits in range"}
+                for i in range(1, 9)}
 
     results: dict[str, L1Result] = {}
 

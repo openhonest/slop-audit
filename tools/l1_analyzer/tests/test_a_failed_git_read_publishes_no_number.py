@@ -53,6 +53,52 @@ def test_the_reason_is_still_named(not_a_repository):
     assert details.strip()
 
 
+@pytest.mark.parametrize("code", GIT_INDICATORS)
+def test_a_range_holding_no_commit_publishes_no_number_either(code):
+    """The same refusal on a different path, and an ordinary one to reach: a `--since`
+    narrower than the history leaves the walk with nothing to count. It published the same
+    bare zero, and a reader would have taken a range they chose too narrow for a repository
+    that deletes nothing."""
+    repo = pathlib.Path(indicators.__file__).resolve().parents[3]
+    result = indicators.compute_git_indicators(repo, since="2001-01-01", until="2001-01-02")[code]
+    assert result["band"] == "n/a"
+    assert result["value"] == "n/a"
+    assert "no commits in range" in result["details"]
+
+
+def test_no_result_in_the_package_publishes_a_number_beside_an_n_a_band():
+    """The rule, made permanent. Both instances of this defect were written the same way
+    and lived in different functions, so counting them is what stops a third.
+
+    A published result carries a value and a band, and the card renders the value first. A
+    band of n/a says nothing was measured; a value beside it that is not also n/a says
+    something was. The two cannot both be true, and the number is the one a reader acts on.
+
+    The results that legitimately carry a value beside an n/a band are the ones whose value
+    is a SENTENCE rather than a number: the state and thread meters report their counts as
+    prose and leave the band to the reader, which is a different claim from a measurement.
+    """
+    import ast
+
+    offenders = []
+    for path in sorted(pathlib.Path(indicators.__file__).parent.glob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text())):
+            literal = node.value if isinstance(node, ast.DictComp) else node
+            if not isinstance(literal, ast.Dict):
+                continue
+            pairs = {ast.unparse(k).strip("'\"") : v
+                     for k, v in zip(literal.keys, literal.values) if k is not None}
+            band, value = pairs.get("band"), pairs.get("value")
+            if not (isinstance(band, ast.Constant) and band.value == "n/a"):
+                continue
+            if isinstance(value, ast.Constant) and isinstance(value.value, (int, float)):
+                offenders.append(f"{path.name}:{node.lineno} value {ast.unparse(value)}")
+    assert not offenders, (
+        f"a number published beside an n/a band: {offenders}. The band says nothing was "
+        "measured and the number says otherwise, and the card renders the number."
+    )
+
+
 def test_a_real_repository_still_publishes_its_numbers():
     """The measure still measures. This repository is a git working copy, so every one of
     the eight comes back with a number rather than the refusal above."""
