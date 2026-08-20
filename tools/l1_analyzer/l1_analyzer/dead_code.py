@@ -49,7 +49,6 @@ import tree_sitter_rust
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
-from l1_analyzer import absolute_paths
 from l1_analyzer.dead_code_defs import (
     COLLECTORS,
     EXCLUDED,
@@ -57,6 +56,7 @@ from l1_analyzer.dead_code_defs import (
     Definition,
     RepoFacts,
 )
+from l1_analyzer.disclosure import listed_note
 from l1_analyzer.scope import (
     PRODUCTION,
     _bucket_reason,
@@ -826,7 +826,7 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
         details += f"; {corpus['unreadable']} file(s) unreadable or oversized and excluded"
     # Three lists share one cap, so the note names the largest of them: a reader told the
     # findings were cut knows to check the others rather than trust their lengths.
-    details += absolute_paths._listed_note(_CAP, max(len(dead) + len(unreachable),
+    details += listed_note(_CAP, max(len(dead) + len(unreachable),
                                                     len(undecidable), len(test_only)))
     return {
         "value": percent,

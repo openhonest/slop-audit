@@ -22,6 +22,7 @@ import re
 from pathlib import Path
 
 from l1_analyzer import incomplete
+from l1_analyzer.disclosure import listed_note
 from l1_analyzer.scope import PRODUCTION
 
 # Roots that identify one machine: a home or user directory, a temp or scratch location, a
@@ -66,19 +67,6 @@ def _matches(text: str) -> list[tuple[int, str]]:
     return out
 
 
-def _listed_note(shown: int, total: int) -> str:
-    """What a capped list owes its reader, or nothing when the cap did not bite.
-
-    The count was always honest and the LIST was short, so two fields of one result
-    disagreed: a reader counting the findings got the cap where the value said the total.
-    The only way to notice was to compare the two, which is what nobody does when one of
-    them is a list they are iterating.
-
-    Silent under the cap, for the reason the sweep ceiling is: a note on every result is one
-    a reader learns to skip, and that is how the one that mattered would be missed."""
-    return "" if total <= shown else f"; {shown} of them listed below"
-
-
 def scan(repo: Path, lang: str) -> dict:
     """Flag hardcoded machine-specific absolute paths across the repo's source. Returns
     {verdict, value, band, details, findings}. `lang` is accepted for a uniform additive
@@ -111,7 +99,7 @@ def scan(repo: Path, lang: str) -> dict:
     details = ("no hardcoded machine-specific absolute paths"
                if count == 0
                else f"{count} hardcoded machine-specific absolute path(s) across {files_hit} file(s)"
-                    + _listed_note(_CAP, count))
+                    + listed_note(_CAP, count))
     return {
         "verdict": "clean" if count == 0 else "flagged",
         "value": count,

@@ -25,11 +25,6 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     And when higher is better the tests are inclusive, while when lower is better they are strict, so a value sitting exactly on a lower-is-better healthy threshold lands in the middle band
     But it has no answer for "not measured": every caller needing one writes the n/a band itself
 
-  Scenario: _with_skipped discloses the files a reader could not open
-    Given a detail sentence and the number of files that could not be read
-    When _with_skipped joins them
-    Then it returns the sentence with a note naming that count appended to it
-    But at zero it returns the sentence unchanged, so a complete scan carries no note
 
   Scenario: _classify_file sorts one commit path into doc, code or other
     Given one repository-relative path taken from a commit

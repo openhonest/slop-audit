@@ -30,9 +30,4 @@ Feature: absolute_paths — machine-specific absolute paths in source
     And the band is Healthy only at zero, because a hardcoded machine path is never correct
     But the test tree is excluded, since a test proving a path detector fires must contain the path it detects
 
-  Scenario: _listed_note says a finding list was cut, when it was
-    Given how many findings are listed and how many were found
-    When _listed_note compares them
-    Then it names the shorter number, so a reader counting the list is not told a smaller total than the value beside it
-    But it says nothing when the cap did not bite, because a note on every result is one a reader learns to skip and that is how the one that mattered would be missed
 

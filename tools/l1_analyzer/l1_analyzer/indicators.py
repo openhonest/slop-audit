@@ -39,6 +39,9 @@ from l1_analyzer import (
     ruby_trace,
     rust_trace,
 )
+from l1_analyzer.disclosure import (
+    with_skipped as _with_skipped,
+)
 from l1_analyzer.incomplete import IncompleteCode, ratio
 from l1_analyzer.lang_spec import DECISION_NODE_TYPES
 from l1_analyzer.pytest_trace import L1Result
@@ -86,9 +89,8 @@ def band(value: float, healthy: float, slop: float, *, higher_is_better: bool) -
         return "Healthy" if value >= healthy else ("Not Healthy" if value >= slop else "Slop")
     return "Healthy" if value < healthy else ("Not Healthy" if value < slop else "Slop")
 
-def _with_skipped(details: str, skipped: int) -> str:
-    """Append an honest note when some files could not be read."""
-    return details if skipped == 0 else f"{details}; {skipped} file(s) unreadable and excluded"
+# Both disclosure notes live in one module now. This one was here and `listed_note` was in
+# absolute_paths, which is a module about hardcoded paths and no home for a reporting rule.
 
 # ---------------------------------------------------------------------------
 # Boundary readers (I/O). Each returns (data, skipped_count) so callers can
