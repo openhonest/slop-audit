@@ -35,6 +35,19 @@ _IN_PLACE = frozenset({
 # Container reads that a memoization cache may use and that do not inspect a value's shape.
 _CACHE_READS = frozenset({"pop", "clear", "get", "keys", "values", "items", "setdefault"})
 
+# Typing wrappers to see through when reading an annotation's value type. `Mapped[T]` is the
+# SQLAlchemy 2.0 column wrapper; the rest are the standard typing wrappers. `None` is dropped
+# so `X | None` / `Optional[X]` is judged by `X`.
+_TYPE_WRAPPERS = frozenset({"Mapped", "Optional", "Final", "ClassVar", "Annotated", "Union"})
+# Provably-immutable value types: a value of one of these cannot be mutated in place by any
+# callee it is passed to, so its escape to an unknown callee is harmless. Conservative — a
+# type not listed here is treated as mutable.
+_IMMUTABLE_TYPES = frozenset({
+    "bytes", "str", "int", "float", "bool", "complex",
+    "datetime", "date", "time", "timedelta", "Decimal", "UUID",
+    "frozenset", "tuple",
+})
+
 
 def _text(node: Node | None) -> str:
     return "" if node is None or node.text is None else node.text.decode("utf8", errors="ignore")
@@ -284,6 +297,30 @@ def _is_memoization(cls: Node, attr: str, refs: list[Node]) -> bool:
 
 # --- entry point -----------------------------------------------------------------
 
+def _annotation_core_types(typ: Node) -> set[str]:
+    """The value-type identifiers named in an annotation, minus typing wrappers and None:
+    ``Mapped[datetime | None]`` -> {datetime}; ``Mapped[list[str]]`` -> {list, str}."""
+    names = {_text(n) for n in _descendants(typ) if n.type == "identifier"}
+    return names - _TYPE_WRAPPERS - {"None"}
+
+
+def _is_immutable_typed(cls: Node, attr: str) -> bool:
+    """True when ``attr`` has a class-level annotation whose value type is provably immutable
+    (every core type is a known-immutable builtin/stdlib type). An immutable value cannot be
+    mutated in place by any callee it is handed to, so its escape to an unknown callee — the
+    only thing keeping such a finding fail-closed — is harmless. Conservative: an unannotated
+    attribute, or one whose annotation names any non-immutable type, returns False."""
+    for n in _descendants(cls):
+        if n.type != "assignment":
+            continue
+        left, typ = n.child_by_field_name("left"), n.child_by_field_name("type")
+        if typ is None or left is None or left.type != "identifier" or _text(left) != attr:
+            continue
+        core = _annotation_core_types(typ)
+        return bool(core) and core <= _IMMUTABLE_TYPES
+    return False
+
+
 def is_false_positive(key: str, refs: list[Node], verdict: str) -> bool:
     """True when the finding for this attribute is a provable false positive under one of
     the three rules, and should be reclassified NEUTRAL. Conservative: any doubt is False.
@@ -308,6 +345,15 @@ def is_false_positive(key: str, refs: list[Node], verdict: str) -> bool:
         return False
     if _is_write_once(cls, attr, refs):
         return True                                   # immutable, read only in bounded ways
+    if verdict == "unresolved" and _is_immutable_typed(cls, attr):
+        # An UNRESOLVED here means the only thing the classifier could not bound is an escape:
+        # the value is handed to an unknown callee. When the value's TYPE is provably immutable
+        # (bytes/str/int/datetime/...), the callee cannot mutate it in place and Python cannot
+        # retain a mutating handle to it, so the escape is harmless — the value's reaching set
+        # is still exactly what the guard above already proved bounded. Composing with a pure
+        # helper on an immutable column (hash_prefix(self.email_hash), json.loads(self.value))
+        # is Honest-Code decomposition, not an unbounded finding.
+        return True
     if verdict == "promiscuous":
         return _is_memoization(cls, attr, refs) or _drives_no_decision(refs)
     return False
