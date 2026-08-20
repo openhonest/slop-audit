@@ -199,10 +199,10 @@ def test_a_container_filled_under_a_guard_is_not_a_published_constant():
 
 # --- rule four: it has no way to say anything good -----------------------------------
 
-def test_the_result_carries_no_band_and_no_verdict():
+def test_the_result_carries_no_band_and_no_verdict(vacuity_of_the_package):
     """The whole poka-yoke. A field that can hold Healthy is a field that can hold a
     fabricated Healthy, and this check would then be its own first finding."""
-    result = vacuity.check(PKG)
+    result = vacuity_of_the_package
     assert "band" not in result and "verdict" not in result and "value" not in result
     assert set(result) == {"findings", "reach"}
 
@@ -252,11 +252,11 @@ def test_the_check_does_not_convict_itself_as_written():
 
 # --- reach: the eight languages it refuses -------------------------------------------
 
-def test_it_reads_python_only_and_says_so():
+def test_it_reads_python_only_and_says_so(vacuity_of_the_package):
     """Eight of the nine grammars are read by tree-sitter, which reports node types and
     not the emptiness semantics this rule evaluates. Publishing over them would be the
     check's own recognition set standing in for the code."""
-    result = vacuity.check(PKG)
+    result = vacuity_of_the_package
     assert result["reach"]["languages_read"] == 1
     assert result["reach"]["languages_total"] == 9
 
@@ -269,7 +269,7 @@ def test_the_refused_languages_are_named_rather_than_skipped(lang):
 
 # --- the labelled set, pinned so a regression is visible ------------------------------
 
-def test_two_of_the_three_labelled_paths_are_gone_and_the_third_is_a_reach_limit():
+def test_two_of_the_three_labelled_paths_are_gone_and_the_third_is_a_reach_limit(vacuity_of_the_package):
     """The live labelled set from test_read_nothing.py, after the 2026-08-16 repair.
 
     L1.16 and L1.17 are gone, and the checker is what says so. Both divided by a file count
@@ -286,7 +286,7 @@ def test_two_of_the_three_labelled_paths_are_gone_and_the_third_is_a_reach_limit
     rather than excused, so that teaching `_refuses` to read a raise fails this test and
     makes someone move the name out of the survivor list.
     """
-    result = vacuity.check(PKG)
+    result = vacuity_of_the_package
     hit = {(pathlib.Path(f["file"]).name, f["function"]) for f in result["findings"]}
     for gone in (("indicators.py", "_trailing_whitespace"),       # L1.16
                  ("indicators.py", "_god_files"),                 # L1.17
@@ -375,7 +375,7 @@ def test_a_returned_refusal_that_explains_nothing_is_still_convicted():
     assert [f["field"] for f in found] == ["n"], found
 
 
-def test_the_l1_15_path_is_gone_and_the_checker_is_what_says_so():
+def test_the_l1_15_path_is_gone_and_the_checker_is_what_says_so(vacuity_of_the_package):
     """It was four until 2026-08-15. L1.15's `if total_loc > 1000 else 0.0` was the
     headline instance in this module's own docstring, and removing the floor removed the
     path. This assertion is the one that matters about the fix: the check that found the
@@ -385,7 +385,7 @@ def test_the_l1_15_path_is_gone_and_the_checker_is_what_says_so():
     The refusal it was replaced with is not a second instance. `total_loc == 0` returns
     band `n/a`, and a refusal is what the rule looks for on that branch; a fix that kept
     publishing a verdict over nothing would still be found here."""
-    result = vacuity.check(PKG)
+    result = vacuity_of_the_package
     hit = {(pathlib.Path(f["file"]).name, f["function"]) for f in result["findings"]}
     assert ("indicators.py", "_compute_type_escapes") not in hit
 

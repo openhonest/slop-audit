@@ -18,20 +18,18 @@ hide behind an argument about categories.
 
 import pathlib
 
-from l1_analyzer import dead_code
-
 REPO = pathlib.Path(__file__).resolve().parents[3]
 
 
-def test_no_definition_in_this_repository_is_unreferenced():
-    r = dead_code.analyze(REPO, "python")
+def test_no_definition_in_this_repository_is_unreferenced(dead_code_of_the_repository):
+    r = dead_code_of_the_repository
     named = [f"{f['file']}:{f['line']} {f['name']}" for f in (r.get("findings") or [])]
     assert not named, "dead code in our own tree:\n  " + "\n  ".join(named)
 
 
-def test_the_indicator_can_still_see_this_repository():
+def test_the_indicator_can_still_see_this_repository(dead_code_of_the_repository):
     """The guard. A band of n/a would make the assertion above vacuous, and n/a is what
     the indicator returns when it cannot read a repository at all."""
-    r = dead_code.analyze(REPO, "python")
+    r = dead_code_of_the_repository
     assert r["band"] != "n/a", r.get("details")
     assert r["counts"]["definitions"] > 100, "too few definitions read to be measuring this repo"
