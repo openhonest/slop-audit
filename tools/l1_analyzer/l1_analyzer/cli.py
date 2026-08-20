@@ -395,7 +395,18 @@ def main(argv: list[str] | None = None) -> int:
         "--prove-max",
         type=int,
         default=3,
-        help="With --prove, the maximum number of located hazards to attempt (default 3).",
+        help="With --prove, the maximum number of located hazards to attempt (default 3). "
+             "With --prove-coverage-repo it is the per-MODULE cap: how many gaps one module "
+             "may offer.",
+    )
+    parser.add_argument(
+        "--prove-max-total",
+        type=int,
+        default=5,
+        help="With --prove-coverage-repo, the total gaps the whole run may hand to a model "
+             "(default 5). The per-module cap and this one bound different things: five per "
+             "module over forty modules is two hundred attempts, and this is what stops that. "
+             "A sweep that stops here says so in its own report.",
     )
     parser.add_argument(
         "--coverage-repair-rounds",
@@ -515,12 +526,14 @@ def main(argv: list[str] | None = None) -> int:
             from l1_analyzer import python_coverage_prove
             results["coverage_proofs"] = python_coverage_prove.prove_coverage_repo(
                 args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
-                timeout_seconds=args.timeout, python_executable=args.python, progress=_cov_progress)
+                timeout_seconds=args.timeout, python_executable=args.python,
+                progress=_cov_progress, max_attempts=args.prove_max_total)
         else:
             from l1_analyzer import coverage_prove
             results["coverage_proofs"] = coverage_prove.prove_coverage_repo(
                 args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
-                timeout_seconds=args.timeout, progress=_cov_progress)
+                timeout_seconds=args.timeout, progress=_cov_progress,
+                max_attempts=args.prove_max_total)
     elif args.prove_coverage:
         from l1_analyzer import coverage_prove
         results["coverage_proofs"] = coverage_prove.prove_coverage(
