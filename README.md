@@ -93,17 +93,17 @@ L1.19 and L1.20 run the target repo's own test suite under the target's own runt
 | L1.19 decision-point enumeration | yes | yes |
 | L1.18, L1.18b finite testability | not yet | yes |
 | L1.19 coverage, L1.20 determinism (runtime) | not yet | yes |
-| L1.12, L1.13, L1.14 | not yet | only when `vulture`, `jscpd` and `gitleaks` are installed, otherwise `n/a` |
+| L1.12, L1.13, L1.14 | not yet | yes, natively |
 | Additive: absolute paths | yes | yes |
 | Additive: thread surface, path cover, interleaving robustness | not yet | yes |
 
 The portable binary is a certified-equivalent redistribution, not a second opinion. Each ported indicator is validated equal to the Python reference on a real repository in each of the nine languages, and [`.github/workflows/parity.yml`](.github/workflows/parity.yml) fails the build if the two ever disagree. Where they differ in coverage, the Python instrument is canonical.
 
-Requiring `vulture`, `jscpd` and `gitleaks` for three indicators is a defect, not a design. Those three are being reimplemented natively so that a complete panel needs nothing but the binary.
+Requiring `vulture`, `jscpd` and `gitleaks` for three indicators was a defect, not a design, and it cost the instrument a whole indicator: L1.13 returned `n/a` on every repository this methodology had measured, because jscpd was installed on none of the machines that ran it, and `n/a` is excluded from both halves of the slop-signal fraction. All three are native in the Python reference as of 2026-08-19, and the canon defines each as an algorithm rather than as a tool invocation. The port still carries L1.12, L1.13 and L1.14 as declared gaps.
 
 ## What one run produces
 
-The report card, on this repository:
+The report card, on this repository, regenerated 2026-08-19:
 
 ```
 # Slop Audit — slop-audit (python)
@@ -114,12 +114,12 @@ This code definitely CAN be exhaustively tested.
 
 None of the data this code keeps can grow without limit, so a fixed number of tests
 can check every case. The Slop Audit worked out the fewest test runs that reach every
-path: 930 runs cover them all.
+path: 1,643 runs cover them all.
 
 - Finitely testable: 0
 - Provably unbounded: 0
-- Undetermined: 0
-- test runs cover every path through the code, both sides of every yes-or-no: 930
+- Undecided by the analyzer (silence): 0
+- test runs cover every path through the code, both sides of every yes-or-no: 1,643
 
 ## How it maps to your audit
 
