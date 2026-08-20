@@ -19,11 +19,13 @@ runs code): needs ANTHROPIC_API_KEY and the target's pytest environment.
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
 import subprocess
 import tempfile
+import textwrap
 from collections.abc import Callable
 from pathlib import Path
 
@@ -57,18 +59,47 @@ _REPAIR_INSTRUCTION = (
     "\"explanation\"."
 )
 
-# pytest's short-summary line for a failure/error: `FAILED file::proof_3 - AssertionError: ...`.
+# pytest's short-summary line for a failure/error: `FAILED file::proof_0 - AssertionError: ...`.
+# NOT the only source of the verdict, because pytest truncates this line's ` - reason`
+# suffix to the terminal width, and the proof file lives under a macOS tmpdir whose path
+# alone overflows 80 columns. For as long as this regex was the only reader, the reason
+# never survived, every fired assertion was binned "incidental", and the repair loop then
+# rewrote the test until it agreed with the buggy code. Found on 2026-08-20 by a planted
+# positive control whose two correct assertions both came back "passed (branch correct)".
 _OUTCOME = re.compile(r"^(?:FAILED|ERROR)\s+\S*::proof_0\s*-\s*(\w+)", re.MULTILINE)
+# The `--tb=line` row, `.../test_l1_coverage_proof.py:N: ExceptionName: msg`, which pytest
+# does not truncate. Anchored to the proof file's own name so another file's traceback
+# (a conftest raising while the proof fails to import) cannot claim the verdict.
+_TB_LINE = re.compile(r"test_l1_coverage_proof\.py:\d+:\s*(\w+)")
+
+
+# Directories that hold packages without being part of the import path. `src` is the
+# convention; the repository root is the other stopping point and is passed in.
+_SOURCE_ROOTS = frozenset({"src", "lib"})
 
 
 def _import_path(repo: Path, file_path: Path) -> str:
-    """The dotted import path of a module: walk up while __init__.py exists, so a src-layout
-    package resolves to its installed name (src/pkg/sub/mod.py -> pkg.sub.mod)."""
+    """The dotted import path of a module: every directory between the source root and the
+    file, so src/pkg/sub/mod.py is pkg.sub.mod and planted/pricing.py is planted.pricing.
+
+    It walked up only while `__init__.py` existed, which is a rule about REGULAR packages
+    and PEP 420 namespace packages have no `__init__.py`. So `planted/pricing.py` resolved
+    to `pricing`, the model was told a module name that does not import, and its correct
+    proposals died on ModuleNotFoundError and were binned as incidental noise. The repair
+    loop then spent its rounds trying to fix a test that was never wrong.
+
+    Stopping at the source root rather than at the first missing `__init__.py` covers both:
+    a namespace package is walked through like any other directory, and `src` is still
+    dropped because it is where the import path starts, not part of it."""
     parts = [file_path.stem]
     directory = file_path.parent
-    while (directory / "__init__.py").exists():
+    repo = repo.resolve()
+    while directory.resolve() != repo and directory.name not in _SOURCE_ROOTS:
         parts.append(directory.name)
-        directory = directory.parent
+        parent = directory.parent
+        if parent == directory:      # reached the filesystem root without meeting the repo
+            break
+        directory = parent
     return ".".join(reversed(parts))
 
 
@@ -85,7 +116,7 @@ def propose(gap: dict, import_path: str) -> dict | None:
         "is_method": gap["is_method"],
         "uncovered_branch": f"the `{gap['kind']}` branch at line {gap['line']} is never exercised",
     })
-    return _valid(_call_model(_PROPOSE_INSTRUCTION, payload))
+    return _valid(_call_model(_PROPOSE_INSTRUCTION, payload), body_asserts)
 
 
 def repair(gap: dict, import_path: str, test_source: str, error: str) -> dict | None:
@@ -93,11 +124,49 @@ def repair(gap: dict, import_path: str, test_source: str, error: str) -> dict | 
         "module": import_path, "signature": _signature(gap), "function_source": gap["function_source"],
         "test_that_errored": test_source, "error": error[-4000:],
     })
-    return _valid(_call_model(_REPAIR_INSTRUCTION, payload))
+    return _valid(_call_model(_REPAIR_INSTRUCTION, payload), body_asserts)
 
 
 def _indent(body: str) -> str:
     return "\n".join(("    " + ln) if ln.strip() else ln for ln in body.splitlines())
+
+
+# Statements that HOLD other statements and still execute them: a loop runs its body, a
+# `with` runs its block, a branch runs one arm, a `try` runs its. A function, lambda or
+# class definition does not: it binds a name, and the body has to call it. That is the whole
+# distinction, and it is why the rule can be decided without running anything.
+_EXECUTES_ITS_BODY = (ast.For, ast.AsyncFor, ast.While, ast.If, ast.With, ast.AsyncWith,
+                      ast.Try, ast.TryStar, ast.Match, ast.match_case, ast.ExceptHandler,
+                      ast.Module)
+
+
+def body_asserts(body: str) -> bool:
+    """Whether this proof body will evaluate an assertion when it runs.
+
+    A body that asserts nothing cannot produce evidence either way, and the loop used to
+    file it under `pass`, whose report reads "branch correct". Found 2026-08-19: hand the
+    loop a whole test module rather than a body - a plausible model reply, and the shape of
+    every pytest file a model has read - and the assertion lands inside a nested function
+    nobody calls. pytest collects the wrapper, runs it, defines the inner function, and
+    passes. A proof that measured nothing published a clean bill for the branch it was sent
+    to cover, which is the category this package exists to name.
+
+    `pytest.raises` and its kind count: the assertion IS the context manager, and a `with`
+    block runs. A body that will not parse asserts nothing, since it will not run either."""
+    try:
+        tree = ast.parse(textwrap.dedent(body))
+    except SyntaxError:
+        return False
+
+    def reachable(node: ast.AST) -> bool:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.Assert, ast.With, ast.AsyncWith)):
+                return True
+            if isinstance(child, _EXECUTES_ITS_BODY) and reachable(child):
+                return True
+        return False
+
+    return reachable(tree)
 
 
 def render_test(body: str) -> str:
@@ -113,7 +182,7 @@ def _classify(output: str, returncode: int) -> str:
     other exception, or a collection ERROR, is a setup failure (incidental noise)."""
     if returncode == 124:
         return "error"
-    match = _OUTCOME.search(output)
+    match = _OUTCOME.search(output) or _TB_LINE.search(output)
     if match:
         return "divergence" if match.group(1) == "AssertionError" else "incidental"
     if returncode == 0 and "1 passed" in output:

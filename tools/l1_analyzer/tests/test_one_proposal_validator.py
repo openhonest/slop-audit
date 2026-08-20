@@ -42,12 +42,18 @@ def test_no_rule_in_the_package_is_written_twice():
 
 
 def test_the_validator_refuses_a_proposal_with_no_body():
-    assert coverage_prove._valid(None) is None
-    assert coverage_prove._valid({}) is None
-    assert coverage_prove._valid({"body": "   "}) is None
-    assert coverage_prove._valid({"body": 42}) is None
+    # The reachable-assertion rule is a required argument since 2026-08-19: `_valid` is
+    # shared between the two languages, so defaulting it would have checked Python source
+    # with Rust's rule wherever a caller forgot to pass one.
+    check = coverage_prove.body_asserts
+    assert coverage_prove._valid(None, check) is None
+    assert coverage_prove._valid({}, check) is None
+    assert coverage_prove._valid({"body": "   "}, check) is None
+    assert coverage_prove._valid({"body": 42}, check) is None
+    assert coverage_prove._valid({"body": "let x = f(1);"}, check) is None
 
 
 def test_the_validator_keeps_a_real_proposal():
-    assert coverage_prove._valid({"body": "  fn t() {}  ", "explanation": "why"}) == {
-        "body": "fn t() {}", "explanation": "why"}
+    kept = coverage_prove._valid(
+        {"body": '  assert!(f(1) > 0, "why");  ', "explanation": "why"}, coverage_prove.body_asserts)
+    assert kept == {"body": 'assert!(f(1) > 0, "why");', "explanation": "why"}

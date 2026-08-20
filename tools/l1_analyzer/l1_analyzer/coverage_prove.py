@@ -136,10 +136,24 @@ def _signature(gap: dict) -> str:
     return f"fn {gap['function']}({params}) -> {gap['return_type']}"
 
 
-def _valid(data: dict | None) -> dict | None:
+def _valid(data: dict | None, asserts: Callable[[str], bool]) -> dict | None:
+    """A usable proposal, or nothing.
+
+    `asserts` is the language's reachable-assertion rule, and refusing here rather than
+    classifying after the run is the point: a body that evaluates no assertion cannot
+    produce evidence either way, so running it spends a subprocess to learn nothing and
+    then files the nothing under `pass`, whose report reads "branch correct".
+
+    Required, not defaulted. Defaulting it to this module's rule was written first and was
+    wrong in the way this repository refuses everywhere else: `_valid` is shared, so the
+    Python caller that forgot the argument would have had its Python source checked by
+    Rust's rule, silently and with a plausible answer."""
     if data is None or not isinstance(data.get("body"), str) or not data["body"].strip():
         return None
-    return {"body": data["body"].strip(), "explanation": str(data.get("explanation", ""))}
+    body = data["body"].strip()
+    if not asserts(body):
+        return None
+    return {"body": body, "explanation": str(data.get("explanation", ""))}
 
 
 def propose(gap: dict) -> dict | None:
@@ -148,7 +162,7 @@ def propose(gap: dict) -> dict | None:
         "function_source": gap["function_source"], "signature": _signature(gap),
         "uncovered_branch": f"the `{gap['kind']}` branch at line {gap['line']} is never exercised",
     })
-    return _valid(_call_model(_PROPOSE_INSTRUCTION, payload))
+    return _valid(_call_model(_PROPOSE_INSTRUCTION, payload), body_asserts)
 
 
 def repair(gap: dict, test_source: str, compiler_error: str) -> dict | None:
@@ -157,7 +171,47 @@ def repair(gap: dict, test_source: str, compiler_error: str) -> dict | None:
         "signature": _signature(gap), "function_source": gap["function_source"],
         "test_that_failed_to_compile": test_source, "rustc_error": compiler_error[-4000:],
     })
-    return _valid(_call_model(_REPAIR_INSTRUCTION, payload))
+    return _valid(_call_model(_REPAIR_INSTRUCTION, payload), body_asserts)
+
+
+
+def body_asserts(body: str) -> bool:
+    """Whether this proof body will evaluate an assertion when it runs.
+
+    The same hole as Python's, in the language the concurrency sweep runs on: a body
+    defining an `fn` nobody calls compiles, the test passes, and cargo reports nothing
+    wrong. A proof that measured nothing then published a clean bill for its branch.
+
+    An assertion is a macro invocation named assert, assert_eq, assert_ne, or one of their
+    debug_ forms, or a bare `panic!` guarded by a branch. Anything inside a nested
+    `function_item` does not count, because nothing calls it."""
+    from l1_analyzer import (
+        rust_trace,  # noqa: F401 - keeps the tree-sitter import local
+    )
+    from l1_analyzer.indicators import _get_parser
+
+    root = _get_parser("rust").parse(body.encode()).root_node
+
+    def reachable(node) -> bool:
+        for child in node.children:
+            if child.type == "function_item":
+                continue
+            if child.type == "macro_invocation":
+                name = child.child_by_field_name("macro")
+                text = name.text.decode("utf8", errors="ignore") if name is not None and name.text else ""
+                if text in _ASSERT_MACROS:
+                    return True
+            if reachable(child):
+                return True
+        return False
+
+    return reachable(root)
+
+
+_ASSERT_MACROS = frozenset({
+    "assert", "assert_eq", "assert_ne",
+    "debug_assert", "debug_assert_eq", "debug_assert_ne",
+})
 
 
 def render_module(body: str) -> str:

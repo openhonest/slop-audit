@@ -96,3 +96,9 @@ Feature: python_coverage_prove — the pytest coverage-gap prove loop, where an 
     Then it returns the missing lines for each file, keyed by path relative to the repository root
     And files with no missing line, and files resolving outside the root, are left out
     But a timeout, a pytest exit outside pass-or-failures, a report that was never produced, and a report that will not parse each return not-measured with the reason, so nothing is ever scored over an absent measurement
+
+  Scenario: body_asserts decides whether a proof body will evaluate an assertion
+    Given the body a model proposed for one gap
+    When body_asserts parses it
+    Then a body whose assertion runs is usable, including one inside a loop, a branch or a with-block, since those execute what they hold
+    But a body whose only assertion sits inside a nested function nobody calls is not, because that function is defined and never entered, so the proof passes having measured nothing

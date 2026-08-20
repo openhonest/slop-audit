@@ -181,3 +181,8 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
     Then a sweep that located nothing says so, and a sweep whose tests ran reports the retained count
     But a sweep that located gaps and ran none of them says that instead, naming how many the model declined, because it used to fall through to the nothing-located sentence and tell a reader there were no uncovered branches over a module with 154
 
+  Scenario: body_asserts decides whether a proof body will evaluate an assertion
+    Given the body a model proposed for one gap
+    When body_asserts parses it
+    Then a body whose assertion runs is usable, including one inside a loop, a branch or a with-block, since those execute what they hold
+    But a body whose only assertion sits inside a nested function nobody calls is not, because that function is defined and never entered, so the proof passes having measured nothing
