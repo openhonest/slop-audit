@@ -87,3 +87,10 @@ Feature: report — the published grade, the verifiability verdict, and the evid
     Then it returns the verdict, the basis for it, the counts, the finitely-testable share, the hygiene score, the letter, the silence index, the census and the coarse states, as the single source both the command-line report and the web card read
     And the testable share is taken over decided state alone, so undecided state is not held against the grade through a second door after being dropped from the verdict
     But the bound ships unset, so as the module stands no repository can ever be judged coarse and the letter D is never issued
+
+  Scenario: testable_share reports how much of the classified state is finitely testable
+    Given how many pieces of state were neutral and how many were decided at all
+    When testable_share divides one by the other
+    Then it returns that percentage
+    But zero decided state returns a hundred rather than refusing, because refusing to grade a codebase with no mutable state was a defect once already, and three readings have to agree before this is reached: the classifier decided nothing, L1.18 read zero, and the census declared candidates and admitted none
+

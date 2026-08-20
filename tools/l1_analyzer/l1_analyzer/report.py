@@ -268,6 +268,31 @@ def _hygiene(results: dict) -> float | None:
     return (num / den) if den else None
 
 
+def testable_share(neutral: int, decided: int) -> int:
+    """The share of classified state that is finitely testable.
+
+    100 OVER ZERO IS DELIBERATE, and it is what vacuity.check flags at the call site. It is
+    a FALSE POSITIVE, on the same footing as the one state_partition.silence_summary
+    documents, and the reasoning was measured on 2026-08-19 by trying the other answer.
+
+    Making it absent looked right by this package's own rule, since a share of an empty set
+    is absent and `incomplete.ratio` refuses a zero denominator everywhere else. It is
+    wrong here, and two tests say why. A codebase with no mutable state by design is the
+    outcome this whole framework aims at, and refusing to grade it was a defect once
+    already: test_a_codebase_with_no_mutable_state_by_design_is_graded_not_refused was
+    written for exactly that, where the enumerator looked at every declaration, admitted
+    none because none was state, and the report called its own successful reading
+    insufficient basis.
+
+    Nor is the top grade reachable by hiding state. Three readings have to agree before
+    this is reached: the classifier decided nothing, L1.18 read zero, and the census
+    declared candidates and admitted none. The caller refuses outright when L1.18
+    disagrees, which is the case
+    test_a_classifier_that_decided_nothing_beside_a_non_zero_l1_18_refuses covers. Two
+    measures disagreeing is a missing rule; three agreeing is a reading."""
+    return 100 if decided == 0 else round(neutral / decided * 100)
+
+
 def _grade(status: str, pct: int | None, hygiene: float | None) -> str | None:
     if status == "na" or pct is None:
         return None
@@ -365,8 +390,7 @@ def grade_summary(results: dict, unordered_class_bound: int | None) -> GradeSumm
             f"the classifier decided nothing about this repository's state, while L1.18 read "
             f"{l18['value']} ({l18.get('details', 'no detail')}). Two measures of the same code "
             f"disagree, so a rule is missing rather than the code being clean")
-    pct = None if status == "na" else (100 if decided == 0 else
-                                       round(counts["neutral"] / decided * 100))
+    pct = None if status == "na" else testable_share(counts["neutral"], decided)
     hygiene = _hygiene(results)
     return {"status": status, "basis": basis, "counts": counts, "testable_pct": pct,
             "hygiene": hygiene, "grade": _grade(status, pct, hygiene),
