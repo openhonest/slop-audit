@@ -20,7 +20,7 @@
 - [ ] Verify the cross-language example rotation across dimensions (Python, TypeScript, Java, C#, Go, Ruby) — each dimension uses two different languages; the set as a whole should exercise all six
 
 ### Tooling layer
-- [ ] `research/slop-audit-layer1.sh` reference script implementing the twenty indicators (including L1.12 dead-code analyzer, L1.13 PMD CPD invocation with token normalization, L1.14 gitleaks invocation, L1.15 language-specific type-escape counts, L1.16 trailing-whitespace scan, and L1.17 god-file enumeration, L1.18 mutable-state static analysis, L1.19 decision-space enumeration, L1.20 randomized test-order runs)
+- [ ] `research/slop-audit-layer1.sh` reference script implementing the twenty indicators (including L1.12, L1.13 and L1.14, which are defined as parse-tree algorithms in Section 3 rather than as tool invocations, L1.15 language-specific type-escape counts, L1.16 trailing-whitespace scan, and L1.17 god-file enumeration, L1.18 mutable-state static analysis, L1.19 decision-space enumeration, L1.20 randomized test-order runs)
 - [ ] Test the script on the positive control (honest-conversion branch of buckler/idd), validation availability 2026-04-30
 - [ ] Test the script on a candidate negative control branch
 

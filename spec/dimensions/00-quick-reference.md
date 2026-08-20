@@ -79,7 +79,7 @@ Lifecycle category abbreviations: **SEC** = Security architecture, **DAT** = Dat
       <td>Configuration &amp; secrets</td>
       <td>OPS</td>
       <td>No secrets in source; environment-injected or vault-stored; rotatable</td>
-      <td>Check L1.14 gitleaks result first (5 min); grep source and git history for shapes L1.14 missed</td>
+      <td>Check the L1.14 result first (5 min); grep source and git history for shapes L1.14 missed</td>
       <td>L1.14 Slop (≥3 secrets) or any confirmed hardcoded API key / password / token in source or git history</td>
       <td>30–45m (L1.14 does most of the work)</td>
     </tr>
