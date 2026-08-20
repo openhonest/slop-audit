@@ -121,17 +121,17 @@ def _doc_line_share(doc_added: int, total_added: int) -> L1Result:
             "details": f"{doc_added} doc / {total_added} total lines added"}
 
 
-def _delete_to_add_ratio(total_deleted: int, total_added: int) -> L1Result:
+def _delete_to_add_ratio(code_deleted: int, code_added: int) -> L1Result:
     """L1.5: deleted lines as a share of added ones, the refactoring signal.
 
     Same substitution, same direction, and this one is load-bearing: L1.5 is one of the four
     indicators that separated the controls in the 2026-08-17 validation run.
     """
-    pct = ratio(total_deleted, total_added, "L1.5 delete-to-add ratio",
-                "no line was added in the measured range, so a ratio against them is absent "
-                "and not zero")
+    pct = ratio(code_deleted, code_added, "L1.5 delete-to-add ratio",
+                "no CODE line was added in the measured range, so a ratio against them is "
+                "absent and not zero")
     return {"value": round(pct, 1), "band": band(pct, 60, 30, higher_is_better=True),
-            "details": f"{total_deleted} deleted / {total_added} added lines"}
+            "details": f"{code_deleted} deleted / {code_added} added code lines"}
 
 
 def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> dict[str, L1Result]:
@@ -166,7 +166,7 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
     total_commits = 0
     doc_only = code_only = mixed = 0
     total_added = total_deleted = 0
-    doc_added = code_added = 0
+    doc_added = code_added = code_deleted = 0
     net_negative_commits = high_delete_commits = 0
 
     current_commit_files: set[str] = set()
@@ -216,6 +216,10 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
                 doc_added += a
             elif kind == "code":
                 code_added += a
+                # Deletions of CODE, which L1.5 divides by and which nobody tracked. The
+                # additions were tracked all along and never read: L1.5 used the whole-tree
+                # totals while the canon says "across code files".
+                code_deleted += d
     close_commit()
 
     if total_commits == 0:
@@ -246,7 +250,7 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
     # can meet a range that added none, and _measure is what turns the refusal into an n/a
     # carrying its reason instead of a fabricated Slop.
     results["L1.4"] = _measure(_doc_line_share, doc_added, total_added)
-    results["L1.5"] = _measure(_delete_to_add_ratio, total_deleted, total_added)
+    results["L1.5"] = _measure(_delete_to_add_ratio, code_deleted, code_added)
 
     l6 = net_negative_commits / total_commits * 100
     results["L1.6"] = {"value": round(l6, 1), "band": band(l6, 15, 5, higher_is_better=True),

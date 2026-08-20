@@ -190,7 +190,7 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
     let mut total_commits = 0i64;
     let (mut doc_only, mut code_only, mut mixed) = (0i64, 0i64, 0i64);
     let (mut total_added, mut total_deleted) = (0i64, 0i64);
-    let (mut doc_added, mut _code_added) = (0i64, 0i64);
+    let (mut doc_added, mut code_added, mut code_deleted) = (0i64, 0i64, 0i64);
     let (mut net_negative_commits, mut high_delete_commits) = (0i64, 0i64);
 
     let mut current_files: Vec<String> = Vec::new();
@@ -254,7 +254,13 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
                 current_del += d;
                 match classify_file(path) {
                     "doc" => doc_added += a,
-                    "code" => _code_added += a,
+                    // Deletions of CODE, which L1.5 divides by. The additions were tracked
+                    // under a leading underscore and never read, in both tools: L1.5 used
+                    // the whole-tree totals while the canon says "across code files".
+                    "code" => {
+                        code_added += a;
+                        code_deleted += d;
+                    }
                     _ => {}
                 }
             }
@@ -313,8 +319,8 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         details: format!("{doc_added} doc / {total_added} total lines added"),
     });
 
-    let l5 = if total_added > 0 {
-        total_deleted as f64 / total_added as f64 * 100.0
+    let l5 = if code_added > 0 {
+        code_deleted as f64 / code_added as f64 * 100.0
     } else {
         0.0
     };
@@ -323,7 +329,7 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
         label: GIT_LABELS[4].into(),
         value: py_num(l5, 1),
         band: band(l5, 60.0, 30.0, true).into(),
-        details: format!("{total_deleted} deleted / {total_added} added lines"),
+        details: format!("{code_deleted} deleted / {code_added} added code lines"),
     });
 
     let l6 = net_negative_commits as f64 / tc * 100.0;
