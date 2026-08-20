@@ -61,7 +61,11 @@ GOLDEN = Path(__file__).parent / "golden" / "py_repo.json"
 # Re-captured 2026-08-19 for one field only: L1.13 moved from n/a to 0.0 Healthy. It had
 # said "install jscpd to compute L1.13" and now measures natively, so the empty PATH this
 # test sets no longer decides whether the indicator reports at all. Nothing else moved.
-_GOLDEN_SHA256 = "36c4eb7656bde08942160034c536fd54717fb33135d2a1f3f0e9e4cc44db52cb"
+# Re-captured 2026-08-19 for one field only: L1.13's denominator went from 28 lines to 20.
+# It counted every line of the file, blanks and docstrings included, while its numerator
+# marked whole clone line ranges. Both halves generous, and generosity in a divisor lowers a
+# percentage. Both now count lines that carry a code token. The value is 0.0 either way here.
+_GOLDEN_SHA256 = "9a008b3831db332828ffbee92f62234ab70aca35edc675c6ae4e818a4cb0995f"
 
 # A deliberately-sloppy sample: pure function + reads of dict/list/str/int/bool
 # state, plus one bounded projection (len). Written to tmp_path per test. Kept

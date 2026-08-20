@@ -119,7 +119,7 @@ def duplicated_lines(streams: dict[str, list[tuple[str, int]]],
         lines = [line for _symbol, line in stream]
         for start in range(len(stream) - min_tokens + 1):
             digest = _window_hash(symbols[start:start + min_tokens])
-            seen[digest].append((relpath, lines[start], lines[start + min_tokens - 1]))
+            seen[digest].append((relpath, tuple(lines[start:start + min_tokens])))
 
     duplicated: dict[str, set[int]] = defaultdict(set)
     for occurrences in seen.values():
@@ -128,11 +128,16 @@ def duplicated_lines(streams: dict[str, list[tuple[str, int]]],
         # Distinct PLACES, not distinct hashes. A window that overlaps itself inside one
         # long run of identical tokens is one clone, not a hundred, and the start line is
         # what separates them.
-        places = {(relpath, first) for relpath, first, _last in occurrences}
+        places = {(relpath, window[0]) for relpath, window in occurrences}
         if len(places) < 2:
             continue
-        for relpath, first, last in occurrences:
-            duplicated[relpath].update(range(first, last + 1))
+        # The lines the clone's TOKENS sit on, not the range from its first line to its
+        # last. A docstring is one token spanning many lines, so a window could reach across
+        # a signature, a docstring and the next signature and call every line between
+        # duplicated: one here held fifty tokens on six lines and was credited with
+        # twenty-six. A line no token of the clone sits on is not participating in it.
+        for relpath, window in occurrences:
+            duplicated[relpath].update(window)
     return duplicated
 
 
@@ -157,12 +162,22 @@ def analyze(repo: Path, lang: str, min_tokens: int = MIN_TOKENS) -> dict:
     for path, src in files:
         relpath = str(path.relative_to(repo)) if repo in path.parents else path.name
         streams[relpath] = normalized_tokens(parser.parse(src).root_node, lang)
-        total_lines += len(src.decode("utf8", errors="ignore").splitlines())
+        # Lines that carry a code token, which is what "production LOC" means and what the
+        # numerator now counts. It was every line in the file, blanks and docstrings
+        # included, while the numerator marked whole line ranges: both halves generous, and
+        # generosity in a divisor lowers a percentage, so the mismatch flattered the result.
+        # On this package it was worth a band, 7.69% Not Healthy against 10.51% Slop.
+        total_lines += len({line for _symbol, line in streams[relpath]})
 
     duplicated = duplicated_lines(streams, min_tokens)
     duplicated_count = sum(len(lines) for lines in duplicated.values())
-    pct = round(duplicated_count / total_lines * 100, 2) if total_lines else 0.0
-    detail = (f"{duplicated_count} of {total_lines} production lines inside a repeated "
+    if total_lines == 0:
+        # A share over no code lines is absent, not zero, and zero is the HEALTHY end of
+        # this scale: a tree the parser found no token in must not read as clean.
+        return {"value": "n/a", "band": "n/a",
+                "details": f"no {lang} code line carried a token, so duplication was not measured"}
+    pct = round(duplicated_count / total_lines * 100, 2)
+    detail = (f"{duplicated_count} of {total_lines} production code lines inside a repeated "
               f"{min_tokens}-token window, identifiers and literals normalized, "
               f"large data tables discounted as L1.17 discounts them, "
               f"across {len(files)} file(s)")
