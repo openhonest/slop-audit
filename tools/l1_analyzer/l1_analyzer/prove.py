@@ -199,16 +199,23 @@ def write_crate_and_stress(test_source: str, work_dir: str, runs: int, timeout_s
 
 def prove_hazard(
     request: ProofRequest,
-    work_dir: str,
-    runs: int = 100,
-    timeout_seconds: float = 300.0,
-    model_call: ConcurrencyModelCall | None = None,
-    run_generated: RunGenerated | None = None,
+    model_call: ConcurrencyModelCall,
+    run_generated: RunGenerated,
 ) -> ProofOutcome:
-    """The full production loop for one located hazard: generate a test, run it under
-    stress, retain iff it fires. model_call and run_generated default to the real
-    generator and the stress runner; both are injectable so the honesty property stays
-    testable without an API key or a build."""
-    gen = model_call or generate
-    run = run_generated or (lambda test: write_crate_and_stress(test, work_dir, runs, timeout_seconds))
-    return prove(request, gen, run)
+    """The loop for one located hazard: generate a test, run it under stress, retain iff
+    it fires.
+
+    BOTH COLLABORATORS ARE REQUIRED, and they defaulted to the real thing until
+    2026-08-19: `model_call=None` meant the real generator and `run_generated=None` meant
+    writing a crate and building it. A test that forgot either argument reached a paid API
+    and a `cargo build` instead of failing, and it would have looked like it was testing
+    the loop.
+
+    `python_coverage_prove._prove_one` had the same shape and had already fixed it, with
+    the reason written at the site. One module learned it and the other did not, which is
+    the same class of defect twice in one package.
+
+    The convenience the defaults bought belongs at the boundary, and cli.py is the one
+    production caller: the place that knows a run is meant to spend money is the place
+    that names the real generator and the real runner."""
+    return prove(request, model_call, run_generated)

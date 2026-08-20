@@ -279,7 +279,15 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
     outcomes: list[prove.ProofRecord] = []
     for i, f in enumerate(candidates):
         request = prove.proof_request(f, _hazard_context(repo, f))
-        outcome = prove.prove_hazard(request, str(work_root / f"proof-{i}"), timeout_seconds=timeout)
+        # The real collaborators, named here because this is the boundary that knows a run
+        # is meant to spend money and build a crate. They used to be defaults inside
+        # prove_hazard, one forgotten argument away from any test.
+        work = str(work_root / f"proof-{i}")
+        outcome = prove.prove_hazard(
+            request,
+            prove.generate,
+            lambda test, at=work: prove.write_crate_and_stress(test, at, 100, timeout),
+        )
         # Keep the generated test on the outcome so the card can expose a retained (demonstrated)
         # proof as an adoptable test - the runnable repro, not just a verdict line.
         recorded: prove.ProofRecord = {

@@ -72,14 +72,14 @@ def when_prove(hazard, run_generated):
 
 @when("I run the production prove loop with those injected", target_fixture="outcome")
 def when_prove_hazard(hazard, run_generated):
-    # prove_hazard is the production wrapper; injecting model_call + run_generated proves
+    # prove_hazard is the production wrapper; handing it a model call and a runner proves
     # it delegates through the same honesty gate without an API key or a build.
-    return prove.prove_hazard(
-        hazard["request"],
-        work_dir="/unused",
-        model_call=hazard["model_call"],
-        run_generated=run_generated,
-    )
+    #
+    # `work_dir="/unused"` used to sit here, which is what a defaulted collaborator looks
+    # like from the caller's side: a path that means nothing, passed so the real runner it
+    # would otherwise have built would have somewhere to go. Both collaborators are
+    # required now, so there is nothing to say about a directory this test never uses.
+    return prove.prove_hazard(hazard["request"], hazard["model_call"], run_generated)
 
 
 @then("the hazard is demonstrated")

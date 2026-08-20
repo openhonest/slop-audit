@@ -65,8 +65,8 @@ Feature: prove — turning a located concurrency hazard into a demonstrated one
 
   # The docstring says "retain iff it fires"; the body returns one outcome of any of the four
   # verdicts and does no retaining. Retention is the separate job of `retained`.
-  Scenario: prove_hazard runs the whole production loop for one hazard with real defaults
-    Given a located hazard, a working directory, and optional overrides for the model call and the runner
-    When prove_hazard picks the real generator and the real stress runner unless an override was supplied, then runs the loop
-    Then it returns the single outcome for that hazard, carrying the same four verdicts the loop can reach
-    And both the generation and the execution stay injectable, so the honesty property is testable without a key and without a build
+  Scenario: prove_hazard runs the whole loop for one hazard, with both collaborators handed in
+    Given a located hazard, a model call and a runner
+    When prove_hazard passes all three to the honesty gate
+    Then the verdict is whatever that gate decides, and this wrapper adds nothing to it
+    But neither collaborator has a default, because defaulting them put a paid API call and a real crate build one forgotten argument away from any test, and the boundary that means to spend money names them instead
