@@ -344,6 +344,25 @@ def _refine_incidental(repo: Path, module_relpath: str, gap: dict, body: str, ti
     return "invalid_fixture" if _fail_bucket(output, "proof", permuted, gap["return_type"]) != "incidental_panic" else "incidental_panic"
 
 
+# THE TWO PROVE LOOPS ARE NOT MERGED, and that was measured rather than assumed.
+#
+# L1.13 flags this module and python_coverage_prove as the largest cross-file clone class
+# in the package, 56 overlapping windows. Six things they genuinely shared have already
+# moved out: `_valid`, `_call_model`, `ceiling_detail`, `sweep_detail`, `SweepProgress` and
+# `budget.allowance`. What is left is the loop structure, and it is less alike than the
+# clone count suggests.
+#
+# Compared statement for statement with every string blanked, on 2026-08-19: `_prove_one`
+# is 21 lines here against 18 there with 8 identical, and `_prove_module` is 26 against 11
+# with 4. The Rust side batches every gap into one crate, compiles once, and falls back to
+# proving each gap in isolation when the batch does not build; the Python side runs each
+# proof on its own because pytest has no equivalent of a single crate compile. That is a
+# structural difference, not a vocabulary one.
+#
+# Merging them would take a callback per divergence, which is the machinery the determinism
+# tallies were left unmerged to avoid. Two implementations that differ in what they DO are
+# not a duplication to remove; the shared RULES were, and those are gone.
+
 def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, timeout_seconds: float,
                propose_fn: Callable[..., dict | None], repair_fn: Callable[..., dict | None],
                run_fn: Callable[..., tuple[str, str]],
