@@ -438,8 +438,15 @@ def ceiling_detail(attempted: int, located: int, ceiling: int) -> str:
             f"(ceiling {ceiling}). The rest were not measured and are not counted clean.")
 
 
+# A sweep reports its progress through this, once per module, before that module is
+# proven. Typed, and it was `progress=None` untyped: a public parameter naming no shape at
+# all, so the three arguments it is called with lived only in a docstring and a caller that
+# read them differently would fail inside the sweep rather than at the call.
+SweepProgress = Callable[[str, int, int], None]
+
+
 def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int = 3,
-                        timeout_seconds: float = 600.0, progress=None,
+                        timeout_seconds: float = 600.0, progress: SweepProgress | None = None,
                         max_attempts: int = 5) -> dict:
     """Sweep the WHOLE crate: one coverage build, then every module with uncovered branches is
     proven (batched, with per-gap repair fallback). Retained proofs are aggregated across the

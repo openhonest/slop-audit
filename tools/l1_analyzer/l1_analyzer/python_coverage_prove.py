@@ -33,6 +33,7 @@ from l1_analyzer import coverage_prove, pytest_trace, python_facets
 from l1_analyzer import model_call as llm
 from l1_analyzer.coverage_prove import (
     CoverageProof,
+    SweepProgress,
     _call_model,
     _valid,
     ceiling_detail,
@@ -267,7 +268,7 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[dict],
 
 def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int = 3,
                         timeout_seconds: float = 600.0, python_executable: str | None = None,
-                        progress=None, max_attempts: int = 5) -> dict:
+                        progress: SweepProgress | None = None, max_attempts: int = 5) -> dict:
     """Sweep the whole package: one coverage run to locate uncovered branches, then every module
     with uncovered branches is proven. Retained proofs (assertion-divergences) aggregate across
     the package. Directory-insensitive: the suite runs under the target's own interpreter."""
