@@ -29,7 +29,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from l1_analyzer import coverage_prove, python_coverage_prove
+from l1_analyzer import budget, coverage_prove, python_coverage_prove
 
 _KEY = "ANTHROPIC_API_KEY"
 
@@ -66,9 +66,11 @@ def key_from(env_file: Path) -> str | None:
 
 
 def share(run_ceiling: int, per_repo: int, spent: int) -> int:
-    """How many attempts the next repository may make: its own cap, or whatever the run
-    has left, whichever is smaller. Never negative."""
-    return max(0, min(per_repo, run_ceiling - spent))
+    """How many attempts the next repository may make.
+
+    The rule itself lives in `budget`, because the module sweep computes the same thing and
+    spelled it as a slice, which the duplicate-rule guard cannot see through."""
+    return budget.allowance(per_repo, run_ceiling, spent)
 
 
 def fair_share(ceiling: int, repos: int) -> int:

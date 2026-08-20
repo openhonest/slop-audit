@@ -35,7 +35,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
-from l1_analyzer import coverage_gates, rust_facets, rust_trace
+from l1_analyzer import budget, coverage_gates, rust_facets, rust_trace
 from l1_analyzer import model_call as llm
 
 # The retention buckets, in report order. Only `divergence` is a proven bug and retained;
@@ -482,7 +482,10 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         located += len(module_gaps)
         # The repo-wide ceiling, applied after `located` counts the whole gap so the report
         # can say what was left. Truncating before counting would hide the size of the miss.
-        gaps = module_gaps[:max(0, max_attempts - attempted_gaps)]
+        # One rule, in `budget`: the module's own cap or what the run has left,
+        # whichever is smaller. The cap is already applied above, so what this
+        # adds is the run ceiling.
+        gaps = module_gaps[:budget.allowance(len(module_gaps), max_attempts, attempted_gaps)]
         attempted_gaps += len(gaps)
         if not gaps:
             continue
