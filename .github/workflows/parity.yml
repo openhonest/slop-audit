@@ -30,7 +30,8 @@ jobs:
         run: cargo build --release --locked
         working-directory: tools/slop-audit-rs
       # Three in-tree targets: the repo itself and the Python package resolve as python,
-      # the crate as rust. The other six languages are covered by the corpus job below.
+      # the crate as rust. Every other language is covered by the corpus job below, which
+      # reads the manifest rather than a count written here.
       - name: Diff the panels
         working-directory: tools/slop-audit-rs
         run: |
@@ -40,8 +41,13 @@ jobs:
           uv run validate.py "$GITHUB_WORKSPACE/tools/slop-audit-rs"
 
   corpus:
-    # Six real repositories, pinned in corpus.toml, covering Java, C# and C. They are
-    # cloned in full, because L1.1 through L1.8 read the commit history, so this job is
+    # Every repository pinned in corpus.toml, one per supported language at least. The
+    # count is not written here: it said "six, covering Java, C# and C" and the manifest
+    # grew to thirteen across nine languages, so the comment was a second copy of a number
+    # nobody updates. validate_corpus.py reads the manifest and is the only place that
+    # knows how many there are.
+    #
+    # Cloned in full, because L1.1 through L1.8 read the commit history, so this job is
     # heavier than the one above and does not run on every push.
     name: Parity across the pinned corpus
     if: github.event_name != 'pull_request'

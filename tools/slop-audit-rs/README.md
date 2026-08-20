@@ -41,11 +41,11 @@ uv run validate_corpus.py            # every entry in corpus.toml
 uv run validate_corpus.py csharp     # one language, or one slug
 ```
 
-`corpus.toml` pins six real repositories at fixed commits, two each for Java, C#, and C: gson, junit4, Newtonsoft.Json, RestSharp, json-c and libuv. They are cloned into `~/.cache/slop-audit-corpus`, or `$SLOP_AUDIT_CORPUS`, and nothing is vendored into this tree. Clones are full, not shallow, because L1.1 through L1.8 read the history.
+`corpus.toml` pins a real repository at a fixed commit for every language the analyzer reads, and the manifest is the only place that says how many. They are cloned into `~/.cache/slop-audit-corpus`, or `$SLOP_AUDIT_CORPUS`, and nothing is vendored into this tree. Clones are full, not shallow, because L1.1 through L1.8 read the history.
 
-Real repositories are the point. A synthetic fixture agrees on zeros; these do not. The corpus produces 2,056 type escapes in Newtonsoft.Json, 46 god-files out of 945 with one over 4k lines, 11,329 decision points, and non-zero absolute-path findings in two of the six. An indicator that only ever ran against a hand-written fixture has not been validated, it has been rehearsed.
+Real repositories are the point. A synthetic fixture agrees on zeros; these do not. Measured 2026-08-19: 2,452 type escapes and 16,807 decision points across the corpus, L1.15 spanning 6.4% on RestSharp to 26.2% on requests, and L1.17 spanning zero to 15.1% on libuv. An indicator that only ever ran against a hand-written fixture has not been validated, it has been rehearsed.
 
-The current panel is equal on all nine languages: six corpus repositories for Java, C# and C, and a repository each for the other six.
+The current panel is equal on every compared indicator, across every repository in the manifest and all nine languages. The indicators the binary does not measure are reported as GAP lines naming why, which is the honest half of a port that is not finished.
 
 ## Build
 
