@@ -197,21 +197,31 @@ def rust_project(tmp_path_factory) -> pathlib.Path:
     })
 
 
-def _has_llvm_cov() -> bool:
-    """Whether cargo-llvm-cov can actually produce a report, not merely whether it exists.
+def _llvm_tools() -> dict[str, str] | None:
+    """The LLVM coverage tools cargo-llvm-cov needs, discovered rather than assumed.
 
-    `cargo llvm-cov --version` succeeds on this machine and the tool then refuses with
-    "could not find the LLVM coverage tools; install the llvm-tools-preview rustup
-    component". A skip guard that checks a binary answers a version flag is a guard that
-    skips for the wrong reason, or worse fails a test for a missing component rather than a
-    broken measure. The tool's own refusal is the honest probe."""
+    `cargo llvm-cov --version` succeeds while the tool refuses with "could not find the LLVM
+    coverage tools; install the llvm-tools-preview rustup component, or set LLVM_COV /
+    LLVM_PROFDATA". That refusal names both remedies and is correct: the tools can be
+    present and simply not where cargo looks, which is the case on a Homebrew machine where
+    the llvm formula is keg-only.
+
+    So this takes the second remedy the tool itself offers. A skip guard that only asked
+    whether the binary answers a version flag skipped for the wrong reason."""
     if shutil.which("cargo") is None:
-        return False
-    probe = subprocess.run(["cargo", "llvm-cov", "report", "--help"],
-                           capture_output=True, text=True, check=False)
-    if probe.returncode != 0:
-        return False
-    return shutil.which("llvm-profdata") is not None or "LLVM_PROFDATA" in __import__("os").environ
+        return None
+    if shutil.which("llvm-profdata") and shutil.which("llvm-cov"):
+        return {}
+    brew = shutil.which("brew")
+    if brew is None:
+        return None
+    prefix = subprocess.run([brew, "--prefix", "llvm"], capture_output=True, text=True, check=False)
+    if prefix.returncode != 0:
+        return None
+    binaries = pathlib.Path(prefix.stdout.strip()) / "bin"
+    if not (binaries / "llvm-profdata").exists():
+        return None
+    return {"LLVM_COV": str(binaries / "llvm-cov"), "LLVM_PROFDATA": str(binaries / "llvm-profdata")}
 
 
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo is not on PATH")
@@ -221,8 +231,10 @@ def test_rust_determinism_counts_its_seeds(rust_project):
     assert result["details"].strip()
 
 
-@pytest.mark.skipif(not _has_llvm_cov(), reason="cargo-llvm-cov is not installed")
-def test_rust_coverage_is_measured_when_llvm_cov_is_present(rust_project):
+@pytest.mark.skipif(_llvm_tools() is None, reason="cargo-llvm-cov has no LLVM coverage tools")
+def test_rust_coverage_is_measured_when_llvm_cov_is_present(rust_project, monkeypatch):
+    for name, value in (_llvm_tools() or {}).items():
+        monkeypatch.setenv(name, value)      # environment, which is what the tool reads
     result = rust_trace.decision_space_coverage(rust_project, 900.0)
     assert result["band"] != "n/a", result["details"]
     assert 0 < float(result["value"]) <= 100
