@@ -225,7 +225,7 @@ def test_a_literal_lands_in_one_region_or_in_none(literal, region):
     ("band(1)", "band"), ("m.band(1)", "band"), ("get()(1)", "")])
 def test_the_called_name_is_read_from_a_plain_call_and_an_attribute(call, name):
     node = ast.parse(call, mode="eval").body
-    assert facets._called_name(node) == name
+    assert facets.called_name(node) == name
 
 
 def test_bound_regions_reads_a_parametrize_decorator():

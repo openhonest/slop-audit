@@ -156,7 +156,7 @@ def asserted_calls(tests: ast.AST) -> set[str]:
     bound: dict[str, str] = {}
     for node in ast.walk(tests):
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
-            name = _called_name(node.value)
+            name = called_name(node.value)
             for target in node.targets:
                 # A tuple target binds every name in it to the same call. Reading only the
                 # plain-name form meant `a, b = f()` followed by `assert a == 1` was not
@@ -168,7 +168,7 @@ def asserted_calls(tests: ast.AST) -> set[str]:
         if isinstance(node, ast.Assert):
             for inner in ast.walk(node):
                 if isinstance(inner, ast.Call):
-                    called = _called_name(inner)
+                    called = called_name(inner)
                     if called:
                         asserted.add(called)
                 if isinstance(inner, ast.Name) and inner.id in bound:
@@ -195,7 +195,7 @@ def expected_exceptions(tests: ast.AST) -> set[str]:
             if inner in managers or any(inner in ast.walk(m) for m in managers):
                 continue
             if isinstance(inner, ast.Call):
-                called = _called_name(inner)
+                called = called_name(inner)
                 if called:
                     expecting.add(called)
     return expecting
@@ -281,7 +281,7 @@ def supplied_regions(tests: ast.AST) -> dict[str, set[str]]:
     for node in ast.walk(tests):
         if not isinstance(node, ast.Call):
             continue
-        name = _called_name(node)
+        name = called_name(node)
         if not name:
             continue
         for position, argument in enumerate(node.args):
@@ -311,7 +311,7 @@ def regions_of(node: ast.expr, names: dict[str, set[str]],
     if isinstance(node, ast.Name):
         return names.get(node.id, set())
     if isinstance(node, ast.Call):
-        return factories.get(_called_name(node), set())
+        return factories.get(called_name(node), set())
     return set()
 
 
@@ -371,7 +371,7 @@ def _region_of(node: ast.expr) -> str:
     return ""
 
 
-def _called_name(call: ast.Call) -> str:
+def called_name(call: ast.Call) -> str:
     if isinstance(call.func, ast.Name):
         return call.func.id
     if isinstance(call.func, ast.Attribute):

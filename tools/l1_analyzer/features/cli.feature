@@ -9,6 +9,12 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     Then the verdict says whether it was retained and what happened when it ran
     But it is a separate command from --facets, because one command would have to write the test itself and a tool that both proposes and accepts its own proposal has no gate
 
+  Scenario: _report_call_map emits one module's four-column map as a .hd file
+    Given a module, its test file(s) and the layer the caller declares
+    When _report_call_map watches the suite and classifies the functions
+    Then the map is printed in the Honest Framework's own grammar
+    But a run that could not be watched says so first, because the violation this map shows is a write in the pure lane and reading the source alone can only guess at one
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md

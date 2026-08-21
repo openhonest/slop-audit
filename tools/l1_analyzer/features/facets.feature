@@ -55,9 +55,9 @@ Feature: facets — closeable facets and the Silence index for one module and it
     Then a number is zero, negative or positive, a string or container is empty or non-empty, and a bool is true or false
     But anything that is not a literal names no region
 
-  Scenario: _called_name names the function a call invokes
+  Scenario: called_name names the function a call invokes
     Given a call node
-    When _called_name reads its callee
+    When called_name reads its callee
     Then a plain name and an attribute access both yield the name being called
     But a more complex callee yields nothing rather than a guess
 

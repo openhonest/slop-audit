@@ -371,6 +371,25 @@ def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str,
     return 0
 
 
+def _report_call_map(module: Path, tests: tuple[Path, ...], layer: str) -> int:
+    """The module's four-column map, as a `.hd` file on stdout.
+
+    It runs the watch, because the violation this map exists to show is a write in the pure
+    lane and reading the source alone can only guess at one."""
+    import ast
+
+    from l1_analyzer import callmap, runtime_probe
+
+    seen = runtime_probe.watch(module, tests)
+    watched = runtime_probe.verdicts(seen["observations"])
+    roles = callmap.classify(ast.parse(module.read_text()), watched)
+    if seen["reason"]:
+        print(f"# the suite could not be watched, so no write is charged to the pure lane: "
+              f"{seen['reason']}")
+    print(callmap.render(roles, module.stem, layer))
+    return 0
+
+
 def _prove_facet(module: Path, tests: tuple[Path, ...], index: int, proposal: dict,
                  output_format: str) -> int:
     """Run one caller-written proposal through the execution gate.
@@ -530,6 +549,24 @@ def main(argv: list[str] | None = None) -> int:
              "cargo-llvm-cov. --prove-max caps gaps per module.",
     )
     parser.add_argument(
+        "--call-map",
+        nargs="+",
+        default=None,
+        metavar="PATH",
+        help="Emit the four-column call-stack map for ONE module and its test file(s), as "
+             "a `.hd` file. Roles are function prefixes: boundary_in reads a source, "
+             "orchestrator composes, a bare fn is pure, boundary_out writes a target. A "
+             "write in the pure lane is marked, and the charge rests on the watched run "
+             "rather than on a guess, so a function nobody watched is not accused.",
+    )
+    parser.add_argument(
+        "--layer",
+        default="",
+        choices=["", "foundation", "data", "domain", "ui", "tooling"],
+        help="The layer to declare in the emitted .hd. Left out by default: a layer is an "
+             "architectural intent and no reading of the source decides it.",
+    )
+    parser.add_argument(
         "--proof-cap",
         type=int,
         default=0,
@@ -602,6 +639,13 @@ def main(argv: list[str] | None = None) -> int:
         return _report_facets(Path(args.facets[0]),
                               tuple(Path(t) for t in args.facets[1:]), args.format,
                               args.proof_cap)
+
+    if args.call_map:
+        module, *tests = args.call_map
+        for path in args.call_map:
+            if not Path(path).is_file():
+                parser.error(f"--call-map needs files that exist: {path}")
+        return _report_call_map(Path(module), tuple(Path(t) for t in tests), args.layer)
 
     if args.prove_facet:
         module, tests, index, argument, expected, why = args.prove_facet
