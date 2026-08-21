@@ -220,7 +220,7 @@ def test_the_report_says_the_cardinality_does_not_compose_across_states(tmp_path
     # sentence existed and not that any reader met it. Moving it here found that the shipped
     # card carried the compose limit only inside the D note, and no repository is graded D, so
     # the claim reached nobody.
-    markdown = card.card_markdown(card.build_card("x", "python", _panel(result)))
+    markdown = card.card_markdown(card.build_card("x", "python", _panel(result), ran_tests=False))
     assert "does not compose" in markdown
     # And the silence index is named beside the grade on every card, not only this one.
     assert "reported separately, as silence, and never folded into the grade" in markdown

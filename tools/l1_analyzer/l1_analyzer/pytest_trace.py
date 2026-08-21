@@ -312,7 +312,7 @@ def _coverage_verdict(returncode: int, totals: dict, provenance: str) -> L1Resul
 
 
 def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
-                            python_executable: str | None = None) -> L1Result:
+                            python_executable: str | None) -> L1Result:
     """L1.19: branch-level decision coverage from coverage.py.
 
     Bands (spec 03-layer1-indicators.md): >90% Healthy, 60-90% Not Healthy,
@@ -368,7 +368,7 @@ def _pytest_summary(output: str) -> str:
 
 
 def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float,
-                     python_executable: str | None = None) -> L1Result:
+                     python_executable: str | None) -> L1Result:
     """L1.20: run the suite `runs` times in randomized order and count the runs
     where every test passes. Value is "passing/runs".
 

@@ -64,7 +64,7 @@ def test_every_reason_has_a_sentence_a_reader_can_act_on():
 def test_a_sweep_that_never_reached_a_model_does_not_blame_the_model(module):
     said = module.sweep_detail(retained=0, modules=1, located=154,
                                outcomes={"declined": 2}, provenance="cpython 3.13",
-                               reason=model_call.NO_SDK)
+                               reason=model_call.NO_SDK, cause="")
     assert "returned nothing usable" not in said
     assert model_call.WHY[model_call.NO_SDK] in said
 
@@ -73,5 +73,5 @@ def test_a_sweep_that_never_reached_a_model_does_not_blame_the_model(module):
 def test_a_sweep_the_model_really_declined_still_says_so(module):
     said = module.sweep_detail(retained=0, modules=1, located=154,
                                outcomes={"declined": 2}, provenance="cpython 3.13",
-                               reason=model_call.DECLINED)
+                               reason=model_call.DECLINED, cause="")
     assert "154" in said and "2" in said

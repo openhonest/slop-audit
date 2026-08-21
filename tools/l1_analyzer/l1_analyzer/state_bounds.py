@@ -302,7 +302,13 @@ def _switch_partition(subject: Node, switch: Node, arm_type: str) -> Reach:
     return state_partition.finite(classes, False, f"switch:{switch.start_byte}")
 
 
-def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None, depth: int = 3) -> Reach:
+# How far a value is followed from the state it came from to the decision it reaches.
+# Three, because a fourth hop has never changed a verdict on the corpus and the walk is
+# quadratic in the reference count.
+_REACH_DEPTH = 3
+
+
+def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None, depth: int) -> Reach:
     """How this single reference to a state value is consumed."""
     parent = ref.parent
     if parent is None:
@@ -440,7 +446,7 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
     return _flow(ref, sp, closed_sets, cells, depth)
 
 
-def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None, depth: int = 3) -> Reach:
+def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None, depth: int) -> Reach:
     """Categorise how a value derived from the state (node) reaches a decision."""
     parent = node.parent
     if parent is None:
@@ -762,7 +768,10 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
         # could only ever fill two cells.
         cells = _write_key_bound(refs, sp, closed_sets)
         verdict, drives, silence, construct, partition, silence_line = _verdict(
-            [_categorize(r, sp, closed_sets, cells) for r in refs], refs)
+            # The recursion budget, stated where the recursion starts. It used to be a
+            # default on `_categorize` itself, so the one caller that sets it and the many
+            # recursive calls that spend it looked identical at the call site.
+            [_categorize(r, sp, closed_sets, cells, _REACH_DEPTH) for r in refs], refs)
         # An invoked slot earns NEUTRAL from the compositional rule; that rule has premises.
         if verdict == NEUTRAL and _injected_slot_premise_fails(refs, sp, instance):
             verdict, drives, silence, construct, partition, silence_line = (

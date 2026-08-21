@@ -115,7 +115,7 @@ def _panel(repo: Path) -> dict:
     static and is present either way."""
     return indicators.compute_source_indicators(
         repo, lang="python", exec_tests=False, timeout_seconds=5.0, classify_state_bounds=True
-    )
+    , python_executable=None)
 
 
 def _moved(before: dict, after: dict) -> set[str]:

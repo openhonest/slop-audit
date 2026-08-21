@@ -141,7 +141,7 @@ def _determinism_verdict(compiler: str) -> L1Result:
     return _na(f"C has no standard test-order randomizer; determinism not measured (compiler: {compiler})")
 
 
-def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.19 for C (best-effort): line coverage from a gcov-instrumented `make <target>`,
     totalled by lcov. Bands match the spec: >90% Healthy, 60-90% Not Healthy, <60% Slop.
     `runtime_override` is accepted for a uniform harness signature and ignored: C selects its
@@ -178,7 +178,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     return _coverage_verdict(summary_text, build.returncode, build_output, compiler, target)
 
 
-def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.20 for C: C has no standard test-order randomizer (no pytest-randomly or
     `go test -shuffle` analogue), so execution-order determinism is not measured. Returns n/a,
     naming the compiler that would run the suite, never a misleading 0/5. `runs` and

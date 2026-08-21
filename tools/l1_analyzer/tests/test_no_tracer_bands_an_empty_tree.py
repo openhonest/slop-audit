@@ -56,8 +56,11 @@ def _skip_unless(binary: str) -> None:
 def _coverage(tracer, repo: pathlib.Path) -> dict:
     """Each tracer's L1.19 entry point, whose signature differs by one argument."""
     if tracer is pytest_trace:
-        return tracer.decision_space_coverage(repo, "python", 120.0)
-    return tracer.decision_space_coverage(repo, 120.0)
+        return tracer.decision_space_coverage(repo, "python", 120.0, python_executable=None)
+    if tracer is rust_trace:
+        # Rust selects its toolchain from the crate, so this harness takes neither hint.
+        return tracer.decision_space_coverage(repo, 120.0)
+    return tracer.decision_space_coverage(repo, 120.0, runtime_override=None)
 
 
 @pytest.mark.parametrize(("name", "tracer", "binary", "_path", "_source"), LANGUAGES,

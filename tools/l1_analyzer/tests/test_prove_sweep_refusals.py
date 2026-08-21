@@ -31,9 +31,24 @@ def _empty_repo():
     return pathlib.Path(tempfile.mkdtemp())
 
 
+def _sweep(module, repo):
+    """One sweep, with every knob stated.
+
+    None of these carry a default any more. A default absorbed the caller's omission and
+    made the non-default region invisible at every call site, and the cost was concrete:
+    the same removal missed the gate's own call because the signature was covering for it.
+    The CLI holds these values in argparse, which is a visible boundary; a test states
+    them here for the same reason."""
+    knobs = {"cap_per_module": 5, "repair_rounds": 3, "timeout_seconds": 600.0,
+             "progress": None, "max_attempts": 5}
+    if module is python_coverage_prove:
+        knobs["python_executable"] = None
+    return module.prove_coverage_repo(repo, **knobs)
+
+
 @pytest.mark.parametrize("module", [coverage_prove, python_coverage_prove])
 def test_a_sweep_without_a_key_refuses_and_names_the_key(no_key, module):
-    result = module.prove_coverage_repo(_empty_repo())
+    result = _sweep(module, _empty_repo())
     assert result["retained"] == []
     assert result["attempted"] == 0
     assert "ANTHROPIC_API_KEY" in result["detail"], result["detail"]
@@ -43,7 +58,7 @@ def test_a_sweep_without_a_key_refuses_and_names_the_key(no_key, module):
 def test_the_refusal_never_publishes_a_band_or_a_score(no_key, module):
     """The failure this guards. A refusal that carried a band would be read as a verdict,
     and zero attempts is not zero findings."""
-    result = module.prove_coverage_repo(_empty_repo())
+    result = _sweep(module, _empty_repo())
     assert "band" not in result
     assert "value" not in result
     assert result["detail"].strip(), "a refusal with no reason is a refusal nobody can act on"
@@ -52,8 +67,8 @@ def test_the_refusal_never_publishes_a_band_or_a_score(no_key, module):
 def test_the_two_sweeps_do_not_borrow_each_other_s_wording(no_key):
     """Each names its own reason. They agree here because both really do need the key,
     and the assertion is that the sentence is theirs to give."""
-    rust = coverage_prove.prove_coverage_repo(_empty_repo())["detail"]
-    python = python_coverage_prove.prove_coverage_repo(_empty_repo())["detail"]
+    rust = _sweep(coverage_prove, _empty_repo())["detail"]
+    python = _sweep(python_coverage_prove, _empty_repo())["detail"]
     assert "ANTHROPIC_API_KEY" in rust and "ANTHROPIC_API_KEY" in python
 
 
@@ -61,7 +76,7 @@ def test_a_key_without_a_toolchain_refuses_for_the_toolchain(monkeypatch):
     """The second refusal, reached only once the key exists. It must not repeat the first
     one's sentence: a repository with a key and no pytest is not missing a key."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key-for-a-refusal-path")
-    result = python_coverage_prove.prove_coverage_repo(_empty_repo())
+    result = _sweep(python_coverage_prove, _empty_repo())
     assert result["attempted"] == 0
     assert "ANTHROPIC_API_KEY" not in result["detail"], result["detail"]
     assert result["detail"].strip()

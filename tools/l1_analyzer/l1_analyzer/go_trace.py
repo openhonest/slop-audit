@@ -103,7 +103,7 @@ def _coverage_verdict(func_output: str, profile_written: bool, run_returncode: i
     }
 
 
-def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.19 for Go: statement coverage from `go test -coverprofile`. Bands match the spec:
     >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a uniform
     harness signature and ignored: `go` selects the toolchain from the module itself."""
@@ -179,7 +179,7 @@ def _determinism_verdict(outcomes: list[tuple[int, int, str]], runs: int, toolch
     return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
 
 
-def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.20 for Go: `go test -shuffle=<seed> -count=1` `runs` times, counting the runs where
     every package passes. A run that does not build or runs no tests is not a determinism
     result, so return n/a with the reason rather than a misleading 0/5."""

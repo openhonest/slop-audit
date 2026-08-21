@@ -534,7 +534,7 @@ def audit(module: Path, tests: Path | tuple[Path, ...]) -> Audit:
         found += _branch_facets(fn, uncovered) + regions
         found += _return_facet(fn, asserted) + _exception_facets(fn, expecting)
         runtime, unverifiable = runtime_probe.runtime_facets(
-            fn, watched.get(fn.name, {}), seen["reason"])
+            fn, watched.get(fn.name, {}), unwatchable=seen["reason"])
         found += runtime
         undeclared += unverifiable
         undeclared += missing_types

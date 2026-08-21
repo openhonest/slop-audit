@@ -37,7 +37,11 @@ def panel(repo: pathlib.Path) -> dict[str, str]:
     results = indicators.compute_git_indicators(repo, None, None)
     results.update(indicators.compute_config_indicators(repo))
     results.update(indicators.compute_source_indicators(
-        repo, lang="auto", exec_tests=False, timeout_seconds=60, classify_state_bounds=False))
+        repo, lang="auto", exec_tests=False, timeout_seconds=60, classify_state_bounds=False,
+        # No suite runs with exec_tests False, so there is no interpreter for this call to
+        # choose. Stated rather than defaulted: the default is what let the gate's own call
+        # site be missed when every other one was updated.
+        python_executable=None))
     return {k: str(v.get("band")) for k, v in sorted(results.items())
             if k.startswith("L1.") and isinstance(v, dict)}
 

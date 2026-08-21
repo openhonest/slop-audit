@@ -55,7 +55,7 @@ def _graded(source: str) -> dict:
     (directory / "m.py").write_text(source)
     results = indicators.compute_source_indicators(
         directory, lang="python", exec_tests=False, timeout_seconds=30,
-        classify_state_bounds=True)
+        classify_state_bounds=True, python_executable=None)
     return report.grade_summary(results, report.UNORDERED_CLASS_BOUND)
 
 

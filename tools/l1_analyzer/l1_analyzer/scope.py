@@ -200,7 +200,7 @@ def _component_scoped_out(component: str, marker: str) -> bool:
     return lowered == marker or lowered.endswith("." + marker)
 
 
-def _extra_reason(parts: Iterable[str], extra: tuple[str, ...], path: Path | None = None) -> str | None:
+def _extra_reason(parts: Iterable[str], extra: tuple[str, ...], path: Path | None) -> str | None:
     """The first `extra` marker any path component is scoped out by, or None.
 
     Given `path`, a TEST marker must also be corroborated by the claiming directory's

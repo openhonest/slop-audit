@@ -158,20 +158,20 @@ def test_wrap_is_a_noop_without_nvm(monkeypatch, tmp_path):
 def test_l19_na_without_node(monkeypatch, tmp_path):
     # An empty PATH is a real machine state: shutil.which genuinely finds no node.
     monkeypatch.setenv("PATH", "")
-    assert js_trace.decision_space_coverage(tmp_path, 30)["band"] == "n/a"
+    assert js_trace.decision_space_coverage(tmp_path, 30, runtime_override=None)["band"] == "n/a"
 
 
 @_NEEDS_NODE
 def test_l19_na_when_node_modules_missing(tmp_path):
     _write_pkg(tmp_path, {"test": "vitest run"}, {})
-    r = js_trace.decision_space_coverage(tmp_path, 30)
+    r = js_trace.decision_space_coverage(tmp_path, 30, runtime_override=None)
     assert r["band"] == "n/a" and "node_modules missing" in r["details"]
 
 
 @_NEEDS_NODE
 def test_l20_na_when_node_modules_missing(tmp_path):
     _write_pkg(tmp_path, {"test": "vitest run"}, {})
-    r = js_trace.test_determinism(tmp_path, 5, 30)
+    r = js_trace.test_determinism(tmp_path, 5, 30, runtime_override=None)
     assert r["band"] == "n/a" and "node_modules missing" in r["details"]
 
 
@@ -179,7 +179,7 @@ def test_l20_na_when_node_modules_missing(tmp_path):
 def test_l20_na_when_runner_not_drivable(tmp_path):
     (tmp_path / "node_modules").mkdir()
     _write_pkg(tmp_path, {"test": "mocha"}, {"mocha": "^10.0.0"})
-    r = js_trace.test_determinism(tmp_path, 5, 30)
+    r = js_trace.test_determinism(tmp_path, 5, 30, runtime_override=None)
     assert r["band"] == "n/a"
     assert "order-randomizing runner" in r["details"] and "mocha" in r["details"]
 
@@ -189,7 +189,7 @@ def test_l20_jest_below_30_is_na(tmp_path):
     (tmp_path / "node_modules" / "jest").mkdir(parents=True)
     (tmp_path / "node_modules" / "jest" / "package.json").write_text(json.dumps({"version": "29.7.0"}))
     _write_pkg(tmp_path, {"test": "jest"}, {"jest": "^29.0.0"})
-    r = js_trace.test_determinism(tmp_path, 5, 30)
+    r = js_trace.test_determinism(tmp_path, 5, 30, runtime_override=None)
     assert r["band"] == "n/a" and "jest>=30" in r["details"]
 
 

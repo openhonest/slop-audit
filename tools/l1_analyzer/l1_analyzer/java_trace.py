@@ -177,7 +177,7 @@ def _toolchain(repo: Path, timeout_seconds: float) -> tuple[L1Result | None, Jav
     return None, {"maven": maven, "env": env, "jdk": _jdk(repo, timeout_seconds, env) + prov}
 
 
-def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.19 for Java: branch coverage from JaCoCo (`mvn test jacoco:report`). Bands match the
     spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a
     uniform harness signature and ignored: the project's build selects the runtime."""
@@ -224,7 +224,7 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str) -> L1Res
         _surefire_summary,
     )
 
-def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.20 for Java: `mvn -Dsurefire.runOrder=random test` run `runs` times, counting the
     runs where the whole suite passes. Value is "passing/runs". Bands: 5/5 Healthy, 4/5 Not
     Healthy, <4/5 Slop. A run that does not build or runs no tests is not a determinism result,

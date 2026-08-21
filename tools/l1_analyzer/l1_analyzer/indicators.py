@@ -449,8 +449,8 @@ def compute_source_indicators(
     lang: str,
     exec_tests: bool,
     timeout_seconds: float,
-    classify_state_bounds: bool = True,
-    python_executable: str | None = None,
+    classify_state_bounds: bool,
+    python_executable: str | None,
 ) -> dict[str, L1Result]:
     """L1.12-L1.20. `lang` may be "auto" (resolved here) or a concrete key.
     `exec_tests` gates the two runtime indicators (L1.19 coverage, L1.20);
@@ -619,26 +619,46 @@ def _god_files(repo: Path) -> L1Result:
 # register it below. `runtime_override` is the optional runtime hint (the Python interpreter
 # for pytest; self-detecting harnesses ignore it).
 _COVERAGE_HARNESS = {
-    "python": lambda repo, timeout, override: pytest_trace.decision_space_coverage(repo, "python", timeout, override),
+    # The hint reaches each harness under the name that harness gave it. Python's is an
+    # interpreter, the rest take a runtime hint, and Rust reads its toolchain from the crate
+    # so it takes neither. Forwarding it positionally would break the moment one of them
+    # grows a parameter, which is what happened here.
+    "python": lambda repo, timeout, override: pytest_trace.decision_space_coverage(
+        repo, "python", timeout, python_executable=override),
     "rust": lambda repo, timeout, override: rust_trace.decision_space_coverage(repo, timeout),
-    "go": lambda repo, timeout, override: go_trace.decision_space_coverage(repo, timeout, override),
-    "ruby": lambda repo, timeout, override: ruby_trace.decision_space_coverage(repo, timeout, override),
-    "javascript": lambda repo, timeout, override: js_trace.decision_space_coverage(repo, timeout, override),
-    "typescript": lambda repo, timeout, override: js_trace.decision_space_coverage(repo, timeout, override),
-    "java": lambda repo, timeout, override: java_trace.decision_space_coverage(repo, timeout, override),
-    "csharp": lambda repo, timeout, override: csharp_trace.decision_space_coverage(repo, timeout, override),
-    "c": lambda repo, timeout, override: c_trace.decision_space_coverage(repo, timeout, override),
+    "go": lambda repo, timeout, override: go_trace.decision_space_coverage(
+        repo, timeout, runtime_override=override),
+    "ruby": lambda repo, timeout, override: ruby_trace.decision_space_coverage(
+        repo, timeout, runtime_override=override),
+    "javascript": lambda repo, timeout, override: js_trace.decision_space_coverage(
+        repo, timeout, runtime_override=override),
+    "typescript": lambda repo, timeout, override: js_trace.decision_space_coverage(
+        repo, timeout, runtime_override=override),
+    "java": lambda repo, timeout, override: java_trace.decision_space_coverage(
+        repo, timeout, runtime_override=override),
+    "csharp": lambda repo, timeout, override: csharp_trace.decision_space_coverage(
+        repo, timeout, runtime_override=override),
+    "c": lambda repo, timeout, override: c_trace.decision_space_coverage(
+        repo, timeout, runtime_override=override),
 }
 _DETERMINISM_HARNESS = {
-    "python": lambda repo, timeout, override: pytest_trace.test_determinism(repo, "python", 5, timeout, override),
+    "python": lambda repo, timeout, override: pytest_trace.test_determinism(
+        repo, "python", 5, timeout, python_executable=override),
     "rust": lambda repo, timeout, override: rust_trace.test_determinism(repo, 5, timeout),
-    "go": lambda repo, timeout, override: go_trace.test_determinism(repo, 5, timeout, override),
-    "ruby": lambda repo, timeout, override: ruby_trace.test_determinism(repo, 5, timeout, override),
-    "javascript": lambda repo, timeout, override: js_trace.test_determinism(repo, 5, timeout, override),
-    "typescript": lambda repo, timeout, override: js_trace.test_determinism(repo, 5, timeout, override),
-    "java": lambda repo, timeout, override: java_trace.test_determinism(repo, 5, timeout, override),
-    "csharp": lambda repo, timeout, override: csharp_trace.test_determinism(repo, 5, timeout, override),
-    "c": lambda repo, timeout, override: c_trace.test_determinism(repo, 5, timeout, override),
+    "go": lambda repo, timeout, override: go_trace.test_determinism(
+        repo, 5, timeout, runtime_override=override),
+    "ruby": lambda repo, timeout, override: ruby_trace.test_determinism(
+        repo, 5, timeout, runtime_override=override),
+    "javascript": lambda repo, timeout, override: js_trace.test_determinism(
+        repo, 5, timeout, runtime_override=override),
+    "typescript": lambda repo, timeout, override: js_trace.test_determinism(
+        repo, 5, timeout, runtime_override=override),
+    "java": lambda repo, timeout, override: java_trace.test_determinism(
+        repo, 5, timeout, runtime_override=override),
+    "csharp": lambda repo, timeout, override: csharp_trace.test_determinism(
+        repo, 5, timeout, runtime_override=override),
+    "c": lambda repo, timeout, override: c_trace.test_determinism(
+        repo, 5, timeout, runtime_override=override),
 }
 
 
@@ -665,7 +685,7 @@ def _runtime_determinism(repo: Path, lang: str, timeout_seconds: float, python_e
     return _measure(harness, repo, timeout_seconds, python_executable)
 
 def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float,
-                        python_executable: str | None = None) -> L1Result:
+                        python_executable: str | None) -> L1Result:
     """Real coverage when the suite can run; otherwise the static decision-point
     enumeration with coverage clearly marked not-measured."""
     static = _compute_decision_space(repo, lang)
@@ -679,7 +699,7 @@ def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds
     return static
 
 def _test_determinism_l20(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float,
-                          python_executable: str | None = None) -> L1Result:
+                          python_executable: str | None) -> L1Result:
     if not exec_tests:
         return {"value": "not run", "band": "n/a", "details": "test execution disabled"}
     return _runtime_determinism(repo, lang, timeout_seconds, python_executable)

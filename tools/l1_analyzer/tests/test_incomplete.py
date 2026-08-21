@@ -77,7 +77,7 @@ def test_a_harness_refusal_reaches_the_report_as_an_n_a_and_not_as_a_traceback(t
     directly and the raise would have escaped `compute_source_indicators` entirely."""
     from l1_analyzer import indicators
     repo = _repo_with_no_branches(tmp_path)
-    result = indicators._decision_space_l19(repo, "python", True, 120)
+    result = indicators._decision_space_l19(repo, "python", True, 120, python_executable=None)
     assert "INCOMPLETE CODE" in result["details"]
     assert "no enumerable decision branches" in result["details"]
 

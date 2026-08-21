@@ -21,18 +21,36 @@ from l1_analyzer import coverage_prove, python_coverage_prove
 _SWEEPS = (coverage_prove.prove_coverage_repo, python_coverage_prove.prove_coverage_repo)
 
 
+def _sweep_with(sweep, repo, max_attempts):
+    """One sweep with every knob stated. None of them carry a default any more."""
+    knobs = {"cap_per_module": 5, "repair_rounds": 3, "timeout_seconds": 600.0,
+             "progress": None, "max_attempts": max_attempts}
+    if "python_executable" in inspect.signature(sweep).parameters:
+        knobs["python_executable"] = None
+    return sweep(repo, **knobs)
+
+
 @pytest.mark.parametrize("sweep", _SWEEPS, ids=["rust", "python"])
-def test_the_sweep_takes_an_adjustable_ceiling(sweep):
+def test_the_sweep_cannot_be_run_without_naming_a_ceiling(sweep):
+    """This used to require a DEFAULT of 5, on the ground that a library caller naming no
+    ceiling should get a bound rather than an unbounded run. Requiring the argument defends
+    the same property more strongly: a caller who names no ceiling now cannot call at all,
+    so there is no omission for a default to absorb and no way to spend the ceiling without
+    having chosen it.
+
+    The documented starting value of 5 lives in argparse, which is a visible boundary a
+    reader can see, rather than in a signature that supplies it silently."""
     parameter = inspect.signature(sweep).parameters.get("max_attempts")
     assert parameter is not None, "no repo-wide ceiling; the sweep's cost is unbounded"
-    assert parameter.default == 5, "the ceiling starts at 5"
+    assert parameter.default is inspect.Parameter.empty, (
+        "the ceiling has a default again, so a caller can spend it without choosing it")
 
 
 @pytest.mark.parametrize("sweep", _SWEEPS, ids=["rust", "python"])
 def test_a_ceiling_of_zero_attempts_nothing_and_says_why(sweep, tmp_path):
     """The boundary that proves the ceiling is read before any model call: at zero the
     sweep must refuse without needing a toolchain, a key or a network."""
-    result = sweep(tmp_path, max_attempts=0)
+    result = _sweep_with(sweep, tmp_path, max_attempts=0)
     assert result["attempted"] == 0
     assert result["retained"] == []
     assert "ceiling" in result["detail"], result["detail"]

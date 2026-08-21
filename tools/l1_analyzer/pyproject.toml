@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-slop-audit-l1 = "l1_analyzer.cli:main"
+slop-audit-l1 = "l1_analyzer.cli:run"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-bdd>=7.0", "coverage>=7.0", "pytest-randomly>=3.15"]

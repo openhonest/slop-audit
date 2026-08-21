@@ -78,7 +78,7 @@ def test_every_language_config_has_required_keys():
 def test_compute_source_indicators_rejects_unexpected_kwargs(tmp_path):
     (tmp_path / "acc.py").write_text("x = 1\n")
     with pytest.raises(TypeError):
-        indicators.compute_source_indicators(tmp_path, lang="python", exec_tests=False, timeout_seconds=5.0, bogus=1)
+        indicators.compute_source_indicators(tmp_path, lang="python", exec_tests=False, timeout_seconds=5.0, bogus=1, python_executable=None)
 
 
 # --- skipped files are surfaced, never silently dropped ---------------------
@@ -170,14 +170,14 @@ def test_git_indicators_run(tmp_path):
 # --- L1.19 / L1.20 runtime harness ------------------------------------------
 
 def test_l1_19_l1_20_non_python_is_na(tmp_path):
-    cov = pytest_trace.decision_space_coverage(tmp_path, "go", 30.0)
-    det = pytest_trace.test_determinism(tmp_path, "go", 5, 30.0)
+    cov = pytest_trace.decision_space_coverage(tmp_path, "go", 30.0, python_executable=None)
+    det = pytest_trace.test_determinism(tmp_path, "go", 5, 30.0, python_executable=None)
     assert cov["band"] == "n/a" and det["band"] == "n/a"
 
 
 def test_l1_19_static_fallback_when_exec_disabled(tmp_path):
     (tmp_path / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
-    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=False, timeout_seconds=30.0)
+    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=False, timeout_seconds=30.0, python_executable=None)
     assert res["band"] == "n/a"
     assert "coverage not measured" in res["details"]
     assert isinstance(res["value"], int) and res["value"] >= 1
@@ -594,9 +594,9 @@ def test_config_indicators_absent(tmp_path):
 def test_l1_19_l1_20_pass_on_a_clean_fixture(tmp_path):
     (tmp_path / "m.py").write_text("def classify(x):\n    if x < 0:\n        return 'n'\n    return 'p'\n")
     (tmp_path / "test_m.py").write_text("from m import classify\ndef test_neg():\n    assert classify(-1) == 'n'\ndef test_pos():\n    assert classify(1) == 'p'\n")
-    cov = pytest_trace.decision_space_coverage(tmp_path, "python", 60.0)
+    cov = pytest_trace.decision_space_coverage(tmp_path, "python", 60.0, python_executable=None)
     assert cov["value"] == 100.0 and cov["band"] == "Healthy"  # both branches exercised
-    det = pytest_trace.test_determinism(tmp_path, "python", 5, 60.0)
+    det = pytest_trace.test_determinism(tmp_path, "python", 5, 60.0, python_executable=None)
     assert det["value"] == "5/5" and det["band"] == "Healthy"
 
 
@@ -622,7 +622,7 @@ def test_l1_12_and_l1_14_are_native_and_need_no_tool_on_path(tmp_path, monkeypat
     (tmp_path / "app.py").write_text(
         'AWS = "' + "AKIA" + "2E0RTQ4KJ7X9WZ1P" + '"\n\n\ndef orphan():\n    return 1\n')
     res = indicators.compute_source_indicators(
-        tmp_path, lang="auto", exec_tests=False, timeout_seconds=5, classify_state_bounds=False)
+        tmp_path, lang="auto", exec_tests=False, timeout_seconds=5, classify_state_bounds=False, python_executable=None)
     assert res["L1.12"]["band"] != "n/a" and res["L1.12"]["value"] > 0
     assert res["L1.14"]["value"] == 1 and res["L1.14"]["band"] == "Not Healthy"
 
@@ -642,7 +642,7 @@ def test_l1_15_density_over_a_kloc_is_slop(tmp_path):
 
 def test_l1_19_falls_back_to_static_when_no_tests(tmp_path):
     (tmp_path / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
-    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=True, timeout_seconds=60.0)
+    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=True, timeout_seconds=60.0, python_executable=None)
     assert res["band"] == "n/a" and "coverage not measured" in res["details"]
     assert isinstance(res["value"], int) and res["value"] >= 1
 
@@ -651,7 +651,7 @@ def test_l1_19_falls_back_to_static_when_no_tests(tmp_path):
 
 def test_l1_19_no_tests_is_na(tmp_path):
     (tmp_path / "m.py").write_text("def f(x):\n    return x\n")
-    res = pytest_trace.decision_space_coverage(tmp_path, "python", 60.0)
+    res = pytest_trace.decision_space_coverage(tmp_path, "python", 60.0, python_executable=None)
     assert res["band"] == "n/a" and "no tests" in res["details"]
 
 
@@ -663,35 +663,35 @@ def test_l1_19_no_branches_is_na(tmp_path):
     # unchanged, and a reader of the report still sees n/a; what changed is that a caller who
     # forgets to check can no longer spell the absence as a value.
     with pytest.raises(IncompleteCode, match="no enumerable decision branches"):
-        pytest_trace.decision_space_coverage(tmp_path, "python", 60.0)
+        pytest_trace.decision_space_coverage(tmp_path, "python", 60.0, python_executable=None)
 
 
 def test_l1_19_timeout_is_na(tmp_path):
     (tmp_path / "m.py").write_text("def f(x):\n    return x\n")
     (tmp_path / "test_slow.py").write_text("import time\ndef test_slow():\n    time.sleep(3)\n    assert True\n")
-    res = pytest_trace.decision_space_coverage(tmp_path, "python", 0.5)  # far too short
+    res = pytest_trace.decision_space_coverage(tmp_path, "python", 0.5, python_executable=None)  # far too short
     assert res["band"] == "n/a" and "timed out" in res["details"]
 
 
 def test_l1_20_no_tests_is_na(tmp_path):
     (tmp_path / "m.py").write_text("def f(x):\n    return x\n")
-    assert pytest_trace.test_determinism(tmp_path, "python", 5, 60.0)["band"] == "n/a"
+    assert pytest_trace.test_determinism(tmp_path, "python", 5, 60.0, python_executable=None)["band"] == "n/a"
 
 
 def test_l1_20_not_run_when_exec_disabled(tmp_path):
-    res = indicators._test_determinism_l20(tmp_path, "python", exec_tests=False, timeout_seconds=30.0)
+    res = indicators._test_determinism_l20(tmp_path, "python", exec_tests=False, timeout_seconds=30.0, python_executable=None)
     assert res["value"] == "not run" and res["band"] == "n/a"
 
 
 def test_l1_20_order_dependent_scores_below_five(tmp_path):
     (tmp_path / "test_order.py").write_text("_s = {'x': False}\ndef test_a():\n    _s['x'] = True\ndef test_b():\n    assert _s['x'] is True\n")
-    res = pytest_trace.test_determinism(tmp_path, "python", 5, 60.0)
+    res = pytest_trace.test_determinism(tmp_path, "python", 5, 60.0, python_executable=None)
     assert res["value"] != "5/5" and res["band"] in ("Not Healthy", "Slop")
 
 
 def test_l1_20_timeout_is_na(tmp_path):
     (tmp_path / "test_slow.py").write_text("import time\ndef test_slow():\n    time.sleep(3)\n    assert True\n")
-    res = pytest_trace.test_determinism(tmp_path, "python", 5, 0.5)
+    res = pytest_trace.test_determinism(tmp_path, "python", 5, 0.5, python_executable=None)
     assert res["band"] == "n/a" and "timed out" in res["details"]
 
 

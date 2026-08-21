@@ -147,7 +147,7 @@ def test_a_repository_the_classifier_never_read_gets_no_grade(tmp_path):
 
 def test_the_card_makes_no_capability_claim_when_the_classifier_admitted_nothing(tmp_path):
     result = _classify(tmp_path, "m.rs", RUST_UNVISITED_FIELD, "rust")
-    model = card.build_card("o/r", "rust", _results(result))
+    model = card.build_card("o/r", "rust", _results(result), ran_tests=False)
     md = card.card_markdown(model)
     assert model["grade"] is None
     assert "**Grade:" not in md
@@ -158,7 +158,7 @@ def test_the_card_makes_no_capability_claim_when_the_classifier_admitted_nothing
 
 def test_the_card_says_what_it_could_not_read(tmp_path):
     result = _classify(tmp_path, "m.rs", RUST_UNVISITED_FIELD, "rust")
-    md = card.card_markdown(card.build_card("o/r", "rust", _results(result)))
+    md = card.card_markdown(card.build_card("o/r", "rust", _results(result), ran_tests=False))
     assert "insufficient basis" in md.lower()
 
 
@@ -309,7 +309,7 @@ def test_one_visited_declaration_carries_the_unvisited_ones_and_the_report_says_
     result = state_bounds.classify(tmp_path, "rust")
     g = report.grade_summary(_results(result), None)
     assert g["basis"] == report.MEASURED
-    model = card.build_card("o/r", "rust", _results(result))
+    model = card.build_card("o/r", "rust", _results(result), ran_tests=False)
     assert model["grade"] is not None, "the disclosure belongs on a card that GRADED"
     for rendered in (card.card_markdown(model), card.card_html(model)):
         assert "a field declared inside a record type" in rendered

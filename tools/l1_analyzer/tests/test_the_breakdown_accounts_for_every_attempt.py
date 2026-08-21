@@ -18,7 +18,7 @@ def test_a_partly_declined_sweep_names_the_declines(module):
     outcomes = dict.fromkeys(module.EMPTY_OUTCOMES, 0)
     outcomes.update({"pass": 15, "declined": 5})
     said = module.sweep_detail(retained=0, modules=5, located=157, outcomes=outcomes,
-                               provenance="cpython 3.13")
+                               provenance="cpython 3.13", reason="", cause="")
     # The run count belongs to the outcome breakdown the caller appends; what was missing
     # is the declines, which no part of the sentence mentioned once anything had run.
     assert "5" in said and "declin" in said.lower(), (
@@ -32,4 +32,4 @@ def test_a_sweep_with_no_declines_says_nothing_about_them(module):
     outcomes = dict.fromkeys(module.EMPTY_OUTCOMES, 0)
     outcomes["pass"] = 15
     assert "declin" not in module.sweep_detail(
-        retained=0, modules=5, located=15, outcomes=outcomes, provenance="cpython 3.13").lower()
+        retained=0, modules=5, located=15, outcomes=outcomes, provenance="cpython 3.13", reason="", cause="").lower()

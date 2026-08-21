@@ -63,7 +63,7 @@ def go_project(tmp_path_factory) -> pathlib.Path:
 def test_a_directory_with_no_module_refuses(tmp_path):
     """The defect. It read 0.0% Slop off a profile the toolchain wrote having compiled
     nothing."""
-    result = go_trace.decision_space_coverage(tmp_path, 120.0)
+    result = go_trace.decision_space_coverage(tmp_path, 120.0, runtime_override=None)
     assert result["band"] == "n/a", (
         f"a tree with no Go module read {result['value']} {result['band']}: {result['details']}"
     )
@@ -75,20 +75,20 @@ def test_a_module_with_no_test_files_refuses(tmp_path):
     a Go module whose packages carry no test at all."""
     (tmp_path / "go.mod").write_text("module fixture\n\ngo 1.21\n")
     (tmp_path / "band.go").write_text("package fixture\n\nfunc Band() int { return 1 }\n")
-    result = go_trace.decision_space_coverage(tmp_path, 120.0)
+    result = go_trace.decision_space_coverage(tmp_path, 120.0, runtime_override=None)
     assert result["band"] == "n/a", result["details"]
 
 
 def test_the_refusal_says_no_test_ran(tmp_path):
     """A reader told n/a must be told which n/a: no Go here at all, or Go with no tests."""
-    result = go_trace.decision_space_coverage(tmp_path, 120.0)
+    result = go_trace.decision_space_coverage(tmp_path, 120.0, runtime_override=None)
     assert result["details"].strip()
     assert "no test" in result["details"].lower() or "ran" in result["details"].lower()
 
 
 def test_a_project_whose_tests_do_run_is_still_measured(go_project):
     """The measure must still measure, so the refusal is not a blanket one."""
-    result = go_trace.decision_space_coverage(go_project, 300.0)
+    result = go_trace.decision_space_coverage(go_project, 300.0, runtime_override=None)
     assert result["band"] != "n/a", result["details"]
     assert 0 < float(result["value"]) < 100
     assert "go version" in result["details"]

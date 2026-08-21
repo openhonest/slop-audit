@@ -25,7 +25,7 @@ def _concurrency(verdict, test):
 
 def test_demonstrated_concurrency_proof_is_exposed_with_its_test_source():
     c = card.build_card("o/r", "rust", {
-        **_BASE, **_concurrency("demonstrated", "fn t() { assert!(raced); }")})
+        **_BASE, **_concurrency("demonstrated", "fn t() { assert!(raced); }")}, ran_tests=False)
     assert len(c["proofs"]) == 1
     p = c["proofs"][0]
     assert p["layer"] == "concurrency" and p["target"] == "Coord" and p["location"] == "wal.rs:699"
@@ -35,12 +35,12 @@ def test_demonstrated_concurrency_proof_is_exposed_with_its_test_source():
 def test_non_demonstrated_concurrency_proof_is_not_exposed():
     # A clean run (no race fired) is not a proof and must never surface as an adoptable test.
     c = card.build_card("o/r", "rust", {
-        **_BASE, **_concurrency("not-demonstrated", "fn t() { assert!(never_fired); }")})
+        **_BASE, **_concurrency("not-demonstrated", "fn t() { assert!(never_fired); }")}, ran_tests=False)
     assert c["proofs"] == []
 
 
 def test_demonstrated_but_missing_test_source_is_not_exposed():
-    c = card.build_card("o/r", "rust", {**_BASE, **_concurrency("demonstrated", test="")})
+    c = card.build_card("o/r", "rust", {**_BASE, **_concurrency("demonstrated", test="")}, ran_tests=False)
     assert c["proofs"] == []
 
 
@@ -50,7 +50,7 @@ def test_coverage_proof_is_exposed_with_language_and_source():
          "explanation": "the zero branch is never exercised",
          "test_source": "#[test]\nfn zero() { assert_eq!(classify(0), \"zero\"); }"},
     ]}}
-    c = card.build_card("o/r", "rust", results)
+    c = card.build_card("o/r", "rust", results, ran_tests=False)
     assert [p["layer"] for p in c["proofs"]] == ["coverage"]
     assert c["proofs"][0]["language"] == "rust"
     assert "classify(0)" in c["proofs"][0]["test_source"]
@@ -61,7 +61,7 @@ def test_both_producers_feed_one_surface_and_render():
                "coverage_proofs": {"retained": [
                    {"function": "f", "language": "rust", "location": "a.rs:1",
                     "explanation": "gap", "test_source": "#[test] fn t() {}"}]}}
-    c = card.build_card("o/r", "rust", results)
+    c = card.build_card("o/r", "rust", results, ran_tests=False)
     assert {p["layer"] for p in c["proofs"]} == {"concurrency", "coverage"}
     md = card.card_markdown(c)
     assert "## Adoptable proofs" in md and "never writes into your test file" in md
@@ -70,6 +70,6 @@ def test_both_producers_feed_one_surface_and_render():
 
 
 def test_no_proofs_means_no_section():
-    c = card.build_card("o/r", "rust", _BASE)
+    c = card.build_card("o/r", "rust", _BASE, ran_tests=False)
     assert c["proofs"] == []
     assert "Adoptable proofs" not in card.card_markdown(c)

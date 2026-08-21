@@ -131,7 +131,7 @@ def test_frozen_mode_matches_registered_golden_byte_for_byte(tmp_path, monkeypat
     repo = _fixture(tmp_path)
     result = indicators.compute_source_indicators(
         repo, lang="auto", exec_tests=False, timeout_seconds=5, classify_state_bounds=False
-    )
+    , python_executable=None)
     assert "L1.18b" not in result  # off-mode adds nothing
     golden = json.loads(GOLDEN.read_text())
     assert json.dumps(result, sort_keys=True) == json.dumps(golden, sort_keys=True)
@@ -159,8 +159,8 @@ def test_golden_records_no_optional_tool_as_installed():
 
 def test_on_mode_is_additive_l18_identical_plus_l18b(tmp_path):
     repo = _fixture(tmp_path)
-    off = indicators.compute_source_indicators(repo, "auto", False, 5, classify_state_bounds=False)
-    on = indicators.compute_source_indicators(repo, "auto", False, 5, classify_state_bounds=True)
+    off = indicators.compute_source_indicators(repo, "auto", False, 5, classify_state_bounds=False, python_executable=None)
+    on = indicators.compute_source_indicators(repo, "auto", False, 5, classify_state_bounds=True, python_executable=None)
     assert on["L1.18"] == off["L1.18"]                 # the registered number never moves
     assert set(on) - set(off) == {"L1.18b", "path_cover", "thread_surface", "absolute_paths"}  # the additive enrichments
 

@@ -15,6 +15,7 @@ is what the run ceiling exists to bound.
 """
 
 import inspect
+import pathlib
 import subprocess
 import sys
 
@@ -51,8 +52,15 @@ def test_both_sweeps_are_handed_the_ceiling():
     )
 
 
-def test_the_ceiling_still_defaults_where_no_operator_is_present():
-    """A library caller that names no ceiling gets the documented 5 rather than an
-    unbounded run. The flag is the operator's control, not a removal of the bound."""
+def test_the_documented_starting_ceiling_lives_at_the_boundary():
+    """The 5 is real and it is where a reader can see it: argparse, next to the sentence
+    that documents it. It used to sit in the sweep's own signature as well, which meant a
+    library caller could spend a ceiling without ever choosing one.
+
+    The flag is the operator's control. The bound is now unskippable rather than
+    defaulted, which is the stronger version of what this test was written to protect."""
+    parser_source = pathlib.Path(cli.__file__).read_text()
+    assert '"--prove-max-total"' in parser_source
+    assert "default=5" in parser_source.split('"--prove-max-total"', 1)[1][:200]
     for sweep in (coverage_prove.prove_coverage_repo, python_coverage_prove.prove_coverage_repo):
-        assert inspect.signature(sweep).parameters["max_attempts"].default == 5
+        assert inspect.signature(sweep).parameters["max_attempts"].default is inspect.Parameter.empty

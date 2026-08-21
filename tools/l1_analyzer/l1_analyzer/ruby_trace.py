@@ -169,7 +169,7 @@ def _coverage_verdict(covered: int, total: int, returncode: int, version: str) -
     }
 
 
-def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.19 for Ruby: SimpleCov branch coverage from the suite's own coverage/.resultset.json.
     Bands match the spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is
     accepted for a uniform harness signature and ignored: the target's shims select ruby."""
@@ -241,7 +241,7 @@ def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runs: int
     }
 
 
-def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.20 for Ruby: run the suite `runs` times in randomized order and count the runs
     where every test passes. Value is "passing/runs". Bands: 5/5 Healthy, 4/5 Not Healthy,
     <4/5 Slop. A run that builds nothing or runs no tests is not a determinism result, so

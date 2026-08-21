@@ -134,7 +134,12 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None, max_thread_ex
         threshold); it is a bright line at the current number, so a new escape fails
         the commit unless the baseline is deliberately raised in the hook config."""
     results = indicators.compute_source_indicators(
-        repo, lang=lang, exec_tests=False, timeout_seconds=5.0, classify_state_bounds=True
+        repo, lang=lang, exec_tests=False, timeout_seconds=5.0, classify_state_bounds=True,
+        # Stated rather than defaulted, and None is the honest value: with exec_tests False
+        # no suite runs, so there is no interpreter for this call to choose. The signature
+        # used to supply the None itself, which is what let this call site be missed when
+        # every other one was updated.
+        python_executable=None,
     )
     audited_lang = _audited_language(results, lang, repo)
     problems: list[str] = []
@@ -448,7 +453,20 @@ def _prove_facet(module: Path, tests: tuple[Path, ...], index: int, proposal: di
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def run() -> int:
+    """The console-script entry point.
+
+    setuptools calls the installed script with no arguments, so something here has to be
+    callable with none. That is this, and it is one line: it reads the process arguments
+    and hands them to `main`, which now requires them.
+
+    `main(argv=None)` used to be that callable itself, and the default meant every other
+    caller could omit the argument too, so nothing distinguished a caller who meant the
+    process arguments from one who forgot to say."""
+    return main(sys.argv[1:])
+
+
+def main(argv: list[str] | None) -> int:
     # The name the console script is installed under, so `--help` prints a command the
     # reader can actually run. argparse defaults `prog` to sys.argv[0], which is right
     # only by accident; naming it wrong sends a new adopter to a command that does not
@@ -871,4 +889,4 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())

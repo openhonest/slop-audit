@@ -37,7 +37,7 @@ def given_classifier(k, tmp_path):
 
 @when("I compute L1.19", target_fixture="result")
 def when_19(repo):
-    return pytest_trace.decision_space_coverage(repo, "python", 60.0)
+    return pytest_trace.decision_space_coverage(repo, "python", 60.0, python_executable=None)
 
 
 @then(parsers.parse("L1.19 is {val:f}"))
@@ -73,7 +73,7 @@ def given_chain(tmp_path):
 
 @when("I measure L1.20 determinism", target_fixture="result")
 def when_20(repo):
-    return pytest_trace.test_determinism(repo, "python", 5, 60.0)
+    return pytest_trace.test_determinism(repo, "python", 5, 60.0, python_executable=None)
 
 
 @then("all 5 runs pass")

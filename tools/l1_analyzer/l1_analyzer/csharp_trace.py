@@ -94,7 +94,7 @@ def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, sdk: st
     }
 
 
-def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.19 for C#: branch coverage from `dotnet test --collect:"XPlat Code Coverage"`. Bands
     match the spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is accepted
     for a uniform harness signature and ignored: `dotnet` selects the SDK from the repo itself."""
@@ -142,7 +142,7 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], sdk: str) -> L1Res
         _first_line,
     )
 
-def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.20 for C#: `dotnet test` `runs` times, counting the runs where the whole suite passes.
     `dotnet test` has no seed CLI, so the order is scheduler-varied, not seed-controlled. A run
     that does not build or runs no tests is not a determinism result, so return n/a with the

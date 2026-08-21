@@ -113,23 +113,23 @@ def test_pin_falls_back_to_the_ambient_runtime_without_a_manager(monkeypatch, tm
 
 def test_l19_na_without_ruby(monkeypatch, tmp_path):
     monkeypatch.setenv("PATH", "")
-    assert ruby_trace.decision_space_coverage(tmp_path, 30)["band"] == "n/a"
+    assert ruby_trace.decision_space_coverage(tmp_path, 30, runtime_override=None)["band"] == "n/a"
 
 
 def test_l20_na_without_ruby(monkeypatch, tmp_path):
     monkeypatch.setenv("PATH", "")
-    assert ruby_trace.test_determinism(tmp_path, 5, 30)["band"] == "n/a"
+    assert ruby_trace.test_determinism(tmp_path, 5, 30, runtime_override=None)["band"] == "n/a"
 
 
 @_NEEDS_RUBY
 def test_l19_na_when_no_runner_detected(tmp_path):
-    r = ruby_trace.decision_space_coverage(tmp_path, 30)
+    r = ruby_trace.decision_space_coverage(tmp_path, 30, runtime_override=None)
     assert r["band"] == "n/a" and "no RSpec" in r["details"]
 
 
 @_NEEDS_RUBY
 def test_l20_na_when_no_runner_detected(tmp_path):
-    r = ruby_trace.test_determinism(tmp_path, 5, 30)
+    r = ruby_trace.test_determinism(tmp_path, 5, 30, runtime_override=None)
     assert r["band"] == "n/a" and "no RSpec" in r["details"]
 
 

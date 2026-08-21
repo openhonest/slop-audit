@@ -63,7 +63,7 @@ def test_determinism_refuses_rather_than_driving_a_jest_it_could_not_identify(tm
     (tmp_path / "package.json").write_text(
         '{"scripts": {"test": "jest"}, "devDependencies": {"jest": "^29.0.0"}}')
     (tmp_path / "node_modules").mkdir()
-    result = js_trace.test_determinism(tmp_path, 3, 5.0)
+    result = js_trace.test_determinism(tmp_path, 3, 5.0, runtime_override=None)
     assert result["band"] == "n/a"
     assert "version" in result["details"].lower()
 

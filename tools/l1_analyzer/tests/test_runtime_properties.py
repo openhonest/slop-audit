@@ -280,7 +280,7 @@ def test_a_runtime_facet_is_closed_only_by_a_property_shown_to_hold():
     located violation the glossary also counts in the numerator."""
     fn = _fn("def squeeze(text: str) -> str:\n    return text\n")
     built, unverified = runtime_probe.runtime_facets(
-        fn, {"determinism": "holds", "purity": "unobserved", "idempotency": "breaks"})
+        fn, {"determinism": "holds", "purity": "unobserved", "idempotency": "breaks"}, unwatchable="")
     silent = {f["detail"].split()[0]: f["silent"] for f in built}
     assert silent == {"determinism": False, "purity": True, "idempotency": True}, built
     assert unverified == []
@@ -288,7 +288,7 @@ def test_a_runtime_facet_is_closed_only_by_a_property_shown_to_hold():
 
 def test_a_function_the_suite_never_called_has_every_invited_property_silent():
     fn = _fn("def squeeze(text: str) -> str:\n    return text\n")
-    built, unverified = runtime_probe.runtime_facets(fn, {})
+    built, unverified = runtime_probe.runtime_facets(fn, {}, unwatchable="")
     assert {f["detail"].split()[0] for f in built} == {"determinism", "purity", "idempotency"}
     assert all(f["silent"] for f in built)
     assert unverified == []
@@ -298,7 +298,7 @@ def test_a_runtime_facet_names_what_the_run_showed():
     """A closed facet has to say what closed it. "determinism holds" and "determinism
     breaks" are both evidence and mean opposite things to a reader."""
     fn = _fn("def roll(n: int) -> int:\n    return n\n")
-    built, _unverified = runtime_probe.runtime_facets(fn, {"determinism": "breaks"})
+    built, _unverified = runtime_probe.runtime_facets(fn, {"determinism": "breaks"}, unwatchable="")
     determinism = next(f for f in built if f["detail"].startswith("determinism"))
     assert determinism["kind"] == "runtime_property"
     assert determinism["detail"] == "determinism breaks"
@@ -397,7 +397,7 @@ def test_invites_called_twice_answers_the_same_way():
 
 def test_runtime_facets_called_twice_answers_the_same_way():
     fn = _fn("def f(items: list) -> list:\n    return items\n")
-    assert runtime_probe.runtime_facets(fn, {}) == runtime_probe.runtime_facets(fn, {})
+    assert runtime_probe.runtime_facets(fn, {}, unwatchable="") == runtime_probe.runtime_facets(fn, {}, unwatchable="")
 
 
 # --------------------------------------------------------------------------

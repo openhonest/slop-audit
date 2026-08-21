@@ -178,7 +178,7 @@ _OPAQUE_REASON = ("every watched call passed or returned a value whose repr carr
 
 
 def runtime_facets(fn: ast.FunctionDef, verdict: dict[str, str],
-                   unwatchable: str = "") -> tuple[list[Facet], list[Undeclared]]:
+                   unwatchable: str) -> tuple[list[Facet], list[Undeclared]]:
     """One facet per property this function invites, silent while nobody has watched it,
     and one reason apiece for the properties that could not be read at all.
 

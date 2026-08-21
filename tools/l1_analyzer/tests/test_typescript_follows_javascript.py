@@ -86,5 +86,5 @@ def test_a_typescript_file_of_only_these_forms_enumerates_its_functions(tmp_path
     )
     result = indicators.compute_source_indicators(
         _p.Path(tmp_path), lang="typescript", exec_tests=False,
-        timeout_seconds=60, classify_state_bounds=True)
+        timeout_seconds=60, classify_state_bounds=True, python_executable=None)
     assert result["L1.18"]["band"] != "n/a", result["L1.18"]["details"]

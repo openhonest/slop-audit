@@ -267,9 +267,9 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[dict],
     return retained, outcomes
 
 
-def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int = 3,
-                        timeout_seconds: float = 600.0, python_executable: str | None = None,
-                        progress: SweepProgress | None = None, max_attempts: int = 5) -> dict:
+def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
+                        timeout_seconds: float, python_executable: str | None,
+                        progress: SweepProgress | None, max_attempts: int) -> dict:
     """Sweep the whole package: one coverage run to locate uncovered branches, then every module
     with uncovered branches is proven. Retained proofs (assertion-divergences) aggregate across
     the package. Directory-insensitive: the suite runs under the target's own interpreter."""

@@ -27,7 +27,7 @@ from l1_analyzer import pytest_trace
 # --- the refusals that need no fake -------------------------------------------
 
 def test_l19_is_na_without_a_python_target(tmp_path):
-    result = pytest_trace.decision_space_coverage(tmp_path, "rust", 5)
+    result = pytest_trace.decision_space_coverage(tmp_path, "rust", 5, python_executable=None)
     assert result["band"] == "n/a"
 
 

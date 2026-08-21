@@ -272,7 +272,9 @@ def test_a_fourth_measure_that_grew_the_defect_would_be_caught_here():
     """
     from l1_analyzer import indicators
     with _tree({}, NO_GIT) as nothing:
-        results = indicators.compute_source_indicators(nothing, "python", False, 5.0)
+        results = indicators.compute_source_indicators(nothing, "python", False, 5.0,
+                                                       classify_state_bounds=True,
+                                                       python_executable=None)
     banded = {key: r["band"] for key, r in results.items() if isinstance(r, dict)}
     assert banded, "the sweep read no indicator, so it proves nothing"
     assert set(banded.values()) == {"n/a"}, (

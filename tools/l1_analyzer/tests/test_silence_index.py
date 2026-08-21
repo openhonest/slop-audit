@@ -107,7 +107,7 @@ def test_silence_is_reported_with_a_file_and_line_for_every_silent_site(tmp_path
     assert site["reason"]
     # And the reader gets them, not just the JSON: a share nobody can act on is not a
     # measure, it is a number.
-    markdown = card.card_markdown(card.build_card("x", "python", _panel(result)))
+    markdown = card.card_markdown(card.build_card("x", "python", _panel(result), ran_tests=False))
     assert "What we could not follow" in markdown
     # The reason, not only the site. Which of the four it is decides whose move is next, and
     # the card printed the location without it until report.py's renderers were deleted and

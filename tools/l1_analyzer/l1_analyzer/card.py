@@ -382,7 +382,7 @@ def _proofs(results: dict) -> list[dict]:
     return out[:_PROOF_CAP]
 
 
-def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> dict:
+def build_card(slug: str, lang: str, results: dict, ran_tests: bool) -> dict:
     """The full scorecard model, identical to the site's. ran_tests=True (the CLI) adds
     the measured runtime metrics (L1.19 coverage, L1.20 determinism); False (the site) omits
     them and the footer says the code was never executed."""

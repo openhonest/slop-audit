@@ -195,7 +195,7 @@ def _toolchain(repo: Path) -> tuple[L1Result | None, dict | None]:
     return None, pkg
 
 
-def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.19 for JS/TS: branch coverage from c8 (V8). Bands match the spec: >90% Healthy,
     60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a uniform harness
     signature and ignored: `node` on PATH is the runtime."""
@@ -325,7 +325,7 @@ def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runtime: 
     }
 
 
-def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None = None) -> L1Result:
+def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.20 for JS/TS: run the project's own runner `runs` times in a shuffled order with a
     distinct seed, counting the runs where the whole suite passes. Value is "passing/runs".
     Bands: 5/5 Healthy, 4/5 Not Healthy, <4/5 Slop. `runtime_override` is accepted for a

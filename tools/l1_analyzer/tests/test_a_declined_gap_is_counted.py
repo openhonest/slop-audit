@@ -49,7 +49,7 @@ def test_located_gaps_are_never_reported_as_none_located(module):
     """The sentence that lied. Located-but-none-ran is its own case, distinct from
     nothing-was-located, and it names how many were declined."""
     said = module.sweep_detail(retained=0, modules=1, located=154, outcomes={"declined": 2},
-                               provenance="cpython 3.13")
+                               provenance="cpython 3.13", reason="", cause="")
     assert "no proof-ready uncovered branches located" not in said
     assert "154" in said and "2" in said
 
@@ -58,5 +58,5 @@ def test_located_gaps_are_never_reported_as_none_located(module):
                          ids=["rust", "python"])
 def test_nothing_located_still_says_nothing_was_located(module):
     said = module.sweep_detail(retained=0, modules=3, located=0, outcomes={},
-                               provenance="cpython 3.13")
+                               provenance="cpython 3.13", reason="", cause="")
     assert "no proof-ready uncovered branches located" in said

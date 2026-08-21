@@ -84,7 +84,7 @@ def jest_project(tmp_path_factory) -> pathlib.Path:
 
 def test_coverage_is_a_number_rather_than_null(jest_project):
     """The claim, verified. Null here would be the failure the sibling tool hit."""
-    result = js_trace.decision_space_coverage(jest_project, 900.0)
+    result = js_trace.decision_space_coverage(jest_project, 900.0, runtime_override=None)
     assert result["band"] != "n/a", result["details"]
     assert isinstance(result["value"], (int, float))
 
@@ -92,7 +92,7 @@ def test_coverage_is_a_number_rather_than_null(jest_project):
 def test_the_number_is_the_one_the_fixture_implies(jest_project):
     """Two of three arms are reached, so the harness has to say so. A figure that is merely
     non-null could still be measuring the wrong thing."""
-    result = js_trace.decision_space_coverage(jest_project, 900.0)
+    result = js_trace.decision_space_coverage(jest_project, 900.0, runtime_override=None)
     assert 60 <= float(result["value"]) <= 90, result["details"]
 
 
@@ -101,7 +101,7 @@ def test_the_worker_processes_are_covered(jest_project):
     so a harness that only watched the parent would report near-nothing. c8 sets
     NODE_V8_COVERAGE and V8 inherits it into children, which is what makes the runner
     irrelevant to coverage."""
-    result = js_trace.decision_space_coverage(jest_project, 900.0)
+    result = js_trace.decision_space_coverage(jest_project, 900.0, runtime_override=None)
     assert float(result["value"]) > 0, (
         "coverage came back at zero, which is what a parent-only collector reports when the "
         f"runner forks: {result['details']}"
@@ -111,7 +111,7 @@ def test_the_worker_processes_are_covered(jest_project):
 def test_determinism_drives_jest_by_its_seed(jest_project):
     """The opposite case, and the reason it is not a contradiction: only a runner with a
     seed can be ordered, so here the runner does matter and is named."""
-    result = js_trace.test_determinism(jest_project, 3, 900.0)
+    result = js_trace.test_determinism(jest_project, 3, 900.0, runtime_override=None)
     assert result["value"] == "3/3"
     assert result["band"] == "Healthy"
     assert "jest" in result["details"]

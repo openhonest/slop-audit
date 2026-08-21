@@ -21,6 +21,12 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     Then the hook shape writes to stderr, where a hook runner puts what a blocked tool call said
     But it writes nothing when there is nothing to change, because a hook that congratulates the agent on every file teaches it to skip the output
 
+  Scenario: run is the console-script entry point, and the only caller that needs no arguments
+    Given the installed script, which setuptools calls with nothing
+    When run reads the process arguments and hands them to main
+    Then main receives the arguments it requires
+    But main used to be that callable itself, and its default meant every other caller could omit the arguments too, so nothing distinguished a caller who meant the process arguments from one who forgot to say
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md

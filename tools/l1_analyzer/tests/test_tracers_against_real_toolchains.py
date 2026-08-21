@@ -81,7 +81,7 @@ def go_project(tmp_path_factory) -> pathlib.Path:
 
 @pytest.mark.skipif(shutil.which("go") is None, reason="go is not on PATH")
 def test_go_coverage_is_measured_and_names_its_runtime(go_project):
-    result = go_trace.decision_space_coverage(go_project, 300.0)
+    result = go_trace.decision_space_coverage(go_project, 300.0, runtime_override=None)
     assert result["band"] != "n/a", result["details"]
     assert 0 < float(result["value"]) < 100, "the fixture leaves one arm unreached"
     assert "go version" in result["details"], "a measured result must name the runtime that ran it"
@@ -89,7 +89,7 @@ def test_go_coverage_is_measured_and_names_its_runtime(go_project):
 
 @pytest.mark.skipif(shutil.which("go") is None, reason="go is not on PATH")
 def test_go_determinism_counts_every_shuffled_run(go_project):
-    result = go_trace.test_determinism(go_project, 3, 300.0)
+    result = go_trace.test_determinism(go_project, 3, 300.0, runtime_override=None)
     assert result["value"] == "3/3"
     assert result["band"] == "Healthy"
     assert "go version" in result["details"]
@@ -99,7 +99,7 @@ def test_go_determinism_counts_every_shuffled_run(go_project):
 def test_go_refuses_a_directory_with_no_module(tmp_path):
     """The refusal path, beside the measuring one, so the two are told apart by a real run
     rather than by which of them happens to be tested."""
-    result = go_trace.decision_space_coverage(tmp_path, 60.0)
+    result = go_trace.decision_space_coverage(tmp_path, 60.0, runtime_override=None)
     assert result["band"] == "n/a"
     assert result["details"].strip()
 
@@ -141,7 +141,7 @@ def c_project(tmp_path_factory) -> pathlib.Path:
 def test_c_reports_a_verdict_rather_than_crashing(c_project):
     """C has no standard coverage report this harness can rely on, so the interesting
     property is that it reaches a verdict and names its reason either way."""
-    result = c_trace.decision_space_coverage(c_project, 300.0)
+    result = c_trace.decision_space_coverage(c_project, 300.0, runtime_override=None)
     assert result["band"] in ("Healthy", "Not Healthy", "Slop", "n/a")
     assert result["details"].strip(), "a verdict with no sentence says nothing"
 
@@ -150,7 +150,7 @@ def test_c_reports_a_verdict_rather_than_crashing(c_project):
 def test_c_determinism_refuses_for_the_reason_the_canon_gives(c_project):
     """C ships no standard test-order randomizer, so 0/5 would read as a suite that falls
     over when reordered rather than one that was never reordered."""
-    result = c_trace.test_determinism(c_project, 5, 300.0)
+    result = c_trace.test_determinism(c_project, 5, 300.0, runtime_override=None)
     assert result["band"] == "n/a"
     assert "randomizer" in result["details"]
 

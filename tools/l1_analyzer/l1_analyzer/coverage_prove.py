@@ -464,9 +464,9 @@ def ceiling_detail(attempted: int, located: int, ceiling: int) -> str:
 SweepProgress = Callable[[str, int, int], None]
 
 
-def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int = 3,
-                        timeout_seconds: float = 600.0, progress: SweepProgress | None = None,
-                        max_attempts: int = 5) -> dict:
+def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
+                        timeout_seconds: float, progress: SweepProgress | None,
+                        max_attempts: int) -> dict:
     """Sweep the WHOLE crate: one coverage build, then every module with uncovered branches is
     proven (batched, with per-gap repair fallback). Retained proofs are aggregated across the
     codebase. `progress(relpath, n_gaps, running_retained)` is called before each module."""
@@ -530,7 +530,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
 
 
 def sweep_detail(retained: int, modules: int, located: int, outcomes: dict, provenance: str,
-                 reason: str = "", cause: str = "") -> str:
+                 reason: str, cause: str) -> str:
     """What a finished sweep says, in the three cases it can be in.
 
     The middle case was missing. A sweep that located gaps, handed some to a model and got
@@ -577,8 +577,8 @@ def _outcome_detail(outcomes: dict) -> str:
             f"{outcomes['error']} did not compile.")
 
 
-def prove_coverage(repo: Path, module_relpath: str, cap: int = 3, timeout_seconds: float = 600.0,
-                   repair_rounds: int = 3) -> dict:
+def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: float,
+                   repair_rounds: int) -> dict:
     """Locate uncovered decision branches in one Rust module, prove each (propose -> run,
     then compiler-feedback repair up to repair_rounds), and retain the ones that fail.
     Returns the coverage_proofs shape the card consumes. Every not-run path carries a reason."""
