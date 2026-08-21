@@ -301,8 +301,11 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
             "demonstrated": demonstrated, "attempted": len(outcomes), "outcomes": outcomes}
 
 
-def _report_facets(module: Path, tests: Path, output_format: str) -> int:
-    """One module's closeable facets, printed for a reader or as JSON."""
+def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str) -> int:
+    """One module's closeable facets, printed for a reader or as JSON.
+
+    Several test files are read as one body of evidence, because a suite split across two
+    files is still one suite and reading only the first reports the other as absent."""
     from l1_analyzer import facets
 
     audit = facets.audit(module, tests)
@@ -312,7 +315,7 @@ def _report_facets(module: Path, tests: Path, output_format: str) -> int:
 
     coverage = f"{audit['coverage_percent']}%" if audit["coverage_measured"] else "not measured"
     index = f"{audit['silence_index']}%" if audit["silence_index"] is not None else "not measured"
-    print(f"# Facets — {module.name} against {tests.name}\n")
+    print(f"# Facets — {module.name} against {', '.join(t.name for t in tests)}\n")
     print(f"Coverage: {coverage} | Silence index: {index}")
     print(f"{audit['closeable_silence_sites']} of {audit['total_checkable_facets']} closeable "
           f"facets lack evidence\n")
@@ -466,10 +469,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--facets",
-        nargs=2,
+        nargs='+',
         default=None,
-        metavar=("MODULE", "TESTS"),
-        help="Audit ONE module against ONE test file: every closeable facet and the Silence "
+        metavar="PATH",
+        help="Audit ONE module against the test file(s) holding evidence about it: every "
+             "closeable facet and the Silence "
              "index over them. Coverage records what ran; silence records evidence the suite "
              "lacks, so a branch that executed and was never asserted on is covered and silent "
              "at once. Reports unexercised branches, candidate input regions, unasserted return "
@@ -505,7 +509,15 @@ def main(argv: list[str] | None = None) -> int:
         # checks below: this takes one module and the test file that is supposed to hold
         # evidence about it, so the "point me at a directory" rule does not apply and the
         # twenty indicators have nothing to say about which function is silent.
-        return _report_facets(Path(args.facets[0]), Path(args.facets[1]), args.format)
+        if len(args.facets) < 2:
+            parser.error("--facets takes a module and at least one test file")
+        # Checked here, at the boundary, because a path that is not there used to reach the
+        # reader and come back as a stack trace.
+        missing = [p for p in args.facets if not Path(p).is_file()]
+        if missing:
+            parser.error("--facets needs files that exist: " + ", ".join(missing))
+        return _report_facets(Path(args.facets[0]),
+                              tuple(Path(t) for t in args.facets[1:]), args.format)
 
     # The analyzer audits a repository (a directory), not a single file: the git, config,
     # coverage, and test-run steps all operate on a tree. A file argument used to reach the

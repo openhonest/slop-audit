@@ -104,17 +104,41 @@ def _functions(tree: ast.AST) -> list[ast.FunctionDef]:
     return [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
 
 
+def is_declared(node: ast.expr | None) -> bool:
+    """Whether a type was declared at all, which is a different question from which one.
+
+    `_annotation` used to answer both and returned the empty string for each, so a type it
+    could not read was indistinguishable from no type. Every parameter typed `ast.AST`,
+    `ast.expr` or `int | None` was reported as an UNDECLARED DOMAIN, which blames the
+    author for a gap in the reader. Two questions, two functions."""
+    return node is not None
+
+
 def _annotation(node: ast.expr | None) -> str:
-    """The bare name of a declared type, or the empty string when nothing was declared."""
+    """The bare name of a declared type, or the empty string when there is no single one.
+
+    A union has no one name and no one region table, so it reads empty here. `is_declared`
+    is what keeps it out of the undeclared list."""
     if node is None:
         return ""
     if isinstance(node, ast.Name):
         return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
     if isinstance(node, ast.Subscript):
         return _annotation(node.value)
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value.split("[")[0]
+        return node.value.split("[")[0].strip('"\'')
     return ""
+
+
+def _names(target: ast.expr) -> list[str]:
+    """Every name an assignment target binds, unpacking tuples and lists."""
+    if isinstance(target, ast.Name):
+        return [target.id]
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return [name for element in target.elts for name in _names(element)]
+    return []
 
 
 def asserted_calls(tests: ast.AST) -> set[str]:
@@ -129,8 +153,13 @@ def asserted_calls(tests: ast.AST) -> set[str]:
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
             name = _called_name(node.value)
             for target in node.targets:
-                if isinstance(target, ast.Name) and name:
-                    bound[target.id] = name
+                # A tuple target binds every name in it to the same call. Reading only the
+                # plain-name form meant `a, b = f()` followed by `assert a == 1` was not
+                # counted, so a function whose result the test unpacks and asserts on read
+                # as having no evidence at all.
+                for bindable in _names(target):
+                    if name:
+                        bound[bindable] = name
         if isinstance(node, ast.Assert):
             for inner in ast.walk(node):
                 if isinstance(inner, ast.Call):
@@ -151,9 +180,15 @@ def expected_exceptions(tests: ast.AST) -> set[str]:
     for node in ast.walk(tests):
         if not isinstance(node, (ast.With, ast.AsyncWith)):
             continue
-        if not any("raises" in ast.unparse(item.context_expr) for item in node.items):
+        managers = [item.context_expr for item in node.items]
+        if not any("raises" in ast.unparse(manager) for manager in managers):
             continue
+        # The manager's own call is not evidence about anything the block tests. Collecting
+        # it put `raises` in the set, so a module holding a function of that name had its
+        # exception path read as asserted by any raises block anywhere in the suite.
         for inner in ast.walk(node):
+            if inner in managers or any(inner in ast.walk(m) for m in managers):
+                continue
             if isinstance(inner, ast.Call):
                 called = _called_name(inner)
                 if called:
@@ -232,14 +267,6 @@ def supplied_regions(tests: ast.AST) -> dict[str, set[str]]:
     them and this rule cannot see that it does."""
     supplied: dict[str, set[str]] = {}
     bound = bound_regions(tests)
-
-    def regions_of(node: ast.expr) -> set[str]:
-        """A literal's own region, or every region a bound name carries."""
-        direct = _region_of(node)
-        if direct:
-            return {direct}
-        return bound.get(node.id, set()) if isinstance(node, ast.Name) else set()
-
     for node in ast.walk(tests):
         if not isinstance(node, ast.Call):
             continue
@@ -247,11 +274,23 @@ def supplied_regions(tests: ast.AST) -> dict[str, set[str]]:
         if not name:
             continue
         for position, argument in enumerate(node.args):
-            supplied.setdefault(f"{name}/{position}", set()).update(regions_of(argument))
+            supplied.setdefault(f"{name}/{position}", set()).update(regions_of(argument, bound))
         for keyword in node.keywords:
             if keyword.arg:
-                supplied.setdefault(f"{name}/{keyword.arg}", set()).update(regions_of(keyword.value))
+                supplied.setdefault(f"{name}/{keyword.arg}",
+                                    set()).update(regions_of(keyword.value, bound))
     return supplied
+
+
+def regions_of(node: ast.expr, bound: dict[str, set[str]]) -> set[str]:
+    """A literal's own region, or every region a name bound in the test file carries.
+
+    Module level rather than a closure over `bound`: a nested function cannot be called by
+    a test, so its own return contract was unassertable by construction."""
+    direct = _region_of(node)
+    if direct:
+        return {direct}
+    return bound.get(node.id, set()) if isinstance(node, ast.Name) else set()
 
 
 def _region_of(node: ast.expr) -> str:
@@ -272,6 +311,13 @@ def _region_of(node: ast.expr) -> str:
         return "empty" if not node.elts else "non-empty"
     if isinstance(node, ast.Dict):
         return "empty" if not node.values else "non-empty"
+    # `set()` and `dict()` are how an empty collection is usually written, and reading them
+    # as unreadable reported a region silent that the test right in front of it supplies.
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        if node.func.id in ("set", "dict", "list", "tuple", "frozenset", "bytes", "str"):
+            return "empty" if not (node.args or node.keywords) else "non-empty"
+        if node.func.id in ("int", "float"):
+            return "zero" if not node.args else ""
     return ""
 
 
@@ -289,10 +335,9 @@ def _branch_facets(fn: ast.FunctionDef, uncovered: frozenset[int]) -> list[Facet
     for node in ast.walk(fn):
         if not isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)):
             continue
-        body = getattr(node, "body", [])
-        if not body:
-            continue
-        entry = body[0].lineno
+        # Every one of these nodes has a non-empty body in any tree the parser accepts, so
+        # a guard here would be a check against a shape that cannot arrive.
+        entry = node.body[0].lineno
         out.append({
             "kind": "unexercised_branch", "function": fn.name, "line": node.lineno,
             "detail": f"{type(node).__name__.lower()} at line {node.lineno}",
@@ -320,7 +365,7 @@ def _region_facets(fn: ast.FunctionDef,
         if position is not None:
             evidence = evidence | supplied.get(f"{fn.name}/{position}", set())
         declared = _annotation(arg.annotation)
-        if not declared:
+        if not is_declared(arg.annotation):
             undeclared.append({
                 "kind": "undeclared_domain", "function": fn.name, "line": fn.lineno,
                 "detail": f"parameter `{arg.arg}` has no declared type",
@@ -376,7 +421,7 @@ def import_root(module: Path) -> Path:
     return directory
 
 
-def _coverage(module: Path, tests: Path) -> tuple[frozenset[int], float | None, bool]:
+def _coverage(module: Path, tests: tuple[Path, ...]) -> tuple[frozenset[int], float | None, bool]:
     """Uncovered lines, the branch percentage, and whether the suite succeeded.
 
     Coverage data goes to a temp directory so the target's own settings and data are
@@ -386,11 +431,19 @@ def _coverage(module: Path, tests: Path) -> tuple[frozenset[int], float | None, 
         report = Path(directory) / "coverage.json"
         run = subprocess.run(
             [sys.executable, "-m", "coverage", "run", "--branch", f"--data-file={data}",
-             f"--include={module}", "-m", "pytest", str(tests), "-q", "-p", "no:cacheprovider"],
+             f"--include={module}", "-m", "pytest", *[str(t) for t in tests],
+             "-q", "-p", "no:cacheprovider"],
             cwd=import_root(module), capture_output=True, text=True, timeout=600, check=False)
         made = subprocess.run(
             [sys.executable, "-m", "coverage", "json", f"--data-file={data}", "-o", str(report)],
             cwd=import_root(module), capture_output=True, text=True, timeout=300, check=False)
+        # Exit 0 is a green suite and 1 is a red one; both RAN, so their coverage is a
+        # reading. Anything else is a collection error, a usage error or an empty run, and
+        # the percentage it leaves behind is not evidence about what the tests reach. A
+        # module that raised on import reported 100% covered, which is this instrument's
+        # own bug category turned on itself: unmeasured read as clean.
+        if run.returncode not in (0, 1):
+            return frozenset(), None, False
         if made.returncode != 0 or not report.exists():
             return frozenset(), None, run.returncode == 0
         payload = json.loads(report.read_text())
@@ -402,11 +455,18 @@ def _coverage(module: Path, tests: Path) -> tuple[frozenset[int], float | None, 
         return frozenset(entry.get("missing_lines", [])), pct, run.returncode == 0
 
 
-def audit(module: Path, tests: Path) -> Audit:
-    """Every closeable facet of one module, and how many the suite leaves silent."""
-    module, tests = Path(module), Path(tests)
+def audit(module: Path, tests: Path | tuple[Path, ...]) -> Audit:
+    """Every closeable facet of one module, and how many the suite leaves silent.
+
+    Several test files are read as one body of evidence. Reading only one meant a suite
+    split across two files reported the evidence in the sibling as absent, which points a
+    reader at facets that are already closed."""
+    module = Path(module)
+    tests = (Path(tests),) if isinstance(tests, (str, Path)) else tuple(Path(t) for t in tests)
     module_tree = ast.parse(module.read_text())
-    tests_tree = ast.parse(tests.read_text())
+    tests_tree = ast.Module(
+        body=[node for path in tests for node in ast.parse(path.read_text()).body],
+        type_ignores=[])
     uncovered, coverage_percent, succeeded = _coverage(module, tests)
     asserted = asserted_calls(tests_tree)
     expecting = expected_exceptions(tests_tree)
@@ -429,7 +489,7 @@ def audit(module: Path, tests: Path) -> Audit:
         reason = "coverage produced no data, so branch facets are reported unmeasured"
 
     return {
-        "module": str(module), "tests": str(tests),
+        "module": str(module), "tests": ", ".join(str(t) for t in tests),
         "facets": found, "undeclared": undeclared,
         "total_checkable_facets": len(found),
         "closeable_silence_sites": len(silent),

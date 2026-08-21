@@ -119,3 +119,21 @@ Feature: facets — closeable facets and the Silence index for one module and it
     Then both spellings are read, one name as a string and several as a comma-separated string or a tuple
     But a case whose value is not a literal contributes nothing rather than a guess
 
+  Scenario: is_declared answers whether a parameter has a type at all
+    Given the annotation node of a parameter, which may be absent
+    When is_declared reads it
+    Then only an absent annotation is undeclared, however the present one is spelled
+    But _annotation used to answer this question as well as which type it was, and returned the empty string for each, so a dotted name or a union was filed as an undeclared domain and blamed the author for a gap in the reader
+
+  Scenario: _names reads every name an assignment target binds
+    Given an assignment target, which may be a name, a tuple, a list or neither
+    When _names reads it
+    Then a tuple target yields every name nested inside it
+    But a target that binds no name, such as an attribute or a subscript, yields none
+
+  Scenario: regions_of reads the regions one argument expression carries
+    Given an argument expression and the table of names the test file binds
+    When regions_of reads it
+    Then a literal carries its own region and a bound name carries every region bound to it
+    But it is module level rather than a closure, because a nested function cannot be called by a test and its own return contract was unassertable by construction
+
