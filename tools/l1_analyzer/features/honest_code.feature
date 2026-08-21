@@ -97,6 +97,24 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     Then the assessment carries the clauses, the share and the band
     But it touches no filesystem, which is what lets the hook path run on the buffer an agent just wrote
 
+  Scenario: allowances reads the exceptions a file declares, with their reasons
+    Given the text of a file
+    When allowances reads its honest-code-allow comments
+    Then each names one clause and carries the reason it does not apply here
+    But an allowance with no reason is not honoured, since a suppression nobody justified is the silent skip this whole instrument exists to name
+
+  Scenario: allowed_reason says whether one finding was declared an exception
+    Given a finding and the allowances its file declares
+    When allowed_reason compares the clause and the line
+    Then a finding the author declared, with a reason, is set apart from the violations
+    But it is never dropped, because an exception nobody can see is indistinguishable from a rule nobody checked
+
+  Scenario: _split_allowed separates the violations from the declared exceptions
+    Given a clause's findings and the allowances the file declares
+    When _split_allowed compares them
+    Then a site the author declared, with a reason, is set apart rather than counted as a violation
+    But it is never dropped, since eleven handlers in this package are correct as written and leaving them as permanent findings would train a reader to skip the clause
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Clause 17, the strangler pattern, is a property of how a migration is sequenced over weeks.

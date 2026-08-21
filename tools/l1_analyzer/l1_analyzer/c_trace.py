@@ -60,21 +60,27 @@ def _compiler(cc: str, repo: Path, timeout_seconds: float) -> str:
     return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown C compiler"
 
 
-def _make_target(repo: Path) -> str | None:
-    """The first of `test`/`check` the repo's Makefile declares as a target, or None. Read-only
-    detection of the target's own build: the harness never edits the Makefile."""
+def _make_target(repo: Path) -> tuple[str | None, str]:
+    """The first of `test`/`check` the repo's Makefile declares as a target, and why there
+    is none.
+
+    Read-only detection of the target's own build: the harness never edits the Makefile.
+
+    The reason travels with the absence because a bare None had the caller say "no Makefile
+    test/check target found" for a Makefile it could not open. It may have had one, and the
+    two absences send a reader to different repairs."""
     for name in _MAKEFILES:
         makefile = repo / name
         if makefile.exists():
             try:
                 text = makefile.read_text(encoding="utf-8", errors="ignore")
-            except OSError:
-                return None
+            except OSError as error:
+                return None, f"{name} could not be read: {error}"
             for target in _TEST_TARGETS:
                 if re.search(rf"^{target}\s*:", text, re.MULTILINE):
-                    return target
-            return None
-    return None
+                    return target, ""
+            return None, f"{name} declares no {' or '.join(_TEST_TARGETS)} target"
+    return None, f"no Makefile here ({', '.join(_MAKEFILES)})"
 
 
 def _coverage_verdict(summary_text: str, build_returncode: int, build_output: str,
@@ -144,10 +150,10 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     if cc is None:
         return _na("needs a C compiler (cc/gcc/clang) in PATH")
     compiler = _compiler(cc, repo, timeout_seconds)
-    target = _make_target(repo)
+    target, why = _make_target(repo)
     if target is None:
         return _na("C has no standard coverage convention; provide a build that runs tests under "
-                   "gcov/lcov (no Makefile test/check target found)")
+                   f"gcov/lcov ({why})")
     lcov = _lcov()
     if lcov is None:
         return _na(f"C coverage needs lcov to total gcov data; install lcov (compiler: {compiler})")

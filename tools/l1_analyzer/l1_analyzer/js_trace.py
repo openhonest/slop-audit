@@ -98,6 +98,7 @@ def _node_modules_present(repo: Path) -> bool:
 def _package_json(repo: Path) -> dict | None:
     try:
         return json.loads((repo / "package.json").read_text())
+    # honest-code-allow: L1.21.8 - the caller turns this None into _na("no readable package.json in the repo"), which covers absent and malformed alike and is a refusal to measure rather than a clean reading
     except (OSError, json.JSONDecodeError):
         return None
 
@@ -109,14 +110,27 @@ def _test_command(pkg: dict) -> str | None:
     return None if (not script.strip() or _NO_TEST_SCRIPT in script) else script
 
 
-def _installed_major(repo: Path, package: str) -> int | None:
-    """The installed major version of a node_modules package, or None when it cannot be read.
-    Directory-insensitive: it reads the target's own installed copy, not any global one."""
+def _installed_major(repo: Path, package: str) -> tuple[int | None, str]:
+    """The installed major version of a node_modules package, and why it is unknown.
+
+    Directory-insensitive: it reads the target's own installed copy, not any global one.
+
+    The reason travels with the absence because the caller's guard used to read
+    `if major is not None and major < 30`, so a version nobody could read PROCEEDED to the
+    measurement. Unknown has to be its own answer, or an assumption is measured as a fact."""
+    installed = repo / "node_modules" / package / "package.json"
     try:
-        version = json.loads((repo / "node_modules" / package / "package.json").read_text())["version"]
-        return int(str(version).lstrip("^~=v").split(".", 1)[0])
-    except (OSError, json.JSONDecodeError, KeyError, ValueError):
-        return None
+        version = json.loads(installed.read_text())["version"]
+    except OSError:
+        return None, f"{package}'s installed package.json could not be read"
+    except json.JSONDecodeError:
+        return None, f"{package}'s installed package.json is not valid JSON"
+    except KeyError:
+        return None, f"{package}'s installed package.json declares no version"
+    try:
+        return int(str(version).lstrip("^~=v").split(".", 1)[0]), ""
+    except ValueError:
+        return None, f"{package}'s installed version {version!r} has no readable major number"
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +344,13 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         return _na("determinism needs an order-randomizing runner (vitest --sequence.shuffle or "
                    f"jest --seed); detected {runner or 'no recognized test runner'}")
     if runner == "jest":
-        major = _installed_major(repo, "jest")
+        major, unknown = _installed_major(repo, "jest")
+        # Refused rather than attempted. `jest --seed` needs jest 30, and driving it at a
+        # version nobody could identify produces a determinism figure with an assumption
+        # underneath it.
+        if unknown:
+            return _na(f"determinism needs a known jest version to know whether --seed "
+                       f"exists, and {unknown}")
         if major is not None and major < 30:
             return _na(f"jest --seed needs jest>=30; detected jest {major} in node_modules")
 

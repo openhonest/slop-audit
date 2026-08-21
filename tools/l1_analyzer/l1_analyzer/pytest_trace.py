@@ -74,6 +74,7 @@ def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str], timeout_s
     except subprocess.TimeoutExpired:
         try:
             os.killpg(process.pid, signal.SIGKILL)
+        # honest-code-allow: L1.21.8 - the process was already gone, which is the state the kill was for. There is no failure here to report to anyone
         except ProcessLookupError:
             pass
         stdout, stderr = process.communicate()
@@ -142,17 +143,27 @@ def resolve_via_shim(repo: Path, tool: str, timeout_seconds: float) -> tuple[str
     return None, ""
 
 
-def _module_available(module: str, python_executable: str | None = None) -> bool:
-    """True if `import module` succeeds in the interpreter that will run the suite. That is
-    the analyzer's own interpreter by default, or the one `python_executable` names."""
+def _module_available(module: str, python_executable: str | None) -> tuple[bool, str]:
+    """Whether `import module` succeeds in the interpreter that will run the suite, and why
+    it did not.
+
+    The interpreter is the analyzer's own by default, or the one `python_executable` names.
+
+    The reason travels with the answer because a bare False conflated two repairs. A caller
+    told only "unavailable" said "needs pytest and coverage.py in the target environment",
+    which sends a reader to install a package when the interpreter they named would not
+    start at all."""
+    interpreter = _interpreter(python_executable)
     try:
         result = subprocess.run(
-            [_interpreter(python_executable), "-c", f"import {module}"],
+            [interpreter, "-c", f"import {module}"],
             capture_output=True, text=True, timeout=30, check=False,
         )
-        return result.returncode == 0
-    except (subprocess.SubprocessError, OSError):
-        return False
+    except (subprocess.SubprocessError, OSError) as error:
+        return False, f"the interpreter {interpreter} could not be run: {error}"
+    if result.returncode == 0:
+        return True, ""
+    return False, f"{module} is not importable in {interpreter}"
 
 
 def coverage_band(pct: float) -> str:
@@ -311,8 +322,11 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
     if lang != "python":
         return _na(f"runtime decision-coverage harness is Python-only; {lang} not supported yet")
     exe, provenance = resolve_interpreter(repo, python_executable)
-    if not _module_available("pytest", exe) or not _module_available("coverage", exe):
-        return _na(f"needs pytest and coverage.py in the target environment ({provenance})")
+    for module in ("pytest", "coverage"):
+        available, why = _module_available(module, exe)
+        if not available:
+            return _na(f"needs pytest and coverage.py in the target environment "
+                       f"({provenance}): {why}")
 
     with tempfile.TemporaryDirectory(prefix="l1-cov-") as directory:
         data_file = Path(directory) / ".coverage"
@@ -369,10 +383,13 @@ def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float,
     if lang != "python":
         return _na(f"runtime determinism harness is Python-only; {lang} not supported yet")
     exe, provenance = resolve_interpreter(repo, python_executable)
-    if not _module_available("pytest", exe):
-        return _na(f"needs pytest in the target environment ({provenance})")
-    if not _module_available("pytest_randomly", exe):
-        return _na(f"needs pytest-randomly to randomize execution order (install it in {provenance})")
+    available, why = _module_available("pytest", exe)
+    if not available:
+        return _na(f"needs pytest in the target environment ({provenance}): {why}")
+    available, why = _module_available("pytest_randomly", exe)
+    if not available:
+        return _na(f"needs pytest-randomly to randomize execution order "
+                   f"(install it in {provenance}): {why}")
 
     _INCOMPLETE = {2: "the run was interrupted", 3: "pytest hit an internal error",
                    4: "pytest usage or collection error (the suite did not run)"}

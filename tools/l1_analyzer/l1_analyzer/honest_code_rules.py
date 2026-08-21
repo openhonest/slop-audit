@@ -76,8 +76,14 @@ _TYPED_SCALARS = frozenset({"int", "str", "float", "bool", "bytes", "list", "dic
 
 
 class Finding(TypedDict):
-    """One site a clause found, readable at the line it names."""
+    """One site a clause found, readable at the file and line it names.
 
+    `file` is filled in by the runner rather than by the checker, because a checker reads a
+    tree and the tree does not know where it came from. It has to be there: a line number
+    with no file is not a finding anyone can act on, and the repository path was flattening
+    them and dropping it."""
+
+    file: str
     clause: str
     symbol: str
     line: int
@@ -91,7 +97,7 @@ def _finding(clause: str, symbol: str, line: int, detail: str, instead: str,
     """One finding. `undecided` is required rather than defaulted: this module's own clause
     14 flagged the default, and it was right. Every caller now states whether the clause
     read the whole rule or half of it, so nobody can forget to say."""
-    return {"clause": clause, "symbol": symbol, "line": line, "detail": detail,
+    return {"file": "", "clause": clause, "symbol": symbol, "line": line, "detail": detail,
             "instead": instead, "undecided": undecided}
 
 

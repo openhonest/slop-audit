@@ -92,15 +92,20 @@ def test_installed_major_reads_the_targets_own_copy(tmp_path):
     pkg_dir = tmp_path / "node_modules" / "jest"
     pkg_dir.mkdir(parents=True)
     (pkg_dir / "package.json").write_text(json.dumps({"version": "29.7.0"}))
-    assert js_trace._installed_major(tmp_path, "jest") == 29
+    assert js_trace._installed_major(tmp_path, "jest") == (29, "")
 
 
-def test_installed_major_is_none_when_it_cannot_be_read(tmp_path):
-    assert js_trace._installed_major(tmp_path, "jest") is None
+def test_installed_major_is_unknown_with_a_reason_when_it_cannot_be_read(tmp_path):
+    """Unknown is its own answer. The caller's guard read `major is not None and major < 30`,
+    so a version nobody could read PROCEEDED to drive `jest --seed` at a jest that may not
+    have the flag."""
+    major, why = js_trace._installed_major(tmp_path, "jest")
+    assert major is None and "could not be read" in why
     pkg_dir = tmp_path / "node_modules" / "jest"
     pkg_dir.mkdir(parents=True)
     (pkg_dir / "package.json").write_text("{not json")
-    assert js_trace._installed_major(tmp_path, "jest") is None
+    major, why = js_trace._installed_major(tmp_path, "jest")
+    assert major is None and "valid JSON" in why
 
 
 # --- the ran-marker and the failure line --------------------------------------

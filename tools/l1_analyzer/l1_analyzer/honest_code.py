@@ -20,6 +20,7 @@ process, reads a second file, or asks the network.
 """
 
 import ast
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
@@ -60,6 +61,19 @@ class Clause(TypedDict):
     check: Callable[[dict], list[Finding] | None]
 
 
+class Allowed(TypedDict):
+    """One site the author declared an exception, and why.
+
+    Never dropped. An exception nobody can see is indistinguishable from a rule nobody
+    checked, which is the thing this instrument is built to name."""
+
+    file: str
+    clause: str
+    line: int
+    detail: str
+    reason: str
+
+
 class Assessed(TypedDict):
     """One clause after it ran, or the reason it did not."""
 
@@ -68,6 +82,7 @@ class Assessed(TypedDict):
     decided: bool
     reason: str
     findings: list[Finding]
+    allowed: list[Allowed]
 
 
 class Assessment(TypedDict):
@@ -122,6 +137,15 @@ _WHY_NOT = {
 
 _BANDS = ((95.0, "Healthy"), (75.0, "Not Healthy"))
 
+# How an author declares that a clause does not apply at one site. The reason is required:
+# a suppression nobody justified is the silent skip this whole instrument exists to name,
+# and it has to cost the author a sentence.
+_ALLOW = re.compile(r"honest-code-allow:\s*(L1\.21\.\d+)\s*[-\u2014:]+\s*(\S.*?)\s*$")
+
+# How far below the comment the site it covers may sit. One line, so a comment cannot reach
+# past the thing it was written about.
+_ALLOW_REACH = 2
+
 
 def read_source_text(text: str, path: str) -> dict:
     """One file's text, parsed into what every clause needs.
@@ -163,6 +187,32 @@ def read_source(path: Path) -> dict:
     return read_source_text(path.read_text(errors="replace"), str(path))
 
 
+def allowances(text: str) -> dict[int, dict[str, str]]:
+    """The exceptions a file declares, keyed by the line the comment sits on.
+
+    Each names one clause and carries the reason it does not apply there. A declaration
+    with no reason is not returned at all: a suppression nobody justified is the silent
+    skip this instrument exists to name."""
+    declared: dict[int, dict[str, str]] = {}
+    for number, line in enumerate(text.split("\n"), start=1):
+        found = _ALLOW.search(line)
+        if found:
+            declared.setdefault(number, {})[found.group(1)] = found.group(2)
+    return declared
+
+
+def allowed_reason(finding: Finding, declared: dict[int, dict[str, str]]) -> str:
+    """Why this finding was declared an exception, or the empty string.
+
+    The comment may sit on the site's own line or just above it, and no further: a comment
+    cannot reach past the thing it was written about."""
+    for offset in range(_ALLOW_REACH):
+        reasons = declared.get(finding["line"] - offset, {})
+        if finding["clause"] in reasons:
+            return reasons[finding["clause"]]
+    return ""
+
+
 def applies_to(clause: Clause, source: dict) -> bool:
     """Whether this clause can be decided for this file at all.
 
@@ -177,19 +227,45 @@ def assess(source: dict) -> list[Assessed]:
     A clause that could not be decided never carries findings: not applicable and not
     decidable are both silence, and a finding under either would be a claim about something
     nobody read."""
+    declared = allowances(source["text"])
     assessed: list[Assessed] = []
     for clause in CLAUSES:
         reason = _skip_reason(clause, source)
         findings = None if reason else clause["check"](source)
+        for finding in findings or ():
+            # Filled in here, where the path is known. A checker reads a tree and the tree
+            # does not know which file it came from.
+            finding["file"] = source["path"]
         if findings is None and not reason:
             reason = (f"not applicable to a {source['language']} file, so nothing here was "
                       "checked")
+        kept, allowed = _split_allowed(findings or [], declared)
         assessed.append({
             "code": clause["code"], "name": clause["name"],
             "decided": reason == "", "reason": reason,
-            "findings": findings or [],
+            "findings": kept, "allowed": allowed,
         })
     return assessed
+
+
+def _split_allowed(findings: list[Finding],
+                   declared: dict[int, dict[str, str]]) -> tuple[list[Finding], list[Allowed]]:
+    """The violations, and the sites the author declared with a reason.
+
+    Set apart rather than dropped. Four handlers in this tool are correct as written and
+    argued at the site; leaving them as permanent findings would train a reader to skip the
+    clause, and skipping a clause is how the one that matters gets skipped too."""
+    kept: list[Finding] = []
+    allowed: list[Allowed] = []
+    for finding in findings:
+        reason = allowed_reason(finding, declared)
+        if reason:
+            allowed.append({"file": finding["file"], "clause": finding["clause"],
+                            "line": finding["line"], "detail": finding["detail"],
+                            "reason": reason})
+        else:
+            kept.append(finding)
+    return kept, allowed
 
 
 def _skip_reason(clause: Clause, source: dict) -> str:
@@ -263,6 +339,7 @@ def report(assessment: Assessment) -> str:
     broken = [c for c in assessment["clauses"] if c["decided"] and c["findings"]]
     held = [c for c in assessment["clauses"] if c["decided"] and not c["findings"]]
     undecided = [c for c in assessment["clauses"] if not c["decided"]]
+    declared = [a for c in assessment["clauses"] for a in c["allowed"]]
 
     for clause in broken:
         lines.append(f"## {clause['code']} — {clause['name']} ({len(clause['findings'])})")
@@ -275,6 +352,13 @@ def report(assessment: Assessment) -> str:
         lines.append("")
     if held:
         lines += ["## clauses that hold", "", ", ".join(c["code"] for c in held), ""]
+    if declared:
+        lines += [f"## declared exceptions ({len(declared)})", "",
+                  ("> Sites the author stated a reason for. They are not violations and "
+                   "they are not invisible: a reader audits the reason here."), ""]
+        for entry in declared:
+            lines.append(f"- `{entry['clause']}:{entry['line']}` — {entry['reason']}")
+        lines.append("")
     if undecided:
         lines += [f"## clauses not decided ({len(undecided)})", "",
                   ("> These are outside the share, numerator and denominator both. A clause "
@@ -323,12 +407,14 @@ def analyze(repo: Path, lang: str) -> dict:
     decided: set[str] = set()
     # A production clause over a test file would make the score about the suite rather than
     # about the code, and a test clause over a production file has no tests to read.
+    declared_exceptions: list[Allowed] = []
     for read, wanted in ((production, False), (tests, True)):
         for path, text in read:
             for clause in assess_file_text(text, str(path))["clauses"]:
                 if (clause["code"] in TEST_SCOPED) != wanted or not clause["decided"]:
                     continue
                 decided.add(clause["code"])
+                declared_exceptions += clause["allowed"]
                 if clause["findings"]:
                     broken.setdefault(clause["code"], []).extend(clause["findings"])
 
@@ -338,12 +424,15 @@ def analyze(repo: Path, lang: str) -> dict:
         nothing = ("no file here could be measured against any clause, so there is no "
                    "conformity to report. Not decided: " + ", ".join(never_decided))
         return {"value": "n/a", "band": "n/a", "details": nothing,
-                "findings": [], "undecided": never_decided}
+                "findings": [], "undecided": never_decided, "allowed": declared_exceptions}
 
     share = round((len(decided) - len(broken)) / len(decided) * 100, 1)
+    exceptions = (f". {len(declared_exceptions)} declared exception"
+                  f"{'' if len(declared_exceptions) == 1 else 's'}"
+                  if declared_exceptions else "")
     detail = (f"{len(decided) - len(broken)} of {len(decided)} decided clauses hold across "
-              f"{len(files)} files. Not decided ({len(never_decided)}): "
+              f"{len(files)} files{exceptions}. Not decided ({len(never_decided)}): "
               + ", ".join(never_decided))
     return {"value": share, "band": band_of(share), "details": detail,
             "findings": [f for group in broken.values() for f in group],
-            "undecided": never_decided}
+            "undecided": never_decided, "allowed": declared_exceptions}

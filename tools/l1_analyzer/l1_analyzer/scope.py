@@ -145,6 +145,7 @@ def _test_dir_corroborated(directory: Path) -> bool:
     and the cache stops one rglob per file underneath it."""
     try:
         entries = list(directory.rglob("*"))
+    # honest-code-allow: L1.21.8 - an unreadable directory falls through to being audited as production rather than scoped out, which is the conservative direction: it can only add files to a measurement, never silently remove them
     except OSError:
         return False
     for f in entries:
@@ -310,6 +311,7 @@ def _is_generated(path: Path) -> bool:
     an unreadable file is treated as not generated (it falls through to normal scope)."""
     try:
         head = path.read_bytes()[:2048].decode("utf8", errors="ignore")
+    # honest-code-allow: L1.21.8 - an unreadable file falls through to normal scope and is audited rather than skipped as generated, which is the conservative direction and is stated in the docstring above
     except OSError:
         return False
     return any(marker in head for marker in _GENERATED_MARKERS)

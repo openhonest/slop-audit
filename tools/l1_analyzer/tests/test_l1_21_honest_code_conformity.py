@@ -334,3 +334,97 @@ def test_a_production_clause_is_not_measured_over_a_test_file(tmp_path):
         "    elif k == 'c':\n        three()\n")
     result = honest_code.analyze(tmp_path, "python")
     assert not any(f["clause"] == "L1.21.1" for f in result["findings"]), result["findings"]
+
+
+def test_a_repository_finding_names_the_file_it_is_in(tmp_path):
+    """A line number with no file is not a finding anyone can act on. The per-file path
+    knows which file it read; the repository path flattened the findings and dropped it."""
+    (tmp_path / "dirty.py").write_text(DIRTY)
+    result = honest_code.analyze(tmp_path, "python")
+    assert result["findings"]
+    assert all(f["file"].endswith("dirty.py") for f in result["findings"]), result["findings"]
+
+
+def test_a_single_file_finding_names_its_file_too():
+    """One shape for a finding, wherever it came from, so a caller reading both does not
+    have to know which produced it."""
+    assessment = honest_code.assess_file_text(DIRTY, "m.py")
+    located = [f for c in assessment["clauses"] for f in c["findings"]]
+    assert located
+    assert all(f["file"] == "m.py" for f in located)
+
+
+# --------------------------------------------------------------------------
+# Exceptions the author declares, with reasons
+# --------------------------------------------------------------------------
+
+SWALLOW = ("def f(x):\n    try:\n        return g(x)\n"
+           "    except ValueError:\n        return None\n")
+
+ALLOWED = ("def f(x):\n    try:\n        return g(x)\n"
+           "    # honest-code-allow: L1.21.8 — a body that will not parse asserts nothing\n"
+           "    except ValueError:\n        return None\n")
+
+
+def test_an_undeclared_swallow_is_a_violation():
+    assessed = honest_code.assess(honest_code.read_source_text(SWALLOW, "m.py"))
+    clause = next(c for c in assessed if c["code"] == "L1.21.8")
+    assert clause["findings"]
+
+
+def test_a_declared_exception_is_not_counted_as_a_violation():
+    """Four handlers in this tool are correct as written and argued at the site. Leaving
+    them as permanent findings would train a reader to skip the clause, and skipping a
+    clause is how the one that matters gets skipped too."""
+    assessed = honest_code.assess(honest_code.read_source_text(ALLOWED, "m.py"))
+    clause = next(c for c in assessed if c["code"] == "L1.21.8")
+    assert clause["findings"] == []
+
+
+def test_a_declared_exception_is_still_reported_where_a_reader_can_audit_it():
+    """Never dropped. An exception nobody can see is indistinguishable from a rule nobody
+    checked, which is the thing this instrument is built to name."""
+    assessed = honest_code.assess(honest_code.read_source_text(ALLOWED, "m.py"))
+    clause = next(c for c in assessed if c["code"] == "L1.21.8")
+    assert len(clause["allowed"]) == 1
+    assert "will not parse" in clause["allowed"][0]["reason"]
+
+
+def test_an_allowance_with_no_reason_is_not_honoured():
+    """A suppression nobody justified is the silent skip this whole instrument exists to
+    name. It has to cost the author a sentence."""
+    text = SWALLOW.replace("    except ValueError:",
+                           "    # honest-code-allow: L1.21.8\n    except ValueError:")
+    assessed = honest_code.assess(honest_code.read_source_text(text, "m.py"))
+    clause = next(c for c in assessed if c["code"] == "L1.21.8")
+    assert clause["findings"], "a bare suppression silenced the clause"
+
+
+def test_an_allowance_for_a_different_clause_does_not_apply():
+    text = SWALLOW.replace("    except ValueError:",
+                           "    # honest-code-allow: L1.21.1 — a reason for another clause\n"
+                           "    except ValueError:")
+    assessed = honest_code.assess(honest_code.read_source_text(text, "m.py"))
+    clause = next(c for c in assessed if c["code"] == "L1.21.8")
+    assert clause["findings"]
+
+
+def test_the_report_names_the_declared_exceptions_and_their_reasons():
+    printed = honest_code.report(honest_code.assess_file_text(ALLOWED, "m.py"))
+    assert "declared" in printed.lower()
+    assert "will not parse" in printed
+
+
+def test_the_repository_measure_counts_the_declared_exceptions(tmp_path):
+    (tmp_path / "allowed.py").write_text(ALLOWED)
+    result = honest_code.analyze(tmp_path, "python")
+    assert result["allowed"]
+    assert "1 declared exception" in result["details"]
+
+
+def test_a_clause_with_only_declared_exceptions_holds(tmp_path):
+    """The author stated a reason and a reader can read it. That is a different fact from
+    a clause nobody checked, and the share treats it as decided and holding."""
+    (tmp_path / "allowed.py").write_text(ALLOWED)
+    result = honest_code.analyze(tmp_path, "python")
+    assert not any(f["clause"] == "L1.21.8" for f in result["findings"])

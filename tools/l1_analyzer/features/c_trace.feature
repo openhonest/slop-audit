@@ -42,7 +42,7 @@ Feature: c_trace — the L1.19 and L1.20 runtime harness for C repositories
     When _make_target reads the first such file it finds and looks for a test target, then a check target
     Then it returns the name of the first one declared
     And it only reads the file, because the harness never edits the target's build
-    But a repository with no makefile, an unreadable makefile, or a makefile declaring neither target yields nothing, and coverage is then not applicable
+    But the three ways of having no target come back with three different reasons, since a bare nothing had the caller say "no Makefile test/check target found" for a makefile it could not open
 
   Scenario: _coverage_verdict decides L1.19 from the lcov summary and the build that produced it
     Given lcov's summary text, the exit code of the instrumented make run, that run's output, the compiler that built it and the make target that ran

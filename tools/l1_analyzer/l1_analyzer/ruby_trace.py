@@ -71,6 +71,7 @@ def _lock_has_rspec(repo: Path) -> bool:
     live outside a top-level spec/ directory is still detected as RSpec."""
     try:
         return "rspec" in (repo / "Gemfile.lock").read_text()
+    # honest-code-allow: L1.21.8 - this is the third of three RSpec signals and the other two are read independently, so an unreadable lock file cannot by itself decide the answer, and when no signal fires the caller refuses with a reason
     except OSError:
         return False
 

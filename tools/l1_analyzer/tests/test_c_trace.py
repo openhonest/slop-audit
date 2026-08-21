@@ -21,12 +21,17 @@ from l1_analyzer import c_trace
 
 
 def test_make_target_detects_test_and_check(tmp_path):
+    """The reason travels with the absence. A bare None had the caller say "no Makefile
+    test/check target found" for a Makefile it could not open, and the three ways of having
+    no target send a reader to three different repairs."""
     (tmp_path / "Makefile").write_text("all:\n\tgcc -o app main.c\ncheck:\n\t./t\n")
-    assert c_trace._make_target(tmp_path) == "check"
+    assert c_trace._make_target(tmp_path) == ("check", "")
     (tmp_path / "Makefile").write_text("all:\n\tgcc -o app main.c\n")
-    assert c_trace._make_target(tmp_path) is None
+    target, why = c_trace._make_target(tmp_path)
+    assert target is None and "declares no" in why
     (tmp_path / "Makefile").unlink()
-    assert c_trace._make_target(tmp_path) is None
+    target, why = c_trace._make_target(tmp_path)
+    assert target is None and "no Makefile" in why
 
 
 def _summary(pct: str, covered: int, total: int) -> str:

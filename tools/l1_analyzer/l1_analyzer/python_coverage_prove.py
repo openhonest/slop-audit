@@ -156,6 +156,7 @@ def body_asserts(body: str) -> bool:
     block runs. A body that will not parse asserts nothing, since it will not run either."""
     try:
         tree = ast.parse(textwrap.dedent(body))
+    # honest-code-allow: L1.21.8 - a body that will not parse asserts nothing, because it will not run either. False is the true answer to the question asked rather than a stand-in for one
     except SyntaxError:
         return False
 
@@ -281,8 +282,12 @@ def prove_coverage_repo(repo: Path, cap_per_module: int = 5, repair_rounds: int 
         return {"retained": [], "attempted": 0,
                 "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason(llm.anthropic_sdk)]}"}
     interpreter, provenance = pytest_trace.resolve_interpreter(repo, python_executable)
-    if not pytest_trace._module_available("pytest", interpreter) or not pytest_trace._module_available("coverage", interpreter):
-        return {"retained": [], "attempted": 0, "detail": f"needs pytest and coverage.py in the target environment ({provenance})"}
+    for module in ("pytest", "coverage"):
+        available, why = pytest_trace._module_available(module, interpreter)
+        if not available:
+            return {"retained": [], "attempted": 0,
+                    "detail": f"needs pytest and coverage.py in the target environment "
+                              f"({provenance}): {why}"}
     cov = _uncovered_lines(repo, interpreter, timeout_seconds)
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}

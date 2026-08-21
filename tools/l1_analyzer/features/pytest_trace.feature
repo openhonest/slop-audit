@@ -58,7 +58,7 @@ Feature: pytest_trace — running a Python repository's own test suite to measur
     When _module_available runs a bare import in that interpreter under a thirty-second limit
     Then it reports available only when the import exits cleanly
     And a crash, a timeout or an interpreter that cannot be started reports unavailable rather than raising
-    But it proves only that the name imports, not that the version is the one the suite needs
+    But an interpreter that could not be started says so, since a caller told only "unavailable" sent a reader to install a package when the interpreter they named was the problem
 
   Scenario: _na packages a not-measured reason as a result the report can publish
     Given the reason a measurement could not be taken

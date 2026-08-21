@@ -102,6 +102,7 @@ def module_state(module: object, read: Callable[[object], str] = safe_repr) -> s
             (name, read(value)) for name, value in vars(module).items()
             if not name.startswith("__") and not callable(value)
             and not isinstance(value, type)))
+    # honest-code-allow: L1.21.8 - the empty string IS the distinguished unreadable value here, and _purity reads it as unverified rather than as a module holding nothing
     except Exception:  # noqa: BLE001 - an unorderable namespace is unreadable, not a failure
         return ""
 

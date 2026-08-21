@@ -79,7 +79,7 @@ Feature: js_trace — running a JavaScript or TypeScript project's own suite to 
     When _installed_major reads the version from that package's own installed manifest and takes the leading number
     Then it returns that number
     And it reads the target's installed copy rather than any globally installed one, so the answer describes the code that will actually run
-    But an unreadable manifest, a missing version, or a version that is not a number returns nothing, and the caller then declines to rule the runner out
+    But an unknown version comes back with the reason it is unknown, since the caller's guard read "not none and below thirty" and so drove jest --seed at a version nobody could identify
 
   Scenario: _c8_available asks whether the coverage tool is installed in this project
     Given a repository and a time limit
