@@ -4,6 +4,14 @@ The reference implementation of the twenty Layer 1 quantitative indicators (L1.1
 
 This is the canonical instrument. The pre-registered study designs are validated against its output. A separate, validated-equivalent Rust redistribution for portability lives at `../slop-audit-rs/`.
 
+## Install it
+
+```
+uv tool install --python 3.13 <path-to-this-directory>
+```
+
+**Name the interpreter.** Without `--python`, uv picks the newest one it can find, and on a machine carrying a FREE-THREADED build that is what it picks. tree-sitter's parsers ship abi3 wheels, abi3 wheels do not exist for free-threaded builds, and the source build then fails with `The limited API is not currently supported in the free-threaded build`. Any ordinary CPython 3.12 or later works; the free-threaded one does not. `requires-python` cannot express this, because the constraint is on the build rather than on the version.
+
 ## Run it
 
 ```
@@ -12,6 +20,15 @@ uv run slop-audit-l1 <repo> --format json        # machine-readable
 uv run slop-audit-l1 <repo> --no-exec            # static only, skip the runtime indicators
 uv run slop-audit-l1 <repo> --report ./out       # write <slug>.md and <slug>.html cards
 ```
+
+Two commands take ONE file rather than a repository, because they answer a question about a file:
+
+```
+uv run slop-audit-l1 --honest-code <file>                    # L1.21, built for a write hook
+uv run slop-audit-l1 --facets <module> <tests>...            # closeable facets and the Silence index
+```
+
+`--honest-code` prints nothing when the file is clean, prints what to change to stderr when it is not, and exits 1. The panel commands need a directory and refuse a file; pointing one at a file's parent measures the directory, which is a different question.
 
 Tests run with the dev extra: `uv run --extra dev pytest`.
 
