@@ -3,6 +3,18 @@ Feature: vacuity — paths where a check publishes a property it never measured,
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  Scenario: names_a_failure recognises a word that says the work was not done
+    Given one word a module publishes as a verdict
+    When names_a_failure reads its shape
+    Then the un- prefix on a past participle is how English spells work that was not done, so unobserved and unverified are refusals as much as unmeasured and unread
+    But a word that merely starts with un- and asserts something, such as unique or unified, is not, and neither is a word this rule cannot read
+
+  Scenario: _refusal_name reads a constant's name the way it reads the string it holds
+    Given the identifier of a module constant a measure publishes
+    When _refusal_name strips its underscores and reads its shape
+    Then a name that says the work was not done is a refusal, whatever case or underscores it carries
+    But the morphology reached the string branch and not this one, so a module publishing the literal was excused and one publishing the constant bound to that same literal was convicted
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
@@ -275,4 +287,3 @@ Feature: vacuity — paths where a check publishes a property it never measured,
     When _panel_row reads it
     Then a dict literal is that dict, and a dict comprehension is the row each of its entries is
     But anything else carries no published dict, and reading the comprehension is what the checker could not do: it had a rule for a panel refused row by row and no way to reach one, so eight published results in a single statement were walked past
-

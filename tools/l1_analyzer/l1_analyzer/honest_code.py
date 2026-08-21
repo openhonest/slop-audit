@@ -427,12 +427,14 @@ def analyze(repo: Path, lang: str) -> dict:
                 "findings": [], "undecided": never_decided, "allowed": declared_exceptions}
 
     share = round((len(decided) - len(broken)) / len(decided) * 100, 1)
-    exceptions = (f". {len(declared_exceptions)} declared exception"
-                  f"{'' if len(declared_exceptions) == 1 else 's'}"
-                  if declared_exceptions else "")
+    # The count is stated even when it is zero, and with no conditional anywhere in the
+    # sentence. Writing the clause only when there were some published an empty string into
+    # `details`, so a reader saw nothing where a reading belongs; spelling the plural with
+    # a conditional then published a bare "s" the same way. Both were convictions the
+    # vacuity check was right to make, and the repair for each is to stop branching.
     detail = (f"{len(decided) - len(broken)} of {len(decided)} decided clauses hold across "
-              f"{len(files)} files{exceptions}. Not decided ({len(never_decided)}): "
-              + ", ".join(never_decided))
+              f"{len(files)} files. Declared exceptions: {len(declared_exceptions)}. "
+              f"Not decided ({len(never_decided)}): " + ", ".join(never_decided))
     return {"value": share, "band": band_of(share), "details": detail,
             "findings": [f for group in broken.values() for f in group],
             "undecided": never_decided, "allowed": declared_exceptions}

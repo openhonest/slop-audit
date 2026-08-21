@@ -110,6 +110,32 @@ REFUSALS = frozenset({
 })
 _REFUSAL_NAMES = frozenset({"NA", "UNREAD", "UNKNOWN", "UNMEASURED", "NOT_RUN", "NOT_MEASURED"})
 
+# The un- of a past participle, which is how English spells work that was not done. A
+# module that says `unobserved` has refused as plainly as one that says `unmeasured`.
+_NOT_DONE_ENDINGS = ("ed", "n")
+
+
+def names_a_failure(word: str) -> bool:
+    """Whether a published word says the work was not done.
+
+    By SHAPE rather than by list. The comment on this rule has always said the failure
+    family is matched by morphology, because enumerating the words one at a time is the
+    habit this whole check exists against, and then it listed them. Two verdicts added to
+    this package, `unobserved` and `unverified`, fell outside the list and were convicted
+    as vacuous measurements when they are the opposite.
+
+    WHAT THE SHAPE CANNOT DECIDE. Latin `uni-` and English `un-` share two letters, so
+    `unified` and `uninitialized` look alike and mean opposite things. Nothing short of a
+    lexicon separates them. A word beginning `uni` therefore stays CONVICTED: being wrong
+    in that direction sends a person to read the site, and being wrong in the other misses
+    a vacuous path, which is the failure this whole check exists to prevent."""
+    word = word.strip().lower()
+    if word in REFUSALS or word == "error" or word.endswith(("_error", " error")):
+        return True
+    if not word.startswith("un") or word.startswith("uni") or len(word) < 6:
+        return False
+    return word.endswith(_NOT_DONE_ENDINGS)
+
 # Calls whose result is a size, and calls that build a container. A quantity assembled
 # from one of these can be driven to zero by an empty input; a status code or a flag
 # cannot, and treating one as a cardinality is where a finding stops being a proof.
@@ -236,10 +262,20 @@ def _is_refusal_constant(node: ast.expr) -> bool:
         # The `error` family by morphology rather than by listing the words. A token that
         # names a failure to complete is a refusal whatever the module chose to call it,
         # and enumerating them one at a time is the habit this whole check exists against.
-        return word in REFUSALS or word == "error" or word.endswith(("_error", " error"))
+        return names_a_failure(word)
+    # A name is read the same way as the string it is bound to. The morphology reached the
+    # string branch and not this one, so a module publishing the literal "unobserved" was
+    # excused and one publishing `_UNOBSERVED`, bound to that same string, was convicted.
+    # The leading underscore is a naming convention, not a change of meaning.
     if isinstance(node, ast.Attribute):
-        return node.attr.upper() in _REFUSAL_NAMES      # `thread_surface.UNREAD`
-    return isinstance(node, ast.Name) and node.id.upper() in _REFUSAL_NAMES
+        return _refusal_name(node.attr)                 # `thread_surface.UNREAD`
+    return isinstance(node, ast.Name) and _refusal_name(node.id)
+
+
+def _refusal_name(identifier: str) -> bool:
+    """Whether a constant's NAME says the work was not done."""
+    bare = identifier.strip("_")
+    return bare.upper() in _REFUSAL_NAMES or names_a_failure(bare.replace("_", " "))
 
 
 def _is_prose(node: ast.expr) -> bool:

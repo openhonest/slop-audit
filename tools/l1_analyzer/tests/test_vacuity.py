@@ -477,3 +477,71 @@ def test_the_language_total_is_derived_from_the_languages_refused():
     """
     assert vacuity.LANGUAGES_TOTAL == len(vacuity.REFUSED) + 1, (
         "the total must be derived from the refusals, not written beside them")
+
+
+# --------------------------------------------------------------------------
+# The refusal family, by shape rather than by list
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("word", [
+    "unmeasured", "unread", "unknown", "unobserved", "unverified", "unresolved",
+    "unexercised", "undecided",
+])
+def test_a_word_that_says_the_work_was_not_done_is_a_refusal(word):
+    """The comment above this rule says the failure family is matched by MORPHOLOGY rather
+    than by listing the words, because enumerating them one at a time is the habit the
+    whole check exists against. It then listed them, and two new verdicts in this package,
+    `unobserved` and `unverified`, fell outside the list and were convicted as vacuous
+    measurements. They are the opposite: they are how the runtime probe says nobody
+    looked."""
+    assert vacuity.names_a_failure(word) is True, word
+
+
+@pytest.mark.parametrize("word", ["unique", "unified", "union", "healthy", "clean", "high"])
+def test_a_word_that_asserts_something_is_not_a_refusal(word):
+    """`un-` alone is not the rule. It has to be the un- of a past participle, which is
+    how English spells work that was not done."""
+    assert vacuity.names_a_failure(word) is False, word
+
+
+@pytest.mark.parametrize("word", ["uninitialized", "uninstalled", "unindexed"])
+def test_a_word_the_shape_cannot_decide_stays_convicted(word):
+    """Latin `uni-` and English `un-` share two letters, so `unified` and `uninitialized`
+    look alike and mean opposite things. Nothing short of a lexicon separates them.
+
+    These are genuine refusals and this rule misses them. That is the direction to be
+    wrong in: a missed refusal sends a person to read the site, and a false one misses a
+    vacuous path, which is the failure the whole check exists to prevent."""
+    assert vacuity.names_a_failure(word) is False, word
+
+
+def test_the_listed_refusals_still_read_as_refusals():
+    """The list stays, because `n/a` and `no data` carry no morphology to read."""
+    for word in ("n/a", "not measured", "no data", "skipped"):
+        assert vacuity.names_a_failure(word) is True, word
+
+
+def test_a_verdict_naming_a_property_is_still_a_measurement():
+    """The rule must not swallow the verdicts it exists to convict. `holds`, `breaks` and
+    a band name are readings a reader acts on."""
+    for word in ("holds", "breaks", "slop", "0"):
+        assert vacuity.names_a_failure(word) is False, word
+
+
+def test_a_refusal_bound_to_a_module_constant_is_read_the_same_way():
+    """The morphology reached the string branch and not the name branch, so a module
+    publishing the literal "unobserved" was excused and one publishing `_UNOBSERVED`, bound
+    to that same string, was convicted. The leading underscore is a naming convention, not
+    a change of meaning."""
+    import ast
+    for name in ("_UNOBSERVED", "UNVERIFIED", "_UNRESOLVED", "UNMEASURED"):
+        node = ast.parse(name, mode="eval").body
+        assert vacuity._is_refusal_constant(node) is True, name
+
+
+def test_a_constant_naming_a_property_is_still_convicted():
+    """The rule must not swallow the verdicts it exists to catch."""
+    import ast
+    for name in ("_HEALTHY", "SLOP", "_CLEAN", "UNIFIED"):
+        node = ast.parse(name, mode="eval").body
+        assert vacuity._is_refusal_constant(node) is False, name

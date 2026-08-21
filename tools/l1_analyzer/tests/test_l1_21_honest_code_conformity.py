@@ -419,7 +419,16 @@ def test_the_repository_measure_counts_the_declared_exceptions(tmp_path):
     (tmp_path / "allowed.py").write_text(ALLOWED)
     result = honest_code.analyze(tmp_path, "python")
     assert result["allowed"]
-    assert "1 declared exception" in result["details"]
+    assert "Declared exceptions: 1" in result["details"]
+
+
+def test_the_repository_measure_states_the_exception_count_even_at_zero(tmp_path):
+    """Stated with no conditional anywhere in the sentence. Writing the clause only when
+    there were some published an empty string into `details`; spelling the plural with a
+    conditional then published a bare "s" the same way. A reader cannot tell "none
+    declared" from "this run does not report them"."""
+    (tmp_path / "clean.py").write_text(CLEAN)
+    assert "Declared exceptions: 0" in honest_code.analyze(tmp_path, "python")["details"]
 
 
 def test_a_clause_with_only_declared_exceptions_holds(tmp_path):

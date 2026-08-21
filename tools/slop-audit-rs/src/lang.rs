@@ -195,15 +195,27 @@ pub fn parser_for(key: &str) -> Parser {
 /// detect_primary_language: the LANG_CFG key with the most files, or "unknown" when
 /// the repo holds no recognised source.
 ///
-/// Counts every matching file exactly as the reference's `_rglob_files(repo, f"*{ext}")`
-/// does, with no vendored-directory filter. That is the reference's behaviour, so a repo
-/// whose node_modules dwarfs its source resolves the same way in both tools. Filtering
-/// vendored code out here would be a better meter and a different one. A directory whose
-/// name ends in a source extension is not counted: it is not a file.
+/// Counts every matching file the way the reference does, THROUGH THE SAME SCOPE POLICY
+/// every other reader uses. A directory whose name ends in a source extension is not
+/// counted: it is not a file.
+///
+/// This paragraph used to say the opposite, that there was deliberately no
+/// vendored-directory filter because that was the reference's behaviour. The reference has
+/// since been corrected and this was not, so the sentence described a tool that no longer
+/// existed and the two answered differently.
+///
+/// Reproduced on this crate: thirteen `.rs` files outside `target/`, no `.c` or `.h`
+/// outside it, and twenty-three vendored `.c` and `.h` inside it from the linked
+/// tree-sitter grammars. The crate detected as C, every source indicator then ran the C
+/// grammar over Rust, and the parity job read two indicators as differing when what
+/// differed was which language each tool thought it was reading.
 pub fn detect_primary_language(repo: &Path) -> &'static str {
     let mut counts = vec![0usize; LANGS.len()];
     for entry in crate::walk_repo(repo) {
         if !crate::is_file_entry(&entry) {
+            continue;
+        }
+        if crate::in_ignored_dir(entry.path()) {
             continue;
         }
         let name = match entry.path().file_name().and_then(|n| n.to_str()) {
@@ -246,6 +258,32 @@ mod tests {
             let tree = parser.parse(b"", None);
             assert!(tree.is_some(), "{} parsed nothing", cfg.key);
         }
+    }
+
+    /// A build directory does not decide which grammar the whole audit runs.
+    ///
+    /// This crate is the case that found it: thirteen Rust files beside twenty-three
+    /// vendored C files under `target/`, and the binary called it a C project while the
+    /// Python reference called it Rust. Every source indicator then ran the wrong grammar,
+    /// and the parity job reported two indicators differing when the disagreement was
+    /// about which language each tool was reading.
+    #[test]
+    fn a_build_directory_does_not_decide_the_language() {
+        let root = std::env::temp_dir().join(format!("lang-detect-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).expect("make src");
+        std::fs::create_dir_all(root.join("target").join("build")).expect("make target");
+        for n in 0..2 {
+            std::fs::write(root.join("src").join(format!("m{n}.rs")), "fn main() {}\n")
+                .expect("write rust");
+        }
+        for n in 0..9 {
+            std::fs::write(root.join("target").join("build").join(format!("g{n}.c")), "int x;\n")
+                .expect("write vendored c");
+        }
+        let detected = detect_primary_language(&root);
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(detected, "rust", "a build artifact outvoted the source");
     }
 
     /// Every extension L1.17 scans maps to a grammar, and every mapped grammar is a
