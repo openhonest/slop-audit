@@ -10,8 +10,13 @@
 # file and not the directory. A real key pasted into the same paragraph still fails the
 # scan, which is the property a path-wide exemption would throw away.
 #
+# The same is true of the credential scanner's own tests. L1.14 is a credential meter, and
+# a test that it flags a private key has to contain something shaped like a private key.
+# Those fixtures are listed below by string for the same reason as the prose ones: a real
+# key pasted into that test file still fails the scan.
+#
 # Adding to this list is a deliberate, reviewable act. Every entry must be a string that
-# was invented for a document, never one that was ever valid anywhere.
+# was invented for a document or a test, never one that was ever valid anywhere.
 
 [extend]
 useDefault = true
@@ -24,4 +29,17 @@ regexes = [
   '''postgres://app:hunter2@db\.prod\.internal:5432/myapp''',
   '''the-quick-brown-fox-jumps-over-the-lazy-dog''',
   '''SG\.xyz\.\.\.''',
+
+  # tools/l1_analyzer/tests/test_secret_scan.py. The meter cannot be tested without
+  # material that looks like the thing it detects, so each of these was invented to be
+  # found. Two are published test vectors that were never anyone's key: the RSA body is
+  # the standard PKCS#8 example and the UUID is RFC 4122's own.
+  '''MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj''',
+  # The block the test builds around that body. Its payload is the literal text `{body}`,
+  # an f-string placeholder, so the string gitleaks captures is a PEM envelope with no key
+  # in it at all.
+  '''BEGIN RSA PRIVATE KEY-----\\n\{body\}\\n-----END RSA PRIVATE KEY''',
+  '''9Xq4Zt7Lm2Rv8Kd3Nb6Hs1Jw5Yc0Pf''',
+  '''3f2504e0-4f89-11d3-9a0c-0305e82c3301''',
+  '''xGLoLZGEXF_0oUpHyV9_p0I87sS4JKe1cWbuGLno''',
 ]
