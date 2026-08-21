@@ -75,6 +75,18 @@ def _coverage_verdict(func_output: str, profile_written: bool, run_returncode: i
     if not profile_written:
         return _na(f"coverage produced no data (go test exit {run_returncode}): "
                    f"{_first_line(run_output)}")
+    # A PROFILE IS NOT A READING. `go test ./...` over a tree with no module, or a module
+    # whose packages carry no test file, exits non-zero having compiled nothing and still
+    # writes a profile; `go tool cover -func` totals that empty profile at 0.0%, and 0.0 is
+    # the Slop end of this scale. So a directory the toolchain never compiled scored the
+    # worst possible reading.
+    #
+    # `_ran_tests` was written for exactly this distinction and used by the determinism arm
+    # only, where its docstring calls it "the difference between a real determinism data
+    # point and the suite never executing". The coverage arm needed the same question.
+    if not _ran_tests(run_output):
+        return _na(f"no Go test ran, so coverage was not measured (go test exit "
+                   f"{run_returncode}): {_first_line(run_output)}")
     match = _TOTAL.search(func_output)
     if match is None:
         return _na("coverage profile had no statement total")

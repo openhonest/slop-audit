@@ -30,10 +30,18 @@ def _func_output(pct: str) -> str:
             f"total:\t\t\t\t\t\t\t(statements)\t{pct}%\n")
 
 
+# A real `go test` transcript line. The run_output argument used to be "" everywhere here,
+# which was fine while the verdict only read the profile. It now also asks whether any test
+# RAN, because `go test ./...` over a tree with no module exits non-zero having compiled
+# nothing, still writes a profile, and `go tool cover -func` totals that empty profile at
+# 0.0% - the Slop end of the scale, for a directory the toolchain never touched.
+_RAN_OUTPUT = "ok  \tfixture\t0.283s\n"
+
+
 # --- L1.19: the cover tool's total read as a value ---------------------------
 
 def test_a_profile_with_a_total_yields_the_statement_share_and_its_band():
-    r = go_trace._coverage_verdict(_func_output("95.0"), True, 0, "", "go version go1.24.0 darwin/arm64")
+    r = go_trace._coverage_verdict(_func_output("95.0"), True, 0, _RAN_OUTPUT, "go version go1.24.0 darwin/arm64")
     assert r["value"] == 95.0 and r["band"] == "Healthy"
     assert "suite passed" in r["details"] and "go version go1.24.0 darwin/arm64" in r["details"]
 
@@ -42,13 +50,13 @@ def test_the_details_disclose_that_go_publishes_statement_coverage_not_branch_co
     # L1.19 carries branch coverage for Python. The Go toolchain instruments statements, so
     # statement coverage is substituted into the same field. The value and the band cannot say
     # so; the detail line must.
-    r = go_trace._coverage_verdict(_func_output("72.0"), True, 0, "", "go1.24.0")
+    r = go_trace._coverage_verdict(_func_output("72.0"), True, 0, _RAN_OUTPUT, "go1.24.0")
     assert "statement coverage" in r["details"].lower()
 
 
 def test_the_band_boundaries_follow_the_spec():
     def band(pct):
-        return go_trace._coverage_verdict(_func_output(pct), True, 0, "", "go1.24.0")["band"]
+        return go_trace._coverage_verdict(_func_output(pct), True, 0, _RAN_OUTPUT, "go1.24.0")["band"]
     assert band("90.1") == "Healthy"        # above 90
     assert band("90.0") == "Not Healthy"    # 90 exactly is not above 90
     assert band("60.0") == "Not Healthy"    # 60 exactly is the floor
@@ -80,7 +88,7 @@ def test_a_profile_that_was_never_written_names_the_run_that_should_have_written
 
 
 def test_a_profile_carrying_no_total_is_its_own_reason():
-    r = go_trace._coverage_verdict("mode: set\n", True, 0, "", "go1.24.0")
+    r = go_trace._coverage_verdict("mode: set\n", True, 0, _RAN_OUTPUT, "go1.24.0")
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "no statement total" in r["details"]
 
