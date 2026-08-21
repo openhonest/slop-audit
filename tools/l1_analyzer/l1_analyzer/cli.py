@@ -371,6 +371,32 @@ def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str,
     return 0
 
 
+def _report_honest_code(path: Path, output_format: str) -> int:
+    """L1.21 for one file, in whichever of the three shapes the caller asked for.
+
+    The hook shape is the default because it is the one that runs thousands of times. It
+    writes to stderr, where a hook runner puts what a blocked tool call said, and it writes
+    nothing when there is nothing to change."""
+    from l1_analyzer import honest_code
+
+    assessment = honest_code.assess_file(path)
+    if output_format == "json":
+        print(json.dumps(assessment, indent=2, default=str))
+        return 0
+    if output_format == "text":
+        print(honest_code.report(assessment))
+        return 0
+
+    printed = honest_code.hook_report(assessment)
+    if assessment["unreadable_reason"]:
+        print(f"{path}: {assessment['unreadable_reason']}", file=sys.stderr)
+        return 1
+    if not printed:
+        return 0
+    print(printed, file=sys.stderr)
+    return 1
+
+
 def _report_call_map(module: Path, tests: tuple[Path, ...], layer: str) -> int:
     """The module's four-column map, as a `.hd` file on stdout.
 
@@ -428,7 +454,11 @@ def main(argv: list[str] | None = None) -> int:
     # only by accident; naming it wrong sends a new adopter to a command that does not
     # exist, at the moment they are most likely to trust the output.
     parser = argparse.ArgumentParser(prog="slop-audit-l1")
-    parser.add_argument("repo", type=Path, help="Path to git repository root")
+    # Optional, because the single-file modes do not audit a repository. --honest-code runs
+    # behind a write hook, and making a hook name a repository it does not read would be
+    # ceremony on every write.
+    parser.add_argument("repo", type=Path, nargs="?", default=None,
+                        help="Path to git repository root")
     parser.add_argument("--since", default=None, help="Start date for git log (e.g. 2025-01-01)")
     parser.add_argument("--until", default=None, help="End date")
     parser.add_argument(
@@ -442,7 +472,10 @@ def main(argv: list[str] | None = None) -> int:
         choices=["auto", *sorted(indicators.LANG_CFG)],
         help="Primary language for source-based indicators (L1.12+). 'auto' detects from files.",
     )
-    parser.add_argument("--format", choices=["text", "json"], default="text")
+    # None rather than "text", so a mode can tell "the caller asked for text" from "the
+    # caller asked for nothing". --honest-code answers the second with its hook shape,
+    # which is the one that runs thousands of times.
+    parser.add_argument("--format", choices=["text", "json", "hook"], default=None)
     parser.add_argument(
         "--no-exec",
         action="store_true",
@@ -549,6 +582,22 @@ def main(argv: list[str] | None = None) -> int:
              "cargo-llvm-cov. --prove-max caps gaps per module.",
     )
     parser.add_argument(
+        "--honest-code",
+        default=None,
+        metavar="FILE",
+        help="L1.21 for ONE file: mechanical conformity with the nineteen Honest Code "
+             "principles, one subclause each. Built for a write hook, so it prints only "
+             "what to change, prints it to stderr where a hook runner feeds it back, says "
+             "nothing at all when the file is clean, and exits 1 when it is not. "
+             "--format text gives the full per-clause report a person reads.",
+    )
+    parser.add_argument(
+        "--honest-code-clauses",
+        action="store_true",
+        help="Add L1.21 to the full audit. Off by default: nineteen clauses over a large "
+             "tree is a cost a caller chooses rather than one imposed on every run.",
+    )
+    parser.add_argument(
         "--call-map",
         nargs="+",
         default=None,
@@ -640,6 +689,18 @@ def main(argv: list[str] | None = None) -> int:
                               tuple(Path(t) for t in args.facets[1:]), args.format,
                               args.proof_cap)
 
+    if args.honest_code:
+        # Before the repository checks, and before --format is defaulted: this takes ONE
+        # file, and a bare invocation gets the hook shape.
+        # Returns before the repository checks: this takes ONE file, because it runs behind
+        # a hook that fires on every write and the panel has nothing to say about the file
+        # an agent just saved.
+        if not Path(args.honest_code).is_file():
+            parser.error(f"--honest-code needs a file that exists: {args.honest_code}")
+        return _report_honest_code(Path(args.honest_code), args.format or "hook")
+
+    args.format = args.format or "text"
+
     if args.call_map:
         module, *tests = args.call_map
         for path in args.call_map:
@@ -701,6 +762,14 @@ def main(argv: list[str] | None = None) -> int:
         # than for silence, which this instrument reserves for what the analyzer could
         # not read.
         results["interleaving_robustness"] = interleaving_robustness.analyze(
+            args.repo, _audited_language(results, args.lang, args.repo))
+
+    # L1.21 (opt-in): nineteen clauses of Honest Code conformity. Off by default because
+    # nineteen clauses over a large tree is a cost a caller chooses rather than one imposed
+    # on every run.
+    if args.honest_code_clauses:
+        from l1_analyzer import honest_code
+        results["honest_code"] = honest_code.analyze(
             args.repo, _audited_language(results, args.lang, args.repo))
 
     # Runtime thread-safety (opt-in): the dynamic counterpart to the static surface

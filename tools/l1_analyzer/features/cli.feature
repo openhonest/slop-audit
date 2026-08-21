@@ -15,6 +15,12 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     Then the map is printed in the Honest Framework's own grammar
     But a run that could not be watched says so first, because the violation this map shows is a write in the pure lane and reading the source alone can only guess at one
 
+  Scenario: _report_honest_code measures one file against the nineteen clauses
+    Given a file and the shape the caller asked for
+    When _report_honest_code assesses it
+    Then the hook shape writes to stderr, where a hook runner puts what a blocked tool call said
+    But it writes nothing when there is nothing to change, because a hook that congratulates the agent on every file teaches it to skip the output
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md

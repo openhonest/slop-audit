@@ -3,6 +3,12 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  Scenario: _honest_code shows L1.21 with the count of clauses it decided
+    Given a panel that carries an Honest Code conformity entry
+    When _honest_code reads it
+    Then the share, the band and the clauses with findings reach the card
+    But the count of DECIDED clauses goes with them, since a reader would otherwise take a hundred percent to mean nineteen held when it can mean sixteen held and three were never looked at
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md

@@ -222,6 +222,25 @@ def _scoped_out(l18b: dict | None) -> dict | None:
             "paths": paths[:12], "paths_more": max(0, len(paths) - 12)}
 
 
+def _honest_code(results: dict) -> dict | None:
+    """The card's view of L1.21, or None when the caller did not ask for it.
+
+    The share is over the clauses that were DECIDED, so the card prints how many of the
+    nineteen those were. Without that a reader would take 100% to mean nineteen clauses
+    held, when it can mean sixteen held and three were never looked at."""
+    entry = results.get("honest_code")
+    if not isinstance(entry, dict) or entry["band"] == "n/a":
+        return None
+    counted: dict[str, int] = {}
+    for finding in entry["findings"]:
+        counted[finding["clause"]] = counted.get(finding["clause"], 0) + 1
+    broken = sorted(counted.items())
+    return {"verdict": str(entry["band"]), "value": entry["value"],
+            "detail": str(entry["details"]),
+            "broken": [{"clause": code, "count": n} for code, n in broken[:_THREAD_CAP]],
+            "broken_more": max(0, len(broken) - _THREAD_CAP)}
+
+
 def _interleaving_robustness(results: dict) -> dict | None:
     """The card's view of the interleaving-robustness check, or None when it did not run.
 
@@ -415,6 +434,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool = False) -> 
         "audit": _metrics(_AUDIT, results, "audit"),
         "thread_surface": _thread_surface(lang, results),
         "interleaving_robustness": _interleaving_robustness(results),
+        "honest_code": _honest_code(results),
         "proofs": _proofs(results),
         "share_text": _t(f"share.{status}", slug=slug),
     }
@@ -538,6 +558,17 @@ def card_markdown(card: dict) -> str:
         if ir["files_more"]:
             lines.append(f"- and {ir['files_more']} more")
         lines += ["", "> " + strip.sub("", _t("interleaving.note"))]
+    hc = card.get("honest_code")
+    if hc:
+        lines += ["", f"## Honest Code conformity (L1.21) — {hc['value']}% ({hc['verdict']})",
+                  "", hc["detail"]]
+        for entry in hc["broken"]:
+            lines.append(f"- {entry['clause']} — {entry['count']} sites")
+        if hc["broken_more"]:
+            lines.append(f"- and {hc['broken_more']} more clauses")
+        lines += ["", ("> The share is over the clauses that were DECIDED. A clause nobody "
+                       "could check is outside it, numerator and denominator both, and is "
+                       "named above rather than counted as a pass.")]
     proofs = card.get("proofs") or []
     if proofs:
         lines += ["", f"## {_t('proofs.heading')}", "", strip.sub("", _t("proofs.note"))]
