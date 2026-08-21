@@ -131,8 +131,13 @@ def effects(fn: ast.FunctionDef) -> tuple[list[str], list[str]]:
             if not (isinstance(target, ast.Name) and target.id in local):
                 note(writes, "namespace")
             continue
-        note(reads, _READS.get(name, ""))
-        note(writes, _WRITES.get(name, ""))
+        # Read by membership. A call this vocabulary has no row for is a gap in the
+        # vocabulary, and leaving it out says that; answering "" for it made an unknown
+        # call indistinguishable from one that genuinely touches nothing.
+        if name in _READS:
+            note(reads, _READS[name])
+        if name in _WRITES:
+            note(writes, _WRITES[name])
     return reads, writes
 
 

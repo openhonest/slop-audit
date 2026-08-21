@@ -3,6 +3,12 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  Scenario: god_file_language gives the grammar for one file extension
+    Given a file extension
+    When god_file_language reads the table by membership
+    Then an extension with a row gets its grammar
+    But an extension with none gets nothing rather than the empty string, which had been standing in for both no grammar and a grammar key and was handed to the literal-node table as though it were a language
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md

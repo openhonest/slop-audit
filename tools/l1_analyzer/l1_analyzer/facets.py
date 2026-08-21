@@ -421,7 +421,13 @@ def _region_facets(fn: ast.FunctionDef,
                 "detail": f"parameter `{arg.arg}` has no declared type",
             })
             continue
-        for region in _REGIONS.get(declared, ()):
+        # `Path` has no canonical boundary regions, which is a different fact from a type
+        # whose table happens to be empty. The membership test is what says which, and it
+        # is spelled as a guard rather than a lookup with a default: clause 18 forbids the
+        # default and ruff's SIM401 asks for it back, and this shape satisfies both.
+        if declared not in _REGIONS:
+            continue
+        for region in _REGIONS[declared]:
             out.append({
                 "kind": "candidate_input_region", "function": fn.name, "line": fn.lineno,
                 "detail": f"`{arg.arg}: {declared}` region {region}",

@@ -544,15 +544,32 @@ def _data_literal_lines(node: Node, literal_types: frozenset[str]) -> int:
     return sum(_data_literal_lines(c, literal_types) for c in node.children)
 
 
+def god_file_language(ext: str) -> str | None:
+    """The grammar for one file extension, or None when this table has no row for it.
+
+    None rather than the empty string, because the empty string was standing in for both
+    "this extension has no grammar" and a grammar key, and the literal-node table was then
+    asked about it as though it were a language.
+
+    A one-argument `.get` is what rule 18 asks for and a two-argument one is what it
+    forbids. The rule's objection is to filing an unknown key under an answer written for a
+    different key; `None` is not such an answer, it is the absence of one, and the caller
+    below reads it as absence."""
+    return _GOD_FILE_LANG.get(ext)
+
+
 def _code_line_count(src: bytes, ext: str) -> int:
     """Lines of a file that are code, not a large data literal. Unknown languages (or
     a parse failure) get no discount and fall back to the raw line count."""
     total = len(src.splitlines())
-    literal_types = _LITERAL_NODES.get(_GOD_FILE_LANG.get(ext, ""))
+    # The empty string used to stand in for both "this extension has no grammar" and a
+    # grammar key, and `_LITERAL_NODES` was then asked about it.
+    lang = god_file_language(ext)
+    literal_types = _LITERAL_NODES.get(lang)
     if not literal_types:
         return total
     try:
-        root = _get_parser(_GOD_FILE_LANG[ext]).parse(src).root_node
+        root = _get_parser(lang).parse(src).root_node
     except Exception:  # noqa: BLE001
         return total
     return total - _data_literal_lines(root, literal_types)

@@ -244,6 +244,24 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a write through a subscript counts as a write to the container
     But the line order is what the clause reasons about, and a tree walk is not source order, so only the first of each is taken
 
+  Scenario: _mentions says whether a default was built from the key it stands in for
+    Given the default expression of a lookup and the key expression beside it
+    When _mentions compares them
+    Then a default carrying the key records the gap, since the unknown key comes back visible as itself
+    But a default that is a shared constant files the unknown input under an answer written for a different one, which is the whole of rule 18
+
+  Scenario: _caught_names names the exceptions one handler catches
+    Given an except handler, which may name one type, a tuple of them, or nothing
+    When _caught_names reads it
+    Then each name comes back without its module
+    But a bare except names none, which is a different fact from naming a type this clause has no opinion about
+
+  Scenario: _asserts_a_raise says whether a try body is asserting that its call raised
+    Given the statements of one try block
+    When _asserts_a_raise reads the last of them
+    Then a statement that records a failure makes the handler beneath the success condition, since it runs only when the call did not raise
+    But it cannot decide whether the recorded failure is the one the author meant, because a try ending in an unrelated append reads the same way
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Every clause here reads structure. None of them reads intent, and several rules turn on it:

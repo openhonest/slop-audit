@@ -9,6 +9,12 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
     Then the share, the band and the clauses with findings reach the card
     But the count of DECIDED clauses goes with them, since a reader would otherwise take a hundred percent to mean nineteen held when it can mean sixteen held and three were never looked at
 
+  Scenario: band_word gives the reader-facing word for one band
+    Given a band a measure published
+    When band_word reads the table by membership
+    Then a band the card knows gets its word
+    But a band it does not know is named as unknown, since the table carries a real n/a row and a default let an unrecognised band render exactly like a measurement that was refused
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md

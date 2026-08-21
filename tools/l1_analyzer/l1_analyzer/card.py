@@ -121,6 +121,18 @@ CARD_COPY: dict[str, str] = {
 
 _BAND_WORD = {"Healthy": "Clean", "Not Healthy": "Caution", "Slop": "Slop", "n/a": "No data"}
 _WANT = {"cannot": "promiscuous", "coarse": "coarse"}
+
+
+def band_word(band: str) -> str:
+    """The reader-facing word for one band, or a sentence naming the band nobody has a
+    word for.
+
+    Read by membership rather than with a default. `_BAND_WORD` carries a real `"n/a": "No
+    data"` row, so `.get(band, "No data")` rendered a band the card does not recognise
+    exactly like a measurement that was refused, and a reader could not tell an indicator
+    that declined to grade from one that produced a grade nobody here has a word for."""
+    known = _BAND_WORD.get(band)
+    return known if known is not None else f"unknown band {band!r}"
 _CULPRIT_CAP = 25
 _ZERO = {"neutral": 0, "promiscuous": 0, "unresolved": 0}
 
@@ -175,7 +187,7 @@ def _metric(spec: dict, result: dict, group: str) -> dict:
     band = str(result["band"])
     k = spec["key"]
     return {"label": _t(f"label.{k}"), "tech": _t(f"tech.{k}"), "value": _value_str(result, spec["unit"]),
-            "band": band, "band_word": _BAND_WORD.get(band, "No data"), "meaning": _t(f"meaning.{k}"),
+            "band": band, "band_word": band_word(band), "meaning": _t(f"meaning.{k}"),
             "group": group, "maps_to": spec["maps_to"]}
 
 
@@ -419,7 +431,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool) -> dict:
         "census_note": "" if status == "na" else _census_note(g["census"]),
         "detail": _detail(status, g["basis"], promiscuous, cover, counts, g["census"]),
         "paths": cover if status == "can" else None,
-        "band": band, "band_word": _BAND_WORD.get(band, "No data"),
+        "band": band, "band_word": band_word(band),
         "testable": None if pct is None else f"{pct}%",
         "neutral_count": counts.get("neutral", 0), "promiscuous_count": promiscuous,
         "unresolved_count": counts.get("unresolved", 0),

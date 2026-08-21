@@ -64,7 +64,22 @@ _MOCK_NAMES = frozenset({"Mock", "MagicMock", "AsyncMock", "patch", "mock_open",
 _MOCK_LIMIT = 3
 
 _HOOK_CALLS = frozenset({"register", "signal", "on_event", "add_event_handler", "atexit"})
+_HOOK_DECORATORS = frozenset({"atexit", "on_event", "listens_for", "add_event_handler",
+                              "before_request", "after_request", "receiver"})
 _HOOK_MODULES = frozenset({"atexit", "signal"})
+
+# Calls that record a failure. The vocabulary is small on purpose: a try whose LAST
+# statement records a failure is asserting that the call above it raised, so the catch
+# below is the success condition rather than a swallow.
+_RECORDS_A_FAILURE = frozenset({"append", "add", "extend", "fail", "error", "insert"})
+
+# BaseException signals that carry control flow rather than failure. `except SystemExit:
+# pass` around a `--help` invocation is argparse's normal exit for help, so it is the
+# expected terminal state of the thing under test.
+#
+# What this does NOT decide: a program that swallows an exit it did not intend has a real
+# defect, and it is a different one from the silent failure this clause names.
+_CONTROL_FLOW = frozenset({"SystemExit", "KeyboardInterrupt", "GeneratorExit"})
 
 _MUTATING_METHODS = frozenset({"append", "extend", "update", "pop", "clear", "setdefault",
                                "add", "remove", "insert", "popitem", "sort", "discard"})
@@ -383,17 +398,54 @@ def swallowed_exceptions(source: dict) -> list[Finding] | None:
     Not decided: whether the enclosing function is a boundary. A route handler catching and
     mapping is right, and nothing in the file says which functions are routes."""
     found: list[Finding] = []
-    for node in ast.walk(source["tree"]):
-        if not isinstance(node, ast.ExceptHandler):
+    for parent in ast.walk(source["tree"]):
+        if not isinstance(parent, ast.Try):
             continue
-        if not _swallows(node.body):
+        # The catch is the ASSERTION when the try's last statement records a failure: that
+        # statement runs only if the call above it did NOT raise, so reaching it is the
+        # defect and the handler is the success condition. Keying on the bare `pass` made
+        # both readings look alike.
+        if _asserts_a_raise(parent.body):
             continue
-        caught = ast.unparse(node.type) if node.type else "everything"
-        found.append(_finding(
-            "L1.21.8", caught, node.lineno,
-            f"catches {caught} and reports success for work that failed",
-            "let it raise and map the type to a response at the boundary", ""))
+        for node in parent.handlers:
+            if not _swallows(node.body):
+                continue
+            if _caught_names(node) <= _CONTROL_FLOW and _caught_names(node):
+                continue
+            caught = ast.unparse(node.type) if node.type else "everything"
+            found.append(_finding(
+                "L1.21.8", caught, node.lineno,
+                f"catches {caught} and reports success for work that failed",
+                "let it raise and map the type to a response at the boundary", ""))
     return found
+
+
+def _caught_names(handler: ast.ExceptHandler) -> set[str]:
+    """The exception names one handler catches, bare or in a tuple."""
+    if handler.type is None:
+        return set()
+    caught = handler.type.elts if isinstance(handler.type, ast.Tuple) else [handler.type]
+    return {ast.unparse(node).split(".")[-1] for node in caught}
+
+
+def _asserts_a_raise(body: list[ast.stmt]) -> bool:
+    """Whether this try body is asserting that its call raised.
+
+    The shape is a call followed by a statement that records a failure. That statement runs
+    only when the call did NOT raise, so the handler beneath is the success condition and
+    the defect would be reaching the recorder.
+
+    What it does not decide: whether the recorded failure is the one the author meant. A
+    try ending in an unrelated append reads the same way, and separating them would need
+    the meaning of the collection rather than its shape."""
+    if len(body) < 2:
+        return False
+    last = body[-1]
+    if isinstance(last, (ast.Assert, ast.Raise)):
+        return True
+    if not isinstance(last, ast.Expr) or not isinstance(last.value, ast.Call):
+        return False
+    return _bare_name(last.value) in _RECORDS_A_FAILURE
 
 
 def _swallows(body: list[ast.stmt]) -> bool:
@@ -731,14 +783,19 @@ def lifecycle_hooks(source: dict) -> list[Finding] | None:
                 f"{whole} parks behaviour where the reader does not look",
                 "declare it where it happens, so the sequence is visible at the call site", ""))
     for node in ast.walk(source["tree"]):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            for decorator in node.decorator_list:
-                whole = ast.unparse(decorator)
-                if "atexit" in whole or "on_event" in whole or "listens_for" in whole:
-                    found.append(_finding(
-                        "L1.21.16", node.name, node.lineno,
-                        f"@{whole} runs this somewhere nobody reads",
-                        "call it where it happens", ""))
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            # What a decorator DOES is decided by what it calls, not by what it carries.
+            # Matching the unparsed decorator as text read a parametrize whose test data
+            # was the string "atexit.register(cleanup)" as a registration.
+            called = decorator.func if isinstance(decorator, ast.Call) else decorator
+            whole = ast.unparse(called)
+            if any(name in whole.split(".") for name in _HOOK_DECORATORS):
+                found.append(_finding(
+                    "L1.21.16", node.name, node.lineno,
+                    f"@{whole} runs this somewhere nobody reads",
+                    "call it where it happens", ""))
     return found
 
 
@@ -774,6 +831,12 @@ def open_dispatch(source: dict) -> list[Finding] | None:
             continue
         if node.func.attr != "get" or len(node.args) < 2:
             continue
+        # A default DERIVED FROM THE KEY records the gap rather than hiding it. The rule's
+        # objection is that a default files an unknown input under an answer written for a
+        # different input; `COPY.get(key, key)` and `REASONS.get(code, f"unknown {code}")`
+        # do the opposite, and the unknown key comes back visible as itself.
+        if _mentions(node.args[1], node.args[0]):
+            continue
         if isinstance(node.func.value, ast.Name) and node.func.value.id in tables:
             found.append(_finding(
                 "L1.21.18", node.func.value.id, node.lineno,
@@ -787,6 +850,12 @@ def open_dispatch(source: dict) -> list[Finding] | None:
 # --------------------------------------------------------------------------
 # 19. Atomic test-and-set over check-then-act
 # --------------------------------------------------------------------------
+
+def _mentions(default: ast.expr, key: ast.expr) -> bool:
+    """Whether the default expression is built from the key it is standing in for."""
+    wanted = ast.dump(key)
+    return any(ast.dump(node) == wanted for node in ast.walk(default))
+
 
 def check_then_act(source: dict) -> list[Finding] | None:
     """A read of a shared value followed by a write to it, inside one function.
