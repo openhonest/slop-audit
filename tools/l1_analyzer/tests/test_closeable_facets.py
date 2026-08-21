@@ -263,3 +263,46 @@ def test_coverage_and_silence_are_reported_side_by_side(audited):
     assert audited["coverage_percent"] is not None
     assert audited["silence_index"] is not None
     assert audited["coverage_percent"] != audited["silence_index"]
+
+
+# --------------------------------------------------------------------------
+# The fifth kind, watched rather than read
+# --------------------------------------------------------------------------
+
+def test_a_watched_mutation_reaches_the_audit(tmp_path):
+    """`collect` appends to the list it is handed. The property is a fact about the run,
+    so nothing in the source could have produced this reading."""
+    (tmp_path / "m.py").write_text(MODULE)
+    (tmp_path / "test_m.py").write_text(
+        "from m import collect\n\n\ndef test_collect():\n    assert collect([]) == ['added']\n")
+    result = facets.audit(tmp_path / "m.py", tmp_path / "test_m.py")
+    observed = [f for f in result["facets"]
+                if f["kind"] == "runtime_property" and f["function"] == "collect"]
+    assert any("mutation breaks" in f["detail"] and not f["silent"] for f in observed), observed
+
+
+def test_a_mutating_function_the_suite_never_calls_stays_silent(audited):
+    """The fixture's suite imports `band` and `divide` only. `collect` mutates, and nobody
+    has watched it do so, so the facet is open rather than closed with a `holds`."""
+    observed = [f for f in audited["facets"]
+                if f["kind"] == "runtime_property" and f["function"] == "collect"
+                and f["detail"].startswith("mutation")]
+    assert observed and all(f["silent"] for f in observed), observed
+
+
+def test_a_property_the_suite_never_exercises_is_silent_in_the_audit(audited):
+    """`band` is called once with 20, so nobody has shown whether it answers the same way
+    twice. Silent, not held."""
+    determinism = next(f for f in audited["facets"]
+                       if f["kind"] == "runtime_property" and f["function"] == "band"
+                       and f["detail"].startswith("determinism"))
+    assert determinism["silent"] is True
+    assert "unobserved" in determinism["detail"]
+
+
+def test_a_function_that_invites_no_property_contributes_no_runtime_facet(audited):
+    """`divide(numerator: int, denominator: int) -> float` cannot mutate an int and cannot
+    be fed its own output, so only determinism is a question about it."""
+    kinds = {f["detail"].split()[0] for f in audited["facets"]
+             if f["kind"] == "runtime_property" and f["function"] == "divide"}
+    assert kinds == {"determinism"}

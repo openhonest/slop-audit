@@ -127,8 +127,13 @@ def _annotation(node: ast.expr | None) -> str:
         return node.attr
     if isinstance(node, ast.Subscript):
         return _annotation(node.value)
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value.split("[")[0].strip('"\'')
+    if isinstance(node, ast.Constant):
+        # `-> None` is a Constant, not a Name. It read as empty, so "declared nothing" and
+        # "declared None" were the same answer again, one layer down.
+        if node.value is None:
+            return "None"
+        if isinstance(node.value, str):
+            return node.value.split("[")[0].strip('"\'')
     return ""
 
 
@@ -267,6 +272,12 @@ def supplied_regions(tests: ast.AST) -> dict[str, set[str]]:
     them and this rule cannot see that it does."""
     supplied: dict[str, set[str]] = {}
     bound = bound_regions(tests)
+    handed = returned_regions(tests)
+    # A fixture reaches a test as a PARAMETER of that test, named after the fixture, so the
+    # name carries what the fixture hands back. Only the decorator makes that true: a plain
+    # helper whose name collides with a parameter did not produce the parameter.
+    for fixture in _fixtures(tests) & handed.keys():
+        bound.setdefault(fixture, set()).update(handed[fixture])
     for node in ast.walk(tests):
         if not isinstance(node, ast.Call):
             continue
@@ -274,23 +285,62 @@ def supplied_regions(tests: ast.AST) -> dict[str, set[str]]:
         if not name:
             continue
         for position, argument in enumerate(node.args):
-            supplied.setdefault(f"{name}/{position}", set()).update(regions_of(argument, bound))
+            supplied.setdefault(f"{name}/{position}",
+                                set()).update(regions_of(argument, bound, handed))
         for keyword in node.keywords:
             if keyword.arg:
                 supplied.setdefault(f"{name}/{keyword.arg}",
-                                    set()).update(regions_of(keyword.value, bound))
+                                    set()).update(regions_of(keyword.value, bound, handed))
     return supplied
 
 
-def regions_of(node: ast.expr, bound: dict[str, set[str]]) -> set[str]:
-    """A literal's own region, or every region a name bound in the test file carries.
+def regions_of(node: ast.expr, names: dict[str, set[str]],
+               factories: dict[str, set[str]]) -> set[str]:
+    """A literal's own region, or every region a name or a factory call carries.
 
-    Module level rather than a closure over `bound`: a nested function cannot be called by
-    a test, so its own return contract was unassertable by construction."""
+    Two tables, not one, because a name and a call of the same spelling are different
+    facts. `collect(_fresh())` passes what `_fresh` returns; `collect(items)` passes
+    whatever `items` is bound to, and a helper function that happens to share the name is
+    not evidence that it produced the value.
+
+    Module level rather than a closure: a nested function cannot be called by a test, so
+    its own return contract was unassertable by construction."""
     direct = _region_of(node)
     if direct:
         return {direct}
-    return bound.get(node.id, set()) if isinstance(node, ast.Name) else set()
+    if isinstance(node, ast.Name):
+        return names.get(node.id, set())
+    if isinstance(node, ast.Call):
+        return factories.get(_called_name(node), set())
+    return set()
+
+
+def returned_regions(tests: ast.AST) -> dict[str, set[str]]:
+    """Functions in the test file that hand back a literal, and which regions those land in.
+
+    `_fresh()` returning `[]` is how a suite supplies an empty list, and a reader that saw
+    only an unreadable call reported the region silent on a function every test in the file
+    calls with an empty list. A fixture is the same shape with a decorator on it, and it is
+    the commonest way a value reaches a test at all."""
+    handed: dict[str, set[str]] = {}
+    for fn in _functions(tests):
+        for node in ast.walk(fn):
+            if isinstance(node, (ast.Return, ast.Expr)) and isinstance(node, ast.Return) or isinstance(node, ast.Yield):
+                value = node.value
+            else:
+                continue
+            region = _region_of(value) if value is not None else ""
+            if region:
+                handed.setdefault(fn.name, set()).add(region)
+    return handed
+
+
+def _fixtures(tests: ast.AST) -> set[str]:
+    """The names pytest will inject into a test by parameter name. A plain helper whose
+    name collides with a parameter is not evidence that the helper produced it."""
+    return {fn.name for fn in _functions(tests)
+            for decorator in fn.decorator_list
+            if "fixture" in ast.unparse(decorator)}
 
 
 def _region_of(node: ast.expr) -> str:
@@ -468,6 +518,11 @@ def audit(module: Path, tests: Path | tuple[Path, ...]) -> Audit:
         body=[node for path in tests for node in ast.parse(path.read_text()).body],
         type_ignores=[])
     uncovered, coverage_percent, succeeded = _coverage(module, tests)
+    # Imported here rather than at the top: runtime_probe reads this module's own readers,
+    # and a cycle at import time would be a shape problem rather than a missing feature.
+    from l1_analyzer import runtime_probe
+    seen = runtime_probe.watch(module, tests)
+    watched = runtime_probe.verdicts(seen["observations"])
     asserted = asserted_calls(tests_tree)
     expecting = expected_exceptions(tests_tree)
     supplied = supplied_regions(tests_tree)
@@ -478,6 +533,10 @@ def audit(module: Path, tests: Path | tuple[Path, ...]) -> Audit:
         regions, missing_types = _region_facets(fn, supplied)
         found += _branch_facets(fn, uncovered) + regions
         found += _return_facet(fn, asserted) + _exception_facets(fn, expecting)
+        runtime, unverifiable = runtime_probe.runtime_facets(
+            fn, watched.get(fn.name, {}), seen["reason"])
+        found += runtime
+        undeclared += unverifiable
         undeclared += missing_types
 
     silent = [f for f in found if f["silent"]]

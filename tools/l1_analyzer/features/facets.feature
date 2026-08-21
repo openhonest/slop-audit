@@ -137,3 +137,15 @@ Feature: facets — closeable facets and the Silence index for one module and it
     Then a literal carries its own region and a bound name carries every region bound to it
     But it is module level rather than a closure, because a nested function cannot be called by a test and its own return contract was unassertable by construction
 
+  Scenario: returned_regions reads the literals a test file hands back
+    Given the parse tree of a test file
+    When returned_regions reads what each of its functions returns or yields
+    Then a function handing back a literal lends that region to whoever calls it
+    But a factory returning something unreadable lends nothing, since a guess about where a computed value lands is not evidence
+
+  Scenario: _fixtures names the functions pytest will inject by parameter name
+    Given the parse tree of a test file
+    When _fixtures reads the decorators
+    Then only a decorated fixture lends its regions to a test parameter of the same name
+    But a plain helper whose name collides with a parameter did not produce the parameter, so the collision is not evidence
+

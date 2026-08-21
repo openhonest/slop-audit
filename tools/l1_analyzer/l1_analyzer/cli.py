@@ -301,6 +301,17 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
             "demonstrated": demonstrated, "attempted": len(outcomes), "outcomes": outcomes}
 
 
+_OUTSIDE_THE_INDEX = (
+    ("undeclared_domain", "undeclared domains",
+     ("Closed by declaring a type, not by adding a test, so these are not counted in the "
+      "Silence index.")),
+    ("honesty_unverified", "properties that could not be verified",
+     ("The audit could not determine these safely, so no test could have shown them. They "
+      "are outside the Silence index rather than charged to the suite, and each carries "
+      "the reason verification was not possible.")),
+)
+
+
 def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str) -> int:
     """One module's closeable facets, printed for a reader or as JSON.
 
@@ -329,15 +340,18 @@ def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str) ->
         for facet in silent:
             print(f"- `{facet['function']}:{facet['line']}` — {facet['detail']}")
         print()
-    if audit["undeclared"]:
-        # Listed apart from the index on purpose: an undeclared domain is closed by
-        # declaring a type, so counting it as a testing silence blames the suite for a gap
-        # in the signature.
-        print(f"## undeclared domains ({len(audit['undeclared'])})\n")
-        print("> Closed by declaring a type, not by adding a test, so these are not "
-              "counted in the Silence index.\n")
-        for gap in audit["undeclared"]:
+    # Both of these sit outside the Silence index, numerator and denominator, and for
+    # different reasons a reader has to be able to tell apart. One is a gap in the
+    # signature the author closes; the other is a gap in what the audit could see.
+    for kind, heading, why in _OUTSIDE_THE_INDEX:
+        gaps = [g for g in audit["undeclared"] if g["kind"] == kind]
+        if not gaps:
+            continue
+        print(f"## {heading} ({len(gaps)})\n")
+        print(f"> {why}\n")
+        for gap in gaps:
             print(f"- `{gap['function']}:{gap['line']}` — {gap['detail']}")
+        print()
     return 0
 
 

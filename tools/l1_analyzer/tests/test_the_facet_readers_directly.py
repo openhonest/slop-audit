@@ -70,11 +70,20 @@ def test_an_absent_annotation_is_the_only_undeclared_case():
 
 @pytest.mark.parametrize(("annotation", "expected"), [
     ("int", "int"), ("list[int]", "list"), ("ast.AST", "AST"), ('"Facet"', "Facet"),
-    ("dict[str, set[str]]", "dict"),
+    ("dict[str, set[str]]", "dict"), ("None", "None"),
 ])
 def test_the_bare_name_of_a_declared_type_is_read(annotation, expected):
     fn = _fn(f"def f(x: {annotation}) -> None:\n    pass\n")
     assert facets._annotation(fn.args.args[0].annotation) == expected
+
+
+def test_a_declared_none_return_is_named_rather_than_read_as_absent():
+    """`-> None` is a Constant, not a Name, and read as empty. "Declared nothing" and
+    "declared None" were the same answer, which is the `_annotation` defect one layer
+    down. `_return_facet` happened to be right because it tested for both."""
+    fn = _fn("def f(n: int) -> None:\n    pass\n")
+    assert facets._annotation(fn.returns) == "None"
+    assert facets.is_declared(fn.returns) is True
 
 
 def test_a_union_has_no_single_bare_name():
@@ -172,7 +181,7 @@ def test_an_empty_collection_written_as_a_constructor_lands_in_a_region(call, re
 
 
 def test_regions_of_reads_nothing_from_an_empty_binding_table():
-    assert facets.regions_of(ast.parse("value", mode="eval").body, {}) == set()
+    assert facets.regions_of(ast.parse("value", mode="eval").body, {}, {}) == set()
 
 
 def test_expected_exceptions_names_the_function_whose_raise_is_asserted():
@@ -277,12 +286,16 @@ def test_a_parametrize_whose_names_are_neither_a_string_nor_a_tuple_yields_nothi
     assert facets._parametrized(node) == []
 
 
-def test_regions_of_reads_a_literal_and_a_bound_name_and_nothing_else():
-    bound = {"value": {"zero"}}
-    assert facets.regions_of(ast.parse("7", mode="eval").body, bound) == {"positive"}
-    assert facets.regions_of(ast.parse("value", mode="eval").body, bound) == {"zero"}
-    assert facets.regions_of(ast.parse("other", mode="eval").body, bound) == set()
-    assert facets.regions_of(ast.parse("f(1)", mode="eval").body, bound) == set()
+def test_regions_of_reads_a_literal_a_bound_name_and_a_factory_call():
+    """Two tables, because a name and a call of the same spelling are different facts."""
+    names, factories = {"value": {"zero"}}, {"make": {"empty"}}
+    read = lambda text: facets.regions_of(ast.parse(text, mode="eval").body, names, factories)
+    assert read("7") == {"positive"}
+    assert read("value") == {"zero"}
+    assert read("make()") == {"empty"}
+    assert read("value()") == set(), "a call is not the name it shares a spelling with"
+    assert read("make") == set(), "a name is not the factory it shares a spelling with"
+    assert read("other") == set()
 
 
 def test_a_call_with_no_readable_name_supplies_nothing():
@@ -397,3 +410,55 @@ def test_the_coverage_reader_returns_no_percentage_when_the_module_never_loads(t
     assert percent is None, (
         "a module that raised on import reported a coverage percentage, which is this "
         "instrument's own bug category turned on itself")
+
+
+# --------------------------------------------------------------------------
+# Values that arrive through a fixture or a factory
+# --------------------------------------------------------------------------
+
+def test_a_function_returning_a_literal_lends_its_region_to_its_callers():
+    """`_fresh()` returning `[]` is how a test suite supplies an empty list, and the reader
+    saw a call it could not read. The region was reported silent on a function every test
+    in the file calls with an empty list."""
+    source = ("def _fresh():\n    return []\n\n\n"
+              "def test_x():\n    assert collect(_fresh()) == ['added']\n")
+    assert facets.returned_regions(_tree(source)) == {"_fresh": {"empty"}}
+
+
+def test_a_function_with_several_literal_returns_lends_every_region():
+    source = "def make(flag):\n    if flag:\n        return []\n    return [1]\n"
+    assert facets.returned_regions(_tree(source)) == {"make": {"empty", "non-empty"}}
+
+
+def test_a_function_returning_something_unreadable_lends_nothing():
+    source = "def make():\n    return build_it()\n"
+    assert facets.returned_regions(_tree(source)) == {}
+
+
+def test_a_factory_call_supplies_the_region_it_returns():
+    source = ("def _fresh():\n    return []\n\n\n"
+              "def test_x():\n    assert collect(_fresh()) == ['added']\n")
+    assert facets.supplied_regions(_tree(source))["collect/0"] == {"empty"}
+
+
+def test_a_fixture_lends_its_region_to_the_test_parameter_named_after_it():
+    """pytest's own mechanism, and the commonest way a value reaches a test at all."""
+    source = ("import pytest\n\n\n"
+              "@pytest.fixture\ndef items():\n    return []\n\n\n"
+              "def test_x(items):\n    assert collect(items) == ['added']\n")
+    assert facets.supplied_regions(_tree(source))["collect/0"] == {"empty"}
+
+
+def test_a_fixture_that_yields_a_literal_is_read_too():
+    source = ("import pytest\n\n\n"
+              "@pytest.fixture\ndef items():\n    yield []\n\n\n"
+              "def test_x(items):\n    assert collect(items) == ['added']\n")
+    assert facets.supplied_regions(_tree(source))["collect/0"] == {"empty"}
+
+
+def test_a_plain_function_is_not_treated_as_a_fixture():
+    """A helper's name colliding with a test parameter is not evidence that the helper
+    produced it. Only the decorator says so."""
+    source = ("def items():\n    return []\n\n\n"
+              "def test_x(items):\n    assert collect(items) == ['added']\n")
+    assert facets.supplied_regions(_tree(source)).get("collect/0", set()) == set()
