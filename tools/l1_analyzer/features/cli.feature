@@ -74,3 +74,9 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     And it settles an unrequested language the same way the source pass would, when no source pass ran
     But an explicit request with no source pass stands, because that is an instruction and not a guess
 
+  Scenario: _report_facets prints one module's closeable facets for a reader
+    Given a module, the test file that should hold evidence about it, and an output format
+    When _report_facets audits the pair
+    Then it prints the coverage and the Silence index beside each other, then every silent facet grouped by kind
+    But undeclared domains are listed apart from the index, because those are closed by declaring a type rather than by adding a test, so counting them would blame the suite for a gap in the signature
+

@@ -301,6 +301,43 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
             "demonstrated": demonstrated, "attempted": len(outcomes), "outcomes": outcomes}
 
 
+def _report_facets(module: Path, tests: Path, output_format: str) -> int:
+    """One module's closeable facets, printed for a reader or as JSON."""
+    from l1_analyzer import facets
+
+    audit = facets.audit(module, tests)
+    if output_format == "json":
+        print(json.dumps(audit, indent=2, default=str))
+        return 0
+
+    coverage = f"{audit['coverage_percent']}%" if audit["coverage_measured"] else "not measured"
+    index = f"{audit['silence_index']}%" if audit["silence_index"] is not None else "not measured"
+    print(f"# Facets — {module.name} against {tests.name}\n")
+    print(f"Coverage: {coverage} | Silence index: {index}")
+    print(f"{audit['closeable_silence_sites']} of {audit['total_checkable_facets']} closeable "
+          f"facets lack evidence\n")
+    if audit["unusable_reason"]:
+        print(f"> {audit['unusable_reason']}\n")
+    for kind in facets.FACET_KINDS:
+        silent = [f for f in audit["facets"] if f["kind"] == kind and f["silent"]]
+        if not silent:
+            continue
+        print(f"## {kind.replace('_', ' ')} ({len(silent)})\n")
+        for facet in silent:
+            print(f"- `{facet['function']}:{facet['line']}` — {facet['detail']}")
+        print()
+    if audit["undeclared"]:
+        # Listed apart from the index on purpose: an undeclared domain is closed by
+        # declaring a type, so counting it as a testing silence blames the suite for a gap
+        # in the signature.
+        print(f"## undeclared domains ({len(audit['undeclared'])})\n")
+        print("> Closed by declaring a type, not by adding a test, so these are not "
+              "counted in the Silence index.\n")
+        for gap in audit["undeclared"]:
+            print(f"- `{gap['function']}:{gap['line']}` — {gap['detail']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # The name the console script is installed under, so `--help` prints a command the
     # reader can actually run. argparse defaults `prog` to sys.argv[0], which is right
@@ -428,6 +465,18 @@ def main(argv: list[str] | None = None) -> int:
              "cargo-llvm-cov. --prove-max caps gaps per module.",
     )
     parser.add_argument(
+        "--facets",
+        nargs=2,
+        default=None,
+        metavar=("MODULE", "TESTS"),
+        help="Audit ONE module against ONE test file: every closeable facet and the Silence "
+             "index over them. Coverage records what ran; silence records evidence the suite "
+             "lacks, so a branch that executed and was never asserted on is covered and silent "
+             "at once. Reports unexercised branches, candidate input regions, unasserted return "
+             "contracts and exception paths, and lists undeclared domains separately because "
+             "those are closed by declaring a type rather than by adding a test.",
+    )
+    parser.add_argument(
         "--prove-coverage",
         default=None,
         metavar="MODULE",
@@ -450,6 +499,13 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
+
+    if args.facets:
+        # A different unit of audit from the panel, and it returns before the repository
+        # checks below: this takes one module and the test file that is supposed to hold
+        # evidence about it, so the "point me at a directory" rule does not apply and the
+        # twenty indicators have nothing to say about which function is silent.
+        return _report_facets(Path(args.facets[0]), Path(args.facets[1]), args.format)
 
     # The analyzer audits a repository (a directory), not a single file: the git, config,
     # coverage, and test-run steps all operate on a tree. A file argument used to reach the
