@@ -471,7 +471,15 @@ def _verdict_lines(card: dict, strip: re.Pattern) -> list[str]:
     lines: list[str] = []
     if card["grade"] is not None:
         lines += [f"**Grade: {card['grade']}** — {card['grade_pct']}% of its state is finitely testable", ""]
-    lines += [card["headline"], "", strip.sub("", card["detail"]), "",
+    lines += [card["headline"], "", strip.sub("", card["detail"])]
+    if card["grade"] is None:
+        # Withheld, which is what the paragraph above says and what the code did not do:
+        # the three count lines were appended unconditionally, so an ungraded card rendered
+        # "Provably unbounded: 0" under a refusal to grade. Three clean-looking zeroes over
+        # state nobody read. Found on 2026-08-20 by rendering an ungraded card, which this
+        # repository never produces because it is clean.
+        return lines
+    lines += ["",
               f"- Finitely testable: {card['neutral_count']}",
               f"- Provably unbounded: {card['promiscuous_count']}",
               f"- Undecided by the analyzer (silence): {card['unresolved_count']}"]
