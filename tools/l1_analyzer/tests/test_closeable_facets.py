@@ -278,7 +278,7 @@ def test_a_watched_mutation_reaches_the_audit(tmp_path):
     result = facets.audit(tmp_path / "m.py", tmp_path / "test_m.py")
     observed = [f for f in result["facets"]
                 if f["kind"] == "runtime_property" and f["function"] == "collect"]
-    assert any("mutation breaks" in f["detail"] and not f["silent"] for f in observed), observed
+    assert any(f["detail"] == "mutation breaks" for f in observed), observed
 
 
 def test_a_mutating_function_the_suite_never_calls_stays_silent(audited):
@@ -305,4 +305,4 @@ def test_a_function_that_invites_no_property_contributes_no_runtime_facet(audite
     be fed its own output, so only determinism is a question about it."""
     kinds = {f["detail"].split()[0] for f in audited["facets"]
              if f["kind"] == "runtime_property" and f["function"] == "divide"}
-    assert kinds == {"determinism"}
+    assert kinds == {"determinism", "purity"}

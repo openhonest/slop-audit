@@ -78,6 +78,12 @@ Feature: runtime_probe — runtime properties, watched while the suite executes
     Then the observations come back with an empty reason
     But a run that timed out or failed before finishing comes back with the reason instead, because an empty list alone reported every property as unobserved and that reads as a suite that never tried
 
+  Scenario: _purity says whether the call changed anything outside its own return value
+    Given a function's observations, each carrying the module's data before and after
+    When _purity compares them
+    Then one impure call outweighs any number of clean ones, since the clean calls are the paths that did not reach the write
+    But a call whose module data could not be read is unverified rather than pure, because an empty reading is not a reading of nothing
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Deciding whether an unobserved property holds would mean calling the function again, and

@@ -33,19 +33,16 @@ def _fn(source: str) -> ast.FunctionDef:
 
 
 def _call(function: str, before: list[str], after: list[str], result: str,
-          raised: str = "", opaque: bool = False,
-          keywords: dict[str, str] | None = None) -> runtime_probe.Observation:
+          raised: str = "", opaque: bool = False, keywords: dict[str, str] | None = None,
+          state: tuple[str, str] = ("{}", "{}")) -> runtime_probe.Observation:
     return {"function": function, "before": before, "after": after, "result": result,
-            "raised": raised, "opaque": opaque, "keywords": keywords or {}}
+            "raised": raised, "opaque": opaque, "keywords": keywords or {},
+            "state_before": state[0], "state_after": state[1]}
 
 
 # --------------------------------------------------------------------------
 # Which properties a function invites
 # --------------------------------------------------------------------------
-
-def test_the_three_properties_are_named_as_a_closed_set():
-    assert runtime_probe.PROPERTIES == ("mutation", "determinism", "idempotency")
-
 
 def test_a_function_taking_a_mutable_argument_invites_the_mutation_question():
     assert "mutation" in runtime_probe.invites(_fn("def f(items: list) -> int:\n    return 1\n"))
@@ -172,7 +169,8 @@ def test_an_opaque_call_is_evidence_for_nothing():
     seen = [_call("f", ["<X object at 0x1>"], ["<X object at 0x1>"], "1", opaque=True),
             _call("f", ["<X object at 0x1>"], ["<X object at 0x1>"], "1", opaque=True)]
     assert runtime_probe.verdicts(seen)["f"] == {
-        "mutation": "unverified", "determinism": "unverified", "idempotency": "unverified"}
+        "mutation": "unverified", "determinism": "unverified", "purity": "holds",
+        "idempotency": "unverified"}
 
 
 def test_a_call_that_raised_is_not_evidence_about_the_result():
@@ -269,7 +267,7 @@ def test_a_run_that_could_not_be_watched_makes_every_property_unverified():
     fn = _fn("def f(items: list) -> list:\n    return items\n")
     built, unverified = runtime_probe.runtime_facets(fn, {}, "the watched run failed")
     assert built == []
-    assert len(unverified) == 3
+    assert len(unverified) == 4
     assert all("the watched run failed" in u["detail"] for u in unverified)
 
 
@@ -277,19 +275,21 @@ def test_a_run_that_could_not_be_watched_makes_every_property_unverified():
 # The facets built from it
 # --------------------------------------------------------------------------
 
-def test_a_runtime_facet_is_silent_only_when_the_property_was_unobserved():
+def test_a_runtime_facet_is_closed_only_by_a_property_shown_to_hold():
+    """`holds` closes it. `unobserved` is a silence the suite can close, and `breaks` is a
+    located violation the glossary also counts in the numerator."""
     fn = _fn("def squeeze(text: str) -> str:\n    return text\n")
     built, unverified = runtime_probe.runtime_facets(
-        fn, {"determinism": "holds", "mutation": "unobserved", "idempotency": "breaks"})
+        fn, {"determinism": "holds", "purity": "unobserved", "idempotency": "breaks"})
     silent = {f["detail"].split()[0]: f["silent"] for f in built}
-    assert silent == {"determinism": False, "idempotency": False}, built
+    assert silent == {"determinism": False, "purity": True, "idempotency": True}, built
     assert unverified == []
 
 
 def test_a_function_the_suite_never_called_has_every_invited_property_silent():
     fn = _fn("def squeeze(text: str) -> str:\n    return text\n")
     built, unverified = runtime_probe.runtime_facets(fn, {})
-    assert {f["detail"].split()[0] for f in built} == {"determinism", "idempotency"}
+    assert {f["detail"].split()[0] for f in built} == {"determinism", "purity", "idempotency"}
     assert all(f["silent"] for f in built)
     assert unverified == []
 
@@ -299,8 +299,9 @@ def test_a_runtime_facet_names_what_the_run_showed():
     breaks" are both evidence and mean opposite things to a reader."""
     fn = _fn("def roll(n: int) -> int:\n    return n\n")
     built, _unverified = runtime_probe.runtime_facets(fn, {"determinism": "breaks"})
-    assert built[0]["kind"] == "runtime_property"
-    assert "breaks" in built[0]["detail"]
+    determinism = next(f for f in built if f["detail"].startswith("determinism"))
+    assert determinism["kind"] == "runtime_property"
+    assert determinism["detail"] == "determinism breaks"
 
 
 # --------------------------------------------------------------------------
@@ -423,7 +424,8 @@ def test_an_unverified_property_yields_no_facet_and_one_reason():
     built, unverified = runtime_probe.runtime_facets(fn, {"mutation": "unverified",
                                                           "determinism": "holds",
                                                           "idempotency": "unverified"}, "")
-    assert [f["detail"] for f in built] == ["determinism holds"]
+
+    assert sorted(f["detail"] for f in built) == ["determinism holds", "purity unobserved"]
     assert {u["kind"] for u in unverified} == {"honesty_unverified"}
     assert len(unverified) == 2
     assert all("could not be read" in u["detail"] for u in unverified), unverified
@@ -438,6 +440,110 @@ def test_an_unverified_property_stays_out_of_the_audit_index(tmp_path):
     (tmp_path / "test_m.py").write_text(
         "from m import Box, stash\n\n\ndef test_stash():\n    assert stash(Box()).items == [1]\n")
     result = facets_module.audit(tmp_path / "m.py", tmp_path / "test_m.py")
-    runtime = [f for f in result["facets"] if f["kind"] == "runtime_property"]
-    assert runtime == [], runtime
-    assert any(u["kind"] == "honesty_unverified" for u in result["undeclared"]), result["undeclared"]
+    # Purity is still readable: the module's own data did not change. Mutation and
+    # idempotency are not, because the argument's repr carries its address.
+    silent_kinds = {f["detail"].split()[0] for f in result["facets"]
+                    if f["kind"] == "runtime_property" and f["function"] == "stash"}
+    assert silent_kinds == {"purity"}, silent_kinds
+    unverified = {u["detail"].split()[0] for u in result["undeclared"]
+                  if u["kind"] == "honesty_unverified" and u["function"] == "stash"}
+    # `Box` is not a mutable builtin, so mutation is never a question about this signature.
+    assert unverified == {"determinism", "idempotency"}, unverified
+
+
+# --------------------------------------------------------------------------
+# A demonstrated violation is a site, not a closed facet
+# --------------------------------------------------------------------------
+
+def test_a_demonstrated_violation_counts_toward_the_silence_index():
+    """The glossary lists a demonstrated mutation, determinism, purity or idempotency
+    violation among the kinds that form the Silence-index NUMERATOR. It is a located site
+    the suite has to close, by fixing the function or by asserting the behaviour on
+    purpose, and reading it as closed put a real finding on the clean side of the number.
+
+    `holds` is the only verdict that closes a runtime facet."""
+    fn = _fn("def collect(items: list) -> list:\n    return items\n")
+    built, _unverified = runtime_probe.runtime_facets(fn, {"mutation": "breaks"}, "")
+    breaking = next(f for f in built if f["detail"].startswith("mutation"))
+    assert breaking["silent"] is True
+
+
+def test_a_property_shown_to_hold_is_the_only_closed_one():
+    fn = _fn("def total(items: list) -> int:\n    return len(items)\n")
+    built, _unverified = runtime_probe.runtime_facets(
+        fn, {"mutation": "holds", "determinism": "unobserved", "purity": "holds"}, "")
+    assert {f["detail"]: f["silent"] for f in built} == {
+        "mutation holds": False, "determinism unobserved": True, "purity holds": False}
+
+
+# --------------------------------------------------------------------------
+# Purity, the fourth property
+# --------------------------------------------------------------------------
+
+def test_the_four_properties_are_named_as_a_closed_set():
+    assert runtime_probe.PROPERTIES == ("mutation", "determinism", "purity", "idempotency")
+
+
+def test_every_function_that_can_be_called_invites_the_purity_question():
+    """Any function can write to a module global, so the question arises for all of them,
+    unlike mutation which needs a mutable argument to be about."""
+    assert "purity" in runtime_probe.invites(_fn("def f() -> None:\n    pass\n"))
+
+
+def test_a_call_that_left_the_module_state_alone_holds_purity():
+    seen = [_call("f", ["1"], ["1"], "1", state=("{}", "{}"))]
+    assert runtime_probe.verdicts(seen)["f"]["purity"] == "holds"
+
+
+def test_a_call_that_changed_the_module_state_breaks_purity():
+    """A write to a module global is a side effect the return value does not mention."""
+    seen = [_call("f", ["1"], ["1"], "1", state=("{'CACHE': {}}", "{'CACHE': {1: 2}}"))]
+    assert runtime_probe.verdicts(seen)["f"]["purity"] == "breaks"
+
+
+def test_one_impure_call_outweighs_any_number_of_clean_ones():
+    seen = [_call("f", ["1"], ["1"], "1", state=("{}", "{}")),
+            _call("f", ["2"], ["2"], "2", state=("{}", "{'X': 1}"))]
+    assert runtime_probe.verdicts(seen)["f"]["purity"] == "breaks"
+
+
+def test_a_call_whose_module_state_could_not_be_read_shows_nothing_about_purity():
+    seen = [_call("f", ["1"], ["1"], "1", state=("", ""))]
+    assert runtime_probe.verdicts(seen)["f"]["purity"] == "unverified"
+
+
+def test_the_watched_run_sees_a_write_to_a_module_global(tmp_path):
+    """End to end. Nothing in the source says whether the write happened on the path the
+    suite took; only the run does."""
+    (tmp_path / "m.py").write_text(
+        "SEEN = []\n\n\ndef remember(n: int) -> int:\n    SEEN.append(n)\n    return n\n\n\n"
+        "def double(n: int) -> int:\n    return n * 2\n")
+    (tmp_path / "test_m.py").write_text(
+        "from m import double, remember\n\n\n"
+        "def test_remember():\n    assert remember(1) == 1\n\n\n"
+        "def test_double():\n    assert double(2) == 4\n")
+    watched = runtime_probe.verdicts(
+        runtime_probe.watch(tmp_path / "m.py", (tmp_path / "test_m.py",))["observations"])
+    assert watched["remember"]["purity"] == "breaks", watched
+    assert watched["double"]["purity"] == "holds", watched
+
+
+def test_purity_reads_unobserved_on_no_calls_and_holds_on_a_clean_one():
+    assert runtime_probe._purity([]) == "unobserved"
+    assert runtime_probe._purity([_call("f", ["1"], ["1"], "1")]) == "holds"
+
+
+def test_an_empty_repr_of_a_module_never_read_is_not_a_pure_call():
+    """An empty state string means the module's data could not be read, which is not the
+    same as a module holding nothing. `[]` is the second, and it is readable."""
+    assert runtime_probe._purity([_call("f", ["1"], ["1"], "1", state=("[]", "[]"))]) == "holds"
+    assert runtime_probe._purity([_call("f", ["1"], ["1"], "1", state=("", ""))]) == "unverified"
+
+
+def test_determinism_on_no_readable_call_is_unverified():
+    assert runtime_probe._determinism(
+        [_call("f", ["<X object at 0x1>"], ["<X object at 0x1>"], "1", opaque=True)]) == "unverified"
+
+
+def test_the_empty_string_is_not_an_unreadable_repr():
+    assert runtime_probe.is_opaque("") is False

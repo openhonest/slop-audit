@@ -17,6 +17,7 @@ import inspect
 import json
 import os
 from collections.abc import Callable
+from functools import partial
 from typing import TypedDict
 
 
@@ -35,6 +36,8 @@ class Observation(TypedDict):
     result: str
     raised: str
     opaque: bool
+    state_before: str
+    state_after: str
 
 
 MODULE_VARIABLE = "L1_PROBE_MODULE"
@@ -88,9 +91,25 @@ def describe(args: tuple[object, ...], kwargs: dict[str, object],
             {name: read(value) for name, value in kwargs.items()})
 
 
+def module_state(module: object, read: Callable[[object], str] = safe_repr) -> str:
+    """The module's own mutable data, as one string.
+
+    Functions, classes and dunders are left out: what a call can change and the return
+    value does not mention is the data. An empty string means it could not be read, which
+    is not the same as a module holding nothing."""
+    try:
+        return read(sorted(
+            (name, read(value)) for name, value in vars(module).items()
+            if not name.startswith("__") and not callable(value)
+            and not isinstance(value, type)))
+    except Exception:  # noqa: BLE001 - an unorderable namespace is unreadable, not a failure
+        return ""
+
+
 def observe(fn: Callable[..., object], seen: list[Observation],
             reader: Callable[..., tuple[list[str], dict[str, str]]] = describe,
-            unreadable: Callable[[list[str]], bool] = opaque) -> Callable[..., object]:
+            unreadable: Callable[[list[str]], bool] = opaque,
+            state: Callable[[], str] = lambda: "") -> Callable[..., object]:
     """`fn`, wrapped so every call appends one observation to `seen`.
 
     The arguments are read on both sides of the call, which is what makes a change in place
@@ -110,6 +129,7 @@ def observe(fn: Callable[..., object], seen: list[Observation],
     code to keep it that way rather than trusting this paragraph."""
     def watched(*args: object, **kwargs: object) -> object:
         before, keywords = reader(args, kwargs)
+        state_before = state()
         raised, result = "", None
         try:
             result = fn(*args, **kwargs)
@@ -124,6 +144,7 @@ def observe(fn: Callable[..., object], seen: list[Observation],
                 "keywords": keywords, "result": shown, "raised": raised,
                 "opaque": unreadable(before + after + list(keywords.values())
                                      + ([shown] if shown else [])),
+                "state_before": state_before, "state_after": state(),
             })
         return result
 
@@ -139,10 +160,11 @@ def wrap_module(name: str, seen: list[Observation]) -> int:
     Functions the module merely imported are left alone: they belong to another module and
     watching them here would attribute their behaviour to this one."""
     module = importlib.import_module(name)
+    read_state = partial(module_state, module)
     wrapped = 0
     for attribute, value in list(vars(module).items()):
         if inspect.isfunction(value) and getattr(value, "__module__", "") == name:
-            setattr(module, attribute, observe(value, seen))
+            setattr(module, attribute, observe(value, seen, state=read_state))
             wrapped += 1
     return wrapped
 

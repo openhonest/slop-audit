@@ -339,3 +339,61 @@ def test_wrapping_a_module_a_second_time_wraps_nothing(tmp_path, monkeypatch):
     import twice
     twice.f(1)
     assert plugin.wrap_module("twice", _fresh()) == 0, "the wrapper was wrapped again"
+
+
+# --------------------------------------------------------------------------
+# The module's own data, which purity is about
+# --------------------------------------------------------------------------
+
+def test_the_module_state_is_its_data_and_not_its_functions(tmp_path, monkeypatch):
+    """Purity asks what a call changed that its return value does not mention. Functions,
+    classes and dunders are not that: they are what the module IS, not what it holds."""
+    (tmp_path / "stateful.py").write_text(
+        "CACHE = {}\nLIMIT = 5\n\n\nclass Box:\n    pass\n\n\ndef f(n: int) -> int:\n    return n\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    import stateful
+    shown = plugin.module_state(stateful)
+    assert "CACHE" in shown and "LIMIT" in shown
+    assert "Box" not in shown and "__name__" not in shown
+
+
+def test_the_module_state_changes_when_its_data_does(tmp_path, monkeypatch):
+    (tmp_path / "changing.py").write_text("CACHE = {}\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    import changing
+    before = plugin.module_state(changing)
+    changing.CACHE["a"] = 1
+    assert plugin.module_state(changing) != before
+
+
+def test_a_module_state_that_cannot_be_read_is_reported_empty(tmp_path, monkeypatch):
+    """Empty means unreadable, which is not the same as a module holding nothing. The
+    verdict reader treats the two differently and has to be able to."""
+    (tmp_path / "bare.py").write_text("")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    import bare
+
+    def refuse(_value: object) -> str:
+        raise RuntimeError("no")
+
+    assert plugin.module_state(bare, read=refuse) == ""
+
+
+def test_a_module_holding_no_data_still_reads_as_readable(tmp_path, monkeypatch):
+    (tmp_path / "empty_module.py").write_text("def f(n: int) -> int:\n    return n\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    import empty_module
+    assert plugin.module_state(empty_module) == "[]"
+
+
+def test_wrapping_a_module_with_no_name_says_so():
+    with pytest.raises(ValueError):
+        plugin.wrap_module("", [])
+
+
+def test_writing_no_observations_still_records_the_run(tmp_path):
+    """An audit that watched a suite and saw nothing is a different fact from an audit that
+    could not watch one. The empty file is what says the first happened."""
+    destination = tmp_path / "seen.json"
+    assert plugin.write_observations([], str(destination)) is True
+    assert json.loads(destination.read_text()) == []

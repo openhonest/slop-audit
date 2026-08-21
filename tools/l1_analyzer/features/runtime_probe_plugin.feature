@@ -60,6 +60,12 @@ Feature: runtime_probe_plugin — watching the audited module while its suite ru
     Then it says whether it wrote
     But no destination means nobody asked to watch this run, and writing to a path from a previous one would overwrite one audit with another
 
+  Scenario: module_state reads the module's own data, which purity is about
+    Given the module being watched
+    When module_state reads its namespace
+    Then functions, classes and dunders are left out, since what a call can change and the return value does not mention is the data
+    But an unreadable namespace comes back empty, and empty is not the same as a module holding nothing
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # A default repr carries an address, so two distinct values never compare equal and a change

@@ -31,7 +31,7 @@ from typing import TypedDict
 from l1_analyzer import runtime_probe_plugin
 from l1_analyzer.facets import Facet, Undeclared, _annotation, import_root, is_declared
 
-PROPERTIES = ("mutation", "determinism", "idempotency")
+PROPERTIES = ("mutation", "determinism", "purity", "idempotency")
 
 # Types whose value can be changed in place, so "did you mutate my argument" is a question
 # a test can put to the function. An int cannot be mutated, and charging a suite for not
@@ -68,6 +68,9 @@ def invites(fn: ast.FunctionDef) -> tuple[str, ...]:
     asked: list[str] = []
     if any(_annotation(a.annotation) in _MUTABLE for a in arguments):
         asked.append("mutation")
+    # Purity is a question about EVERY function: any of them can write to a module global,
+    # and a caller reading the signature has no way to know one did.
+    asked.append("purity")
     if is_declared(fn.returns) and returns != "None":
         asked.append("determinism")
         # Exactly one argument. `f(f(x))` only exists when `f` takes one thing, and
@@ -92,9 +95,8 @@ def verdicts(seen: list[Observation]) -> dict[str, dict[str, str]]:
     by_function: dict[str, list[Observation]] = {}
     for call in seen:
         by_function.setdefault(call["function"], []).append(call)
-    return {name: {"mutation": _mutation(calls),
-                   "determinism": _determinism(calls),
-                   "idempotency": _idempotency(calls)}
+    return {name: {"mutation": _mutation(calls), "determinism": _determinism(calls),
+                   "purity": _purity(calls), "idempotency": _idempotency(calls)}
             for name, calls in by_function.items()}
 
 
@@ -118,6 +120,23 @@ def _signature(call: Observation) -> tuple[str, ...]:
     had an empty argument list and they all grouped together as the same call."""
     return tuple(call["before"]) + tuple(
         f"{name}={value}" for name, value in sorted(call["keywords"].items()))
+
+
+def _purity(calls: list[Observation]) -> str:
+    """Whether the call changed anything outside its own return value.
+
+    Mutation asks about the ARGUMENTS; purity asks about the module's own data, which a
+    caller reading the signature has no way to know was touched. One impure call outweighs
+    any number of clean ones, for the same reason as mutation: the clean calls are the
+    paths that did not reach the write.
+
+    A call whose module state could not be read is unverified, not pure."""
+    readable = [c for c in calls if c["state_before"] and c["state_after"]]
+    if not readable:
+        return _UNVERIFIED if calls else _UNOBSERVED
+    if any(c["state_before"] != c["state_after"] for c in readable):
+        return "breaks"
+    return "holds"
 
 
 def _determinism(calls: list[Observation]) -> str:
@@ -179,7 +198,12 @@ def runtime_facets(fn: ast.FunctionDef, verdict: dict[str, str],
             continue
         found.append({
             "kind": "runtime_property", "function": fn.name, "line": fn.lineno,
-            "detail": f"{prop} {answer}", "silent": answer == _UNOBSERVED,
+            # `holds` is the only verdict that closes the facet. The glossary lists a
+            # DEMONSTRATED violation among the kinds forming the Silence-index numerator:
+            # it is a located site the suite has to close, by fixing the function or by
+            # asserting the behaviour on purpose, and reading it as closed put a real
+            # finding on the clean side of the number.
+            "detail": f"{prop} {answer}", "silent": answer != "holds",
         })
     return found, unverified
 

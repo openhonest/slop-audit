@@ -312,16 +312,21 @@ _OUTSIDE_THE_INDEX = (
 )
 
 
-def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str) -> int:
+def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str,
+                   proof_cap: int) -> int:
     """One module's closeable facets, printed for a reader or as JSON.
 
     Several test files are read as one body of evidence, because a suite split across two
     files is still one suite and reading only the first reports the other as absent."""
-    from l1_analyzer import facets
+    from l1_analyzer import facets, proof
 
     audit = facets.audit(module, tests)
+    # Nothing is asked for unless the caller sets a cap. A request is what gets sent to a
+    # model, so how many are made is their decision about money and about what leaves the
+    # machine, not a default chosen here.
+    asked = proof.requests(audit, proof_cap)
     if output_format == "json":
-        print(json.dumps(audit, indent=2, default=str))
+        print(json.dumps({**audit, "proof_requests": asked}, indent=2, default=str))
         return 0
 
     coverage = f"{audit['coverage_percent']}%" if audit["coverage_measured"] else "not measured"
@@ -352,6 +357,49 @@ def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str) ->
         for gap in gaps:
             print(f"- `{gap['function']}:{gap['line']}` — {gap['detail']}")
         print()
+    if asked:
+        print(f"## proof requests ({len(asked)})\n")
+        print("> Each carries one signature and one gap, and no source. Write the test "
+              "yourself and run it through `--prove-facet MODULE TESTS INDEX INPUT "
+              "PROPERTY WHY`; only a test that FAILS is retained.\n")
+        for request in asked:
+            print(f"- [{request['index']}] `{request['function']}:{request['line']}` — "
+                  f"{request['detail']}")
+            print(f"      `{request['signature']}`")
+            print(f"      {request['instruction']}")
+        print()
+    return 0
+
+
+def _prove_facet(module: Path, tests: tuple[Path, ...], index: int, proposal: dict,
+                 output_format: str) -> int:
+    """Run one caller-written proposal through the execution gate.
+
+    A separate command from `--facets` on purpose. One command would have to write the test
+    itself, and a tool that both proposes and accepts its own proposal has no gate."""
+    from l1_analyzer import facets, proof
+
+    audit = facets.audit(module, tests)
+    asked = proof.requests(audit, index + 1)
+    request = next((r for r in asked if r["index"] == index), None)
+    if request is None:
+        print(f"no proof request carries index {index}; this audit made {len(asked)}. "
+              "Run --facets with --proof-cap to see them.")
+        return 1
+
+    verdict = proof.verify(module, request, proposal)
+    if output_format == "json":
+        print(json.dumps({**verdict, "request": request}, indent=2, default=str))
+        return 0
+
+    state = "RETAINED" if verdict["retained"] else "DISCARDED"
+    print(f"# Proof {index} — {request['function']}:{request['line']} — {state}\n")
+    print(f"{verdict['outcome']}: {verdict['reason']}\n")
+    if verdict["rendered"]:
+        print("```python")
+        print(verdict["rendered"].rstrip())
+        print("```")
+        print("\nNothing was written into your test file. Adopting this is your decision.")
     return 0
 
 
@@ -482,6 +530,27 @@ def main(argv: list[str] | None = None) -> int:
              "cargo-llvm-cov. --prove-max caps gaps per module.",
     )
     parser.add_argument(
+        "--proof-cap",
+        type=int,
+        default=0,
+        metavar="N",
+        help="With --facets: ask for up to N isolated proof requests. Each carries one "
+             "signature and one gap and no source, so what leaves this machine is a "
+             "function's shape rather than a repository. Nothing is asked for by default, "
+             "because a request is what gets sent to a model.",
+    )
+    parser.add_argument(
+        "--prove-facet",
+        nargs=6,
+        default=None,
+        metavar="ARG",
+        help="Run one proposal through the execution gate: MODULE TESTS INDEX INPUT "
+             "PROPERTY WHY. INDEX comes from --proof-cap. The proposal is rendered as one "
+             "test and run alone; only a test that FAILS, or that makes the audited "
+             "function raise, is retained. A passing test proves the opposite of the claim "
+             "and is discarded. Nothing is written into your test file.",
+    )
+    parser.add_argument(
         "--facets",
         nargs='+',
         default=None,
@@ -531,7 +600,19 @@ def main(argv: list[str] | None = None) -> int:
         if missing:
             parser.error("--facets needs files that exist: " + ", ".join(missing))
         return _report_facets(Path(args.facets[0]),
-                              tuple(Path(t) for t in args.facets[1:]), args.format)
+                              tuple(Path(t) for t in args.facets[1:]), args.format,
+                              args.proof_cap)
+
+    if args.prove_facet:
+        module, tests, index, argument, expected, why = args.prove_facet
+        for path in (module, tests):
+            if not Path(path).is_file():
+                parser.error(f"--prove-facet needs files that exist: {path}")
+        if not index.lstrip("-").isdigit():
+            parser.error("--prove-facet takes the request INDEX as a number")
+        return _prove_facet(Path(module), (Path(tests),), int(index),
+                            {"concrete_input": argument, "expected_property": expected,
+                             "plain_explanation": why}, args.format)
 
     # The analyzer audits a repository (a directory), not a single file: the git, config,
     # coverage, and test-run steps all operate on a tree. A file argument used to reach the

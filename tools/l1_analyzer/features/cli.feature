@@ -3,6 +3,12 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  Scenario: _prove_facet runs one caller-written proposal through the execution gate
+    Given a module, its tests, a request index and the three fields of a proposal
+    When _prove_facet renders and runs it
+    Then the verdict says whether it was retained and what happened when it ran
+    But it is a separate command from --facets, because one command would have to write the test itself and a tool that both proposes and accepts its own proposal has no gate
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
@@ -79,4 +85,3 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     When _report_facets audits the pair
     Then it prints the coverage and the Silence index beside each other, then every silent facet grouped by kind
     But undeclared domains are listed apart from the index, because those are closed by declaring a type rather than by adding a test, so counting them would blame the suite for a gap in the signature
-
