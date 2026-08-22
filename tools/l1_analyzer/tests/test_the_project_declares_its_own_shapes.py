@@ -28,6 +28,20 @@ import pytest
 from l1_analyzer import honest_code_rules as rules
 
 
+def _violations(source: dict) -> list[str]:
+    """The findings that survive as violations, which is what the clause used to return.
+
+    It emits a withheld finding now and says a declaration withheld it, so a consumer can
+    count real suppressions instead of inferring them from the presence of a decorator."""
+    return [f["symbol"] for f in rules.io_below_the_boundary(source) or []
+            if f["withheld_by"] == ""]
+
+
+def _withheld(source: dict) -> list[str]:
+    return [f["symbol"] for f in rules.io_below_the_boundary(source) or []
+            if f["withheld_by"] == "declaration"]
+
+
 def _module(text: str) -> dict:
     return {"path": "m.py", "language": "python", "text": text,
             "tree": ast.parse(text), "readable": True, "unreadable_reason": ""}
@@ -98,7 +112,10 @@ def test_a_function_that_declares_itself_the_boundary_may_do_io():
     and then doing I/O is conforming, and the project's own checker already reads this."""
     source = ("@boundary\ndef load(path):\n    return path.read_text()\n\n\n"
               "def total(path):\n    return load(path)\n")
-    assert rules.io_below_the_boundary(_module(source)) == []
+    assert _violations(_module(source)) == []
+    assert _withheld(_module(source)) == ["load"], (
+        "the declaration withheld a finding and has to say so, or a consumer counting "
+        "suppressions has to guess from the presence of a decorator")
 
 
 @pytest.mark.parametrize("spelling", [
@@ -117,8 +134,8 @@ def test_the_declaration_is_recognised_however_it_is_spelled(spelling):
     declared = (f"{spelling}\ndef load(path):\n    return path.read_text()\n\n\n"
                 "def total(path):\n    return load(path)\n")
     undeclared = declared.replace(spelling + "\n", "")
-    assert rules.io_below_the_boundary(_module(declared)) == [], spelling
-    assert rules.io_below_the_boundary(_module(undeclared)), (
+    assert _violations(_module(declared)) == [], spelling
+    assert _violations(_module(undeclared)), (
         f"the fixture for {spelling} reports nothing either way, so it cannot tell whether "
         "the declaration was read")
 
@@ -128,7 +145,7 @@ def test_an_undeclared_function_doing_io_is_still_found():
     evidence and the clause still fires."""
     source = ("def load(path):\n    return path.read_text()\n\n\n"
               "def total(path):\n    return load(path)\n")
-    assert [f["symbol"] for f in rules.io_below_the_boundary(_module(source))] == ["load"]
+    assert _violations(_module(source)) == ["load"]
 
 
 def test_a_declared_boundary_does_not_excuse_its_callers():
@@ -137,7 +154,7 @@ def test_a_declared_boundary_does_not_excuse_its_callers():
     source = ("@boundary\ndef load(path):\n    return path.read_text()\n\n\n"
               "def save(path, text):\n    path.write_text(text)\n\n\n"
               "def run(path):\n    return load(path), save(path, 'x')\n")
-    assert [f["symbol"] for f in rules.io_below_the_boundary(_module(source))] == ["save"]
+    assert _violations(_module(source)) == ["save"]
 
 
 def test_a_decorator_that_merely_mentions_the_word_is_not_a_declaration():

@@ -109,4 +109,4 @@ def test_no_helper_below_the_entry_point_touches_the_filesystem():
     found = rules.io_below_the_boundary({
         "path": "c_trace.py", "language": "python", "text": source,
         "tree": ast.parse(source), "readable": True, "unreadable_reason": ""})
-    assert [f["symbol"] for f in found] == [], found
+    assert [f["symbol"] for f in found if f["withheld_by"] == ""] == [], found

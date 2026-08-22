@@ -305,14 +305,20 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
         called_by_siblings |= _called(fn) - {fn.name}
     found: list[Finding] = []
     for fn in functions:
-        if fn.name not in called_by_siblings or _declares_a_boundary(fn):
+        if fn.name not in called_by_siblings:
             continue
         touched = sorted(_io_calls(fn))
         if touched:
-            found.append(_finding(
+            # Emitted and marked, not dropped. A suppression that suppresses nothing is
+            # invisible from outside the analyzer, so a consumer counting declarations had
+            # to infer from the presence of a decorator and was wrong three times in four.
+            withheld = "declaration" if _declares_a_boundary(fn) else ""
+            finding = _finding(
                 "L1.21.4", fn.name, fn.lineno,
                 f"performs I/O ({', '.join(touched)}) and is called by another function here",
-                "take the data as a parameter and let the caller at the edge do the I/O", ""))
+                "take the data as a parameter and let the caller at the edge do the I/O", "")
+            finding["withheld_by"] = withheld
+            found.append(finding)
     return found
 
 

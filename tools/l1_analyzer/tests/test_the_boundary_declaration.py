@@ -35,10 +35,13 @@ def test_a_declared_function_still_behaves_exactly_as_written():
 
 
 def _findings(module) -> list[dict]:
+    """The findings that survive as violations. A declared boundary is emitted and marked
+    withheld rather than dropped, so a consumer can count real suppressions."""
     source = pathlib.Path(module.__file__).read_text()
-    return rules.io_below_the_boundary({
+    found = rules.io_below_the_boundary({
         "path": pathlib.Path(module.__file__).name, "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""})
+        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+    return [f for f in found if f["withheld_by"] == ""]
 
 
 def test_the_makefile_reader_is_declared_and_the_clause_reads_it():
@@ -63,5 +66,6 @@ def test_an_undeclared_reader_is_still_reported():
               "def run(path):\n    return declared(path), undeclared(path)\n")
     found = rules.io_below_the_boundary({
         "path": "m.py", "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""})
-    assert [f["symbol"] for f in found] == ["undeclared"]
+        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+    assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["undeclared"]
+    assert [f["symbol"] for f in found if f["withheld_by"] == "declaration"] == ["declared"]

@@ -109,11 +109,17 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     Then a finding the author declared, with a reason, is set apart from the violations
     But it is never dropped, because an exception nobody can see is indistinguishable from a rule nobody checked
 
-  Scenario: _split_allowed separates the violations from the declared exceptions
-    Given a clause's findings and the allowances the file declares
-    When _split_allowed compares them
-    Then a site the author declared, with a reason, is set apart rather than counted as a violation
-    But it is never dropped, since eleven handlers in this package are correct as written and leaving them as permanent findings would train a reader to skip the clause
+  Scenario: _withheld records one finding and what kept it off the violation list
+    Given a finding and the reason it was withheld
+    When _withheld records it
+    Then the file, the symbol, the line and the reason travel together, so a reader can go and argue with the decision at the site
+    But it is never dropped, since a suppression nobody can see is indistinguishable from a rule nobody checked
+
+  Scenario: _split_withheld separates the violations from everything that withheld one
+    Given a clause's findings and the allowances its file declares
+    When _split_withheld reads what withheld each one
+    Then a site an allow comment excused and a site a boundary decorator excused are both set apart, and each says which withheld it
+    But a declaration that withheld nothing produces no record, since a marker on a function the clause would never have spoken about suppressed nothing and counting it punishes the declaration it was added to encourage
 
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.

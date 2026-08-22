@@ -38,6 +38,7 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Given a parsed source
     When io_below_the_boundary reads the call graph and the effects of each function
     Then a function that performs I/O and is itself called by a sibling has put the I/O below the boundary
+    And a declared boundary is reported as withheld rather than dropped, so the count of real suppressions is a fact rather than a guess made from the presence of a decorator
     But an entry point that performs I/O is the boundary, which is where the I/O is supposed to be
 
   Scenario: inheritance_for_reuse finds a class inheriting to share code

@@ -35,6 +35,11 @@ class Finding(TypedDict):
     them and dropping it."""
 
     file: str
+    # What kept this finding off the violation list, or the empty string when nothing did.
+    # "declaration" means a boundary decorator; an allow comment is recorded separately,
+    # because the two are different acts: a comment carries a written reason and a
+    # declaration carries an architectural claim.
+    withheld_by: str
     clause: str
     symbol: str
     line: int
@@ -81,8 +86,8 @@ def _finding(clause: str, symbol: str, line: int, detail: str, instead: str,
     """One finding. `undecided` is required rather than defaulted: this module's own clause
     14 flagged the default, and it was right. Every caller now states whether the clause
     read the whole rule or half of it, so nobody can forget to say."""
-    return {"file": "", "clause": clause, "symbol": symbol, "line": line, "detail": detail,
-            "instead": instead, "undecided": undecided}
+    return {"file": "", "withheld_by": "", "clause": clause, "symbol": symbol, "line": line,
+            "detail": detail, "instead": instead, "undecided": undecided}
 
 
 def _functions(source: dict) -> list[ast.FunctionDef]:

@@ -106,6 +106,7 @@ class Allowed(TypedDict):
 
     file: str
     clause: str
+    symbol: str
     line: int
     detail: str
     reason: str
@@ -121,6 +122,7 @@ class Assessed(TypedDict):
     reason: str
     findings: list[Finding]
     allowed: list[Allowed]
+    declared: list[Allowed]
 
 
 class Assessment(TypedDict):
@@ -293,33 +295,52 @@ def assess(source: dict) -> list[Assessed]:
             kind = NOT_APPLICABLE
             reason = (f"not applicable to a {source['language']} file, so nothing here was "
                       "checked")
-        kept, allowed = _split_allowed(findings or [], declared)
+        kept, allowed, by_declaration = _split_withheld(findings or [], declared)
         assessed.append({
             "code": clause["code"], "name": clause["name"],
             "decided": reason == "", "undecided": "" if reason == "" else kind,
             "reason": reason, "findings": kept, "allowed": allowed,
+            "declared": by_declaration,
         })
     return assessed
 
 
-def _split_allowed(findings: list[Finding],
-                   declared: dict[int, dict[str, str]]) -> tuple[list[Finding], list[Allowed]]:
-    """The violations, and the sites the author declared with a reason.
+_DECLARED_REASON = ("a boundary declaration on the function withheld this; the call graph "
+                    "inference would otherwise have reported it")
 
-    Set apart rather than dropped. Four handlers in this tool are correct as written and
-    argued at the site; leaving them as permanent findings would train a reader to skip the
-    clause, and skipping a clause is how the one that matters gets skipped too."""
+
+def _split_withheld(findings: list[Finding], declared: dict[int, dict[str, str]]
+                    ) -> tuple[list[Finding], list[Allowed], list[Allowed]]:
+    """The violations, the sites an allow comment excused, and the sites a boundary
+    declaration excused.
+
+    Three lists, because the two suppressions are different acts and a reader has to be
+    able to tell them apart: a comment carries a written reason, a declaration carries an
+    architectural claim.
+
+    Set apart rather than dropped, and the declaration half was dropped until now. A
+    consumer counting suppressions had to infer them from the presence of a decorator, and
+    on one real package that inference was wrong three times in four: 62 of 82 markers sat
+    on functions this clause would never have spoken about. Only a withheld finding is
+    recorded here, so a marker that suppressed nothing costs its package nothing."""
     kept: list[Finding] = []
     allowed: list[Allowed] = []
+    by_declaration: list[Allowed] = []
     for finding in findings:
         reason = allowed_reason(finding, declared)
         if reason:
-            allowed.append({"file": finding["file"], "clause": finding["clause"],
-                            "line": finding["line"], "detail": finding["detail"],
-                            "reason": reason})
+            allowed.append(_withheld(finding, reason))
+        elif finding["withheld_by"] == "declaration":
+            by_declaration.append(_withheld(finding, _DECLARED_REASON))
         else:
             kept.append(finding)
-    return kept, allowed
+    return kept, allowed, by_declaration
+
+
+def _withheld(finding: Finding, reason: str) -> Allowed:
+    """One finding that was withheld, and what withheld it."""
+    return {"file": finding["file"], "clause": finding["clause"], "symbol": finding["symbol"],
+            "line": finding["line"], "detail": finding["detail"], "reason": reason}
 
 
 def _skip_reason(clause: Clause, source: dict) -> tuple[str, str]:
@@ -413,6 +434,7 @@ def report(assessment: Assessment) -> str:
     held = [c for c in assessment["clauses"] if c["decided"] and not c["findings"]]
     undecided = [c for c in assessment["clauses"] if not c["decided"]]
     declared = [a for c in assessment["clauses"] for a in c["allowed"]]
+    by_declaration = [a for c in assessment["clauses"] for a in c["declared"]]
 
     for clause in broken:
         lines.append(f"## {clause['code']} — {clause['name']} ({len(clause['findings'])})")
@@ -431,6 +453,14 @@ def report(assessment: Assessment) -> str:
                    "they are not invisible: a reader audits the reason here."), ""]
         for entry in declared:
             lines.append(f"- `{entry['clause']}:{entry['line']}` — {entry['reason']}")
+        lines.append("")
+    if by_declaration:
+        lines += [f"## boundary declarations ({len(by_declaration)})", "",
+                  ("> Sites a boundary decorator withheld. The declaration overrode this "
+                   "reader's call-graph inference, which is the case worth seeing; a "
+                   "declaration that agreed with it withheld nothing and is not listed."), ""]
+        for entry in by_declaration:
+            lines.append(f"- `{entry['symbol']}:{entry['line']}` — {entry['detail']}")
         lines.append("")
     if undecided:
         lines += [f"## clauses not decided ({len(undecided)})", "",
@@ -481,6 +511,7 @@ def analyze(repo: Path, lang: str) -> dict:
     # A production clause over a test file would make the score about the suite rather than
     # about the code, and a test clause over a production file has no tests to read.
     declared_exceptions: list[Allowed] = []
+    boundary_declarations: list[Allowed] = []
     unreadable = 0
     for read, wanted in ((production, False), (tests, True)):
         for path, text in read:
@@ -492,6 +523,7 @@ def analyze(repo: Path, lang: str) -> dict:
                     continue
                 decided.add(clause["code"])
                 declared_exceptions += clause["allowed"]
+                boundary_declarations += clause["declared"]
                 if clause["findings"]:
                     broken.setdefault(clause["code"], []).extend(clause["findings"])
 
@@ -502,7 +534,8 @@ def analyze(repo: Path, lang: str) -> dict:
                    "conformity to report. Not decided: " + ", ".join(never_decided))
         return {"value": "n/a", "band": "n/a", "details": nothing,
                 "findings": [], "undecided": never_decided,
-                "allowed": declared_exceptions, "unreadable_files": unreadable}
+                "allowed": declared_exceptions, "declared": boundary_declarations,
+                "unreadable_files": unreadable}
 
     share = round((len(decided) - len(broken)) / len(decided) * 100, 1)
     # The count is stated even when it is zero, and with no conditional anywhere in the
@@ -513,8 +546,10 @@ def analyze(repo: Path, lang: str) -> dict:
     detail = (f"{len(decided) - len(broken)} of {len(decided)} decided clauses hold across "
               f"{len(files)} files. Declared exceptions: {len(declared_exceptions)}. "
               f"{unreadable} file(s) could not be read. "
+              f"{len(boundary_declarations)} boundary declaration"
+              f"{'' if len(boundary_declarations) == 1 else 's'} withheld a finding. "
               f"Not decided ({len(never_decided)}): " + ", ".join(never_decided))
     return {"value": share, "band": band_of(share), "details": detail,
             "findings": [f for group in broken.values() for f in group],
             "undecided": never_decided, "allowed": declared_exceptions,
-            "unreadable_files": unreadable}
+            "declared": boundary_declarations, "unreadable_files": unreadable}
