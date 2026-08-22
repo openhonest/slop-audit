@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from l1_analyzer import honest_code_rules as rules
+from l1_analyzer.honest_code_read import read_tree
 from l1_analyzer.honest_code_rules import BROWSER_LANGUAGES, Finding
 from l1_analyzer.lang_spec import LANG_SPEC
 
@@ -217,7 +218,7 @@ def read_source_text(text: str, path: str) -> dict:
     # built for any language the vocabulary covers, which is what lets a ported clause see
     # a JavaScript file that Python's own parser cannot.
     if language in _VOCABULARY:
-        source.update(rules.read_tree(text, language))
+        source.update(read_tree(text, language))
         source["unreadable_reason"] = ""
     if language not in _PARSED:
         # No Python tree, and that is not a failure to read: the clauses that apply here

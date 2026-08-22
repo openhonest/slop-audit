@@ -17,6 +17,7 @@ runs, not that it is reading the thing it names.
 """
 
 import pytest
+from l1_analyzer import honest_code_read as read
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.lang_spec import LANG_SPEC
 
@@ -67,7 +68,7 @@ LANGUAGES = ["python", "javascript"]
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_dispatch_chain_is_found_in_this_language(language):
-    found = rules.dispatch_chains(rules.read_tree(DISPATCH[language], language))
+    found = rules.dispatch_chains(read.read_tree(DISPATCH[language], language))
     assert len(found) == 1, found
     assert "channel" in found[0]["symbol"]
 
@@ -76,21 +77,21 @@ def test_a_dispatch_chain_is_found_in_this_language(language):
 def test_the_same_source_without_the_chain_is_quiet(language):
     """The other direction, on the same code. Without this a fixture proves the clause
     runs, not that it is reading the thing it names."""
-    assert rules.dispatch_chains(rules.read_tree(NO_DISPATCH[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(NO_DISPATCH[language], language)) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_an_ordinary_conditional_is_not_a_dispatch_chain(language):
     """The rule says so itself: bounds checks and null guards are ordinary conditionals. A
     clause that fires on every function with a condition teaches a reader to ignore it."""
-    assert rules.dispatch_chains(rules.read_tree(ORDINARY[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(ORDINARY[language], language)) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_two_armed_test_is_not_yet_a_table(language):
     source = {"python": "def f(kind):\n    if kind == 'a':\n        return one()\n    return two()\n",
               "javascript": "function f(kind) {\n  if (kind === 'a') { return one(); }\n  return two();\n}\n"}
-    assert rules.dispatch_chains(rules.read_tree(source[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(source[language], language)) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -107,7 +108,7 @@ def test_a_chain_dispatching_on_two_different_names_is_not_one_table(language):
                        "  else if (b === 2) { return two(); }\n"
                        "  else if (a === 3) { return three(); }\n  return null;\n}\n"),
     }
-    assert rules.dispatch_chains(rules.read_tree(source[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(source[language], language)) == []
 
 
 # --------------------------------------------------------------------------
@@ -115,7 +116,7 @@ def test_a_chain_dispatching_on_two_different_names_is_not_one_table(language):
 # --------------------------------------------------------------------------
 
 def test_the_tree_reader_names_the_language_it_read():
-    source = rules.read_tree("const x = 1;\n", "javascript")
+    source = read.read_tree("const x = 1;\n", "javascript")
     assert source["language"] == "javascript"
     assert source["root"].type in ("program", "module")
 
@@ -123,7 +124,7 @@ def test_the_tree_reader_names_the_language_it_read():
 def test_the_tree_reader_carries_the_vocabulary_for_that_language():
     """A clause reads node types from the spec rather than naming them, which is what lets
     one implementation serve every language the spec covers."""
-    assert rules.read_tree("x = 1\n", "python")["spec"] is LANG_SPEC["python"]
+    assert read.read_tree("x = 1\n", "python")["spec"] is LANG_SPEC["python"]
 
 
 def test_a_language_the_spec_does_not_cover_is_refused():
@@ -131,4 +132,4 @@ def test_a_language_the_spec_does_not_cover_is_refused():
     produces findings about a file nobody read, which is the failure this package spent the
     morning removing."""
     with pytest.raises(KeyError):
-        rules.read_tree("x = 1\n", "klingon")
+        read.read_tree("x = 1\n", "klingon")

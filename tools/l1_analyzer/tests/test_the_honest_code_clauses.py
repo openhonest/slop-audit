@@ -340,8 +340,13 @@ def test_a_call_at_the_place_it_happens_is_not_a_hook():
 def test_the_strangler_clause_never_returns_a_verdict():
     """It is a property of how work is sequenced over weeks. No file, and no set of files,
     carries the sequence of the work that produced them, so a pass here would be a claim
-    nobody could support."""
-    assert rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n")) is None
+    nobody could support.
+
+    It used to say so by returning None, which a caller cannot tell from a clause that ran
+    and found nothing. The refusal is loud now, and the two tests below say why: the gate
+    answers before this is reached, so reaching it is itself the defect."""
+    with pytest.raises(NotImplementedError):
+        rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))
 
 
 # --------------------------------------------------------------------------
@@ -580,3 +585,31 @@ def test_a_control_flow_signal_is_not_an_error_this_clause_names(signal):
 def test_an_ordinary_exception_is_still_caught_by_the_clause():
     source = "def probe():\n    try:\n        cli_main(['--help'])\n    except ValueError:\n        pass\n"
     assert rules.swallowed_exceptions(_module(source))
+
+
+def test_the_clause_nothing_decides_is_never_asked():
+    """`_skip_reason` answers `never` for clause 17 before any checker runs, so its body is
+    unreachable during a normal assessment. A stub checker flagged the empty return and was
+    right for a better reason than it knew: not unwritten, never run."""
+    from l1_analyzer import honest_code
+
+    asked = []
+    original = honest_code.CLAUSES
+    honest_code.CLAUSES = tuple(
+        {**c, "check": lambda _source, code=c["code"]: asked.append(code)}
+        if c["code"] == "L1.21.17" else c
+        for c in original)
+    try:
+        honest_code.assess(honest_code.read_source_text("def f(n: int) -> int:\n    return n\n",
+                                                        "m.py"))
+    finally:
+        honest_code.CLAUSES = original
+    assert asked == []
+
+
+def test_reaching_the_clause_nothing_decides_is_itself_a_defect():
+    """It returned None, which reads to a caller exactly like a clause that ran and found
+    nothing. Reaching it means the gate that answers `never` has stopped working, and a
+    silent None would let that failure arrive somewhere else as a clean result."""
+    with pytest.raises(NotImplementedError):
+        rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))
