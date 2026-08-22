@@ -143,7 +143,7 @@ def _card(l18b: dict, l18_band: str = "Slop") -> dict:
     }
     for code in ("L1.9", "L1.10", "L1.11", "L1.15", "L1.16", "L1.17"):
         panel[code] = {"value": "n/a", "band": "Healthy", "details": "fixture"}
-    return card.build_card("fixture", "rust", panel, ran_tests=False)
+    return card.build_card("fixture", "rust", panel, ran_tests=False, analyzer_version="test")
 
 
 def test_a_card_limited_by_unbounded_state_says_so():

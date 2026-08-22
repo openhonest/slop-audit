@@ -16,8 +16,17 @@ use slop_audit_rs::{lang, panel};
 use std::path::Path;
 
 fn usage() -> ! {
-    eprintln!("usage: slop-audit-rs <repo> [--lang KEY] [--tsv]");
+    eprintln!("usage: slop-audit-rs <repo> [--lang KEY] [--tsv] [--version]");
     std::process::exit(2);
+}
+
+/// Which build this is, from the crate metadata cargo compiled in.
+///
+/// One source. A string literal here would be a second owner of the same fact with nothing
+/// checking the two agreed, and the parity job's verdict that two implementations agree was
+/// about two builds neither of them could name.
+fn version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
 }
 
 fn main() {
@@ -29,6 +38,12 @@ fn main() {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--tsv" => tsv = true,
+            // Before the repository check: it answers a question about the binary rather
+            // than about a tree.
+            "--version" => {
+                println!("slop-audit-rs {}", version());
+                return;
+            }
             "--lang" => lang_arg = Some(args.next().unwrap_or_else(|| usage())),
             "-h" | "--help" => usage(),
             other if other.starts_with('-') => usage(),

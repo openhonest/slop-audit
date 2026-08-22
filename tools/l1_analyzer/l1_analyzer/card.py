@@ -394,7 +394,8 @@ def _proofs(results: dict) -> list[dict]:
     return out[:_PROOF_CAP]
 
 
-def build_card(slug: str, lang: str, results: dict, ran_tests: bool) -> dict:
+def build_card(slug: str, lang: str, results: dict, ran_tests: bool,
+               analyzer_version: str) -> dict:
     """The full scorecard model, identical to the site's. ran_tests=True (the CLI) adds
     the measured runtime metrics (L1.19 coverage, L1.20 determinism); False (the site) omits
     them and the footer says the code was never executed."""
@@ -447,6 +448,7 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool) -> dict:
         "thread_surface": _thread_surface(lang, results),
         "interleaving_robustness": _interleaving_robustness(results),
         "honest_code": _honest_code(results),
+        "analyzer_version": analyzer_version,
         "proofs": _proofs(results),
         "share_text": _t(f"share.{status}", slug=slug),
     }
@@ -538,6 +540,11 @@ def card_markdown(card: dict) -> str:
     """The same card as Markdown, for the CLI and agent-facing output."""
     strip = re.compile(r"<[^>]+>")
     lines = [f"# Slop Audit — {card['slug']} ({card['lang']})", ""]
+    # Which build made this. A card is a published measurement, and a reader cannot tell
+    # whether a number came from the build that fixed L1.13's denominator or the one before
+    # it unless the card says so.
+    if card["analyzer_version"]:
+        lines += [f"_slop-audit-l1 {card['analyzer_version']}_", ""]
     # An ungraded card keeps the checks that WERE measured. Withholding the state verdict is
     # a statement about the state classifier, and god-files, secrets, type escapes and CI were
     # measured by other indicators that the missing state has nothing to do with. The first

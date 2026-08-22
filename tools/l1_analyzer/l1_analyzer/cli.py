@@ -336,7 +336,8 @@ def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str,
 
     coverage = f"{audit['coverage_percent']}%" if audit["coverage_measured"] else "not measured"
     index = f"{audit['silence_index']}%" if audit["silence_index"] is not None else "not measured"
-    print(f"# Facets — {module.name} against {', '.join(t.name for t in tests)}\n")
+    print(f"# Facets — {module.name} against {', '.join(t.name for t in tests)}")
+    print(f"_slop-audit-l1 {version()}_\n")
     print(f"Coverage: {coverage} | Silence index: {index}")
     print(f"{audit['closeable_silence_sites']} of {audit['total_checkable_facets']} closeable "
           f"facets lack evidence\n")
@@ -451,6 +452,20 @@ def _prove_facet(module: Path, tests: tuple[Path, ...], index: int, proposal: di
         print("```")
         print("\nNothing was written into your test file. Adopting this is your decision.")
     return 0
+
+
+def version() -> str:
+    """Which build this is, from the installed package metadata.
+
+    One source. A constant here would be a second owner of the same fact with nothing
+    checking the two agreed, which is the shape that let an adopter ship a release the
+    marketplace never served while `plugin update` reported the plugin current.
+
+    A measurement that cannot name the build behind it cannot be cited later, and the bands
+    and the denominators in this instrument have both moved under readers before."""
+    from importlib import metadata
+
+    return metadata.version("slop-audit-l1")
 
 
 def run() -> int:
@@ -600,6 +615,12 @@ def main(argv: list[str] | None) -> int:
              "cargo-llvm-cov. --prove-max caps gaps per module.",
     )
     parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Print which build this is and exit. Every panel and every card carries the "
+             "same string, so a measurement can be traced to the instrument that made it.",
+    )
+    parser.add_argument(
         "--honest-code",
         default=None,
         metavar="FILE",
@@ -706,6 +727,12 @@ def main(argv: list[str] | None) -> int:
         return _report_facets(Path(args.facets[0]),
                               tuple(Path(t) for t in args.facets[1:]), args.format,
                               args.proof_cap)
+
+    if args.version:
+        # Before every path check: it answers a question about the tool rather than about a
+        # tree, so requiring a repository would ask for something the answer never uses.
+        print(f"slop-audit-l1 {version()}")
+        return 0
 
     if args.honest_code:
         # Before the repository checks, and before --format is defaulted: this takes ONE
@@ -846,7 +873,7 @@ def main(argv: list[str] | None) -> int:
     # measures raise is that every earlier attempt to render "we read nothing" ended up
     # rendering it as "we read everything and it was clean". Exit 2: not a crash, not a pass.
     try:
-        model = card.build_card(slug, _audited_language(results, args.lang, args.repo), results, ran_tests=ran_tests)
+        model = card.build_card(slug, _audited_language(results, args.lang, args.repo), results, ran_tests=ran_tests, analyzer_version=version())
     except IncompleteCode as refusal:
         print(f"\n{refusal}\n\nNo grade is issued. The analyzer has no rule for what this "
               f"repository contains, so any letter it printed would be about its own blind "
@@ -866,6 +893,10 @@ def main(argv: list[str] | None) -> int:
         # ambiguous about whether the additive L1.18b classifier was active.
         envelope = {
             "repo": str(args.repo),
+            # Which build produced these numbers. A panel that cannot name its instrument
+            # cannot be cited later, and the bands and the denominators here have both
+            # moved under readers before.
+            "analyzer_version": version(),
             "state_bounds": "off" if args.no_state_bounds else "on",
             "results": results,
         }

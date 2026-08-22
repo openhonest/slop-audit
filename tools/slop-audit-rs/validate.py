@@ -128,12 +128,33 @@ def diff_panels(repo: Path, lang: str = "auto", *, quiet: bool = False) -> tuple
     return diffs, len(codes)
 
 
+def _reference_version() -> str:
+    """The Python reference's build, asked of the tool rather than read from a file.
+
+    Run from the reference package, the same way its panel is, so `uv run` resolves that
+    project's environment rather than this directory's."""
+    run = subprocess.run(["uv", "run", "slop-audit-l1", "--version"], cwd=REFERENCE,
+                         capture_output=True, text=True, check=False)
+    return run.stdout.strip() or "slop-audit-l1 (version not reported)"
+
+
+def _ported_version() -> str:
+    """The portable bundle's build, asked of the binary the same way."""
+    run = subprocess.run([str(BINARY), "--version"], capture_output=True, text=True, check=False)
+    return run.stdout.strip() or "slop-audit-rs (version not reported)"
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
     repo = Path(sys.argv[1]).resolve()
     lang = sys.argv[2] if len(sys.argv) > 2 else "auto"
+    # WHICH two builds. This job's verdict is that two implementations agree, and it used to
+    # name neither, so a green run could not be cited afterwards and a disagreement could not
+    # be attributed to a change in either side.
+    print(f"reference: {_reference_version()}")
+    print(f"ported:    {_ported_version()}\n")
     diffs, compared = diff_panels(repo, lang)
     # "16/16" on its own reads as a complete audit. It is a statement about the indicators
     # that were compared, and saying so is the whole lesson of this differ's own blind spot.

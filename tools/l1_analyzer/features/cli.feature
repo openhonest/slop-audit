@@ -27,6 +27,12 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     Then main receives the arguments it requires
     But main used to be that callable itself, and its default meant every other caller could omit the arguments too, so nothing distinguished a caller who meant the process arguments from one who forgot to say
 
+  Scenario: version says which build this is
+    Given the installed package metadata
+    When version reads it
+    Then every panel, every card and every facet report carries the same string, so a measurement can be traced to the instrument that made it
+    But a constant in the source would be a second owner of the same fact with nothing checking the two agreed, which is how a release ships while the channel serving it reports current
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
