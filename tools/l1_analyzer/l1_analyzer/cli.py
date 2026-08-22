@@ -377,29 +377,45 @@ def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str,
     return 0
 
 
-def _report_honest_code(path: Path, output_format: str) -> int:
-    """L1.21 for one file, in whichever of the three shapes the caller asked for.
+def _report_honest_code(paths: list[Path], output_format: str) -> int:
+    """L1.21 for the files named, in whichever of the three shapes the caller asked for.
+
+    Several files are measured in ONE process, which is the whole saving. The analysis
+    costs about nothing: on a small file a real run takes as long as `--help`, so the bill
+    is interpreter startup plus tree-sitter grammars for nine languages, and paying it once
+    for twenty files instead of twenty times is the difference between two seconds and
+    seventy milliseconds.
+
+    One file returns exactly what it always returned, JSON object and all. A consumer
+    already reads that shape, and changing it to serve the batch case would break a working
+    integration to add a feature.
 
     The hook shape is the default because it is the one that runs thousands of times. It
     writes to stderr, where a hook runner puts what a blocked tool call said, and it writes
     nothing when there is nothing to change."""
     from l1_analyzer import honest_code
 
-    assessment = honest_code.assess_file(path)
+    assessments = [honest_code.assess_file(path) for path in paths]
     if output_format == "json":
-        print(json.dumps(assessment, indent=2, default=str))
+        one = assessments[0] if len(assessments) == 1 else assessments
+        print(json.dumps(one, indent=2, default=str))
         return 0
     if output_format == "text":
-        print(honest_code.report(assessment))
+        for assessment in assessments:
+            print(honest_code.report(assessment))
         return 0
 
-    printed = honest_code.hook_report(assessment)
-    if assessment["unreadable_reason"]:
-        print(f"{path}: {assessment['unreadable_reason']}", file=sys.stderr)
-        return 1
-    if not printed:
+    lines: list[str] = []
+    for path, assessment in zip(paths, assessments):
+        if assessment["unreadable_reason"]:
+            lines.append(f"{path}: {assessment['unreadable_reason']}")
+            continue
+        printed = honest_code.hook_report(assessment)
+        if printed:
+            lines.append(printed)
+    if not lines:
         return 0
-    print(printed, file=sys.stderr)
+    print("\n".join(lines), file=sys.stderr)
     return 1
 
 
@@ -622,13 +638,17 @@ def main(argv: list[str] | None) -> int:
     )
     parser.add_argument(
         "--honest-code",
+        nargs="+",
         default=None,
         metavar="FILE",
-        help="L1.21 for ONE file: mechanical conformity with the nineteen Honest Code "
+        help="L1.21 for one or more files: mechanical conformity with the nineteen Honest Code "
              "principles, one subclause each. Built for a write hook, so it prints only "
              "what to change, prints it to stderr where a hook runner feeds it back, says "
              "nothing at all when the file is clean, and exits 1 when it is not. "
-             "--format text gives the full per-clause report a person reads.",
+             "--format text gives the full per-clause report a person reads. Several files "
+             "are measured in one process, which is the whole saving: the analysis costs "
+             "about nothing and the bill is interpreter startup, paid once here instead of "
+             "once per file. One file returns exactly what it always returned.",
     )
     parser.add_argument(
         "--honest-code-clauses",
@@ -740,9 +760,14 @@ def main(argv: list[str] | None) -> int:
         # Returns before the repository checks: this takes ONE file, because it runs behind
         # a hook that fires on every write and the panel has nothing to say about the file
         # an agent just saved.
-        if not Path(args.honest_code).is_file():
-            parser.error(f"--honest-code needs a file that exists: {args.honest_code}")
-        return _report_honest_code(Path(args.honest_code), args.format or "hook")
+        # Every path is checked before any is measured. A run that quietly skipped a
+        # missing one and measured the rest would report a coverage it did not have, and a
+        # caller who named a file that is not there has a different problem from one whose
+        # file is clean.
+        missing = [p for p in args.honest_code if not Path(p).is_file()]
+        if missing:
+            parser.error("--honest-code needs files that exist: " + ", ".join(missing))
+        return _report_honest_code([Path(p) for p in args.honest_code], args.format or "hook")
 
     args.format = args.format or "text"
 
