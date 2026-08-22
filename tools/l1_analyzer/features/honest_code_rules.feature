@@ -262,6 +262,18 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a statement that records a failure makes the handler beneath the success condition, since it runs only when the call did not raise
     But it cannot decide whether the recorded failure is the one the author meant, because a try ending in an unrelated append reads the same way
 
+  Scenario: _local_exceptions names the classes this file defines that are exceptions
+    Given the classes one file declares and the bases each names
+    When _local_exceptions follows those bases to their root
+    Then a class three levels down from Exception is still an exception
+    But a base defined in another module cannot be followed, so a class deriving from one stays reported, which sends a reader to look rather than hiding it
+
+  Scenario: _declares_a_boundary says whether a function is one of the project's own edges
+    Given a function definition and its decorators
+    When _declares_a_boundary reads what each decorator NAMES
+    Then a declared edge is conforming rather than violating, since the rule is that I/O belongs at the boundary
+    But a decorator merely carrying the word as data is not a declaration, which is the lesson clause 16 learned from a parametrize holding an exit handler
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Every clause here reads structure. None of them reads intent, and several rules turn on it:

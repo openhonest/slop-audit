@@ -19,6 +19,17 @@ conformity number worth having and one that can be raised by looking away.
 import ast
 from typing import TypedDict
 
+# How a project declares that a function IS an edge. Clause 4's rule is that I/O belongs at
+# the boundary, so a function saying it is the boundary and then doing I/O is conforming.
+#
+# This is not a suppression. A suppression silences a rule; a boundary decorator states
+# where the project's edges are, which is the thing the rule is about, and in at least one
+# adopter it is already load-bearing in another checker. The clause INFERS the boundary
+# from the call graph when nothing says. A declaration is better evidence than an
+# inference, so where both exist the declaration wins.
+BOUNDARY_DECORATORS = frozenset({"boundary", "boundary_in", "boundary_out", "edge",
+                                 "entrypoint", "entry_point"})
+
 # Bases that DECLARE a shape rather than share an implementation. The rules allow exactly
 # these, and flagging them would flag the recommended alternative.
 DECLARED_SHAPES = frozenset({
@@ -196,8 +207,9 @@ def data_classes(source: dict) -> list[Finding] | None:
     Not decided: whether a class the rule permits was the right choice. A wrapper around a
     resource is allowed and whether it earned the permission is a question for a reader."""
     found: list[Finding] = []
+    shapes = DECLARED_SHAPES | _local_exceptions(source)
     for node in _classes(source):
-        if set(_base_names(node)) & DECLARED_SHAPES:
+        if set(_base_names(node)) & shapes:
             continue
         methods = _methods(node)
         init = next((m for m in methods if m.name == "__init__"), None)
@@ -280,7 +292,7 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
         called_by_siblings |= _called(fn) - {fn.name}
     found: list[Finding] = []
     for fn in functions:
-        if fn.name not in called_by_siblings:
+        if fn.name not in called_by_siblings or _declares_a_boundary(fn):
             continue
         touched = sorted(_io_calls(fn))
         if touched:
@@ -294,6 +306,19 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
 # --------------------------------------------------------------------------
 # 5. Flat composition over inheritance
 # --------------------------------------------------------------------------
+
+def _declares_a_boundary(fn: ast.FunctionDef) -> bool:
+    """Whether this function is decorated as one of the project's own edges.
+
+    Read from what the decorator NAMES, not from its text: a parametrize carrying the word
+    as test data is not a declaration, which is the lesson clause 16 learned from one
+    carrying an exit handler."""
+    for decorator in fn.decorator_list:
+        named = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if set(ast.unparse(named).split(".")) & BOUNDARY_DECORATORS:
+            return True
+    return False
+
 
 def _io_calls(fn: ast.FunctionDef) -> set[str]:
     """The I/O this function performs, by name.
@@ -320,11 +345,20 @@ def _io_calls(fn: ast.FunctionDef) -> set[str]:
 def inheritance_for_reuse(source: dict) -> list[Finding] | None:
     """A class whose base is neither a declared shape nor a framework requirement.
 
-    Not decided: whether a framework demands the base. A Django model must inherit, and
-    nothing in the file says the base belongs to a framework rather than to the author."""
+    An exception hierarchy is followed to its root. The table knew the literal name
+    `Exception` and nothing about a class deriving from one, so `class
+    ParseError(HonestCheckError)` read as inheriting to share an implementation. That is
+    the normal way to write exceptions and the framework's rule permits it; sixteen of them
+    in one adopter's file fired as violations.
+
+    Not decided: whether a framework demands the base, and whether a base defined in
+    another module is an exception. A Django model must inherit, and one file cannot see
+    past its own imports. Both stay reported, which sends a reader to look rather than
+    hiding it."""
     found: list[Finding] = []
+    shapes = DECLARED_SHAPES | _local_exceptions(source)
     for node in _classes(source):
-        inherited = [b for b in _base_names(node) if b not in DECLARED_SHAPES]
+        inherited = [b for b in _base_names(node) if b not in shapes]
         if inherited:
             found.append(_finding(
                 "L1.21.5", node.name, node.lineno,
@@ -337,6 +371,21 @@ def inheritance_for_reuse(source: dict) -> list[Finding] | None:
 # --------------------------------------------------------------------------
 # 6 and 7. The two browser clauses
 # --------------------------------------------------------------------------
+
+def _local_exceptions(source: dict) -> set[str]:
+    """Classes this file defines that reach `Exception` through their own bases.
+
+    Followed to the root rather than one level, so a three-deep hierarchy is still
+    exceptions all the way down."""
+    bases = {node.name: _base_names(node) for node in _classes(source)}
+    known = {name for name, parents in bases.items()
+             if set(parents) & {"Exception", "BaseException"}}
+    while True:
+        grew = {name for name, parents in bases.items() if set(parents) & known} - known
+        if not grew:
+            return known
+        known |= grew
+
 
 def client_side_state(source: dict) -> list[Finding] | None:
     """A store library or `localStorage` holding a copy of what the server already knows.
