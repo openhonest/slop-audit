@@ -29,6 +29,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -60,27 +61,38 @@ def _compiler(cc: str, repo: Path, timeout_seconds: float) -> str:
     return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown C compiler"
 
 
-def _make_target(repo: Path) -> tuple[str | None, str]:
-    """The first of `test`/`check` the repo's Makefile declares as a target, and why there
-    is none.
+def make_target_in(text: str) -> tuple[str | None, str]:
+    """The first of `test`/`check` a makefile declares as a target, and why there is none.
 
-    Read-only detection of the target's own build: the harness never edits the Makefile.
+    A pure function of the text. It used to walk three filenames and open one before it
+    could decide anything, so every test of the DECISION had to build a directory first.
+    The anchor matters: `^test\\s*:` is a rule declaring the target, and a recipe line that
+    merely mentions the word is not."""
+    for target in _TEST_TARGETS:
+        if re.search(rf"^{target}\s*:", text, re.MULTILINE):
+            return target, ""
+    return None, f"the makefile declares no {' or '.join(_TEST_TARGETS)} target"
 
-    The reason travels with the absence because a bare None had the caller say "no Makefile
-    test/check target found" for a Makefile it could not open. It may have had one, and the
-    two absences send a reader to different repairs."""
+
+@boundary
+def _read_makefile(repo: Path) -> tuple[str, str, str]:
+    """The first makefile this repository carries, its name, and why there is none.
+
+    The only part of this module below the entry points that meets the filesystem, and it
+    only reads: the harness never edits the target's build.
+
+    An absent makefile and an unreadable one come back with different reasons, because a
+    bare nothing had the caller say no test target was found for a file it could not open,
+    and the two send a reader to different repairs."""
     for name in _MAKEFILES:
         makefile = repo / name
-        if makefile.exists():
-            try:
-                text = makefile.read_text(encoding="utf-8", errors="ignore")
-            except OSError as error:
-                return None, f"{name} could not be read: {error}"
-            for target in _TEST_TARGETS:
-                if re.search(rf"^{target}\s*:", text, re.MULTILINE):
-                    return target, ""
-            return None, f"{name} declares no {' or '.join(_TEST_TARGETS)} target"
-    return None, f"no Makefile here ({', '.join(_MAKEFILES)})"
+        if not makefile.exists():
+            continue
+        try:
+            return makefile.read_text(encoding="utf-8", errors="ignore"), name, ""
+        except OSError as error:
+            return "", "", f"{name} could not be read: {error}"
+    return "", "", f"no makefile here ({', '.join(_MAKEFILES)})"
 
 
 def _coverage_verdict(summary_text: str, build_returncode: int, build_output: str,
@@ -150,7 +162,9 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     if cc is None:
         return _na("needs a C compiler (cc/gcc/clang) in PATH")
     compiler = _compiler(cc, repo, timeout_seconds)
-    target, why = _make_target(repo)
+    text, _name, why = _read_makefile(repo)
+    target, target_why = make_target_in(text) if text else (None, why)
+    why = why or target_why
     if target is None:
         return _na("C has no standard coverage convention; provide a build that runs tests under "
                    f"gcov/lcov ({why})")

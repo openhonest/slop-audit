@@ -37,12 +37,19 @@ Feature: c_trace — the L1.19 and L1.20 runtime harness for C repositories
     And the probe runs against the repository rather than the analyzer's own directory, so the answer does not depend on where the audit was launched
     But a probe that fails or times out yields the phrase "an unknown C compiler" rather than an error, because naming the toolchain is never the measurement
 
-  Scenario: _make_target finds the target that runs the repository's tests
+  Scenario: _read_makefile finds the repository's makefile and hands back its text
     Given a repository that may carry a makefile under any of its three usual names
-    When _make_target reads the first such file it finds and looks for a test target, then a check target
-    Then it returns the name of the first one declared
-    And it only reads the file, because the harness never edits the target's build
-    But the three ways of having no target come back with three different reasons, since a bare nothing had the caller say "no Makefile test/check target found" for a makefile it could not open
+    When _read_makefile looks for the first one and reads it
+    Then the text comes back with the name of the file it came from
+    And it only reads, because the harness never edits the target's build
+    But a missing makefile and an unreadable one come back with different reasons, since a bare nothing had the caller say no test target was found for a file it could not open
+
+  Scenario: make_target_in names the test target a makefile declares
+    Given the text of a makefile
+    When make_target_in looks for a test target, then a check target
+    Then the name of the first one declared comes back
+    And it touches no filesystem, so a caller can put any text in front of it and see what it decides
+    But a makefile declaring neither says so, which is a different answer from having no makefile at all
 
   Scenario: _coverage_verdict decides L1.19 from the lcov summary and the build that produced it
     Given lcov's summary text, the exit code of the instrumented make run, that run's output, the compiler that built it and the make target that ran

@@ -103,19 +103,24 @@ def test_an_interpreter_that_will_not_start_is_not_a_missing_module(monkeypatch)
 
 def test_a_makefile_target_that_is_there_is_found(tmp_path):
     (tmp_path / "Makefile").write_text("test:\n\techo hi\n")
-    assert c_trace._make_target(tmp_path) == ("test", "")
+    text, _name, why = c_trace._read_makefile(tmp_path)
+    assert why == ""
+    assert c_trace.make_target_in(text) == ("test", "")
 
 
 def test_a_repository_with_no_makefile_says_that(tmp_path):
-    target, reason = c_trace._make_target(tmp_path)
-    assert target is None
+    text, _name, reason = c_trace._read_makefile(tmp_path)
+    assert text == ""
     assert "no makefile" in reason.lower()
 
 
 def test_a_makefile_with_no_test_target_says_that(tmp_path):
+    """A different absence from the one above, and it comes from the decider rather than
+    the reader: the file was read, and it declares nothing to run."""
     (tmp_path / "Makefile").write_text("build:\n\techo hi\n")
-    target, reason = c_trace._make_target(tmp_path)
-    assert target is None
+    text, _name, why = c_trace._read_makefile(tmp_path)
+    target, reason = c_trace.make_target_in(text)
+    assert why == "" and target is None
     assert "target" in reason.lower()
 
 
@@ -126,9 +131,9 @@ def test_a_makefile_that_cannot_be_read_is_not_a_makefile_with_no_target(tmp_pat
     makefile.write_text("test:\n\techo hi\n")
     makefile.chmod(0o000)
     try:
-        target, reason = c_trace._make_target(tmp_path)
+        text, _name, reason = c_trace._read_makefile(tmp_path)
     finally:
         makefile.chmod(0o644)
-    if target is not None:
+    if text:
         pytest.skip("this filesystem let the unreadable file be read anyway")
     assert "could not be read" in reason.lower()

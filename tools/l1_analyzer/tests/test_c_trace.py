@@ -21,17 +21,25 @@ from l1_analyzer import c_trace
 
 
 def test_make_target_detects_test_and_check(tmp_path):
-    """The reason travels with the absence. A bare None had the caller say "no Makefile
-    test/check target found" for a Makefile it could not open, and the three ways of having
-    no target send a reader to three different repairs."""
+    """The reason travels with the absence, and the three ways of having no target send a
+    reader to three different repairs.
+
+    The reader and the decider are separate now. `_read_makefile` obtains the text and
+    `make_target_in` decides from it, so the two absences that are about the FILE come from
+    the first and the one about its CONTENT comes from the second."""
     (tmp_path / "Makefile").write_text("all:\n\tgcc -o app main.c\ncheck:\n\t./t\n")
-    assert c_trace._make_target(tmp_path) == ("check", "")
+    text, _name, why = c_trace._read_makefile(tmp_path)
+    assert why == ""
+    assert c_trace.make_target_in(text) == ("check", "")
+
     (tmp_path / "Makefile").write_text("all:\n\tgcc -o app main.c\n")
-    target, why = c_trace._make_target(tmp_path)
-    assert target is None and "declares no" in why
+    text, _name, why = c_trace._read_makefile(tmp_path)
+    target, target_why = c_trace.make_target_in(text)
+    assert why == "" and target is None and "declares no" in target_why
+
     (tmp_path / "Makefile").unlink()
-    target, why = c_trace._make_target(tmp_path)
-    assert target is None and "no Makefile" in why
+    text, _name, why = c_trace._read_makefile(tmp_path)
+    assert text == "" and "no makefile" in why
 
 
 def _summary(pct: str, covered: int, total: int) -> str:
