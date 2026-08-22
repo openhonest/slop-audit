@@ -85,11 +85,11 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     Then the language comes from the suffix and the tree from the parser
     But a file that does not parse comes back unreadable rather than empty, since a file nobody could read is not a file with no violations
 
-  Scenario: _skip_reason says why a clause was not run
+  Scenario: _skip_reason says which KIND of undecided a clause is, and the sentence for it
     Given a clause and a source
     When _skip_reason compares them
-    Then a clause nothing decides, an unreadable file and a language mismatch each give their own sentence
-    But a clause that can be run gives no reason at all, which is what marks it decided
+    Then the kind is one of never, not applicable or unreadable, which is what a consumer buckets on, and only unreadable is a failure
+    But the sentence used to be the only thing separating those three, so a reader had to parse English to tell a rule nothing decides from a file the audit could not read
 
   Scenario: assess_file_text measures one file's text against every clause
     Given the text of a file and its path

@@ -437,3 +437,86 @@ def test_a_clause_with_only_declared_exceptions_holds(tmp_path):
     (tmp_path / "allowed.py").write_text(ALLOWED)
     result = honest_code.analyze(tmp_path, "python")
     assert not any(f["clause"] == "L1.21.8" for f in result["findings"])
+
+
+# --------------------------------------------------------------------------
+# Why a clause was not decided, as a value rather than as prose
+# --------------------------------------------------------------------------
+
+def test_the_kinds_of_undecided_are_named_as_a_closed_set():
+    """`decided: False` was one bucket for four different facts, separated only by an
+    English sentence a consumer would have to parse.
+
+    Prompted by an adopter who found the same shape in their own reader: it bucketed every
+    verdict that was not `fired` into `declined`, so a hook that had just held three files
+    displayed as "0 fired (0%)". A third state collapsed into a second reports nothing
+    happening about the exact case the instrument exists for."""
+    assert honest_code.UNDECIDED_KINDS == ("never", "not applicable", "unreadable")
+
+
+def test_a_clause_nothing_can_ever_decide_says_never():
+    """The strangler pattern. It is a property of how work is sequenced, so no file at any
+    moment decides it, and that is permanent rather than a fact about this file."""
+    assessed = honest_code.assess(honest_code.read_source_text(CLEAN, "m.py"))
+    clause = next(c for c in assessed if c["code"] == "L1.21.17")
+    assert clause["undecided"] == "never"
+
+
+def test_a_clause_whose_question_does_not_arise_says_not_applicable():
+    """A browser clause on a Python file, and a test clause on a file with no tests. The
+    audit succeeded and the question did not come up, which is not a failure."""
+    assessed = honest_code.assess(honest_code.read_source_text(CLEAN, "m.py"))
+    kinds = {c["code"]: c["undecided"] for c in assessed}
+    assert kinds["L1.21.6"] == "not applicable"
+    assert kinds["L1.21.10"] == "not applicable"
+
+
+def test_a_file_that_could_not_be_read_says_unreadable_on_the_clauses_it_stopped():
+    """The one of the four kinds that is a FAILURE. The audit did not succeed, and a
+    consumer counting undecided clauses has to be able to tell that from a question that
+    did not arise.
+
+    Eighteen, not nineteen. The strangler pattern reads `never` whether or not the file
+    parses, because nothing decides it either way, and a file that will not parse does not
+    change that. The permanent answer outranks the local one."""
+    assessed = honest_code.assess(honest_code.read_source_text("def f(\n", "broken.py"))
+    kinds = {}
+    for clause in assessed:
+        kinds[clause["undecided"]] = kinds.get(clause["undecided"], 0) + 1
+    assert kinds == {"unreadable": 18, "never": 1}
+    assert next(c for c in assessed if c["code"] == "L1.21.17")["undecided"] == "never"
+
+
+def test_a_decided_clause_carries_no_kind():
+    assessed = honest_code.assess(honest_code.read_source_text(CLEAN, "m.py"))
+    assert all(c["undecided"] == "" for c in assessed if c["decided"])
+
+
+def test_every_undecided_clause_carries_one_of_the_named_kinds():
+    """No clause may be undecided for a reason outside the set. A fifth cause would
+    otherwise arrive as prose nobody buckets."""
+    for text, path in ((CLEAN, "m.py"), (DIRTY, "m.py"), ("def f(\n", "broken.py"),
+                       ("const x = 1;\n", "app.js")):
+        for clause in honest_code.assess(honest_code.read_source_text(text, path)):
+            if not clause["decided"]:
+                assert clause["undecided"] in honest_code.UNDECIDED_KINDS, (path, clause)
+
+
+def test_the_repository_measure_counts_the_kinds_apart(tmp_path):
+    """A reader of the panel can tell a tree with an unreadable file from one whose clauses
+    simply did not arise."""
+    (tmp_path / "clean.py").write_text(CLEAN)
+    (tmp_path / "broken.py").write_text("def f(\n")
+    result = honest_code.analyze(tmp_path, "python")
+    assert result["unreadable_files"] == 1
+    assert "1 file" in result["details"] and "could not be read" in result["details"]
+
+
+def test_a_tree_with_nothing_unreadable_says_zero_rather_than_omitting_it(tmp_path):
+    """Stated at zero, with no conditional in the sentence. The same lesson as the declared
+    exception count: a clause written only when the number is non-zero leaves a reader
+    unable to tell none from not-reported."""
+    (tmp_path / "clean.py").write_text(CLEAN)
+    result = honest_code.analyze(tmp_path, "python")
+    assert result["unreadable_files"] == 0
+    assert "0 file" in result["details"]

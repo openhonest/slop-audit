@@ -49,6 +49,19 @@ _ALL = frozenset({"python", *BROWSER_LANGUAGES})
 # any file at any moment decides it.
 _TREE, _PARTLY, _NOTHING = "tree", "partly", "nothing"
 
+# Why a clause was not decided, as a VALUE rather than as prose. `decided: False` was one
+# bucket for facts that mean different things: a rule nothing will ever decide, a question
+# that did not arise for this file, and a file the audit could not read. The third is a
+# failure and the other two are not, and a consumer counting undecided clauses has to be
+# able to tell them apart without parsing an English sentence.
+#
+# Prompted by an adopter finding the same shape in their own reader: it bucketed every
+# verdict that was not `fired` into `declined`, so a hook that had just held three files
+# displayed as "0 fired (0%)". A third state collapsed into a second reports nothing
+# happening about the exact case the instrument exists for.
+NEVER, NOT_APPLICABLE, UNREADABLE = "never", "not applicable", "unreadable"
+UNDECIDED_KINDS = (NEVER, NOT_APPLICABLE, UNREADABLE)
+
 
 class Clause(TypedDict):
     """One subclause of L1.21: which principle, what decides it, and who checks it."""
@@ -80,6 +93,7 @@ class Assessed(TypedDict):
     code: str
     name: str
     decided: bool
+    undecided: str
     reason: str
     findings: list[Finding]
     allowed: list[Allowed]
@@ -230,20 +244,21 @@ def assess(source: dict) -> list[Assessed]:
     declared = allowances(source["text"])
     assessed: list[Assessed] = []
     for clause in CLAUSES:
-        reason = _skip_reason(clause, source)
+        kind, reason = _skip_reason(clause, source)
         findings = None if reason else clause["check"](source)
         for finding in findings or ():
             # Filled in here, where the path is known. A checker reads a tree and the tree
             # does not know which file it came from.
             finding["file"] = source["path"]
         if findings is None and not reason:
+            kind = NOT_APPLICABLE
             reason = (f"not applicable to a {source['language']} file, so nothing here was "
                       "checked")
         kept, allowed = _split_allowed(findings or [], declared)
         assessed.append({
             "code": clause["code"], "name": clause["name"],
-            "decided": reason == "", "reason": reason,
-            "findings": kept, "allowed": allowed,
+            "decided": reason == "", "undecided": "" if reason == "" else kind,
+            "reason": reason, "findings": kept, "allowed": allowed,
         })
     return assessed
 
@@ -268,16 +283,20 @@ def _split_allowed(findings: list[Finding],
     return kept, allowed
 
 
-def _skip_reason(clause: Clause, source: dict) -> str:
-    """Why a clause was not run, or the empty string when it was."""
+def _skip_reason(clause: Clause, source: dict) -> tuple[str, str]:
+    """Which KIND of undecided this clause is, and the sentence for a reader.
+
+    The kind is what a consumer buckets on. The sentence is what a person reads, and it
+    used to be the only thing separating three facts that mean different things."""
     if clause["decides"] == _NOTHING:
-        return _WHY_NOT[_NOTHING]
+        return NEVER, _WHY_NOT[_NOTHING]
     if not source["readable"]:
-        return source["unreadable_reason"] or "the file could not be read"
+        return UNREADABLE, source["unreadable_reason"] or "the file could not be read"
     if source["language"] not in clause["languages"]:
-        return (f"asks about a browser, and this is a {source['language']} file with no DOM "
-                "to keep a second copy of state in")
-    return ""
+        return NOT_APPLICABLE, (
+            f"asks about a browser, and this is a {source['language']} file with no DOM "
+            "to keep a second copy of state in")
+    return "", ""
 
 
 def conformity(assessed: list[Assessed]) -> float | None:
@@ -408,9 +427,13 @@ def analyze(repo: Path, lang: str) -> dict:
     # A production clause over a test file would make the score about the suite rather than
     # about the code, and a test clause over a production file has no tests to read.
     declared_exceptions: list[Allowed] = []
+    unreadable = 0
     for read, wanted in ((production, False), (tests, True)):
         for path, text in read:
-            for clause in assess_file_text(text, str(path))["clauses"]:
+            assessed = assess_file_text(text, str(path))
+            if wanted is False and assessed["unreadable_reason"]:
+                unreadable += 1
+            for clause in assessed["clauses"]:
                 if (clause["code"] in TEST_SCOPED) != wanted or not clause["decided"]:
                     continue
                 decided.add(clause["code"])
@@ -424,7 +447,8 @@ def analyze(repo: Path, lang: str) -> dict:
         nothing = ("no file here could be measured against any clause, so there is no "
                    "conformity to report. Not decided: " + ", ".join(never_decided))
         return {"value": "n/a", "band": "n/a", "details": nothing,
-                "findings": [], "undecided": never_decided, "allowed": declared_exceptions}
+                "findings": [], "undecided": never_decided,
+                "allowed": declared_exceptions, "unreadable_files": unreadable}
 
     share = round((len(decided) - len(broken)) / len(decided) * 100, 1)
     # The count is stated even when it is zero, and with no conditional anywhere in the
@@ -434,7 +458,9 @@ def analyze(repo: Path, lang: str) -> dict:
     # vacuity check was right to make, and the repair for each is to stop branching.
     detail = (f"{len(decided) - len(broken)} of {len(decided)} decided clauses hold across "
               f"{len(files)} files. Declared exceptions: {len(declared_exceptions)}. "
+              f"{unreadable} file(s) could not be read. "
               f"Not decided ({len(never_decided)}): " + ", ".join(never_decided))
     return {"value": share, "band": band_of(share), "details": detail,
             "findings": [f for group in broken.values() for f in group],
-            "undecided": never_decided, "allowed": declared_exceptions}
+            "undecided": never_decided, "allowed": declared_exceptions,
+            "unreadable_files": unreadable}
