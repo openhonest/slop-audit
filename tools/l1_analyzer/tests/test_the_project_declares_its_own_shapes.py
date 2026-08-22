@@ -39,10 +39,17 @@ def _module(text: str) -> dict:
 
 def test_a_class_deriving_from_a_project_exception_is_not_inheriting_for_reuse():
     """`class ParseError(HonestCheckError)` where HonestCheckError derives from Exception.
-    Sixteen of these in one file fired as violations."""
+    Sixteen of these in one file fired as violations.
+
+    The second half is what gives the first one teeth: change the root from Exception to
+    anything else and the same two-class shape fires, so this fixture is reading the
+    hierarchy rather than the number of classes."""
     source = ("class HonestCheckError(Exception):\n    pass\n\n\n"
               "class ParseError(HonestCheckError):\n    pass\n")
     assert rules.inheritance_for_reuse(_module(source)) == []
+    assert rules.inheritance_for_reuse(_module(source.replace("(Exception)", "(Widget)"))), (
+        "the same shape with a non-exception root reports nothing, so this fixture cannot "
+        "tell whether the hierarchy was followed")
 
 
 def test_a_deep_exception_hierarchy_is_still_exceptions():
@@ -98,9 +105,22 @@ def test_a_function_that_declares_itself_the_boundary_may_do_io():
     "@boundary", "@boundary()", "@honest.boundary", "@boundary_in", "@boundary_out",
 ])
 def test_the_declaration_is_recognised_however_it_is_spelled(spelling):
-    source = (f"{spelling}\ndef load(path):\n    return path.read_text()\n\n\n"
-              "def total(path):\n    return load(path)\n")
-    assert rules.io_below_the_boundary(_module(source)) == [], spelling
+    """Both directions, in one test, because one direction cannot tell whether the fixture
+    is discriminating.
+
+    An adopter verifying this from outside built a case where every function did I/O and
+    nothing called anything: it returned no findings with the decorator AND without it, so
+    it would have passed whether or not the feature existed. A fixture with no interior
+    cannot exercise a rule about interiors.
+
+    Stripping the decorator from the SAME source is what proves this test has teeth."""
+    declared = (f"{spelling}\ndef load(path):\n    return path.read_text()\n\n\n"
+                "def total(path):\n    return load(path)\n")
+    undeclared = declared.replace(spelling + "\n", "")
+    assert rules.io_below_the_boundary(_module(declared)) == [], spelling
+    assert rules.io_below_the_boundary(_module(undeclared)), (
+        f"the fixture for {spelling} reports nothing either way, so it cannot tell whether "
+        "the declaration was read")
 
 
 def test_an_undeclared_function_doing_io_is_still_found():
