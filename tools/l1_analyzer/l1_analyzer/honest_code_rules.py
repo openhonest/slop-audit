@@ -3,10 +3,10 @@
 The numbering is the Honest Framework's, so a clause number means one thing across every
 Open Honest artifact.
 
-Every checker is a pure function of a parsed source and returns the sites it found. That
-matters more here than anywhere else in this tool: a conformity score is only worth having
-if each finding can be read at the site, and a checker that had to run something could not
-sit behind a hook that fires on every write.
+Every checker is a pure function of a source and returns the sites it found. That matters
+more here than anywhere else in this tool: a conformity score is only worth having if each
+finding can be read at the site, and a checker that had to run something could not sit
+behind a hook that fires on every write.
 
 `None` is the third answer. It means the clause was not decided for this file, and it is
 different from an empty list, which means the clause ran and found nothing. Conflating them
@@ -14,19 +14,28 @@ would let a question nobody asked count as a question answered.
 
 Each checker also states what it does NOT decide. That is the difference between a
 conformity number worth having and one that can be raised by looking away.
+
+How a source is read, and the vocabulary a ported clause reads it through, live in
+`honest_code_read`.
 """
 
 import ast
-from typing import TypedDict
 
-# How a project declares that a function IS an edge. Clause 4's rule is that I/O belongs at
-# the boundary, so a function saying it is the boundary and then doing I/O is conforming.
-#
-# This is not a suppression. A suppression silences a rule; a boundary decorator states
-# where the project's edges are, which is the thing the rule is about, and in at least one
-# adopter it is already load-bearing in another checker. The clause INFERS the boundary
-# from the call graph when nothing says. A declaration is better evidence than an
-# inference, so where both exist the declaration wins.
+from tree_sitter import Node
+
+from l1_analyzer.honest_code_read import (
+    Finding,
+    _base_names,
+    _called,
+    _classes,
+    _finding,
+    _functions,
+    _methods,
+    node_text,
+    walk,
+)
+from l1_analyzer.lang_spec import COMPARISON_OPS, LangSpec
+
 BOUNDARY_DECORATORS = frozenset({"boundary", "boundary_in", "boundary_out", "edge",
                                  "entrypoint", "entry_point"})
 
@@ -101,54 +110,6 @@ _STEP_LIMIT = 30
 _TYPED_SCALARS = frozenset({"int", "str", "float", "bool", "bytes", "list", "dict", "set", "tuple"})
 
 
-class Finding(TypedDict):
-    """One site a clause found, readable at the file and line it names.
-
-    `file` is filled in by the runner rather than by the checker, because a checker reads a
-    tree and the tree does not know where it came from. It has to be there: a line number
-    with no file is not a finding anyone can act on, and the repository path was flattening
-    them and dropping it."""
-
-    file: str
-    clause: str
-    symbol: str
-    line: int
-    detail: str
-    instead: str
-    undecided: str
-
-
-def _finding(clause: str, symbol: str, line: int, detail: str, instead: str,
-             undecided: str) -> Finding:
-    """One finding. `undecided` is required rather than defaulted: this module's own clause
-    14 flagged the default, and it was right. Every caller now states whether the clause
-    read the whole rule or half of it, so nobody can forget to say."""
-    return {"file": "", "clause": clause, "symbol": symbol, "line": line, "detail": detail,
-            "instead": instead, "undecided": undecided}
-
-
-def _functions(source: dict) -> list[ast.FunctionDef]:
-    return [n for n in ast.walk(source["tree"])
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-
-
-def _classes(source: dict) -> list[ast.ClassDef]:
-    return [n for n in ast.walk(source["tree"]) if isinstance(n, ast.ClassDef)]
-
-
-def _methods(node: ast.ClassDef) -> list[ast.FunctionDef]:
-    return [n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-
-
-def _called(node: ast.AST) -> set[str]:
-    from l1_analyzer.facets import called_name
-    return {called_name(n) for n in ast.walk(node) if isinstance(n, ast.Call)}
-
-
-def _base_names(node: ast.ClassDef) -> list[str]:
-    return [ast.unparse(base).split("[")[0].split(".")[-1] for base in node.bases]
-
-
 # --------------------------------------------------------------------------
 # 1. Dict-lookup polymorphism over if/elif chains
 # --------------------------------------------------------------------------
@@ -156,50 +117,102 @@ def _base_names(node: ast.ClassDef) -> list[str]:
 def dispatch_chains(source: dict) -> list[Finding] | None:
     """An if/elif chain testing ONE name against literals to select behaviour.
 
+    Read through the language's own node vocabulary, so the rule means the same thing in
+    every language the spec covers rather than being reimplemented per language.
+
     Two or more elif arms, because one `if` and one `else` is a binary choice and a table
     starts where the third case would otherwise be another arm.
 
     Not decided: whether the axis of variation is worth naming. The rule says to build a
     table when you can name the axis and it has a finite set of kinds, and nothing here
     reads that."""
+    spec, raw = source["spec"], source["raw"]
     found: list[Finding] = []
-    for node in ast.walk(source["tree"]):
-        if not isinstance(node, ast.If):
+    for node in walk(source["root"]):
+        if node.type not in spec["branch_types"] or _is_chain_arm(node):
             continue
-        names = _chain_subjects(node)
+        names = chain_subjects(node, spec, raw)
         if len(names) >= 3 and len(set(names)) == 1:
             found.append(_finding(
-                "L1.21.1", names[0], node.lineno,
+                "L1.21.1", names[0], node.start_point[0] + 1,
                 f"{len(names)} arms dispatch on `{names[0]}` to select behaviour",
                 "a dict mapping each value to the function that handles it, read by "
                 "subscript so an unknown key raises", ""))
     return found
 
 
-def _chain_subjects(node: ast.If) -> list[str]:
-    """The name each arm of one if/elif chain compares against a literal.
+def _is_chain_arm(node: Node) -> bool:
+    """Whether this branch is the `else if` of another, rather than the head of a chain.
+
+    Without it a three-armed chain reports three times, once from each arm it is also the
+    head of."""
+    parent = node.parent
+    while parent is not None and parent.type in ("else_clause", "elif_clause"):
+        parent = parent.parent
+    return parent is not None and parent.type == node.type
+
+
+def chain_subjects(node: Node, spec: LangSpec, raw: bytes) -> list[str]:
+    """The name each arm of one if chain compares against a literal.
 
     A bounds check, a null guard and ordinary boolean logic contribute nothing: the rule
     says so itself, and a clause firing on every function with a condition teaches a reader
     to ignore the number."""
     subjects: list[str] = []
-    current: ast.stmt | None = node
-    while isinstance(current, ast.If):
-        test = current.test
-        if (isinstance(test, ast.Compare) and len(test.ops) == 1
-                and isinstance(test.ops[0], (ast.Eq, ast.Is))
-                and isinstance(test.comparators[0], ast.Constant)
-                and isinstance(test.left, ast.Name)):
-            subjects.append(test.left.id)
-        else:
+    for arm in _chain_arms(node, spec):
+        test = arm.child_by_field_name(spec["branch_cond"])
+        while test is not None and test.type == "parenthesized_expression":
+            test = next(iter(test.named_children), None)
+        name = _equality_subject(test, spec, raw)
+        if not name:
             return []
-        current = current.orelse[0] if len(current.orelse) == 1 else None
+        subjects.append(name)
     return subjects
 
 
-# --------------------------------------------------------------------------
-# 2. Typed dicts over classes
-# --------------------------------------------------------------------------
+def _chain_arms(node: Node, spec: LangSpec) -> list[Node]:
+    """Every arm of one if chain, in source order, whichever way the grammar spells it.
+
+    The two shapes are read from structure rather than from a language name. Python hangs
+    its `elif` arms off the head as children; JavaScript nests each `else if` inside the
+    previous one's alternative. A reader keyed to either shape alone sees a one-armed chain
+    in the other language and reports nothing."""
+    arms = [node]
+    arms += [c for c in node.children if c.type == "elif_clause"]
+    current = node
+    while True:
+        alternative = current.child_by_field_name("alternative")
+        if alternative is None:
+            return arms
+        nested = alternative if alternative.type in spec["branch_types"] else next(
+            (c for c in alternative.named_children if c.type in spec["branch_types"]), None)
+        if nested is None:
+            return arms
+        arms.append(nested)
+        current = nested
+
+
+def _equality_subject(test: Node | None, spec: LangSpec, raw: bytes) -> str:
+    """The name on one side of an equality test whose other side is a literal."""
+    if test is None or test.type not in spec["comparison_types"]:
+        return ""
+    children = [c for c in test.children if c.is_named or c.type in COMPARISON_OPS]
+    operators = [node_text(c, raw) for c in test.children if not c.is_named]
+    if not any(op in ("==", "===", "is") for op in operators):
+        return ""
+    named = [c for c in children if c.is_named]
+    if len(named) != 2:
+        return ""
+    left, right = named
+    if right.type in spec["literal_types"] and left.type == "identifier":
+        return node_text(left, raw)
+    if left.type in spec["literal_types"] and right.type == "identifier":
+        return node_text(right, raw)
+    return ""
+
+
+
+
 
 def data_classes(source: dict) -> list[Finding] | None:
     """A class whose body is an `__init__` assigning parameters to self, plus accessors.

@@ -39,39 +39,10 @@ def _source(text: str, path: str, language: str) -> dict:
 
 # --------------------------------------------------------------------------
 # 1. Dict-lookup polymorphism over if/elif chains
-# --------------------------------------------------------------------------
-
-def test_a_chain_dispatching_on_one_value_is_found():
-    found = rules.dispatch_chains(_module(
-        "def send(channel, data):\n"
-        "    if channel == 'email':\n        return send_email(data)\n"
-        "    elif channel == 'sms':\n        return send_sms(data)\n"
-        "    elif channel == 'push':\n        return send_push(data)\n"
-        "    return None\n"))
-    assert len(found) == 1
-    assert found[0]["line"] == 2
-
-
-def test_an_ordinary_conditional_is_not_a_dispatch_chain():
-    """The rule says so itself: bounds checks, null guards and boolean logic are ordinary
-    conditionals. A clause that fires on every function with a condition teaches a reader
-    to ignore the number."""
-    assert rules.dispatch_chains(_module(
-        "def clamp(n, low, high):\n"
-        "    if n < low:\n        return low\n"
-        "    elif n > high:\n        return high\n"
-        "    return n\n")) == []
-
-
-def test_a_two_armed_test_on_one_value_is_not_yet_a_table():
-    """One `if` and one `else` is a binary choice. A table starts where the third case
-    would otherwise be another arm."""
-    assert rules.dispatch_chains(_module(
-        "def f(kind):\n    if kind == 'a':\n        return one()\n    return two()\n")) == []
-
-
-# --------------------------------------------------------------------------
-# 2. Typed dicts over classes
+#
+# Its cases live in test_a_clause_means_the_same_in_every_language.py now. That clause
+# reads the shared node vocabulary, so its fixtures have to run in every language the
+# vocabulary covers and assert both directions in each, which the cases here could not do.
 # --------------------------------------------------------------------------
 
 def test_a_class_that_only_holds_data_is_found():

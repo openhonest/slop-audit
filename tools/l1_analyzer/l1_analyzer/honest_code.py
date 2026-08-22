@@ -27,6 +27,7 @@ from typing import TypedDict
 
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.honest_code_rules import BROWSER_LANGUAGES, Finding
+from l1_analyzer.lang_spec import LANG_SPEC
 
 # Clauses that are ABOUT tests: how many mocks one carries, how much setup a step needs.
 # Measured over the test files rather than the production ones, because measuring only
@@ -43,6 +44,10 @@ _SUFFIXES = {
 }
 
 _ALL = frozenset({"python", *BROWSER_LANGUAGES})
+
+# The languages the shared node vocabulary covers. A ported clause can be decided for any
+# of them; an unported one is limited to `_PARSED` above.
+_VOCABULARY = frozenset(LANG_SPEC)
 
 # What decides each clause. `tree` means a syntax tree decides it; `partly` means half of
 # the rule is readable and the checker names the other half; `nothing` means no reading of
@@ -67,7 +72,16 @@ UNDECIDED_KINDS = (NEVER, NOT_APPLICABLE, UNREADABLE)
 # all, and `reads` says what this checker needs in front of it. Conflating them is what let
 # seventeen tree clauses run against the empty tree a JavaScript file produces, find
 # nothing, and count as holding.
-_TREE_READER, _TEXT_READER = "tree", "text"
+# Three readers, not two, for as long as the port is unfinished.
+#
+# `_PYTHON_AST` is a clause still written against Python's own parser, so it can be decided
+# for Python and nothing else. `_TREE_READER` is a clause read through the shared
+# per-language node vocabulary, so it can be decided for every language that vocabulary
+# covers. `_TEXT_READER` needs no tree at all.
+#
+# The middle one is where clauses arrive as they are ported. When none are left in the
+# first, that constant and this comment go.
+_PYTHON_AST, _TREE_READER, _TEXT_READER = "python-ast", "tree", "text"
 
 
 class Clause(TypedDict):
@@ -121,7 +135,7 @@ class Assessment(TypedDict):
 
 
 def _clause(rule: int, name: str, decides: str, check: Callable[[dict], list[Finding] | None],
-            languages: frozenset[str] = _ALL, reads: str = _TREE_READER) -> Clause:
+            languages: frozenset[str] = _ALL, reads: str = _PYTHON_AST) -> Clause:
     return {"code": f"L1.21.{rule}", "rule": rule, "name": name, "decides": decides,
             "reads": reads, "languages": languages, "check": check}
 
@@ -129,7 +143,9 @@ def _clause(rule: int, name: str, decides: str, check: Callable[[dict], list[Fin
 # The table IS the measure. Adding a principle is adding a row, which is rule 1 applied to
 # the module that checks rule 1.
 CLAUSES: tuple[Clause, ...] = (
-    _clause(1, "Dict-lookup polymorphism over if/elif chains", _TREE, rules.dispatch_chains),
+    # Ported to the shared vocabulary: decided for every language the spec covers.
+    _clause(1, "Dict-lookup polymorphism over if/elif chains", _TREE, rules.dispatch_chains,
+            reads=_TREE_READER),
     _clause(2, "Typed dicts over classes", _TREE, rules.data_classes),
     _clause(3, "Pure functions over methods", _TREE, rules.methods_wearing_a_class),
     _clause(4, "I/O at the boundary", _TREE, rules.io_below_the_boundary),
@@ -197,9 +213,15 @@ def read_source_text(text: str, path: str) -> dict:
 
     language = _SUFFIXES[suffix]
     source = {**blank, "language": language, "unreadable_reason": ""}
+    # The shared tree, for every clause already reading the per-language vocabulary. It is
+    # built for any language the vocabulary covers, which is what lets a ported clause see
+    # a JavaScript file that Python's own parser cannot.
+    if language in _VOCABULARY:
+        source.update(rules.read_tree(text, language))
+        source["unreadable_reason"] = ""
     if language not in _PARSED:
-        # Nothing to parse, and that is not a failure to read: the two clauses that apply to
-        # a browser file read its text.
+        # No Python tree, and that is not a failure to read: the clauses that apply here
+        # read either the shared tree or the text.
         source["readable"] = True
         return source
     try:
@@ -315,10 +337,14 @@ def _skip_reason(clause: Clause, source: dict) -> tuple[str, str]:
     # UNREADABLE rather than NOT APPLICABLE, and the distinction is the point. These clauses
     # DO apply to JavaScript. This reader cannot read it, which is a gap in the instrument
     # rather than a question that did not arise, and only one of those two is a failure.
-    if clause["reads"] == _TREE_READER and source["language"] not in _PARSED:
+    if clause["reads"] == _PYTHON_AST and source["language"] not in _PARSED:
         return UNREADABLE, (
-            f"no parser here reads {source['language']}, so this clause had no syntax tree "
-            "to decide it from")
+            f"this clause is still written against Python's own parser, so it has no way "
+            f"to read {source['language']} yet")
+    if clause["reads"] == _TREE_READER and source["language"] not in _VOCABULARY:
+        return UNREADABLE, (
+            f"the shared node vocabulary does not cover {source['language']}, so this "
+            "clause had no tree to decide it from")
     if source["language"] not in clause["languages"]:
         return NOT_APPLICABLE, (
             f"asks about a browser, and this is a {source['language']} file with no DOM "

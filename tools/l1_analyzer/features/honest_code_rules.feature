@@ -11,10 +11,16 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
   worth having and one that can be raised by looking away.
 
   Scenario: dispatch_chains finds an if/elif chain that selects behaviour by value
-    Given a parsed source
-    When dispatch_chains reads its conditionals
-    Then a chain testing one name against two or more literals is a dispatch table written as control flow
+    Given a parsed source and the node vocabulary of the language it is written in
+    When dispatch_chains reads its conditionals through that vocabulary
+    Then a chain testing one name against two or more literals is a dispatch table written as control flow, in every language the vocabulary covers
     But a bounds check, a null guard and ordinary boolean logic are not, since flagging them would make the clause fire on every function that has a condition
+
+  Scenario: chain_subjects names what each arm of one if chain compares
+    Given the head of an if chain and the vocabulary of its language
+    When chain_subjects walks the arms through the else branch
+    Then a chain comparing one name against literals yields that name once per arm
+    But an arm testing anything else yields nothing at all, since a chain with one ordinary condition in it is not a dispatch table
 
   Scenario: data_classes finds a class whose whole job is holding data
     Given a parsed source
@@ -124,47 +130,11 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a read of a shared value followed by a write to it lets two callers both believe they hold the thing
     But an await between the two makes the race certain rather than occasional, and the finding says which it found
 
-  Scenario: _finding records one site a clause found
-    Given the clause, the symbol, the line, what is wrong, what to do instead and what was not decided
-    When _finding assembles them
-    Then every field is stated by the caller
-    But undecided is required rather than defaulted, because this module's own clause 14 flagged the default and was right
 
-  Scenario: _functions lists every function in a source
-    Given a parsed source
-    When _functions walks the tree
-    Then both plain and async definitions come back
-    But a nested definition comes back too, since a closure that violates a clause violates it wherever it sits
 
-  Scenario: _classes lists every class in a source
-    Given a parsed source
-    When _classes walks the tree
-    Then each class definition comes back
-    But nothing about whether a class was the right choice, which no reading of the source decides
 
-  Scenario: _methods lists the functions defined directly in one class
-    Given a class definition
-    When _methods reads its body
-    Then only the functions of that class body come back
-    But a function nested inside one of them does not, since it belongs to the method rather than to the class
 
-  Scenario: _called names every function a node calls
-    Given any tree node
-    When _called walks its calls
-    Then each called name comes back once
-    But a call on a computed target names nothing, because there is no name a clause could report
 
-  Scenario: _base_names names the classes a definition inherits from
-    Given a class definition
-    When _base_names reads its bases
-    Then a dotted or subscripted base comes back as its bare name
-    But nothing here says whether the base belongs to a framework, which is the half clause 5 cannot decide
-
-  Scenario: _chain_subjects names what each arm of one if chain compares
-    Given the head of an if chain
-    When _chain_subjects walks its arms
-    Then a chain comparing one name against literals yields that name once per arm
-    But an arm testing anything else yields nothing at all, since a chain with one ordinary condition in it is not a dispatch table
 
   Scenario: _only_reads_self says whether a method reaches self only for data
     Given a method definition
@@ -273,6 +243,24 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _declares_a_boundary reads what each decorator NAMES
     Then a declared edge is conforming rather than violating, since the rule is that I/O belongs at the boundary
     But a decorator merely carrying the word as data is not a declaration, which is the lesson clause 16 learned from a parametrize holding an exit handler
+
+  Scenario: _is_chain_arm says whether a branch is the continuation of another
+    Given a branch node and the chain it may sit inside
+    When _is_chain_arm looks at what encloses it
+    Then only the head of a chain is read as a chain
+    But without it a three-armed chain reports three times, once from each arm it is also the head of
+
+  Scenario: _chain_arms lists every arm of one if chain, whichever way the grammar spells it
+    Given the head of an if chain and the vocabulary of its language
+    When _chain_arms follows the arms
+    Then the two shapes are read from structure rather than from a language name, since Python hangs its elif arms off the head and JavaScript nests each else-if inside the previous one's alternative
+    But a reader keyed to either shape alone sees a one-armed chain in the other language and reports nothing
+
+  Scenario: _equality_subject names the value one arm compares against a literal
+    Given the test expression of one arm and the vocabulary of its language
+    When _equality_subject reads the two sides
+    Then an equality test between a name and a literal yields that name, in either order
+    But anything else yields nothing, since a bounds check and a null guard are ordinary conditionals and flagging them would fire this clause on every function with a condition
 
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
