@@ -168,9 +168,13 @@ _BANDS = ((95.0, "Healthy"), (75.0, "Not Healthy"))
 # and it has to cost the author a sentence.
 _ALLOW = re.compile(r"honest-code-allow:\s*(L1\.21\.\d+)\s*[-\u2014:]+\s*(\S.*?)\s*$")
 
-# How far below the comment the site it covers may sit. One line, so a comment cannot reach
-# past the thing it was written about.
-_ALLOW_REACH = 2
+# How far below the comment the site it covers may sit.
+#
+# Three lines, not one. A decorator sits between the comment and the def it annotates, and
+# every cache clause 9 fires on is decorated by definition, so a shorter reach put the
+# declaration out of range of exactly the findings that need one. It still stops well short
+# of the next function, or one comment would excuse everything beneath it.
+_ALLOW_REACH = 4
 
 
 def read_source_text(text: str, path: str) -> dict:

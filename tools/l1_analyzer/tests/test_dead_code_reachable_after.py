@@ -22,9 +22,9 @@ from l1_analyzer.dead_code import (
     _REACHABLE_AFTER,
     _TERMINATORS,
     _is_terminator,
-    _parser,
     _skip_in_unreachable_scan,
     _unreachable_statements,
+    parser,
 )
 
 # One fixture per language, written so that every type its row claims appears after a
@@ -138,7 +138,7 @@ def _types_after_a_terminator(grammar: str, lang: str, source: str) -> set[str]:
     """The node types that actually sit after a terminator inside a block, by the same walk
     `_unreachable_statements` performs. Reading the real scan rather than a description of it
     is the whole point: a type the scan never reaches cannot be spared by naming it."""
-    root = _parser(grammar).parse(source.encode()).root_node
+    root = parser(grammar).parse(source.encode()).root_node
     assert not root.has_error, f"the {lang} fixture does not parse; fix the fixture, not the table"
     found: set[str] = set()
 
@@ -178,7 +178,7 @@ def test_python_declares_no_reachable_type_rather_than_an_unfireable_one() -> No
     in a block of their own, so no arm is ever a sibling of a terminator. The honest row is
     empty, and a `def` below a `return` is charged, because it never executes."""
     assert _REACHABLE_AFTER["python"] == frozenset()
-    root = _parser("python").parse(_FIXTURES[("python", "python")].encode()).root_node
+    root = parser("python").parse(_FIXTURES[("python", "python")].encode()).root_node
     assert [u["line"] for u in _unreachable_statements(root, "python")] == [4, 5, 6]
 
 
@@ -196,7 +196,7 @@ def m(x):
         case _:
             return 3
 """
-    root = _parser("python").parse(source.encode()).root_node
+    root = parser("python").parse(source.encode()).root_node
     assert _unreachable_statements(root, "python") == []
 
 
@@ -215,7 +215,7 @@ int s(int x) {
   }
 }
 """
-    root = _parser("c").parse(source.encode()).root_node
+    root = parser("c").parse(source.encode()).root_node
     assert _unreachable_statements(root, "c") == []
 
 
@@ -241,6 +241,6 @@ function g(x) {
   label: { x = 2; }
 }
 """
-    assert _unreachable_statements(_parser("go").parse(go_source.encode()).root_node, "go") == []
-    js = _unreachable_statements(_parser("javascript").parse(js_source.encode()).root_node, "javascript")
+    assert _unreachable_statements(parser("go").parse(go_source.encode()).root_node, "go") == []
+    js = _unreachable_statements(parser("javascript").parse(js_source.encode()).root_node, "javascript")
     assert [u["line"] for u in js] == [4]

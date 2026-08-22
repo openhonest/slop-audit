@@ -140,7 +140,13 @@ NO_SOURCE, UNREAD, SILENT, MEASURED = "no-source", "unread", "silent", "measured
 UNORDERED_CLASS_BOUND: int | None = None
 
 def _meter_ran(l18b: dict) -> bool:
-    return isinstance(l18b, dict) and isinstance(l18b.get("resolvable_fraction"), (int, float))
+    """Whether the finite-testability meter produced a fraction.
+
+    It trusts the declared type. The check it used to make on `l18b` itself re-tested what
+    the signature promises, and a caller passing a string got a quiet False instead of an
+    error. The VALUE check stays: `resolvable_fraction` arrives from a panel and may be
+    absent or "n/a", which is a fact about the data rather than about the contract."""
+    return isinstance(l18b.get("resolvable_fraction"), (int, float))
 
 
 def silence_fraction(counts: dict) -> float:
@@ -352,10 +358,14 @@ def grade_summary(results: dict, unordered_class_bound: int | None) -> GradeSumm
     doing the testing, and that answer belongs to whoever is publishing the grade."""
     l18 = results.get("L1.18") or {"band": "n/a"}
     band = str(l18["band"])          # the `or` above already supplied the absent case
-    l18b = results.get("L1.18b") or {}
-    counts = (l18b.get("counts") if isinstance(l18b, dict) else None) or {"neutral": 0, "promiscuous": 0, "unresolved": 0}
-    coarse = coarse_states(l18b if isinstance(l18b, dict) else {}, unordered_class_bound)
-    census = l18b.get("census") if isinstance(l18b, dict) else None
+    # Resolved ONCE, here, where the untyped panel arrives. Four isinstance checks on one
+    # value inside one function was the smell that said this step was missing, and each
+    # reader below then had to distrust the type its own signature declares.
+    panel_l18b = results.get("L1.18b")
+    l18b: dict = panel_l18b if isinstance(panel_l18b, dict) else {}
+    counts = l18b.get("counts") or {"neutral": 0, "promiscuous": 0, "unresolved": 0}
+    coarse = coarse_states(l18b, unordered_class_bound)
+    census = l18b.get("census")
     basis = _basis(band, counts, _meter_ran(l18b), census)
     status = _status(basis, counts, bool(coarse))
     # The denominator is DECIDED state, not all state. Undecided state is no longer held

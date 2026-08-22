@@ -582,3 +582,32 @@ def test_a_clean_javascript_file_is_not_reported_as_broadly_conformant():
     assessment = honest_code.assess_file_text("const x = 1;\n", "app.js")
     assert assessment["decided_clauses"] == 2
     assert assessment["conformity"] == 100.0, "the two text clauses did read it and found nothing"
+
+
+def test_an_allowance_reaches_past_a_decorator():
+    """A decorator sits between the comment and the def it annotates, so a two-line reach
+    put the declaration out of range of the very findings that need one. Every cache this
+    clause fires on is decorated by definition."""
+    text = ("# honest-code-allow: L1.21.9 - measured, and the walk is quadratic without it\n"
+            "@lru_cache(maxsize=8)\n"
+            "def walk(directory):\n"
+            "    return list(directory.rglob('*'))\n")
+    declared = honest_code.allowances(text)
+    finding = {"clause": "L1.21.9", "line": 3}
+    assert honest_code.allowed_reason(finding, declared)
+
+
+def test_an_allowance_does_not_reach_the_next_function_down():
+    """It has to stop somewhere, or one comment excuses everything below it."""
+    text = ("# honest-code-allow: L1.21.9 - a reason for the one below\n"
+            "@lru_cache(maxsize=8)\n"
+            "def first(d):\n"
+            "    return 1\n"
+            "\n"
+            "\n"
+            "@lru_cache(maxsize=8)\n"
+            "def second(d):\n"
+            "    return 2\n")
+    declared = honest_code.allowances(text)
+    assert honest_code.allowed_reason({"clause": "L1.21.9", "line": 3}, declared)
+    assert not honest_code.allowed_reason({"clause": "L1.21.9", "line": 8}, declared)

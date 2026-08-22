@@ -58,7 +58,7 @@ from pathlib import Path
 from re import Pattern
 from typing import TypedDict
 
-from l1_analyzer.dead_code import _EXT_LANG, _parser
+from l1_analyzer.dead_code import _EXT_LANG, parser
 from l1_analyzer.scope import (
     PRODUCTION,
     _bucket_reason,
@@ -278,7 +278,7 @@ def _string_spans(raw: bytes, suffix: str) -> list[tuple[int, int]] | None:
         for child in node.children:
             walk(child)
 
-    walk(_parser(entry[0]).parse(raw).root_node)
+    walk(parser(entry[0]).parse(raw).root_node)
     return spans
 
 

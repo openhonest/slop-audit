@@ -136,6 +136,7 @@ _TEST_FRAMEWORK_MARKERS = (
 )
 
 
+# honest-code-allow: L1.21.9 - measured, not argued. One walk of this project's test tree costs 1.8ms over 464 entries and it is called once per file scoped underneath it, so uncached that one directory costs 464 walks and the cost grows as the square of the tree. test_a_cache_earns_its_place_or_goes.py measures the margin and fails if it stops holding. The sibling cache on the tree-sitter parser was measured the same way, found to save milliseconds across a whole audit, and deleted.
 @lru_cache(maxsize=4096)
 def _test_dir_corroborated(directory: Path) -> bool:
     """True when a directory named like a test directory actually holds test code.

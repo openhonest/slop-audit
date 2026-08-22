@@ -34,7 +34,6 @@ from __future__ import annotations
 import ast
 import json
 import re
-from functools import lru_cache
 from pathlib import Path
 from typing import TypedDict
 
@@ -101,11 +100,16 @@ _EXT_LANG: dict[str, tuple[str, str]] = {
     ".go": ("go", "go"),
 }
 
-@lru_cache(maxsize=len(_GRAMMARS))
-def _parser(grammar: str) -> Parser:
-    """One parser per grammar, built on first use. Cached through `lru_cache` rather than
-    a module-level dict a function writes into: this package's own L1.18 counts a written
-    module global as external mutable state, and it caught the dict version of this."""
+def parser(grammar: str) -> Parser:
+    """One parser for a grammar, built on the spot.
+
+    It used to be cached, and the cache is gone because it was measured: a build costs about
+    a hundredth of a millisecond and it is called once per file, so the cache saved a few
+    milliseconds across an entire audit while carrying an invalidation risk for them.
+
+    The cache was never there for speed. It replaced a module-level dict a function wrote
+    into, which this package's own L1.18 counts as external mutable state. A plain call has
+    neither the global nor the cache."""
     return Parser(Language(_GRAMMARS[grammar]()))
 
 
@@ -373,7 +377,7 @@ def _read_corpus(repo: Path) -> Corpus:
             continue
         entry = _EXT_LANG.get(path.suffix.lower())
         if entry is not None:
-            _harvest_source(_parser(entry[0]).parse(raw).root_node, relpath, corpus)
+            _harvest_source(parser(entry[0]).parse(raw).root_node, relpath, corpus)
         else:
             words = _WORD.findall(raw.decode("utf8", errors="ignore"))
             bucket = "docs" if path.suffix.lower() in _DOC_EXTS else "config"
@@ -727,7 +731,7 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
         production_loc += len(src.splitlines())
         analyzed_loc += len(src.splitlines())
         grammar, _key = _EXT_LANG[path.suffix.lower()]
-        root = _parser(grammar).parse(src).root_node
+        root = parser(grammar).parse(src).root_node
         # A tree the grammar could not parse cannot support a claim about what it
         # contains. Newtonsoft.Json's JValue.cs parses with ERROR nodes and the statements
         # around them read as unreachable, sixteen of them. The file's identifiers are

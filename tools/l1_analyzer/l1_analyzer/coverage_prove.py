@@ -464,6 +464,7 @@ def ceiling_detail(attempted: int, located: int, ceiling: int) -> str:
 SweepProgress = Callable[[str, int, int], None]
 
 
+# honest-code-allow: L1.21.13 - the writer and both readers are one unit. `_call_model` writes LAST_REFUSAL and it is the single model boundary BOTH sweeps import, so there is no second source and no cross-module surprise. Threading the reason back would change the injected propose_fn signature, its repair counterpart and every test fake, to reach one reader at the end of one sweep. The sweeps are sequential, so the value is never stale by more than one call.
 def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
                         timeout_seconds: float, progress: SweepProgress | None,
                         max_attempts: int) -> dict:
