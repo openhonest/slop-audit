@@ -520,3 +520,65 @@ def test_a_tree_with_nothing_unreadable_says_zero_rather_than_omitting_it(tmp_pa
     result = honest_code.analyze(tmp_path, "python")
     assert result["unreadable_files"] == 0
     assert "0 file" in result["details"]
+
+
+# --------------------------------------------------------------------------
+# A clause that reads a tree needs a tree
+# --------------------------------------------------------------------------
+
+DIRTY_JS = ("import { createStore } from 'redux';\n"
+            "const store = createStore(reducer);\n"
+            "document.querySelector('#x').addEventListener('click', go);\n"
+            "function send(channel, data) {\n"
+            "  if (channel === 'email') { return one(data); }\n"
+            "  else if (channel === 'sms') { return two(data); }\n"
+            "  else if (channel === 'push') { return three(data); }\n"
+            "}\n"
+            "class Admin extends User {}\n")
+
+
+def test_a_language_this_reader_cannot_parse_decides_no_tree_clause():
+    """The failure this whole instrument exists to name, found inside it.
+
+    Only Python is parsed here. Every clause but the two browser ones reads a syntax tree,
+    and they were being run against the EMPTY tree a JavaScript file produces. They found
+    nothing, counted as holding, and the file above reported 87.5% conformity with sixteen
+    clauses decided: a clean bill of health on a file the tool never parsed.
+
+    That file has an if/elif chain dispatching on a value and a class extending another.
+    Both are real violations of clauses this reader claimed to have decided."""
+    assessed = honest_code.assess(honest_code.read_source_text(DIRTY_JS, "app.js"))
+    decided = {c["code"] for c in assessed if c["decided"]}
+    assert decided == {"L1.21.6", "L1.21.7"}, decided
+
+
+def test_the_browser_clauses_still_decide_because_they_read_text():
+    """They never needed a tree. Both find their violations in that file."""
+    assessed = honest_code.assess(honest_code.read_source_text(DIRTY_JS, "app.js"))
+    firing = {c["code"] for c in assessed if c["decided"] and c["findings"]}
+    assert firing == {"L1.21.6", "L1.21.7"}
+
+
+def test_a_tree_clause_on_an_unparsed_language_says_unreadable_rather_than_not_applicable():
+    """The distinction matters. These clauses DO apply to JavaScript; this reader cannot
+    read it. That is a gap in the instrument, not a question that did not arise, and only
+    one of those two is a failure."""
+    assessed = honest_code.assess(honest_code.read_source_text(DIRTY_JS, "app.js"))
+    clause = next(c for c in assessed if c["code"] == "L1.21.1")
+    assert clause["undecided"] == "unreadable"
+    assert "parse" in clause["reason"] or "parser" in clause["reason"]
+
+
+def test_the_share_for_such_a_file_is_over_the_two_clauses_that_were_read():
+    """Two decided, both broken, so nothing holds. It used to read 87.5%."""
+    assessment = honest_code.assess_file_text(DIRTY_JS, "app.js")
+    assert assessment["decided_clauses"] == 2
+    assert assessment["conformity"] == 0.0
+
+
+def test_a_clean_javascript_file_is_not_reported_as_broadly_conformant():
+    """The other half of the same defect. A file with no store and no imperative DOM used
+    to report every tree clause as holding, which is a claim about code nobody parsed."""
+    assessment = honest_code.assess_file_text("const x = 1;\n", "app.js")
+    assert assessment["decided_clauses"] == 2
+    assert assessment["conformity"] == 100.0, "the two text clauses did read it and found nothing"

@@ -63,13 +63,22 @@ NEVER, NOT_APPLICABLE, UNREADABLE = "never", "not applicable", "unreadable"
 UNDECIDED_KINDS = (NEVER, NOT_APPLICABLE, UNREADABLE)
 
 
+# What a clause reads. Two axes, not one: `decides` says whether the RULE is decidable at
+# all, and `reads` says what this checker needs in front of it. Conflating them is what let
+# seventeen tree clauses run against the empty tree a JavaScript file produces, find
+# nothing, and count as holding.
+_TREE_READER, _TEXT_READER = "tree", "text"
+
+
 class Clause(TypedDict):
-    """One subclause of L1.21: which principle, what decides it, and who checks it."""
+    """One subclause of L1.21: which principle, what decides it, what it reads, and who
+    checks it."""
 
     code: str
     rule: int
     name: str
     decides: str
+    reads: str
     languages: frozenset[str]
     check: Callable[[dict], list[Finding] | None]
 
@@ -112,9 +121,9 @@ class Assessment(TypedDict):
 
 
 def _clause(rule: int, name: str, decides: str, check: Callable[[dict], list[Finding] | None],
-            languages: frozenset[str] = _ALL) -> Clause:
+            languages: frozenset[str] = _ALL, reads: str = _TREE_READER) -> Clause:
     return {"code": f"L1.21.{rule}", "rule": rule, "name": name, "decides": decides,
-            "languages": languages, "check": check}
+            "reads": reads, "languages": languages, "check": check}
 
 
 # The table IS the measure. Adding a principle is adding a row, which is rule 1 applied to
@@ -125,9 +134,12 @@ CLAUSES: tuple[Clause, ...] = (
     _clause(3, "Pure functions over methods", _TREE, rules.methods_wearing_a_class),
     _clause(4, "I/O at the boundary", _TREE, rules.io_below_the_boundary),
     _clause(5, "Flat composition over inheritance", _TREE, rules.inheritance_for_reuse),
-    _clause(6, "DOM as state", _TREE, rules.client_side_state, BROWSER_LANGUAGES),
+    # The only two that read the file's TEXT, which is why they work on a language this
+    # package has no parser for.
+    _clause(6, "DOM as state", _TREE, rules.client_side_state, BROWSER_LANGUAGES,
+            reads=_TEXT_READER),
     _clause(7, "HTML attributes over imperative DOM", _TREE, rules.imperative_dom,
-            BROWSER_LANGUAGES),
+            BROWSER_LANGUAGES, reads=_TEXT_READER),
     _clause(8, "Typed exceptions at the boundary", _TREE, rules.swallowed_exceptions),
     _clause(9, "SQL over application caches", _PARTLY, rules.unmeasured_caches),
     _clause(10, "Pure-function assertions over mocks", _TREE, rules.mock_heavy_tests),
@@ -292,6 +304,17 @@ def _skip_reason(clause: Clause, source: dict) -> tuple[str, str]:
         return NEVER, _WHY_NOT[_NOTHING]
     if not source["readable"]:
         return UNREADABLE, source["unreadable_reason"] or "the file could not be read"
+    # A clause that reads a TREE needs one. Only Python is parsed here, so every tree clause
+    # on any other language was running against an empty tree, finding nothing, and counting
+    # as holding: a clean bill of health on a file nobody parsed.
+    #
+    # UNREADABLE rather than NOT APPLICABLE, and the distinction is the point. These clauses
+    # DO apply to JavaScript. This reader cannot read it, which is a gap in the instrument
+    # rather than a question that did not arise, and only one of those two is a failure.
+    if clause["reads"] == _TREE_READER and source["language"] not in _PARSED:
+        return UNREADABLE, (
+            f"no parser here reads {source['language']}, so this clause had no syntax tree "
+            "to decide it from")
     if source["language"] not in clause["languages"]:
         return NOT_APPLICABLE, (
             f"asks about a browser, and this is a {source['language']} file with no DOM "
