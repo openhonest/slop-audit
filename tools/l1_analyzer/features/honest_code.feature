@@ -139,6 +139,24 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     Then a parse with no error node and some named structure in it names that language
     But tree-sitter accepts almost anything and reports trouble as error nodes rather than as failure, so the absence of them is the test and resemblance is never enough
 
+  Scenario: _markup_parts finds the script and style content inside a block of markup
+    Given a block that the markup grammar accepts whole
+    When _markup_parts reads its script and style elements by node type
+    Then the text inside each is handed back to the same whole-grammar test, one grammar deeper
+    But nothing is stripped and nothing is matched by pattern, since a wrapper removed by hand is the guess this test exists to avoid, and page content is the case that made the depth necessary
+
+  Scenario: _accepts_whole says whether a grammar took the whole text without complaint
+    Given a block of text and a language to try it as
+    When _accepts_whole parses it and looks for error nodes
+    Then a tree with no error and nothing missing is an acceptance
+    But tree-sitter reports trouble as error nodes rather than as failure, so the absence of them is the whole test and a partial parse is never an acceptance
+
+  Scenario: _grammar_root parses one block by whichever grammar owns its language
+    Given a block of text and a language
+    When _grammar_root picks the grammar for it
+    Then the clause vocabulary is asked first, and markup and stylesheets are parsed by grammars kept outside it
+    But they are kept outside on purpose, since that table is what tells a clause it can read a language and no clause reads these
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Clause 17, the strangler pattern, is a property of how a migration is sequenced over weeks.

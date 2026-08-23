@@ -25,6 +25,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
+from tree_sitter import Node
+
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.honest_code_read import read_tree
 from l1_analyzer.honest_code_rules import BROWSER_LANGUAGES, Finding
@@ -137,7 +139,22 @@ _BLOCK_LINES = 5
 # Its only failure mode is SILENCE. A block that carries none of these is not reported, which
 # is exactly what happened before any of this existed; it can never invent a block that is not
 # there. That direction is the reason it is acceptable and the reason it is written down.
-_CODE_MARKS = (";", "{", "}", "=>", "func ", "def ", "class ", "fn ", "public ", "var ")
+_CODE_MARKS = (";", "{", "}", "=>", "<", "func ", "def ", "class ", "fn ", "public ", "var ")
+
+# Grammars this reader uses that no clause reads. They are deliberately NOT in LANG_SPEC:
+# that table is the clause vocabulary, and an entry there would tell nineteen clauses they
+# can read markup.
+#
+# Page content is why they are here. The same JavaScript reported bare went silent once
+# wrapped in a script tag, because the tags are not JavaScript and the whole-grammar test
+# rejected the block. That is the commonest way embedded source arrives.
+_MARKUP = "html"
+_STYLESHEET = "css"
+
+# The element types whose text is another language. Read by node type, so nothing is
+# stripped and nothing is matched by pattern: a wrapper removed by hand is the guess this
+# whole test exists to avoid.
+_EMBEDDING_ELEMENTS = ("script_element", "style_element")
 
 
 class Unexamined(TypedDict):
@@ -504,21 +521,90 @@ def _parses_cleanly_as(text: str, own: str) -> str:
 
     Only a grammar OTHER than the file's own, and only a parse with no error node and some
     named structure in it. tree-sitter accepts almost anything and reports the trouble as
-    error nodes rather than as a failure, so the absence of them is the test."""
-    for language in sorted(_VOCABULARY):
-        if language == own:
-            continue
-        try:
-            tree = read_tree(text, language)
-        except (KeyError, ValueError):
-            continue
-        root = tree["root"]
-        nodes = rules.walk(root)
-        if any(n.type == "ERROR" or n.is_missing for n in nodes):
-            continue
-        if root.named_child_count:
+    error nodes rather than as a failure, so the absence of them is the test.
+
+    Markup is tried last and separately, because it is the most permissive grammar here and
+    would otherwise claim blocks a stricter one should have. When it wins, the block is
+    looked into one grammar deeper rather than named as markup straight away."""
+    # Markup that CARRIES an embedded element is tried first, because that is the strongest
+    # signal available and the alternatives are not merely weaker but wrong. TypeScript's
+    # grammar reads `<script>` as JSX and accepts a whole HTML block, so a plain sweep of
+    # the languages in name order claimed markup as TypeScript, and which one won was
+    # alphabetical rather than decided.
+    wrapper = _accepts_whole(text, _MARKUP)
+    parts = _markup_parts(wrapper, text) if wrapper is not None else []
+    for inner in parts:
+        deeper = _parses_cleanly_as(inner, own)
+        if deeper:
+            return deeper
+
+    # Markup carrying no embedded source is still content nothing examined, and it is named
+    # BEFORE the other grammars are tried rather than after.
+    #
+    # The reason is an ambiguity between grammars rather than an ordering preference. The
+    # JavaScript and TypeScript grammars both accept JSX, so any tag-shaped text parses
+    # cleanly as JavaScript: a plain block of divs was being reported as JavaScript and an
+    # unterminated script tag as TypeScript. When two grammars accept the same block and one
+    # of them is markup that found real elements in it, markup is the better reading.
+    #
+    # What that costs, stated because it is a real cost: genuine JSX held in a Python string
+    # is named markup. The block is unexamined content either way and only the name is
+    # wrong, which is why this is the direction to be wrong in.
+    if wrapper is not None and any(n.type == "element" for n in rules.walk(wrapper)):
+        return _MARKUP
+
+    for language in sorted({*_VOCABULARY, _STYLESHEET} - {own}):
+        root = _accepts_whole(text, language)
+        if root is not None and root.named_child_count:
             return language
     return ""
+
+
+def _markup_parts(root: "Node", text: str) -> list[str]:
+    """The text inside each script and style element, found by NODE TYPE.
+
+    Nothing is stripped and nothing is matched by pattern. A wrapper removed by hand is the
+    guess this whole test exists to avoid, so the markup grammar has to accept the block
+    whole first and the element is then located the way the grammar names it."""
+    raw = text.encode()
+    parts: list[str] = []
+    for node in rules.walk(root):
+        if node.type not in _EMBEDDING_ELEMENTS:
+            continue
+        for child in node.children:
+            if child.type == "raw_text":
+                parts.append(raw[child.start_byte:child.end_byte].decode(errors="replace"))
+    return parts
+
+
+def _accepts_whole(text: str, language: str) -> "Node | None":
+    """The root a grammar produced, when it accepted the WHOLE text with no error node."""
+    try:
+        root = _grammar_root(text, language)
+    except (KeyError, ValueError, ImportError):
+        return None
+    if any(n.type == "ERROR" or n.is_missing for n in rules.walk(root)):
+        return None
+    return root
+
+
+def _grammar_root(text: str, language: str) -> "Node":
+    """One parse, by whichever grammar owns this language.
+
+    The clause vocabulary is asked first. Markup and stylesheets are not in it, because
+    that table is what tells a clause it can read a language and no clause reads these."""
+    if language in _VOCABULARY:
+        return read_tree(text, language)["root"]
+
+    from tree_sitter import Language, Parser
+
+    if language == _MARKUP:
+        import tree_sitter_html as grammar
+    elif language == _STYLESHEET:
+        import tree_sitter_css as grammar
+    else:
+        raise KeyError(language)
+    return Parser(Language(grammar.language())).parse(text.encode()).root_node
 
 
 def report(assessment: Assessment) -> str:

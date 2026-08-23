@@ -129,3 +129,89 @@ def test_the_repository_measure_counts_the_unexamined_blocks(tmp_path):
 def test_the_count_is_stated_at_zero(tmp_path):
     (tmp_path / "plain.py").write_text("def f(n: int) -> int:\n    return n\n")
     assert "0 blocks" in honest_code.analyze(tmp_path, "python")["details"]
+
+
+# --------------------------------------------------------------------------
+# Page content, which is how embedded source usually arrives
+# --------------------------------------------------------------------------
+
+WRAPPED = '''PAGE = """
+<script>
+class Widget extends Base {
+  send(channel, data) {
+    if (channel === 'email') { return sendEmail(data); }
+    else if (channel === 'sms') { return sendSms(data); }
+    return null;
+  }
+}
+</script>
+"""
+
+
+def page() -> str:
+    return PAGE
+'''
+
+STYLED = '''PAGE = """
+<style>
+.widget { color: red; margin: 0; }
+.widget:hover { color: blue; }
+.panel { display: grid; gap: 1rem; }
+</style>
+"""
+
+
+def page() -> str:
+    return PAGE
+'''
+
+
+def test_script_content_is_found_through_its_wrapper():
+    """The same JavaScript reported bare was silent once wrapped in a script tag, because
+    the tags are not JavaScript and the whole-grammar test rejected the block. That is the
+    case this was built for: page content usually arrives wrapped."""
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"))
+    assert [b["language"] for b in found] == ["javascript"]
+
+
+def test_style_content_is_found_the_same_way():
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(STYLED, "m.py"))
+    assert [b["language"] for b in found] == ["css"]
+
+
+def test_a_malformed_wrapper_is_never_read_as_markup():
+    """One grammar deeper, not one pattern looser. The markup grammar has to accept the
+    WHOLE block before anything is looked for inside it, so an unterminated script tag can
+    never be reported as markup or as the language it wraps.
+
+    It is still reported, as TypeScript, because that grammar accepts a bare tag as JSX and
+    genuinely does accept this text whole. The block is unexamined content and only its
+    name is arguable, which is the same ambiguity the precedence rule above settles in the
+    other direction and the reason that rule had to be written down."""
+    source = honest_code.read_source_text(WRAPPED.replace("</script>", ""), "m.py")
+    found = honest_code.unexamined_blocks(source)
+    assert [b["language"] for b in found] != ["html"], (
+        "markup that does not parse whole was read as markup anyway, so the whole-parse "
+        "requirement has stopped holding")
+    assert [b["language"] for b in found] != ["javascript"], (
+        "the inner text was reached without the wrapper parsing, so something is being "
+        "stripped")
+
+
+def test_the_line_reported_is_inside_the_file_not_inside_the_block():
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"))
+    assert found[0]["line"] == 1
+
+
+def test_markup_with_no_script_or_style_reports_the_markup_itself():
+    """Plain markup in a string is still content nothing examined, and naming it as markup
+    is truer than naming it as the language of whatever it does not contain."""
+    source = 'PAGE = """\n<div>\n<p>one</p>\n<p>two</p>\n</div>\n"""\n\n\ndef page() -> str:\n    return PAGE\n'
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(source, "m.py"))
+    assert [b["language"] for b in found] == ["html"]
+
+
+def test_prose_is_still_not_markup():
+    """The markup grammar is permissive enough to accept prose, which would undo the whole
+    result. Prose has no element and no script, so there is nothing to name."""
+    assert honest_code.unexamined_blocks(honest_code.read_source_text(PROSE, "m.py")) == []
