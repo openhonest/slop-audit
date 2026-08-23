@@ -192,3 +192,146 @@ def test_the_base_names_a_definition_inherits_are_read(language):
     admin = next(n for n in read.walk(tree["root"]) if n.type in spec["class_types"]
                  and read.node_text(n, raw).startswith("class Admin"))
     assert rules.base_names(admin, spec, raw) == ["User"]
+
+
+# --------------------------------------------------------------------------
+# Clauses 2 and 3, the class that is only data and the method that is only a function
+#
+# They port together because they read the same four shapes: the classes, the methods in
+# each, the constructor among those, and whether a method reaches the receiver for anything
+# more than data. Porting one and leaving the other would have put two readings of "a
+# method touches self" in the package, which is the defect this file exists to refuse.
+#
+# The constructor is the one shape the vocabulary did not carry. Python spells it `__init__`
+# and JavaScript spells it `constructor`, and a clause that hard-codes either is a clause
+# that means something different in the other language.
+# --------------------------------------------------------------------------
+
+DATA_ONLY = {
+    "python": ("class User:\n"
+               "    def __init__(self, email, name):\n"
+               "        self.email = email\n"
+               "        self.name = name\n\n"
+               "    def get_email(self):\n"
+               "        return self.email\n"),
+    "javascript": ("class User {\n"
+                   "  constructor(email, name) {\n"
+                   "    this.email = email;\n"
+                   "    this.name = name;\n"
+                   "  }\n\n"
+                   "  getEmail() {\n"
+                   "    return this.email;\n"
+                   "  }\n"
+                   "}\n"),
+}
+
+DOES_WORK = {
+    "python": ("class User:\n"
+               "    def __init__(self, email, name):\n"
+               "        self.email = email\n"
+               "        self.name = name\n\n"
+               "    def rename(self, name):\n"
+               "        self.name = name\n"),
+    "javascript": ("class User {\n"
+                   "  constructor(email, name) {\n"
+                   "    this.email = email;\n"
+                   "    this.name = name;\n"
+                   "  }\n\n"
+                   "  rename(name) {\n"
+                   "    this.name = name;\n"
+                   "  }\n"
+                   "}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_class_that_only_holds_data_is_found_in_this_language(language):
+    found = rules.data_classes(read.read_tree(DATA_ONLY[language], language))
+    assert [f["symbol"] for f in found] == ["User"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_class_whose_method_writes_the_receiver_is_quiet(language):
+    """The one thing that separates data from an object: a method that writes the receiver
+    is doing something a free function taking the data could not."""
+    assert rules.data_classes(read.read_tree(DOES_WORK[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_class_with_no_constructor_is_not_a_data_class(language):
+    """The constructor assigning its parameters is the whole shape. Without one there is no
+    evidence the class holds data at all."""
+    source = {"python": "class User:\n    def get_email(self):\n        return self.email\n",
+              "javascript": ("class User {\n  getEmail() {\n"
+                             "    return this.email;\n  }\n}\n")}
+    assert rules.data_classes(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_method_reaching_the_receiver_only_for_data_is_found(language):
+    found = rules.methods_wearing_a_class(read.read_tree(DATA_ONLY[language], language))
+    assert [f["symbol"] for f in found] == ["User.getEmail" if language == "javascript"
+                                            else "User.get_email"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_method_that_writes_the_receiver_is_not_a_free_function(language):
+    assert rules.methods_wearing_a_class(read.read_tree(DOES_WORK[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_constructor_is_named_by_the_vocabulary_rather_than_by_this_clause(language):
+    """A clause spelling `__init__` measures something different in JavaScript, quietly."""
+    spec = LANG_SPEC[language]
+    assert spec["constructor_names"], language
+    assert ("__init__" in spec["constructor_names"]) == (language == "python")
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_class_wrapping_a_resource_is_left_alone(language):
+    """Acceptable when it wraps a stateful external resource, in the rule's own words. The
+    constructor opening something is the evidence, and it is the same evidence either
+    side of the language line."""
+    source = {"python": ("class Pool:\n"
+                         "    def __init__(self, dsn):\n"
+                         "        self.conn = connect(dsn)\n\n"
+                         "    def close(self):\n"
+                         "        self.conn.close()\n"),
+              "javascript": ("class Pool {\n"
+                             "  constructor(dsn) {\n    this.conn = connect(dsn);\n  }\n\n"
+                             "  close() {\n    this.conn.close();\n  }\n}\n")}
+    assert rules.data_classes(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_method_that_calls_another_method_is_left_alone(language):
+    """Calling a sibling is not fetching data. A free function taking the record could not
+    do it, which is the whole test the clause applies."""
+    source = {"python": ("class User:\n"
+                         "    def check(self):\n        return self.validate()\n"),
+              "javascript": ("class User {\n  check() {\n"
+                             "    return this.validate();\n  }\n}\n")}
+    assert rules.methods_wearing_a_class(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_language_with_no_constructor_shape_says_it_could_not_decide(language):
+    """Rust, C and Go have no constructor this vocabulary names. Returning the empty list
+    there would read as "no data classes in this file", which is a claim nothing checked."""
+    for absent in ("rust", "c", "go"):
+        assert rules.data_classes(read.read_tree("", absent)) is None, absent
+    assert rules.data_classes(read.read_tree("", language)) is not None
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_keyword_argument_beside_the_bases_is_not_a_base(language):
+    """`class LangSpec(TypedDict, total=False)` names one base and one option. Python puts
+    both in the same argument list, so reading every identifier under the holder made this
+    package's own vocabulary look like it inherited from something called `total`."""
+    source = {"python": "class Row(TypedDict, total=False):\n    name: str\n",
+              "javascript": "class Row extends Object {}\n"}
+    tree = read.read_tree(source[language], language)
+    node = read.class_nodes(tree["root"], tree["spec"])[0]
+    assert "total" not in read.base_names(node, tree["spec"], tree["raw"])
+    assert read.base_names(node, tree["spec"], tree["raw"]) == (
+        ["TypedDict"] if language == "python" else ["Object"])

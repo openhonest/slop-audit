@@ -211,8 +211,10 @@ CLAUSES: tuple[Clause, ...] = (
     # Ported to the shared vocabulary: decided for every language the spec covers.
     _clause(1, "Dict-lookup polymorphism over if/elif chains", _TREE, rules.dispatch_chains,
             reads=_TREE_READER),
-    _clause(2, "Typed dicts over classes", _TREE, rules.data_classes),
-    _clause(3, "Pure functions over methods", _TREE, rules.methods_wearing_a_class),
+    _clause(2, "Typed dicts over classes", _TREE, rules.data_classes,
+            reads=_TREE_READER),
+    _clause(3, "Pure functions over methods", _TREE, rules.methods_wearing_a_class,
+            reads=_TREE_READER),
     _clause(4, "I/O at the boundary", _TREE, rules.io_below_the_boundary),
     _clause(5, "Flat composition over inheritance", _TREE, rules.inheritance_for_reuse,
             reads=_TREE_READER),

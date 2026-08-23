@@ -126,18 +126,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a read of a shared value followed by a write to it lets two callers both believe they hold the thing
     But an await between the two makes the race certain rather than occasional, and the finding says which it found
 
-  Scenario: _only_reads_self says whether a method reaches self only for data
-    Given a method definition
-    When _only_reads_self walks its uses of self
-    Then a method that only reads attributes could have been handed the data
-    But one that writes self or calls another method is doing something a free function could not
-
-  Scenario: _reads_self says whether a method touches self at all
-    Given a method definition
-    When _reads_self walks it
-    Then a method that never mentions self is already a free function in all but name
-    But that is a different finding from one that reads self, so the two questions stay apart
-
   Scenario: _io_calls names the I/O one function performs
     Given a function definition
     When _io_calls reads its calls
@@ -246,3 +234,9 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When local_exception_roots follows each chain of bases to its root
     Then all four names come back, so a second-level exception is exceptions all the way down
     But a base defined in another module cannot be followed and is not counted a root
+
+  Scenario: _calls_a_resource says whether a constructor opens something
+    Given one constructor storing its parameters and one calling connect
+    When _calls_a_resource reads the calls through the language's call vocabulary
+    Then only the second is wrapping a resource, which the rule permits
+    But a call this list does not name is not read as opening anything

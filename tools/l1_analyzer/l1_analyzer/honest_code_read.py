@@ -120,6 +120,9 @@ def _base_names(node: ast.ClassDef) -> list[str]:
 # adds more of them, so this is the seam the growth actually follows.
 # ---------------------------------------------------------------------------
 
+# An option passed where the bases go. Not a base, in any language that allows one.
+_OPTION_TYPES = ("keyword_argument", "named_argument", "assignment_expression")
+
 _BASE_HOLDERS = ("argument_list", "class_heritage", "superclass", "extends_clause",
                  "type_parameters", "implements_clause")
 
@@ -201,14 +204,22 @@ def base_names(node: Node, spec: LangSpec, raw: bytes) -> list[str]:
     clause, so the holder is found by node type and neither language appears in the rule.
 
     A base defined in another module is only a name here, which is the half this clause
-    cannot decide and says so."""
+    cannot decide and says so.
+
+    An option passed beside the bases is not one of them. Python puts `total=False` in the
+    same argument list as `TypedDict`, and reading every identifier under the holder made
+    this package's own vocabulary look like it inherited from something called `total`."""
     names: list[str] = []
     for child in node.children:
         if child.type not in _BASE_HOLDERS:
             continue
-        for inner in walk(child):
-            if inner.type in ("identifier", "type_identifier", "member_expression",
-                              "attribute"):
+        for base in child.named_children:
+            if base.type in _OPTION_TYPES:
+                continue
+            for inner in walk(base):
+                if inner.type not in ("identifier", "type_identifier", "member_expression",
+                                      "attribute"):
+                    continue
                 text = node_text(inner, raw).split(".")[-1].strip()
                 if text and text not in names:
                     names.append(text)
@@ -221,3 +232,65 @@ def first_name(node: Node, raw: bytes) -> str:
         if child.type in ("identifier", "type_identifier"):
             return node_text(child, raw)
     return ""
+
+
+def class_nodes(root: Node, spec: LangSpec) -> list[Node]:
+    """Every class definition in the tree, by this language's own node types."""
+    return [n for n in walk(root) if n.type in spec["class_types"]]
+
+
+def method_nodes(node: Node, spec: LangSpec) -> list[Node]:
+    """The definitions directly in a class body.
+
+    Directly, not by walking: a function defined inside a method is not a method, and
+    counting it as one would make a class holding one closure look like a class of two.
+    Java and C# spell the constructor as its own node type, so those types are collected
+    here alongside the ordinary ones rather than left for the caller to remember."""
+    body = node.child_by_field_name("body")
+    if body is None:
+        return []
+    wanted = (*spec["func_types"], *spec["constructor_types"])
+    return [child for child in body.named_children if child.type in wanted]
+
+
+def is_constructor(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether a definition is the one that runs when the class is instantiated.
+
+    Two languages name it and two spell it as a node type. Both are read here so no clause
+    has to know which kind its language is."""
+    if node.type in spec["constructor_types"]:
+        return True
+    return node_text(node.child_by_field_name("name"), raw) in spec["constructor_names"]
+
+
+def reaches_receiver(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether anything inside reads `self` or `this` at all."""
+    return any(_receiver_of(n, spec, raw) is not None for n in walk(node))
+
+
+def writes_receiver(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether anything inside assigns to the receiver, or calls a method on it.
+
+    Either one is work a free function taking the data could not do, which is what
+    separates an object from a record. Reading `self.x` is not: the value could have been
+    a parameter."""
+    for n in walk(node):
+        if n.type in spec["assign_types"]:
+            left = n.child_by_field_name(spec["assign_left"])
+            if left is not None and _receiver_of(left, spec, raw) is not None:
+                return True
+        if n.type in spec["call_types"]:
+            fn = n.child_by_field_name(spec["call_fn"])
+            if fn is not None and _receiver_of(fn, spec, raw) is not None:
+                return True
+    return False
+
+
+def _receiver_of(node: Node, spec: LangSpec, raw: bytes) -> Node | None:
+    """The member access whose object is this language's receiver, or nothing."""
+    if node.type not in spec["member_types"]:
+        return None
+    obj = node.child_by_field_name("object") or node.child_by_field_name("value")
+    if obj is None or node_text(obj, raw) not in spec["this_idents"]:
+        return None
+    return node

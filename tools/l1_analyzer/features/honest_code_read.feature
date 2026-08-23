@@ -127,3 +127,39 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When first_name walks the children for the first identifier
     Then the class's own name comes back
     But a definition whose name the grammar hides behind another node type yields nothing
+
+  Scenario: class_nodes finds every class in the tree by this language's node types
+    Given a file holding two class definitions
+    When class_nodes reads the tree through the language's class types
+    Then both come back, in Python's class_definition and JavaScript's class_declaration alike
+    But a function that merely returns an object is not a class in either
+
+  Scenario: method_nodes takes the definitions directly in a class body
+    Given a class holding one method, which itself holds a closure
+    When method_nodes reads the body's own children rather than walking
+    Then one method comes back, because a function inside a method is not a method
+    But Java's constructor is its own node type and is collected here alongside the rest
+
+  Scenario: is_constructor says whether a definition runs when the class is instantiated
+    Given a definition in a language that names its constructor and one that types it
+    When is_constructor asks the vocabulary rather than spelling either
+    Then Python's __init__ and Java's constructor_declaration both answer yes
+    But a language with no constructor shape answers no for every definition it holds
+
+  Scenario: reaches_receiver says whether anything inside reads self or this
+    Given a method returning a field of the receiver
+    When reaches_receiver walks it for a member access on this language's receiver
+    Then the read is found
+    But a method touching only its parameters reaches no receiver at all
+
+  Scenario: writes_receiver says whether anything inside assigns the receiver or calls it
+    Given one method assigning a field and one calling a sibling method
+    When writes_receiver reads assignments and calls through the vocabulary
+    Then both are work a free function taking the data could not do
+    But reading a field is not, because the value could have been a parameter
+
+  Scenario: _receiver_of names the member access whose object is this language's receiver
+    Given a member access on self, one on this, and one on an ordinary name
+    When _receiver_of checks the object against the language's receiver identifiers
+    Then the first two are named and the third is not
+    But a language with no receiver identifier names none of them

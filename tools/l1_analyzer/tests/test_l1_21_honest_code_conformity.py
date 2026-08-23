@@ -592,19 +592,33 @@ def test_the_browser_clauses_still_decide_because_they_read_text():
 def test_an_unported_clause_on_javascript_says_unreadable_rather_than_not_applicable():
     """The distinction matters. These clauses DO apply to JavaScript; this reader cannot
     read it yet. That is a gap in the instrument, not a question that did not arise, and
-    only one of those two is a failure."""
+    only one of those two is a failure.
+
+    The clause is taken from the table rather than named. This test pinned L1.21.2 until
+    that clause was ported, at which point it failed for measuring the schedule instead of
+    the rule, exactly as the number-pinning test above it had."""
     assessed = honest_code.assess(honest_code.read_source_text(DIRTY_JS, "app.js"))
-    clause = next(c for c in assessed if c["code"] == "L1.21.2")
-    assert clause["undecided"] == "unreadable"
-    assert "parser" in clause["reason"]
+    unported = [c for c in assessed if not c["decided"] and c["undecided"] == "unreadable"]
+    assert unported, "every clause reads JavaScript now, so this test has nothing to assert"
+    for clause in unported:
+        assert "parser" in clause["reason"], clause["code"]
 
 
 def test_the_share_for_such_a_file_is_over_the_clauses_that_read_it():
     """It used to read 87.5% over sixteen clauses, fourteen of which never saw the file.
-    The share is over what was actually read, and that file breaks every one of them."""
+
+    The share is over what was actually read. It is not zero any more: that file breaks
+    every clause that could read it when only four could, and porting clauses 2 and 3 added
+    two that read it and hold. The property that has to survive every port is that the
+    denominator counts the clauses that read the file, so it is asserted against the clauses
+    rather than against a number that moves each time."""
     assessment = honest_code.assess_file_text(DIRTY_JS, "app.js")
-    assert assessment["decided_clauses"] < 19
-    assert assessment["conformity"] == 0.0
+    decided = [c for c in assessment["clauses"] if c["decided"]]
+    assert 0 < len(decided) < 19
+    assert assessment["decided_clauses"] == len(decided)
+    broken = [c for c in decided if c["findings"]]
+    assert assessment["conformity"] == round(
+        100 * (len(decided) - len(broken)) / len(decided), 1)
 
 
 def test_a_clean_javascript_file_is_not_reported_as_broadly_conformant():

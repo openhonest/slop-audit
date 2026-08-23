@@ -21,6 +21,8 @@ How a source is read, and the vocabulary a ported clause reads it through, live 
 
 import ast
 
+from tree_sitter import Node
+
 from l1_analyzer.honest_code_read import (
     Finding,
     _base_names,
@@ -31,11 +33,17 @@ from l1_analyzer.honest_code_read import (
     _methods,
     base_names,
     chain_subjects,
+    class_nodes,
     first_name,
     is_chain_arm,
+    is_constructor,
+    method_nodes,
     node_text,
+    reaches_receiver,
     walk,
+    writes_receiver,
 )
+from l1_analyzer.lang_spec import LangSpec
 
 BOUNDARY_DECORATORS = frozenset({"boundary", "boundary_in", "boundary_out", "edge",
                                  "entrypoint", "entry_point"})
@@ -159,45 +167,53 @@ def dispatch_chains(source: dict) -> list[Finding] | None:
 
 
 def data_classes(source: dict) -> list[Finding] | None:
-    """A class whose body is an `__init__` assigning parameters to self, plus accessors.
+    """A class whose constructor assigns its parameters, with no method doing more.
+
+    Read through the language's own node vocabulary, so the rule means the same thing in
+    every language the spec covers. The constructor is the whole shape: without one there
+    is no evidence the class holds data at all.
 
     Not decided: whether a class the rule permits was the right choice. A wrapper around a
-    resource is allowed and whether it earned the permission is a question for a reader."""
+    resource is allowed and whether it earned the permission is a question for a reader.
+
+    Not decided either: a language whose constructor this vocabulary does not name. Rust,
+    C and Go have no constructor shape to read, so the clause says it could not decide
+    rather than returning the empty list, which would read as "no data classes here"."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["constructor_names"] and not spec["constructor_types"]:
+        return None
+    shapes = DECLARED_SHAPES | local_exception_roots(source)
     found: list[Finding] = []
-    shapes = DECLARED_SHAPES | _local_exceptions(source)
-    for node in _classes(source):
-        if set(_base_names(node)) & shapes:
+    for node in class_nodes(source["root"], spec):
+        if set(base_names(node, spec, raw)) & shapes:
             continue
-        methods = _methods(node)
-        init = next((m for m in methods if m.name == "__init__"), None)
+        methods = method_nodes(node, spec)
+        init = next((m for m in methods if is_constructor(m, spec, raw)), None)
         if init is None:
             continue
-        if _called(init) & RESOURCE_CALLS:
+        if _calls_a_resource(init, spec, raw):
             continue
-        others = [m for m in methods if m.name != "__init__"]
-        if all(_only_reads_self(m) for m in others):
+        others = [m for m in methods if m is not init]
+        if all(not writes_receiver(m, spec, raw) for m in others):
+            name = node_text(node.child_by_field_name("name"), raw) or first_name(node, raw)
             found.append(_finding(
-                "L1.21.2", node.name, node.lineno,
+                "L1.21.2", name, node.start_point[0] + 1,
                 "the class holds data and does nothing a dict could not",
-                f"a TypedDict: `{node.name} = TypedDict(\"{node.name}\", {{...}})`", ""))
+                f"a TypedDict: `{name} = TypedDict(\"{name}\", {{...}})`", ""))
     return found
 
 
-def _only_reads_self(method: ast.FunctionDef) -> bool:
-    """Whether a method reaches `self` only for data it could have been passed.
+def _calls_a_resource(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether a constructor opens something. A class wrapping a resource is allowed."""
+    for n in walk(node):
+        if n.type not in spec["call_types"]:
+            continue
+        fn = n.child_by_field_name(spec["call_fn"])
+        if fn is not None and node_text(fn, raw).split(".")[-1] in RESOURCE_CALLS:
+            return True
+    return False
 
-    A method that writes self or calls another method is doing something a free function
-    taking the data could not, so it is left alone."""
-    for node in ast.walk(method):
-        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-            if node.value.id != "self":
-                continue
-            if isinstance(node.ctx, (ast.Store, ast.Del)):
-                return False
-        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                and isinstance(node.func.value, ast.Name) and node.func.value.id == "self"):
-            return False
-    return True
+
 
 
 # --------------------------------------------------------------------------
@@ -205,29 +221,35 @@ def _only_reads_self(method: ast.FunctionDef) -> bool:
 # --------------------------------------------------------------------------
 
 def methods_wearing_a_class(source: dict) -> list[Finding] | None:
-    """A method that reads `self` only to reach data it could have received.
+    """A method that reaches the receiver only to fetch data it could have received.
+
+    Read through the language's own node vocabulary. `self` and `this` are the same shape
+    with two spellings, and the vocabulary already carried both.
 
     Not decided: whether the class is required by a framework. Django models and React
     components are the usual cases and neither is readable from the method alone."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["this_idents"]:
+        return None
     found: list[Finding] = []
-    for node in _classes(source):
-        if set(_base_names(node)) & DECLARED_SHAPES:
+    for node in class_nodes(source["root"], spec):
+        if set(base_names(node, spec, raw)) & DECLARED_SHAPES:
             continue
-        for method in _methods(node):
-            if method.name.startswith("__"):
+        owner = node_text(node.child_by_field_name("name"), raw) or first_name(node, raw)
+        for method in method_nodes(node, spec):
+            name = node_text(method.child_by_field_name("name"), raw)
+            if not name or name.startswith("__") or is_constructor(method, spec, raw):
                 continue
-            if not _reads_self(method) or not _only_reads_self(method):
+            if not reaches_receiver(method, spec, raw):
+                continue
+            if writes_receiver(method, spec, raw):
                 continue
             found.append(_finding(
-                "L1.21.3", f"{node.name}.{method.name}", method.lineno,
-                "the method reaches self only for data it could have been passed",
-                f"a free function: `{method.name}_{node.name.lower()}(data)`", ""))
+                "L1.21.3", f"{owner}.{name}", method.start_point[0] + 1,
+                "the method reaches the receiver only for data it could have been passed",
+                f"a free function: `{name}_{owner.lower()}(data)`", ""))
     return found
 
-
-def _reads_self(method: ast.FunctionDef) -> bool:
-    return any(isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
-               and n.value.id == "self" for n in ast.walk(method))
 
 
 # --------------------------------------------------------------------------

@@ -38,58 +38,20 @@ def _source(text: str, path: str, language: str) -> dict:
 
 
 # --------------------------------------------------------------------------
-# 1. Dict-lookup polymorphism over if/elif chains
+# 1, 2 and 3. Dict-lookup polymorphism, TypedDicts over classes, pure functions over methods
 #
-# Its cases live in test_a_clause_means_the_same_in_every_language.py now. That clause
-# reads the shared node vocabulary, so its fixtures have to run in every language the
+# Their cases live in test_a_clause_means_the_same_in_every_language.py now. All three read
+# the shared node vocabulary, so their fixtures have to run in every language that
 # vocabulary covers and assert both directions in each, which the cases here could not do.
+#
+# Clauses 2 and 3 moved together because they read the same four shapes:
+# the classes, the definitions in each, the constructor among those, and whether a method
+# reaches the receiver for more than data. Porting one and leaving the other would have put
+# two readings of "a method touches self" in this package.
+#
+# The declared shapes Python spells stayed in test_the_project_declares_its_own_shapes.py,
+# beside the exception root that file is about.
 # --------------------------------------------------------------------------
-
-def test_a_class_that_only_holds_data_is_found():
-    found = rules.data_classes(_module(
-        "class User:\n"
-        "    def __init__(self, email, name):\n        self.email = email\n        self.name = name\n"
-        "    def get_email(self):\n        return self.email\n"))
-    assert [f["symbol"] for f in found] == ["User"]
-
-
-@pytest.mark.parametrize("base", ["TypedDict", "Protocol", "Exception", "Enum", "NamedTuple"])
-def test_a_declared_shape_is_not_a_data_class(base):
-    """The rule allows exactly these. Flagging them would flag the recommended alternative."""
-    assert rules.data_classes(_module(
-        f"class User({base}):\n    email: str\n    name: str\n")) == []
-
-
-def test_a_class_wrapping_a_resource_is_left_alone():
-    """Acceptable when it wraps a stateful external resource, in the rule's own words."""
-    assert rules.data_classes(_module(
-        "class Pool:\n"
-        "    def __init__(self, dsn):\n        self.conn = connect(dsn)\n"
-        "    def close(self):\n        self.conn.close()\n")) == []
-
-
-# --------------------------------------------------------------------------
-# 3. Pure functions over methods
-# --------------------------------------------------------------------------
-
-def test_a_method_that_only_reads_self_is_found():
-    found = rules.methods_wearing_a_class(_module(
-        "class User:\n"
-        "    def validate(self):\n        return len(self.email) > 3\n"))
-    assert [f["symbol"] for f in found] == ["User.validate"]
-
-
-def test_a_method_that_writes_self_is_left_alone():
-    """It is doing something a free function taking the data could not."""
-    assert rules.methods_wearing_a_class(_module(
-        "class Counter:\n"
-        "    def bump(self):\n        self.n = self.n + 1\n")) == []
-
-
-def test_a_method_that_calls_another_method_is_left_alone():
-    assert rules.methods_wearing_a_class(_module(
-        "class User:\n"
-        "    def check(self):\n        return self.validate()\n")) == []
 
 
 # --------------------------------------------------------------------------

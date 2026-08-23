@@ -87,7 +87,7 @@ def test_an_exception_hierarchy_is_not_a_data_class_either():
     source = ("class Base(Exception):\n    pass\n\n\n"
               "class Detailed(Base):\n"
               "    def __init__(self, path):\n        self.path = path\n")
-    assert rules.data_classes(_module(source)) == []
+    assert rules.data_classes(_tree(source)) == []
 
 
 def test_a_class_named_like_an_exception_but_deriving_from_nothing_of_the_kind():
@@ -174,3 +174,18 @@ def test_a_decorator_that_merely_mentions_the_word_is_not_a_declaration():
               "def load(case, path):\n    return path.read_text()\n\n\n"
               "def total(path):\n    return load(path)\n")
     assert rules.io_below_the_boundary(_module(source))
+
+
+# ---------------------------------------------------------------------------
+# The shapes Python spells, which clause 2 must not flag
+#
+# These stayed here when clause 2 moved to the cross-language file. The rule permits exactly
+# these five, and flagging one would flag the alternative the rule recommends. Only Python
+# spells them, so a fixture asserting them in every language would be asserting nothing.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("base", ["TypedDict", "Protocol", "Exception", "Enum", "NamedTuple"])
+def test_a_declared_shape_is_not_a_data_class(base):
+    assert rules.data_classes(_tree(
+        f"class User({base}):\n"
+        f"    def __init__(self, email):\n        self.email = email\n")) == []

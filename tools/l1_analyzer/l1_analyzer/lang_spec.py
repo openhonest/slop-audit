@@ -65,6 +65,12 @@ class LangSpec(TypedDict, total=False):
     comparison_types: tuple[str, ...]
     membership: str
     this_idents: frozenset[str]
+    # The constructor, which two languages name and two spell as a node type. A clause that
+    # hard-codes `__init__` measures something different in every other language, quietly.
+    # Both empty means this language has no constructor shape a clause can read, and a clause
+    # that needs one says it could not decide rather than returning a quiet nothing.
+    constructor_names: frozenset[str]
+    constructor_types: tuple[str, ...]
     instance_ref_style: str
     # Which enumerator reads this language's instance state, and which reads its module
     # state. Both are now named by EVERY entry, including the two that read nothing
@@ -294,6 +300,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "comparison_types": ("comparison_operator",),
         "membership": "comparison_in",
         "this_idents": frozenset({"self"}),
+        "constructor_names": frozenset({"__init__"}),
+        "constructor_types": (),
         "instance_ref_style": "member",
         "instance_enum": "member",
         "binding_sites": {},
@@ -373,6 +381,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "comparison_types": ("binary_expression",),
         "membership": "binary_in",
         "this_idents": frozenset({"this"}),
+        "constructor_names": frozenset({"constructor"}),
+        "constructor_types": (),
         "instance_ref_style": "member",
         "instance_enum": "member",
         "binding_sites": {"field_definition": "property", "variable_declarator": "name"},
@@ -442,6 +452,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "comparison_types": ("binary_expression",),
         "membership": "none",
         "this_idents": frozenset({"this"}),
+        "constructor_names": frozenset(),
+        "constructor_types": ("constructor_declaration",),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
         "binding_sites": {"variable_declarator": "name"},
@@ -523,6 +535,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "comparison_types": ("binary_expression",),
         "membership": "none",
         "this_idents": frozenset({"this"}),
+        "constructor_names": frozenset(),
+        "constructor_types": ("constructor_declaration",),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
         "binding_sites": {"variable_declarator": "name", "property_declaration": "name"},
@@ -597,6 +611,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "comparison_types": ("binary_expression",),
         "membership": "none",
         "this_idents": frozenset({"self"}),
+        "constructor_names": frozenset(),
+        "constructor_types": (),
         "instance_ref_style": "member",
         "instance_enum": "self_usage",
         "binding_sites": {"static_item": "name", "field_declaration": "name", "let_declaration": "pattern"},
@@ -677,6 +693,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "comparison_types": ("binary",),
         "membership": "none",
         "this_idents": frozenset(),
+        "constructor_names": frozenset({"initialize"}),
+        "constructor_types": (),
         "instance_ref_style": "member",
         "instance_enum": "ruby_ivar",
         "binding_sites": {},
@@ -757,6 +775,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "comparison_types": ("binary_expression",),
         "membership": "none",
         "this_idents": frozenset(),
+        "constructor_names": frozenset(),
+        "constructor_types": (),
         "instance_ref_style": "identifier",
         "instance_enum": "none",
         "binding_sites": {"declaration": "declarator", "init_declarator": "declarator", "array_declarator": "declarator", "pointer_declarator": "declarator", "field_declaration": "declarator"},
@@ -850,6 +870,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "comparison_types": ("binary_expression",),
         "membership": "none",
         "this_idents": frozenset(),
+        "constructor_names": frozenset(),
+        "constructor_types": (),
         "instance_ref_style": "member",
         "instance_enum": "none",
         "scope_by_receiver": True,
