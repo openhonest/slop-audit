@@ -25,7 +25,6 @@ from tree_sitter import Node
 
 from l1_analyzer.honest_code_read import (
     Finding,
-    _base_names,
     _called,
     _classes,
     _finding,
@@ -39,6 +38,8 @@ from l1_analyzer.honest_code_read import (
     is_chain_arm,
     is_constructor,
     method_nodes,
+    module_level_bindings,
+    names_written_in,
     node_text,
     reaches_receiver,
     walk,
@@ -119,9 +120,6 @@ _RECORDS_A_FAILURE = frozenset({"append", "add", "extend", "fail", "error", "ins
 # defect, and it is a different one from the silent failure this clause names.
 _CONTROL_FLOW = frozenset({"SystemExit", "KeyboardInterrupt", "GeneratorExit"})
 
-_MUTATING_METHODS = frozenset({"append", "extend", "update", "pop", "clear", "setdefault",
-                               "add", "remove", "insert", "popitem", "sort", "discard"})
-
 _STEP_DECORATORS = frozenset({"given", "when", "then", "step"})
 _STEP_LIMIT = 30
 
@@ -157,14 +155,6 @@ def dispatch_chains(source: dict) -> list[Finding] | None:
                 "a dict mapping each value to the function that handles it, read by "
                 "subscript so an unknown key raises", ""))
     return found
-
-
-
-
-
-
-
-
 
 
 def data_classes(source: dict) -> list[Finding] | None:
@@ -215,8 +205,6 @@ def _calls_a_resource(node: Node, spec: LangSpec, raw: bytes) -> bool:
     return False
 
 
-
-
 # --------------------------------------------------------------------------
 # 3. Pure functions over methods
 # --------------------------------------------------------------------------
@@ -250,7 +238,6 @@ def methods_wearing_a_class(source: dict) -> list[Finding] | None:
                 "the method reaches the receiver only for data it could have been passed",
                 f"a free function: `{name}_{owner.lower()}(data)`", ""))
     return found
-
 
 
 # --------------------------------------------------------------------------
@@ -328,8 +315,6 @@ def _io_calls(fn: ast.FunctionDef) -> set[str]:
     return touched
 
 
-
-
 def local_exception_roots(source: dict) -> set[str]:
     """Classes this file defines that reach an exception root through their own bases.
 
@@ -346,8 +331,6 @@ def local_exception_roots(source: dict) -> set[str]:
         if not grew:
             return known
         known |= grew
-
-
 
 
 def inheritance_for_reuse(source: dict) -> list[Finding] | None:
@@ -383,20 +366,6 @@ def inheritance_for_reuse(source: dict) -> list[Finding] | None:
 # --------------------------------------------------------------------------
 # 6 and 7. The two browser clauses
 # --------------------------------------------------------------------------
-
-def _local_exceptions(source: dict) -> set[str]:
-    """Classes this file defines that reach `Exception` through their own bases.
-
-    Followed to the root rather than one level, so a three-deep hierarchy is still
-    exceptions all the way down."""
-    bases = {node.name: _base_names(node) for node in _classes(source)}
-    known = {name for name, parents in bases.items()
-             if set(parents) & {"Exception", "BaseException"}}
-    while True:
-        grew = {name for name, parents in bases.items() if set(parents) & known} - known
-        if not grew:
-            return known
-        known |= grew
 
 
 def client_side_state(source: dict) -> list[Finding] | None:
@@ -688,68 +657,40 @@ _KNOB_UNDECIDED = ("whether a table nobody writes is a knob disguised as a fact 
 def hidden_configuration(source: dict) -> list[Finding] | None:
     """A module-level value that some function WRITES, read inside another.
 
-    The write is what makes it configuration. A table nobody writes is a fact about the
-    world, and flagging it would make this clause demand the opposite of clauses 1 and 18,
-    which both require exactly such a table. Two clauses of one instrument must not ask for
-    opposite things, and the first version of this one did.
+    Read through the language's own node vocabulary. The write is what makes it
+    configuration. A table nobody writes is a fact about the world, and flagging it would
+    make this clause demand the opposite of clauses 1 and 18, which both require exactly
+    such a table. Two clauses of one instrument must not ask for opposite things, and the
+    first version of this one did.
 
     Not decided: whether a knob was disguised as a fact. A module-level value nobody writes
     in this file may still be reassigned from another, and no reading of this file sees
     it."""
-    turned = _turned_names(source)
+    spec, raw = source["spec"], source["raw"]
+    bound = module_level_bindings(source["root"], spec, raw)
+    if not bound:
+        return []
+    functions = function_nodes(source["root"], spec)
+    turned: set[str] = set()
+    for fn in functions:
+        turned |= names_written_in(fn, spec, raw) & set(bound)
     if not turned:
         return []
     found: list[Finding] = []
-    for fn in _functions(source):
-        if _turns_any(fn, turned):
+    for fn in functions:
+        if names_written_in(fn, spec, raw) & turned:
             continue
-        for name in sorted({n.id for n in ast.walk(fn)
-                            if isinstance(n, ast.Name) and n.id in turned}):
+        owner = node_text(fn.child_by_field_name("name"), raw) or first_name(fn, raw)
+        read_here = sorted({node_text(n, raw) for n in walk(fn)
+                            if n.type == "identifier" and node_text(n, raw) in turned})
+        for name in read_here:
             found.append(_finding(
-                "L1.21.13", f"{fn.name}({name})", fn.lineno,
+                "L1.21.13", f"{owner}({name})", fn.start_point[0] + 1,
                 f"reads `{name}`, which another function here writes, so its behaviour "
                 "depends on something no caller can see",
                 f"take `{name.lower()}` as a parameter, so the dependency is in the "
                 "signature", _KNOB_UNDECIDED))
     return found
-
-
-def _turned_names(source: dict) -> set[str]:
-    """Module-level names some function reassigns or mutates in place.
-
-    Somebody turns these, so two callers can get different behaviour for a reason neither
-    of them can see at the call site."""
-    declared = set(_module_level(source))
-    turned: set[str] = set()
-    for fn in _functions(source):
-        turned |= _written_in(fn) & declared
-    return turned
-
-
-def _written_in(fn: ast.FunctionDef) -> set[str]:
-    """The names this function reassigns, subscript-assigns, or mutates by method call."""
-    written: set[str] = set()
-    for node in ast.walk(fn):
-        if isinstance(node, ast.Global):
-            written |= set(node.names)
-        if isinstance(node, (ast.Assign, ast.AugAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            for target in targets:
-                if isinstance(target, ast.Name):
-                    written.add(target.id)
-                if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
-                    written.add(target.value.id)
-        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                and _bare_name(node) in _MUTATING_METHODS
-                and isinstance(node.func.value, ast.Name)):
-            written.add(node.func.value.id)
-    return written
-
-
-def _turns_any(fn: ast.FunctionDef, turned: set[str]) -> bool:
-    """Whether this function is one of the ones doing the turning. It is the writer rather
-    than a reader surprised by the write."""
-    return bool(_written_in(fn) & turned)
 
 
 def _module_level(source: dict) -> dict[str, ast.expr]:
@@ -823,7 +764,6 @@ def _is_literal_node(node: Node, spec: LangSpec) -> bool:
             break
         node = inner
     return node.type in spec["literal_types"] or node.type in spec["container_literal_types"]
-
 
 
 # --------------------------------------------------------------------------

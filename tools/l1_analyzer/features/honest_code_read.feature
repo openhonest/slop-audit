@@ -169,3 +169,21 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When function_nodes reads the tree through the language's function types
     Then both come back, because a method is a function that sits in a class body
     But a call to a function is not a definition of one
+
+  Scenario: module_level_bindings names what the top of the file binds
+    Given a file binding one name by plain assignment and one through a declarator
+    When module_level_bindings reads both shapes through the language's vocabulary
+    Then each name comes back with the value it was bound to
+    But a name bound inside a function is that function's own and is not top level
+
+  Scenario: names_written_in names what a function rebinds, subscripts, or mutates
+    Given one function rebinding a module name and one writing a key of a module table
+    When names_written_in reads assignments, subscript writes, and mutating method calls
+    Then both names come back, and a declaration of enclosing scope counts as a write
+    But a function that only reads those names writes nothing
+
+  Scenario: _written_name names the thing a write lands on
+    Given a write to a plain name and a write to one key of a table
+    When _written_name reaches through the subscript to the thing subscripted
+    Then both report the name another function could mention
+    But a write to something that is not a name at all reports nothing

@@ -224,21 +224,9 @@ def test_a_class_that_is_a_context_manager_has_scoped_it():
 # 13. Configuration as parameters
 # --------------------------------------------------------------------------
 
-def test_a_setting_somebody_turns_is_found():
-    """The WRITE is what makes it configuration. Without one it is a fact about the world,
-    and flagging that would make this clause demand the opposite of clauses 1 and 18."""
-    found = rules.hidden_configuration(_module(
-        "SETTINGS = {'timeout': 30}\n\n\n"
-        "def configure(n):\n    SETTINGS['timeout'] = n\n\n\n"
-        "def fetch(url):\n    return get(url, SETTINGS['timeout'])\n"))
-    assert found
-
-
-def test_a_constant_nothing_can_change_is_not_configuration():
-    """Nothing about it can differ between two calls, so no caller's behaviour depends on
-    something they cannot see."""
-    assert rules.hidden_configuration(_module(
-        "TIMEOUT = 30\n\n\ndef fetch(url):\n    return get(url, TIMEOUT)\n")) == []
+# Its cases live in test_a_clause_means_the_same_in_every_language.py now. The clause reads
+# the shared node vocabulary, and every case it carried is about a write and a read rather
+# than about anything Python spells.
 
 
 # --------------------------------------------------------------------------
@@ -364,37 +352,6 @@ def test_a_named_client_call_is_still_io(call):
         f"def fetch(url, cmd, path, session, requests, httpx, subprocess):\n    return {call}\n\n\n"
         "def top(*a):\n    return fetch(*a)\n"))
     assert found, call
-
-
-def test_a_table_nobody_writes_is_not_hidden_configuration():
-    """Clause 13 flagged every dispatch table in this tool, which would mean clause 13
-    demands the opposite of clauses 1 and 18. Two clauses of one instrument must not ask
-    for opposite things.
-
-    A table nobody writes is a fact about the world. Configuration is a knob, and a knob is
-    one somebody turns."""
-    assert rules.hidden_configuration(_module(
-        "SUFFIXES = {'.py': 'python'}\n\n\ndef language(path):\n    return SUFFIXES[path]\n")) == []
-
-
-def test_a_module_level_value_a_function_writes_is_hidden_configuration():
-    """Somebody turns this one, so two callers can get different behaviour for a reason
-    neither of them can see at the call site."""
-    found = rules.hidden_configuration(_module(
-        "SETTINGS = {'timeout': 30}\n\n\n"
-        "def configure(n):\n    SETTINGS['timeout'] = n\n\n\n"
-        "def fetch(url):\n    return get(url, SETTINGS['timeout'])\n"))
-    assert [f["symbol"].split("(")[0] for f in found] == ["fetch"]
-
-
-def test_the_configuration_clause_says_what_it_cannot_see():
-    """Whether a knob was disguised as a fact is not decidable from a file. The clause
-    reports the tables somebody writes and names the half it cannot read."""
-    found = rules.hidden_configuration(_module(
-        "SETTINGS = {'t': 30}\n\n\ndef configure(n):\n    SETTINGS['t'] = n\n\n\n"
-        "def fetch(u):\n    return get(u, SETTINGS['t'])\n"))
-    assert found
-    assert found[0]["undecided"].strip()
 
 
 def test_a_handler_that_returns_a_reason_is_not_swallowing():

@@ -415,3 +415,100 @@ def test_every_kind_of_literal_default_is_found(language, kind):
             "javascript": f"function f(x, timeout = {written}) {{\n  return x;\n}}\n"}
     found = rules.implicit_defaults(read.read_tree(body[language], language))
     assert [f["symbol"] for f in found] == ["f(timeout)"], (kind, found)
+
+
+# --------------------------------------------------------------------------
+# Clause 13, configuration read from module scope
+#
+# The WRITE is what makes a module-level value configuration. A table nobody writes is a
+# fact about the world, and flagging it would make this clause demand the opposite of
+# clauses 1 and 18, which both require exactly such a table. Two clauses of one instrument
+# must not ask for opposite things, and the first version of this one did.
+#
+# Python needs `global` to rebind from inside a function and JavaScript does not, so the
+# fixtures differ in that one line and the rule does not mention either.
+# --------------------------------------------------------------------------
+
+TURNED_KNOB = {
+    "python": ("TIMEOUT = 30\n\n\n"
+               "def configure(n):\n    global TIMEOUT\n    TIMEOUT = n\n\n\n"
+               "def send(data):\n    return go(data, TIMEOUT)\n"),
+    "javascript": ("let timeout = 30;\n\n"
+                   "function configure(n) {\n  timeout = n;\n}\n\n"
+                   "function send(data) {\n  return go(data, timeout);\n}\n"),
+}
+
+PASSED_IN = {
+    "python": ("def send(data, timeout):\n    return go(data, timeout)\n"),
+    "javascript": ("function send(data, timeout) {\n  return go(data, timeout);\n}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_module_value_one_function_writes_and_another_reads_is_found(language):
+    found = rules.hidden_configuration(read.read_tree(TURNED_KNOB[language], language))
+    assert [f["symbol"] for f in found] == [
+        "send(timeout)" if language == "javascript" else "send(TIMEOUT)"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_same_value_taken_as_a_parameter_is_quiet(language):
+    assert rules.hidden_configuration(read.read_tree(PASSED_IN[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_table_nobody_writes_is_a_fact_rather_than_a_knob(language):
+    """The clause that would otherwise demand the opposite of clauses 1 and 18. Both require
+    a module-level table read from inside functions, and the first version of this one
+    reported every such table as hidden configuration."""
+    source = {"python": ("HANDLERS = {'a': one, 'b': two}\n\n\n"
+                         "def send(kind):\n    return HANDLERS[kind]()\n"),
+              "javascript": ("const handlers = {a: one, b: two};\n\n"
+                             "function send(kind) {\n  return handlers[kind]();\n}\n")}
+    assert rules.hidden_configuration(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_function_that_turns_the_knob_is_not_itself_reported(language):
+    """It is the one place the value is meant to be reached. Reporting it would name the
+    setter as the victim of its own setting."""
+    found = rules.hidden_configuration(read.read_tree(TURNED_KNOB[language], language))
+    assert not [f for f in found if f["symbol"].startswith("configure")], found
+
+
+SUBSCRIPT_KNOB = {
+    "python": ("SETTINGS = {'timeout': 30}\n\n\n"
+               "def configure(n):\n    SETTINGS['timeout'] = n\n\n\n"
+               "def fetch(url):\n    return get(url, SETTINGS['timeout'])\n"),
+    "javascript": ("const settings = {timeout: 30};\n\n"
+                   "function configure(n) {\n  settings['timeout'] = n;\n}\n\n"
+                   "function fetch(url) {\n  return get(url, settings['timeout']);\n}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_table_written_by_subscript_is_a_knob_somebody_turns(language):
+    """The write need not rebind the name. `SETTINGS['timeout'] = n` leaves the binding
+    alone and changes what every reader of it sees, which is the same failure."""
+    found = rules.hidden_configuration(read.read_tree(SUBSCRIPT_KNOB[language], language))
+    assert [f["symbol"].split("(")[0] for f in found] == ["fetch"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_constant_nothing_can_change_is_not_configuration(language):
+    """Nothing about it can differ between two calls, so no caller's behaviour depends on
+    something they cannot see."""
+    source = {"python": "TIMEOUT = 30\n\n\ndef fetch(url):\n    return get(url, TIMEOUT)\n",
+              "javascript": ("const timeout = 30;\n\n"
+                             "function fetch(url) {\n  return get(url, timeout);\n}\n")}
+    assert rules.hidden_configuration(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_configuration_clause_says_what_it_cannot_see(language):
+    """Whether a knob was disguised as a fact is not decidable from a file. A value nobody
+    writes here may still be reassigned from another module, and no reading of this file
+    sees that."""
+    found = rules.hidden_configuration(read.read_tree(SUBSCRIPT_KNOB[language], language))
+    assert found
+    assert found[0]["undecided"].strip()

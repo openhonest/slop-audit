@@ -123,6 +123,11 @@ def _base_names(node: ast.ClassDef) -> list[str]:
 # An option passed where the bases go. Not a base, in any language that allows one.
 _OPTION_TYPES = ("keyword_argument", "named_argument", "assignment_expression")
 
+# A statement declaring that a name belongs to the enclosing scope rather than to this
+# function. Python needs one to rebind a module-level name; most languages need none, and
+# their absence is not a missing shape but a different rule about the same write.
+_SCOPE_DECLARATIONS = ("global_statement", "nonlocal_statement")
+
 _BASE_HOLDERS = ("argument_list", "class_heritage", "superclass", "extends_clause",
                  "type_parameters", "implements_clause")
 
@@ -302,3 +307,71 @@ def function_nodes(root: Node, spec: LangSpec) -> list[Node]:
     Methods included: a method is a function that happens to sit in a class body, and every
     clause reading this wants both."""
     return [n for n in walk(root) if n.type in spec["func_types"]]
+
+
+def module_level_bindings(root: Node, spec: LangSpec, raw: bytes) -> dict[str, Node]:
+    """The names bound at the top of the file, and what each was bound to.
+
+    Two shapes, because languages use two. Python binds by plain assignment and carries no
+    declarator, so the assignment's own left side is the name; the rest declare a binding
+    site and name it in a field. Both are read here so no clause has to know which kind its
+    language is.
+
+    Only the top level: a name bound inside a function is that function's own, and reading
+    it is not reaching past a signature."""
+    bound: dict[str, Node] = {}
+    for statement in root.named_children:
+        for node in walk(statement):
+            site = spec["binding_sites"].get(node.type)
+            if site is not None:
+                name = node.child_by_field_name(site)
+                value = node.child_by_field_name("value")
+                if name is not None:
+                    bound[node_text(name, raw)] = value if value is not None else node
+                continue
+            if node.type in spec["assign_types"]:
+                left = node.child_by_field_name(spec["assign_left"])
+                right = node.child_by_field_name(spec["assign_right"])
+                if left is not None and left.type == "identifier":
+                    bound[node_text(left, raw)] = right if right is not None else node
+    return bound
+
+
+def names_written_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:
+    """The names this function rebinds, writes by subscript, or mutates by method call.
+
+    A declaration that the name belongs to the enclosing scope counts too. Python needs one
+    to rebind and JavaScript does not, so the languages differ in whether the statement is
+    present rather than in what the write means."""
+    written: set[str] = set()
+    for inner in walk(node):
+        if inner.type in _SCOPE_DECLARATIONS:
+            written |= {node_text(c, raw) for c in inner.named_children}
+        if inner.type in spec["assign_types"]:
+            left = inner.child_by_field_name(spec["assign_left"])
+            if left is not None:
+                written |= _written_name(left, spec, raw)
+        if inner.type in spec["call_types"]:
+            fn = inner.child_by_field_name(spec["call_fn"])
+            if fn is None or fn.type not in spec["member_types"]:
+                continue
+            if node_text(fn, raw).split(".")[-1] not in spec["write_methods"]:
+                continue
+            obj = fn.child_by_field_name("object") or fn.child_by_field_name("value")
+            if obj is not None and obj.type == "identifier":
+                written.add(node_text(obj, raw))
+    return written
+
+
+def _written_name(target: Node, spec: LangSpec, raw: bytes) -> set[str]:
+    """The name a write lands on, reaching through a subscript to the thing subscripted.
+
+    `TABLE[key] = value` writes TABLE. Reading only the whole target would record the
+    subscript expression, which is not a name any other function can mention."""
+    if target.type == "identifier":
+        return {node_text(target, raw)}
+    if target.type in spec["subscript_types"]:
+        inner = target.child_by_field_name("object") or target.child_by_field_name("value")
+        if inner is not None and inner.type == "identifier":
+            return {node_text(inner, raw)}
+    return set()

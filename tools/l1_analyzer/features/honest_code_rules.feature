@@ -162,24 +162,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then each module-level name comes back with what it was assigned
     But an assignment inside a conditional at module level is read the same way, since a reader of the file sees one name either way
 
-  Scenario: _turned_names names the module-level values some function writes
-    Given a parsed source
-    When _turned_names reads every function's writes
-    Then a value somebody turns is configuration, since two callers can get different behaviour for a reason neither can see
-    But a table nobody writes is a fact about the world, and flagging it would make clause 13 demand the opposite of clauses 1 and 18
-
-  Scenario: _written_in names what one function reassigns or mutates
-    Given a function definition
-    When _written_in walks its assignments, its globals and its mutating calls
-    Then a subscript assignment and an append are both writes to the container
-    But a read is not, however deeply nested, because the clause is about who turns the knob
-
-  Scenario: _turns_any says whether a function is one doing the turning
-    Given a function and the names some function writes
-    When _turns_any compares them
-    Then the writer is not reported as a reader surprised by the write
-    But it is still the reason every other function is reported, which is why the two are separated here
-
   Scenario: _first_line finds where a name is first read or written in a function
     Given a function, a name and the context to look for
     When _first_line walks the tree
@@ -203,12 +185,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _asserts_a_raise reads the last of them
     Then a statement that records a failure makes the handler beneath the success condition, since it runs only when the call did not raise
     But it cannot decide whether the recorded failure is the one the author meant, because a try ending in an unrelated append reads the same way
-
-  Scenario: _local_exceptions names the classes this file defines that are exceptions
-    Given the classes one file declares and the bases each names
-    When _local_exceptions follows those bases to their root
-    Then a class three levels down from Exception is still an exception
-    But a base defined in another module cannot be followed, so a class deriving from one stays reported, which sends a reader to look rather than hiding it
 
   Scenario: _declares_a_boundary says whether a function is one of the project's own edges
     Given a function definition and its decorators
