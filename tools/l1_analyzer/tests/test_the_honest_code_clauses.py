@@ -245,18 +245,9 @@ def test_a_constant_nothing_can_change_is_not_configuration():
 # 14. No implicit defaults
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("default", ["30", "'utf-8'", "True", "None", "[]", "{}"])
-def test_a_literal_default_is_found(default):
-    found = rules.implicit_defaults(_module(f"def f(x, timeout={default}):\n    return x\n"))
-    assert found, default
-
-
-def test_a_default_that_binds_a_collaborator_is_left_alone():
-    """The opposite failure. A collaborator in the signature is a dependency made visible,
-    which is what rule 13 asks for, and flagging it would push the code back toward the
-    module-level lookup the rule exists to remove."""
-    assert rules.implicit_defaults(_module(
-        "def observe(fn, reader=describe):\n    return reader(fn)\n")) == []
+# Its cases live in test_a_clause_means_the_same_in_every_language.py now. The clause reads
+# the shared node vocabulary, and the kinds of literal it must catch are the same kinds in
+# every language that has default parameters at all.
 
 
 # --------------------------------------------------------------------------

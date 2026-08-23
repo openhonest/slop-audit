@@ -71,6 +71,19 @@ class LangSpec(TypedDict, total=False):
     # that needs one says it could not decide rather than returning a quiet nothing.
     constructor_names: frozenset[str]
     constructor_types: tuple[str, ...]
+    # A parameter that can carry a default, and the field holding its name. Empty means the
+    # language has no default parameter at all, which is a fact about the language rather
+    # than a gap in this reader, and a clause needing one says so.
+    #
+    # There is no field for the default itself. Five grammars spell it five ways, and in two
+    # of them the node type covers every parameter whether it has a default or not. What
+    # they all do carry is the `=` token, so the default is the named child after it, which
+    # is the grammar's own answer rather than a per-language guess.
+    default_param_types: tuple[str, ...]
+    default_param_name: str
+    # Literals that hold other values. `literal_types` carries the scalars; an empty list or
+    # an empty map is just as much a value nobody chose, and is the default that bites.
+    container_literal_types: frozenset[str]
     instance_ref_style: str
     # Which enumerator reads this language's instance state, and which reads its module
     # state. Both are now named by EVERY entry, including the two that read nothing
@@ -302,6 +315,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"self"}),
         "constructor_names": frozenset({"__init__"}),
         "constructor_types": (),
+        "default_param_types": ("default_parameter", "typed_default_parameter"),
+        "default_param_name": "name",
+        "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
         "binding_sites": {},
@@ -383,6 +399,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "constructor_names": frozenset({"constructor"}),
         "constructor_types": (),
+        "default_param_types": ("assignment_pattern",),
+        "default_param_name": "left",
+        "container_literal_types": frozenset({"array", "object"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
         "binding_sites": {"field_definition": "property", "variable_declarator": "name"},
@@ -454,6 +473,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "constructor_names": frozenset(),
         "constructor_types": ("constructor_declaration",),
+        "default_param_types": (),
+        "default_param_name": "",
+        "container_literal_types": frozenset({"array_initializer"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
         "binding_sites": {"variable_declarator": "name"},
@@ -537,6 +559,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"this"}),
         "constructor_names": frozenset(),
         "constructor_types": ("constructor_declaration",),
+        "default_param_types": ("parameter",),
+        "default_param_name": "name",
+        "container_literal_types": frozenset({"array_creation_expression", "initializer_expression"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
         "binding_sites": {"variable_declarator": "name", "property_declaration": "name"},
@@ -613,6 +638,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset({"self"}),
         "constructor_names": frozenset(),
         "constructor_types": (),
+        "default_param_types": (),
+        "default_param_name": "",
+        "container_literal_types": frozenset({"array_expression", "tuple_expression"}),
         "instance_ref_style": "member",
         "instance_enum": "self_usage",
         "binding_sites": {"static_item": "name", "field_declaration": "name", "let_declaration": "pattern"},
@@ -695,6 +723,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset(),
         "constructor_names": frozenset({"initialize"}),
         "constructor_types": (),
+        "default_param_types": ("optional_parameter",),
+        "default_param_name": "name",
+        "container_literal_types": frozenset({"array", "hash"}),
         "instance_ref_style": "member",
         "instance_enum": "ruby_ivar",
         "binding_sites": {},
@@ -777,6 +808,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset(),
         "constructor_names": frozenset(),
         "constructor_types": (),
+        "default_param_types": (),
+        "default_param_name": "",
+        "container_literal_types": frozenset({"initializer_list"}),
         "instance_ref_style": "identifier",
         "instance_enum": "none",
         "binding_sites": {"declaration": "declarator", "init_declarator": "declarator", "array_declarator": "declarator", "pointer_declarator": "declarator", "field_declaration": "declarator"},
@@ -872,6 +906,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "this_idents": frozenset(),
         "constructor_names": frozenset(),
         "constructor_types": (),
+        "default_param_types": (),
+        "default_param_name": "",
+        "container_literal_types": frozenset({"composite_literal"}),
         "instance_ref_style": "member",
         "instance_enum": "none",
         "scope_by_receiver": True,
@@ -949,13 +986,18 @@ _TYPESCRIPT["passthrough_types"] = ("parenthesized_expression", "unary_expressio
                                     "non_null_expression", "as_expression")
 _TYPESCRIPT["value_wrapper_types"] = ("unary_expression", "parenthesized_expression",
                                       "non_null_expression", "as_expression")
+# An annotated parameter parses as `required_parameter` whether it carries a default or not,
+# so the node type alone says nothing and the `=` token is what decides.
+_TYPESCRIPT["default_param_types"] = ("assignment_pattern", "required_parameter",
+                                      "optional_parameter")
+_TYPESCRIPT["default_param_name"] = "pattern"
 
 # The overridden keys, named once so a test can assert that nothing ELSE diverged. Written
 # out per key above rather than merged from a dict of object, so each value is checked
 # against the field it lands in instead of being waved past the checker with an ignore.
 TYPESCRIPT_OVERRIDES = frozenset({
-    "binding_sites", "field_decl_types", "immutable_modifiers",
-    "passthrough_types", "value_wrapper_types",
+    "binding_sites", "default_param_name", "default_param_types", "field_decl_types",
+    "immutable_modifiers", "passthrough_types", "value_wrapper_types",
 })
 
 LANG_SPEC["typescript"] = _TYPESCRIPT

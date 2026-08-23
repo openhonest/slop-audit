@@ -335,3 +335,83 @@ def test_a_keyword_argument_beside_the_bases_is_not_a_base(language):
     assert "total" not in read.base_names(node, tree["spec"], tree["raw"])
     assert read.base_names(node, tree["spec"], tree["raw"]) == (
         ["TypedDict"] if language == "python" else ["Object"])
+
+
+# --------------------------------------------------------------------------
+# Clause 14, the implicit default
+#
+# A literal default cannot be told from a caller who chose that value, and it manufactures
+# an input region no test exercises. A default binding a collaborator is the opposite: it
+# puts a dependency in the signature, which is what clause 13 asks for.
+#
+# Java has no default parameters at all. That is not this reader failing to read Java; it
+# is a question that cannot arise there, and the two are different verdicts.
+# --------------------------------------------------------------------------
+
+LITERAL_DEFAULT = {
+    "python": "def send(channel, timeout=30):\n    return go(channel, timeout)\n",
+    "javascript": ("function send(channel, timeout = 30) {\n"
+                   "  return go(channel, timeout);\n}\n"),
+}
+
+NO_DEFAULT = {
+    "python": "def send(channel, timeout):\n    return go(channel, timeout)\n",
+    "javascript": ("function send(channel, timeout) {\n"
+                   "  return go(channel, timeout);\n}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_literal_default_is_found_in_this_language(language):
+    found = rules.implicit_defaults(read.read_tree(LITERAL_DEFAULT[language], language))
+    assert [f["symbol"] for f in found] == ["send(timeout)"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_same_signature_without_the_default_is_quiet(language):
+    assert rules.implicit_defaults(read.read_tree(NO_DEFAULT[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_default_binding_a_collaborator_is_not_an_implicit_default(language):
+    """It makes a dependency visible in the signature. Flagging it would push the code back
+    toward the module-level lookup clause 13 exists to remove."""
+    source = {"python": "def send(channel, clock=default_clock()):\n    return clock\n",
+              "javascript": ("function send(channel, clock = defaultClock()) {\n"
+                             "  return clock;\n}\n")}
+    assert rules.implicit_defaults(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_an_empty_container_default_is_a_literal_too(language):
+    """The commonest one, and the one that bites: a shared mutable default nobody chose."""
+    source = {"python": "def send(channel, tags=[]):\n    return tags\n",
+              "javascript": "function send(channel, tags = []) {\n  return tags;\n}\n"}
+    found = rules.implicit_defaults(read.read_tree(source[language], language))
+    assert [f["symbol"] for f in found] == ["send(tags)"], found
+
+
+def test_a_language_with_no_default_parameters_says_the_question_cannot_arise():
+    """Java has no default parameter. Reporting "unreadable" there would claim a gap in
+    this reader that is really a fact about the language, and reporting the empty list
+    would claim the file was checked and found clean."""
+    assert rules.implicit_defaults(read.read_tree("class U { void f(int a) {} }", "java")) is None
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+@pytest.mark.parametrize("kind", ["number", "string", "boolean", "nothing", "list", "map"])
+def test_every_kind_of_literal_default_is_found(language, kind):
+    """Each kind separately, because a reader that caught the number and missed the empty
+    map would pass a single fixture and leave the commonest case of the rule unmeasured."""
+    written = {
+        "number": {"python": "30", "javascript": "30"},
+        "string": {"python": "'utf-8'", "javascript": "'utf-8'"},
+        "boolean": {"python": "True", "javascript": "true"},
+        "nothing": {"python": "None", "javascript": "null"},
+        "list": {"python": "[]", "javascript": "[]"},
+        "map": {"python": "{}", "javascript": "{}"},
+    }[kind][language]
+    body = {"python": f"def f(x, timeout={written}):\n    return x\n",
+            "javascript": f"function f(x, timeout = {written}) {{\n  return x;\n}}\n"}
+    found = rules.implicit_defaults(read.read_tree(body[language], language))
+    assert [f["symbol"] for f in found] == ["f(timeout)"], (kind, found)

@@ -162,12 +162,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then each module-level name comes back with what it was assigned
     But an assignment inside a conditional at module level is read the same way, since a reader of the file sees one name either way
 
-  Scenario: _is_literal says whether a default is a value or a bound collaborator
-    Given the default expression of one parameter
-    When _is_literal reads it
-    Then a constant, a negated constant and an empty container are values that absorb the caller's omission
-    But a name is a bound collaborator, which makes a dependency visible and is what rule 13 asks for
-
   Scenario: _turned_names names the module-level values some function writes
     Given a parsed source
     When _turned_names reads every function's writes
@@ -240,3 +234,15 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _calls_a_resource reads the calls through the language's call vocabulary
     Then only the second is wrapping a resource, which the rule permits
     But a call this list does not name is not read as opening anything
+
+  Scenario: _default_of names the value a parameter falls back to
+    Given one parameter carrying a default and one declaring none
+    When _default_of takes the named child after the = token
+    Then the default comes back for the first and nothing for the second
+    But a grammar using one node type for every parameter is told apart by the token alone
+
+  Scenario: _is_literal_node says whether a default is a value or a bound collaborator
+    Given a default of 30, one of [], and one calling default_clock()
+    When _is_literal_node reads it through the language's literal and container types
+    Then the first two are values nobody chose
+    But the third is a dependency made visible in the signature, which rule 13 asks for

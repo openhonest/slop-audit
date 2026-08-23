@@ -35,6 +35,7 @@ from l1_analyzer.honest_code_read import (
     chain_subjects,
     class_nodes,
     first_name,
+    function_nodes,
     is_chain_arm,
     is_constructor,
     method_nodes,
@@ -771,31 +772,58 @@ def _module_level(source: dict) -> dict[str, ast.expr]:
 def implicit_defaults(source: dict) -> list[Finding] | None:
     """A LITERAL default, which cannot be told from a caller who chose that value.
 
-    A default that binds a collaborator is the opposite failure. It makes a dependency
-    visible in the signature, which is what rule 13 asks for, and flagging it would push
-    the code back toward the module-level lookup the rule exists to remove."""
+    Read through the language's own node vocabulary. A default that binds a collaborator is
+    the opposite failure: it makes a dependency visible in the signature, which is what
+    rule 13 asks for, and flagging it would push the code back toward the module-level
+    lookup the rule exists to remove.
+
+    Not decided: a language with no default parameter. Java, Go, C and Rust have none, so
+    the question cannot arise there. That is a fact about the language, not a gap in this
+    reader, and the empty list would instead claim the file was checked and found clean."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["default_param_types"]:
+        return None
     found: list[Finding] = []
-    for fn in _functions(source):
-        defaults = list(zip(fn.args.args[len(fn.args.args) - len(fn.args.defaults):],
-                            fn.args.defaults))
-        defaults += [(a, d) for a, d in zip(fn.args.kwonlyargs, fn.args.kw_defaults) if d]
-        for argument, default in defaults:
-            if not _is_literal(default):
+    for fn in function_nodes(source["root"], spec):
+        owner = node_text(fn.child_by_field_name("name"), raw) or first_name(fn, raw)
+        for parameter in walk(fn.child_by_field_name("parameters") or fn):
+            if parameter.type not in spec["default_param_types"]:
                 continue
+            default = _default_of(parameter)
+            if default is None or not _is_literal_node(default, spec):
+                continue
+            name = node_text(parameter.child_by_field_name(spec["default_param_name"]), raw)
             found.append(_finding(
-                "L1.21.14", f"{fn.name}({argument.arg})", fn.lineno,
-                f"`{argument.arg}={ast.unparse(default)}` absorbs the caller's omission, so "
+                "L1.21.14", f"{owner}({name})", parameter.start_point[0] + 1,
+                f"`{name}={node_text(default, raw)}` absorbs the caller's omission, so "
                 "nothing can tell chose from forgot",
                 "make absence an explicit case of a bounded type, resolved at the boundary "
                 "and exercised by a test", ""))
     return found
 
 
-def _is_literal(node: ast.expr) -> bool:
+def _default_of(parameter: Node) -> Node | None:
+    """The value a parameter falls back to, or nothing if it declares none.
+
+    The named child after the `=` token. Five grammars spell the default five ways and two
+    of them use one node type for every parameter whether it has a default or not, so the
+    token is the only thing all five carry and it is the grammar's own answer."""
+    children = list(parameter.children)
+    equals = next((i for i, c in enumerate(children) if c.type == "="), None)
+    if equals is None:
+        return None
+    return next((c for c in children[equals + 1:] if c.is_named), None)
+
+
+def _is_literal_node(node: Node, spec: LangSpec) -> bool:
     """Whether a default is a value rather than a bound collaborator."""
-    if isinstance(node, ast.UnaryOp):
-        return _is_literal(node.operand)
-    return isinstance(node, (ast.Constant, ast.List, ast.Dict, ast.Set, ast.Tuple))
+    while node.type in spec["value_wrapper_types"]:
+        inner = next((c for c in node.named_children), None)
+        if inner is None:
+            break
+        node = inner
+    return node.type in spec["literal_types"] or node.type in spec["container_literal_types"]
+
 
 
 # --------------------------------------------------------------------------

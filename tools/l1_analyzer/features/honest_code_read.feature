@@ -163,3 +163,9 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When _receiver_of checks the object against the language's receiver identifiers
     Then the first two are named and the third is not
     But a language with no receiver identifier names none of them
+
+  Scenario: function_nodes finds every function in the tree by this language's node types
+    Given a file holding a free function and a class holding one method
+    When function_nodes reads the tree through the language's function types
+    Then both come back, because a method is a function that sits in a class body
+    But a call to a function is not a definition of one

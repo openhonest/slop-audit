@@ -294,3 +294,11 @@ def _receiver_of(node: Node, spec: LangSpec, raw: bytes) -> Node | None:
     if obj is None or node_text(obj, raw) not in spec["this_idents"]:
         return None
     return node
+
+
+def function_nodes(root: Node, spec: LangSpec) -> list[Node]:
+    """Every function definition in the tree, by this language's own node types.
+
+    Methods included: a method is a function that happens to sit in a class body, and every
+    clause reading this wants both."""
+    return [n for n in walk(root) if n.type in spec["func_types"]]
