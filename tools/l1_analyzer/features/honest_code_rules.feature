@@ -16,12 +16,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a chain testing one name against two or more literals is a dispatch table written as control flow, in every language the vocabulary covers
     But a bounds check, a null guard and ordinary boolean logic are not, since flagging them would make the clause fire on every function that has a condition
 
-  Scenario: chain_subjects names what each arm of one if chain compares
-    Given the head of an if chain and the vocabulary of its language
-    When chain_subjects walks the arms through the else branch
-    Then a chain comparing one name against literals yields that name once per arm
-    But an arm testing anything else yields nothing at all, since a chain with one ordinary condition in it is not a dispatch table
-
   Scenario: data_classes finds a class whose whole job is holding data
     Given a parsed source
     When data_classes reads its class definitions
@@ -42,9 +36,10 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     But an entry point that performs I/O is the boundary, which is where the I/O is supposed to be
 
   Scenario: inheritance_for_reuse finds a class inheriting to share code
-    Given a parsed source
-    When inheritance_for_reuse reads the base classes
-    Then a base that is not a declared shape or a framework requirement hides where behaviour comes from
+    Given a parsed source and the node vocabulary of the language it is written in
+    When inheritance_for_reuse reads the base classes through that vocabulary
+    Then a base that is not a declared shape or a framework requirement hides where behaviour comes from, in every language the vocabulary covers
+    And an exception hierarchy is followed to its root, since a class deriving from one this file defines is exceptions all the way down
     But TypedDict, Protocol, Exception, Enum, NamedTuple and ABC declare a shape rather than share an implementation
 
   Scenario: client_side_state finds a second source of truth in the browser
@@ -130,12 +125,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When check_then_act reads each function's reads and writes of shared values
     Then a read of a shared value followed by a write to it lets two callers both believe they hold the thing
     But an await between the two makes the race certain rather than occasional, and the finding says which it found
-
-
-
-
-
-
 
   Scenario: _only_reads_self says whether a method reaches self only for data
     Given a method definition
@@ -245,34 +234,15 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a declared edge is conforming rather than violating, since the rule is that I/O belongs at the boundary
     But a decorator merely carrying the word as data is not a declaration, which is the lesson clause 16 learned from a parametrize holding an exit handler
 
-  Scenario: _is_chain_arm says whether a branch is the continuation of another
-    Given a branch node and the chain it may sit inside
-    When _is_chain_arm looks at what encloses it
-    Then only the head of a chain is read as a chain
-    But without it a three-armed chain reports three times, once from each arm it is also the head of
-
-  Scenario: _chain_arms lists every arm of one if chain, whichever way the grammar spells it
-    Given the head of an if chain and the vocabulary of its language
-    When _chain_arms follows the arms
-    Then the two shapes are read from structure rather than from a language name, since Python hangs its elif arms off the head and JavaScript nests each else-if inside the previous one's alternative
-    But a reader keyed to either shape alone sees a one-armed chain in the other language and reports nothing
-
-  Scenario: _equality_subject names the value one arm compares against a literal
-    Given the test expression of one arm and the vocabulary of its language
-    When _equality_subject reads the two sides
-    Then an equality test between a name and a literal yields that name, in either order
-    But anything else yields nothing, since a bounds check and a null guard are ordinary conditionals and flagging them would fire this clause on every function with a condition
-
-  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
-  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
-  # Every clause here reads structure. None of them reads intent, and several rules turn on it:
-  # whether a class wrapping a resource genuinely needed to be a class, whether a cache was
-  # added after someone profiled the query, whether a conditional that dispatches on a value
-  # has an axis of variation worth naming. The checkers report the shape and leave the intent
-  # to a reader, rather than guessing at it and calling the guess a measurement.
   @undecidable @not-implemented
   Scenario: undecidable whether a structure the clause allows was the right choice
     Given a class the rules permit because it wraps an external resource
     When someone asks whether it needed to be a class at all
     Then the clause records that the structure is permitted
     But nothing here reads intent, so whether the permission was earned stays a question for a reader
+
+  Scenario: local_exception_roots names the classes this file derives from an exception
+    Given a file defining an exception and three classes descending from it in turn
+    When local_exception_roots follows each chain of bases to its root
+    Then all four names come back, so a second-level exception is exceptions all the way down
+    But a base defined in another module cannot be followed and is not counted a root

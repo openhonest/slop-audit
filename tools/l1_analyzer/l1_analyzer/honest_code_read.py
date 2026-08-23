@@ -15,7 +15,7 @@ from typing import TypedDict
 
 from tree_sitter import Node
 
-from l1_analyzer.lang_spec import LANG_SPEC
+from l1_analyzer.lang_spec import COMPARISON_OPS, LANG_SPEC, LangSpec
 
 
 # How a project declares that a function IS an edge. Clause 4's rule is that I/O belongs at
@@ -110,3 +110,114 @@ def _called(node: ast.AST) -> set[str]:
 
 def _base_names(node: ast.ClassDef) -> list[str]:
     return [ast.unparse(base).split("[")[0].split(".")[-1] for base in node.bases]
+
+
+# ---------------------------------------------------------------------------
+# Reading one language's shapes through its own vocabulary
+#
+# These take a node and a spec and name nothing about any language. They live here
+# rather than beside the clauses because every clause ported to the shared vocabulary
+# adds more of them, so this is the seam the growth actually follows.
+# ---------------------------------------------------------------------------
+
+_BASE_HOLDERS = ("argument_list", "class_heritage", "superclass", "extends_clause",
+                 "type_parameters", "implements_clause")
+
+
+def is_chain_arm(node: Node) -> bool:
+    """Whether this branch is the `else if` of another, rather than the head of a chain.
+
+    Without it a three-armed chain reports three times, once from each arm it is also the
+    head of."""
+    parent = node.parent
+    while parent is not None and parent.type in ("else_clause", "elif_clause"):
+        parent = parent.parent
+    return parent is not None and parent.type == node.type
+
+
+def chain_subjects(node: Node, spec: LangSpec, raw: bytes) -> list[str]:
+    """The name each arm of one if chain compares against a literal.
+
+    A bounds check, a null guard and ordinary boolean logic contribute nothing: the rule
+    says so itself, and a clause firing on every function with a condition teaches a reader
+    to ignore the number."""
+    subjects: list[str] = []
+    for arm in _chain_arms(node, spec):
+        test = arm.child_by_field_name(spec["branch_cond"])
+        while test is not None and test.type == "parenthesized_expression":
+            test = next(iter(test.named_children), None)
+        name = _equality_subject(test, spec, raw)
+        if not name:
+            return []
+        subjects.append(name)
+    return subjects
+
+
+def _chain_arms(node: Node, spec: LangSpec) -> list[Node]:
+    """Every arm of one if chain, in source order, whichever way the grammar spells it.
+
+    The two shapes are read from structure rather than from a language name. Python hangs
+    its `elif` arms off the head as children; JavaScript nests each `else if` inside the
+    previous one's alternative. A reader keyed to either shape alone sees a one-armed chain
+    in the other language and reports nothing."""
+    arms = [node]
+    arms += [c for c in node.children if c.type == "elif_clause"]
+    current = node
+    while True:
+        alternative = current.child_by_field_name("alternative")
+        if alternative is None:
+            return arms
+        nested = alternative if alternative.type in spec["branch_types"] else next(
+            (c for c in alternative.named_children if c.type in spec["branch_types"]), None)
+        if nested is None:
+            return arms
+        arms.append(nested)
+        current = nested
+
+
+def _equality_subject(test: Node | None, spec: LangSpec, raw: bytes) -> str:
+    """The name on one side of an equality test whose other side is a literal."""
+    if test is None or test.type not in spec["comparison_types"]:
+        return ""
+    children = [c for c in test.children if c.is_named or c.type in COMPARISON_OPS]
+    operators = [node_text(c, raw) for c in test.children if not c.is_named]
+    if not any(op in ("==", "===", "is") for op in operators):
+        return ""
+    named = [c for c in children if c.is_named]
+    if len(named) != 2:
+        return ""
+    left, right = named
+    if right.type in spec["literal_types"] and left.type == "identifier":
+        return node_text(left, raw)
+    if left.type in spec["literal_types"] and right.type == "identifier":
+        return node_text(right, raw)
+    return ""
+
+
+def base_names(node: Node, spec: LangSpec, raw: bytes) -> list[str]:
+    """The classes one definition inherits from, however the grammar spells it.
+
+    Python parenthesises its bases as an argument list and JavaScript names a heritage
+    clause, so the holder is found by node type and neither language appears in the rule.
+
+    A base defined in another module is only a name here, which is the half this clause
+    cannot decide and says so."""
+    names: list[str] = []
+    for child in node.children:
+        if child.type not in _BASE_HOLDERS:
+            continue
+        for inner in walk(child):
+            if inner.type in ("identifier", "type_identifier", "member_expression",
+                              "attribute"):
+                text = node_text(inner, raw).split(".")[-1].strip()
+                if text and text not in names:
+                    names.append(text)
+    return names
+
+
+def first_name(node: Node, raw: bytes) -> str:
+    """The class's own name, for a grammar that does not field it."""
+    for child in node.children:
+        if child.type in ("identifier", "type_identifier"):
+            return node_text(child, raw)
+    return ""

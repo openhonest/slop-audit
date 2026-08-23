@@ -160,6 +160,18 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Clause 17, the strangler pattern, is a property of how a migration is sequenced over weeks.
+  Scenario: _grammars states which grammars this reader loaded
+    Given the two languages no clause reads, markup and stylesheets
+    When _grammars loads them once at import
+    Then a caller asks the table what is present instead of parsing to find out
+    But a grammar that failed to install is a missing key, not a rejection that reads like prose
+
+  Scenario: _blocks_in finds each foreign block a run of text holds
+    Given a string holding both a style element and a script element
+    When _blocks_in reads it through the markup grammar and then each part
+    Then one block comes back per element, each with its own line and its own size
+    But a run that only parses as its own language is not a foreign block at all
+
   # No reading of any file at any moment decides it, and it is the one clause here that is
   # excluded by its nature rather than by the reach of this reader.
   @undecidable @not-implemented

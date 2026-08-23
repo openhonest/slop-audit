@@ -21,6 +21,9 @@ literals produced eleven hits and every one was genuine embedded source held as 
 fixture.
 """
 
+from unittest import mock
+
+import pytest
 from l1_analyzer import honest_code
 
 WIDGET = '''"""A Python module that serves a JavaScript widget."""
@@ -198,9 +201,14 @@ def test_a_malformed_wrapper_is_never_read_as_markup():
         "stripped")
 
 
-def test_the_line_reported_is_inside_the_file_not_inside_the_block():
+def test_the_line_reported_points_at_the_element_in_the_file():
+    """A file line, not a block-relative one, and the element's line rather than the
+    string's. It used to report the string's line for everything inside it, so a reader
+    given line 1 for a script starting on line 6 had to go and find it, and two elements
+    carried the same line."""
     found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"))
-    assert found[0]["line"] == 1
+    line = WRAPPED.split("\n")[found[0]["line"] - 1]
+    assert "script" in line, f"line {found[0]['line']} is {line!r}"
 
 
 def test_markup_with_no_script_or_style_reports_the_markup_itself():
@@ -215,3 +223,90 @@ def test_prose_is_still_not_markup():
     """The markup grammar is permissive enough to accept prose, which would undo the whole
     result. Prose has no element and no script, so there is nothing to name."""
     assert honest_code.unexamined_blocks(honest_code.read_source_text(PROSE, "m.py")) == []
+
+
+BOTH = '''PAGE = """
+<style>
+.widget { color: red; }
+.panel { display: grid; }
+</style>
+<script>
+function send(channel) {
+  if (channel === 'a') { return one(); }
+  else if (channel === 'b') { return two(); }
+  return null;
+}
+</script>
+"""
+
+
+def page() -> str:
+    return PAGE
+'''
+
+
+def test_every_embedded_element_is_named_not_just_the_first():
+    """A block holding both a style and a script reported one of them, and which one
+    depended on the order they were found in. The other was dropped silently, and the record
+    read as though the block had been accounted for.
+
+    This is the case the feature was built for: page content is usually both."""
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"))
+    assert sorted(b["language"] for b in found) == ["css", "javascript"]
+
+
+def test_each_element_reports_its_own_size_rather_than_the_whole_block():
+    """The block is thirteen lines. Neither element is, and reporting the block's size
+    against one language says the whole string was that language."""
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"))
+    assert all(b["lines"] < 8 for b in found), found
+
+
+def test_each_element_reports_its_own_line():
+    """A reader given line 1 for a script that starts on line 6 has to search for it, and
+    the two elements would carry the same line."""
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"))
+    lines = sorted(b["line"] for b in found)
+    assert len(set(lines)) == 2, found
+    assert lines[0] < lines[1]
+
+
+def test_a_single_element_still_reports_the_element():
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"))
+    assert len(found) == 1
+    assert found[0]["language"] == "javascript"
+
+
+def test_a_bare_block_still_reports_the_whole_of_itself():
+    """Nothing wrapped it, so the block IS the content and its own size is the right size."""
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET, "m.py"))
+    assert len(found) == 1 and found[0]["lines"] >= 5
+
+
+# ---------------------------------------------------------------------------
+# A grammar that is not there
+#
+# `_accepts_whole` caught KeyError, ValueError and ImportError together and returned None,
+# which is the same answer it gives for "the grammar read the text and rejected it". Three
+# facts, one word. The costly one is ImportError: a grammar that failed to install makes
+# every block in that language vanish, the file reports nothing unexamined, and the share
+# claims to cover a file it only half read. That is the silent success clause 8 names, and
+# the reader wrote it about itself.
+# ---------------------------------------------------------------------------
+
+def test_a_language_whose_grammar_is_absent_is_named_rather_than_silently_skipped():
+    """The whole reason the catch was wrong. Absence has to reach the reader."""
+    with_css = honest_code.read_source_text("x = 1\n\nCSS = '''\nbody {\n    color: red;\n}\n'''\n", "m.py")
+    assert [b["language"] for b in honest_code.unexamined_blocks(with_css)] == ["css"]
+
+    without = {name: grammar for name, grammar in honest_code.GRAMMARS.items()
+               if name != "css"}
+    with mock.patch.object(honest_code, "GRAMMARS", without), \
+            pytest.raises(KeyError, match="css"):
+        honest_code.unexamined_blocks(with_css)
+
+
+def test_the_grammars_this_reader_loaded_are_stated_rather_than_discovered_per_call():
+    """A table built once at import, so a caller asks what is there instead of parsing and
+    catching to find out."""
+    assert set(honest_code.GRAMMARS) >= {"html", "css"}

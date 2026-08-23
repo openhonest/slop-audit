@@ -25,6 +25,7 @@ and where both exist the declaration wins.
 import ast
 
 import pytest
+from l1_analyzer import honest_code_read as read
 from l1_analyzer import honest_code_rules as rules
 
 
@@ -40,6 +41,15 @@ def _violations(source: dict) -> list[str]:
 def _withheld(source: dict) -> list[str]:
     return [f["symbol"] for f in rules.io_below_the_boundary(source) or []
             if f["withheld_by"] == "declaration"]
+
+
+def _tree(text: str) -> dict:
+    """A source read through the shared node vocabulary, which clause 5 now reads.
+
+    Clause 5 moved off the Python ast so one clause could mean the same thing in every
+    language. These cases stayed here rather than moving to the cross-language file because
+    they are about a root this project declares for itself, and only Python spells it."""
+    return read.read_tree(text, "python")
 
 
 def _module(text: str) -> dict:
@@ -60,8 +70,8 @@ def test_a_class_deriving_from_a_project_exception_is_not_inheriting_for_reuse()
     hierarchy rather than the number of classes."""
     source = ("class HonestCheckError(Exception):\n    pass\n\n\n"
               "class ParseError(HonestCheckError):\n    pass\n")
-    assert rules.inheritance_for_reuse(_module(source)) == []
-    assert rules.inheritance_for_reuse(_module(source.replace("(Exception)", "(Widget)"))), (
+    assert rules.inheritance_for_reuse(_tree(source)) == []
+    assert rules.inheritance_for_reuse(_tree(source.replace("(Exception)", "(Widget)"))), (
         "the same shape with a non-exception root reports nothing, so this fixture cannot "
         "tell whether the hierarchy was followed")
 
@@ -70,7 +80,7 @@ def test_a_deep_exception_hierarchy_is_still_exceptions():
     source = ("class Base(Exception):\n    pass\n\n\n"
               "class Middle(Base):\n    pass\n\n\n"
               "class Leaf(Middle):\n    pass\n")
-    assert rules.inheritance_for_reuse(_module(source)) == []
+    assert rules.inheritance_for_reuse(_tree(source)) == []
 
 
 def test_an_exception_hierarchy_is_not_a_data_class_either():
@@ -84,7 +94,7 @@ def test_a_class_named_like_an_exception_but_deriving_from_nothing_of_the_kind()
     """The name is not the rule. A class called `Error` that inherits an implementation is
     inheriting an implementation."""
     source = ("class Widget:\n    pass\n\n\nclass ThingError(Widget):\n    pass\n")
-    assert rules.inheritance_for_reuse(_module(source))
+    assert rules.inheritance_for_reuse(_tree(source))
 
 
 def test_ordinary_inheritance_in_the_same_file_is_still_found():
@@ -93,14 +103,14 @@ def test_ordinary_inheritance_in_the_same_file_is_still_found():
     source = ("class Base(Exception):\n    pass\n\n\n"
               "class Leaf(Base):\n    pass\n\n\n"
               "class User:\n    pass\n\n\nclass Admin(User):\n    pass\n")
-    assert [f["symbol"] for f in rules.inheritance_for_reuse(_module(source))] == ["Admin"]
+    assert [f["symbol"] for f in rules.inheritance_for_reuse(_tree(source))] == ["Admin"]
 
 
 def test_a_base_from_another_module_cannot_be_traced_and_is_still_reported():
     """What this does NOT decide, said where it is decided. A base defined elsewhere may
     well be an exception, and one file cannot tell. It stays reported, which is the
     direction that sends a reader to look rather than the one that hides it."""
-    assert rules.inheritance_for_reuse(_module("class Leaf(SomethingImported):\n    pass\n"))
+    assert rules.inheritance_for_reuse(_tree("class Leaf(SomethingImported):\n    pass\n"))
 
 
 # --------------------------------------------------------------------------

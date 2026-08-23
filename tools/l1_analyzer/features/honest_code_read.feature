@@ -83,3 +83,47 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When someone asks whether that grammar was the right one for this file
     Then the tree is handed on with the language it was read as
     But nothing here can tell a correct parse from a clean parse under the wrong grammar, since both produce a tree and neither complains
+
+  Scenario: is_chain_arm says whether a branch is the continuation of another
+    Given a branch node and the chain it may sit inside
+    When _is_chain_arm looks at what encloses it
+    Then only the head of a chain is read as a chain
+    But without it a three-armed chain reports three times, once from each arm it is also the head of
+
+  Scenario: chain_subjects names what each arm of one if chain compares
+    Given the head of an if chain and the vocabulary of its language
+    When chain_subjects walks the arms through the else branch
+    Then a chain comparing one name against literals yields that name once per arm
+    But an arm testing anything else yields nothing at all, since a chain with one ordinary condition in it is not a dispatch table
+
+  Scenario: _chain_arms lists every arm of one if chain, whichever way the grammar spells it
+    Given the head of an if chain and the vocabulary of its language
+    When _chain_arms follows the arms
+    Then the two shapes are read from structure rather than from a language name, since Python hangs its elif arms off the head and JavaScript nests each else-if inside the previous one's alternative
+    But a reader keyed to either shape alone sees a one-armed chain in the other language and reports nothing
+
+  Scenario: _equality_subject names the value one arm compares against a literal
+    Given the test expression of one arm and the vocabulary of its language
+    When _equality_subject reads the two sides
+    Then an equality test between a name and a literal yields that name, in either order
+    But anything else yields nothing, since a bounds check and a null guard are ordinary conditionals and flagging them would fire this clause on every function with a condition
+
+  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
+  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
+  # Every clause here reads structure. None of them reads intent, and several rules turn on it:
+  # whether a class wrapping a resource genuinely needed to be a class, whether a cache was
+  # added after someone profiled the query, whether a conditional that dispatches on a value
+  # has an axis of variation worth naming. The checkers report the shape and leave the intent
+  # to a reader, rather than guessing at it and calling the guess a measurement.
+
+  Scenario: base_names names the classes one definition inherits from
+    Given a class definition and the vocabulary of its language
+    When base_names reads the node the grammar puts the bases in
+    Then Python's parenthesised argument list and JavaScript's heritage clause both yield the bare names
+    But a base defined in another module is only a name here, which is the half this clause cannot decide
+
+  Scenario: first_name reads a class's own name where the grammar does not field it
+    Given a definition in a grammar that exposes no "name" field on the node
+    When first_name walks the children for the first identifier
+    Then the class's own name comes back
+    But a definition whose name the grammar hides behind another node type yields nothing

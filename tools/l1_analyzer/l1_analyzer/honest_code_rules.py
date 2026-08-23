@@ -21,8 +21,6 @@ How a source is read, and the vocabulary a ported clause reads it through, live 
 
 import ast
 
-from tree_sitter import Node
-
 from l1_analyzer.honest_code_read import (
     Finding,
     _base_names,
@@ -31,10 +29,13 @@ from l1_analyzer.honest_code_read import (
     _finding,
     _functions,
     _methods,
+    base_names,
+    chain_subjects,
+    first_name,
+    is_chain_arm,
     node_text,
     walk,
 )
-from l1_analyzer.lang_spec import COMPARISON_OPS, LangSpec
 
 BOUNDARY_DECORATORS = frozenset({"boundary", "boundary_in", "boundary_out", "edge",
                                  "entrypoint", "entry_point"})
@@ -44,7 +45,15 @@ BOUNDARY_DECORATORS = frozenset({"boundary", "boundary_in", "boundary_out", "edg
 DECLARED_SHAPES = frozenset({
     "TypedDict", "Protocol", "Exception", "Enum", "IntEnum", "StrEnum", "NamedTuple",
     "ABC", "ABCMeta", "BaseException", "Generic", "object",
+    # JavaScript spells the same declarations differently. `Error` is its exception root and
+    # `Object` its base of everything, so a class extending either declares a shape rather
+    # than sharing an implementation.
+    "Error", "TypeError", "RangeError", "Object", "HTMLElement",
 })
+
+# The nodes a grammar hangs a class's bases from. Python parenthesises them as an argument
+# list; JavaScript names a heritage clause. Read from structure, so neither language is
+# named in the rule.
 
 # What makes a class a wrapper around a stateful external resource, which the rule permits.
 RESOURCE_CALLS = frozenset({
@@ -129,7 +138,7 @@ def dispatch_chains(source: dict) -> list[Finding] | None:
     spec, raw = source["spec"], source["raw"]
     found: list[Finding] = []
     for node in walk(source["root"]):
-        if node.type not in spec["branch_types"] or _is_chain_arm(node):
+        if node.type not in spec["branch_types"] or is_chain_arm(node):
             continue
         names = chain_subjects(node, spec, raw)
         if len(names) >= 3 and len(set(names)) == 1:
@@ -141,74 +150,9 @@ def dispatch_chains(source: dict) -> list[Finding] | None:
     return found
 
 
-def _is_chain_arm(node: Node) -> bool:
-    """Whether this branch is the `else if` of another, rather than the head of a chain.
-
-    Without it a three-armed chain reports three times, once from each arm it is also the
-    head of."""
-    parent = node.parent
-    while parent is not None and parent.type in ("else_clause", "elif_clause"):
-        parent = parent.parent
-    return parent is not None and parent.type == node.type
 
 
-def chain_subjects(node: Node, spec: LangSpec, raw: bytes) -> list[str]:
-    """The name each arm of one if chain compares against a literal.
 
-    A bounds check, a null guard and ordinary boolean logic contribute nothing: the rule
-    says so itself, and a clause firing on every function with a condition teaches a reader
-    to ignore the number."""
-    subjects: list[str] = []
-    for arm in _chain_arms(node, spec):
-        test = arm.child_by_field_name(spec["branch_cond"])
-        while test is not None and test.type == "parenthesized_expression":
-            test = next(iter(test.named_children), None)
-        name = _equality_subject(test, spec, raw)
-        if not name:
-            return []
-        subjects.append(name)
-    return subjects
-
-
-def _chain_arms(node: Node, spec: LangSpec) -> list[Node]:
-    """Every arm of one if chain, in source order, whichever way the grammar spells it.
-
-    The two shapes are read from structure rather than from a language name. Python hangs
-    its `elif` arms off the head as children; JavaScript nests each `else if` inside the
-    previous one's alternative. A reader keyed to either shape alone sees a one-armed chain
-    in the other language and reports nothing."""
-    arms = [node]
-    arms += [c for c in node.children if c.type == "elif_clause"]
-    current = node
-    while True:
-        alternative = current.child_by_field_name("alternative")
-        if alternative is None:
-            return arms
-        nested = alternative if alternative.type in spec["branch_types"] else next(
-            (c for c in alternative.named_children if c.type in spec["branch_types"]), None)
-        if nested is None:
-            return arms
-        arms.append(nested)
-        current = nested
-
-
-def _equality_subject(test: Node | None, spec: LangSpec, raw: bytes) -> str:
-    """The name on one side of an equality test whose other side is a literal."""
-    if test is None or test.type not in spec["comparison_types"]:
-        return ""
-    children = [c for c in test.children if c.is_named or c.type in COMPARISON_OPS]
-    operators = [node_text(c, raw) for c in test.children if not c.is_named]
-    if not any(op in ("==", "===", "is") for op in operators):
-        return ""
-    named = [c for c in children if c.is_named]
-    if len(named) != 2:
-        return ""
-    left, right = named
-    if right.type in spec["literal_types"] and left.type == "identifier":
-        return node_text(left, raw)
-    if left.type in spec["literal_types"] and right.type == "identifier":
-        return node_text(right, raw)
-    return ""
 
 
 
@@ -361,6 +305,28 @@ def _io_calls(fn: ast.FunctionDef) -> set[str]:
     return touched
 
 
+
+
+def local_exception_roots(source: dict) -> set[str]:
+    """Classes this file defines that reach an exception root through their own bases.
+
+    Followed to the root rather than one level, so a three-deep hierarchy is still
+    exceptions all the way down. Sixteen second-level exceptions in one adopter's file
+    fired as violations before this existed."""
+    spec, raw = source["spec"], source["raw"]
+    bases = {node_text(node.child_by_field_name("name"), raw) or first_name(node, raw):
+             base_names(node, spec, raw)
+             for node in walk(source["root"]) if node.type in spec["class_types"]}
+    known = {name for name, parents in bases.items() if set(parents) & DECLARED_SHAPES}
+    while True:
+        grew = {name for name, parents in bases.items() if set(parents) & known} - known
+        if not grew:
+            return known
+        known |= grew
+
+
+
+
 def inheritance_for_reuse(source: dict) -> list[Finding] | None:
     """A class whose base is neither a declared shape nor a framework requirement.
 
@@ -374,13 +340,17 @@ def inheritance_for_reuse(source: dict) -> list[Finding] | None:
     another module is an exception. A Django model must inherit, and one file cannot see
     past its own imports. Both stay reported, which sends a reader to look rather than
     hiding it."""
+    spec, raw = source["spec"], source["raw"]
+    shapes = DECLARED_SHAPES | local_exception_roots(source)
     found: list[Finding] = []
-    shapes = DECLARED_SHAPES | _local_exceptions(source)
-    for node in _classes(source):
-        inherited = [b for b in _base_names(node) if b not in shapes]
+    for node in walk(source["root"]):
+        if node.type not in spec["class_types"]:
+            continue
+        name = node_text(node.child_by_field_name("name"), raw) or first_name(node, raw)
+        inherited = [b for b in base_names(node, spec, raw) if b not in shapes and b != name]
         if inherited:
             found.append(_finding(
-                "L1.21.5", node.name, node.lineno,
+                "L1.21.5", name, node.start_point[0] + 1,
                 f"inherits from {', '.join(inherited)}, which hides where behaviour comes from",
                 "compose the steps at the point of assembly: `pipe(validate, authenticate, "
                 "create)`", ""))

@@ -133,3 +133,62 @@ def test_a_language_the_spec_does_not_cover_is_refused():
     morning removing."""
     with pytest.raises(KeyError):
         read.read_tree("x = 1\n", "klingon")
+
+
+# --------------------------------------------------------------------------
+# Clause 5, inheritance for reuse
+# --------------------------------------------------------------------------
+
+INHERITS = {
+    "python": "class User:\n    pass\n\n\nclass Admin(User):\n    pass\n",
+    "javascript": "class User {}\n\n\nclass Admin extends User {}\n",
+}
+
+NO_INHERITANCE = {
+    "python": "class User:\n    pass\n\n\nclass Admin:\n    pass\n",
+    "javascript": "class User {}\n\n\nclass Admin {}\n",
+}
+
+EXCEPTIONS = {
+    "python": ("class CheckError(Exception):\n    pass\n\n\n"
+               "class ParseError(CheckError):\n    pass\n"),
+    "javascript": ("class CheckError extends Error {}\n\n\n"
+                   "class ParseError extends CheckError {}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_inheriting_an_implementation_is_found_in_this_language(language):
+    found = rules.inheritance_for_reuse(read.read_tree(INHERITS[language], language))
+    assert [f["symbol"] for f in found] == ["Admin"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_same_classes_without_the_inheritance_are_quiet(language):
+    assert rules.inheritance_for_reuse(read.read_tree(NO_INHERITANCE[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_an_exception_hierarchy_is_exceptions_all_the_way_down(language):
+    """A class deriving from one this file defines as an exception is still an exception,
+    however deep. Sixteen of these in one adopter's file fired as violations before the
+    bases were followed to their root."""
+    assert rules.inheritance_for_reuse(read.read_tree(EXCEPTIONS[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_declared_shape_is_not_inheritance_for_reuse(language):
+    source = {"python": "class Row(TypedDict):\n    name: str\n",
+              "javascript": "class Row extends Object {}\n"}
+    assert rules.inheritance_for_reuse(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_base_names_a_definition_inherits_are_read(language):
+    tree = read.read_tree(INHERITS[language], language)
+    spec, raw = tree["spec"], tree["raw"]
+    # Selected by NAME. `walk` promises no order, which this file's own feature says, and
+    # taking the last node was relying on the thing that promise denies.
+    admin = next(n for n in read.walk(tree["root"]) if n.type in spec["class_types"]
+                 and read.node_text(n, raw).startswith("class Admin"))
+    assert rules.base_names(admin, spec, raw) == ["User"]

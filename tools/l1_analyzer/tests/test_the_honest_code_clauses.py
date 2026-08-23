@@ -113,16 +113,13 @@ def test_io_in_an_entry_point_is_the_boundary():
 
 # --------------------------------------------------------------------------
 # 5. Flat composition over inheritance
+#
+# Its cases live in test_a_clause_means_the_same_in_every_language.py now, for the same
+# reason clause 1's did: it reads the shared node vocabulary, so its fixtures have to run
+# in every language that vocabulary covers and assert both directions in each. The cases
+# for a root this project declares for itself stayed in
+# test_the_project_declares_its_own_shapes.py, because only Python spells that root.
 # --------------------------------------------------------------------------
-
-def test_a_class_inheriting_an_implementation_is_found():
-    found = rules.inheritance_for_reuse(_module("class Admin(User):\n    pass\n"))
-    assert [f["symbol"] for f in found] == ["Admin"]
-
-
-@pytest.mark.parametrize("base", ["TypedDict", "Protocol", "Exception", "ABC", "Enum"])
-def test_inheriting_a_declared_shape_is_not_reuse(base):
-    assert rules.inheritance_for_reuse(_module(f"class Thing({base}):\n    pass\n")) == []
 
 
 # --------------------------------------------------------------------------
