@@ -193,3 +193,21 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When _walk_own_scope records the definition and refuses to descend into its body
     Then the local stays the function's own
     But exempting the starting node would defeat the rule, because that node is the function
+
+  Scenario: handler_body names the node holding one handler's own statements
+    Given a handler in a grammar that fields its body and one in a grammar that does not
+    When handler_body asks for the field and falls back to the language's block types
+    Then both yield the statements the handler runs
+    But this is the one shape these five grammars disagree about, so neither reading covers all
+
+  Scenario: sends_failure_onward says whether anything under a node raises or re-raises
+    Given one handler re-raising and one whose language spells raise as an ordinary call
+    When sends_failure_onward reads the raise node types and the raise names together
+    Then both are disclosing the failure rather than discarding it
+    But reading only the node types would make every Ruby re-raise look like a swallow
+
+  Scenario: is_absent_value says whether a value can be told from a successful empty result
+    Given a return of nothing, a return of an empty list, and a return of a reason
+    When is_absent_value reads it through the language's absent, container and literal types
+    Then the first two are stand-ins a caller cannot tell from success
+    But a truthy constant names the failure and hands it to a caller that discloses it

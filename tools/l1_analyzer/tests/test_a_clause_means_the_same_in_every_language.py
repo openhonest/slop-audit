@@ -632,3 +632,74 @@ def test_a_name_bound_inside_a_function_is_not_bound_at_module_level(language):
     bound = read.module_level_bindings(tree["root"], tree["spec"], tree["raw"])
     assert "raw" not in bound, bound
     assert rules.hidden_configuration(tree) == []
+
+
+# --------------------------------------------------------------------------
+# Clause 8, the swallowed exception
+#
+# The purest form of a silent failure: it reports success for work that failed. Five of the
+# nine languages here have try and catch; Go returns an error beside the value and Rust
+# returns a Result, and neither is a handler this clause can read. That is a fact about
+# those languages rather than a gap in this reader, and the clause says so.
+#
+# The handler's body is the one shape the grammars disagree about. Python calls it a block,
+# JavaScript a statement block, Ruby a `then`, and Python does not field it at all.
+# --------------------------------------------------------------------------
+
+SWALLOWS = {
+    "python": ("def send(data):\n"
+               "    try:\n        return go(data)\n"
+               "    except ValueError:\n        return None\n"),
+    "javascript": ("function send(data) {\n"
+                   "  try {\n    return go(data);\n"
+                   "  } catch (e) {\n    return null;\n  }\n}\n"),
+}
+
+RERAISES = {
+    "python": ("def send(data):\n"
+               "    try:\n        return go(data)\n"
+               "    except ValueError:\n        raise\n"),
+    "javascript": ("function send(data) {\n"
+                   "  try {\n    return go(data);\n"
+                   "  } catch (e) {\n    throw e;\n  }\n}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_handler_returning_a_stand_in_is_found_in_this_language(language):
+    found = rules.swallowed_exceptions(read.read_tree(SWALLOWS[language], language))
+    assert len(found) == 1, found
+    assert "reports success for work that failed" in found[0]["detail"]
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_handler_that_re_raises_is_doing_what_the_rule_asks(language):
+    assert rules.swallowed_exceptions(read.read_tree(RERAISES[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_an_empty_handler_is_the_same_swallow(language):
+    """The commonest spelling of all, and the one with nothing in the body to read."""
+    source = {"python": ("def send(data):\n    try:\n        go(data)\n"
+                         "    except ValueError:\n        pass\n"),
+              "javascript": ("function send(data) {\n  try {\n    go(data);\n"
+                             "  } catch (e) {\n  }\n}\n")}
+    assert len(rules.swallowed_exceptions(read.read_tree(source[language], language))) == 1
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_handler_that_maps_the_error_to_a_response_is_not_swallowing(language):
+    """A boundary catching and mapping is doing what the rule asks. It hands the caller
+    something that names the failure rather than something that looks like success."""
+    source = {"python": ("def route(request):\n    try:\n        return go(request)\n"
+                         "    except ValueError as error:\n        return respond(400, str(error))\n"),
+              "javascript": ("function route(request) {\n  try {\n    return go(request);\n"
+                             "  } catch (error) {\n    return respond(400, error.message);\n  }\n}\n")}
+    assert rules.swallowed_exceptions(read.read_tree(source[language], language)) == []
+
+
+def test_a_language_with_no_handler_says_the_question_cannot_arise():
+    """Go returns an error beside the value and Rust returns a Result. Neither is a handler
+    this clause reads, and reporting the empty list would claim the file was checked."""
+    for absent in ("go", "rust"):
+        assert rules.swallowed_exceptions(read.read_tree("", absent)) is None, absent

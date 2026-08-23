@@ -25,6 +25,7 @@ and where both exist the declaration wins.
 import ast
 
 import pytest
+from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_read as read
 from l1_analyzer import honest_code_rules as rules
 
@@ -34,12 +35,12 @@ def _violations(source: dict) -> list[str]:
 
     It emits a withheld finding now and says a declaration withheld it, so a consumer can
     count real suppressions instead of inferring them from the presence of a decorator."""
-    return [f["symbol"] for f in rules.io_below_the_boundary(source) or []
+    return [f["symbol"] for f in python_rules.io_below_the_boundary(source) or []
             if f["withheld_by"] == ""]
 
 
 def _withheld(source: dict) -> list[str]:
-    return [f["symbol"] for f in rules.io_below_the_boundary(source) or []
+    return [f["symbol"] for f in python_rules.io_below_the_boundary(source) or []
             if f["withheld_by"] == "declaration"]
 
 
@@ -173,7 +174,7 @@ def test_a_decorator_that_merely_mentions_the_word_is_not_a_declaration():
     source = ("@pytest.mark.parametrize('case', ['boundary'])\n"
               "def load(case, path):\n    return path.read_text()\n\n\n"
               "def total(path):\n    return load(path)\n")
-    assert rules.io_below_the_boundary(_module(source))
+    assert python_rules.io_below_the_boundary(_module(source))
 
 
 # ---------------------------------------------------------------------------

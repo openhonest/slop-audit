@@ -103,10 +103,10 @@ def test_no_helper_below_the_entry_point_touches_the_filesystem():
     alone."""
     import ast
 
-    from l1_analyzer import honest_code_rules as rules
+    from l1_analyzer import honest_code_python_rules as python_rules
 
     source = pathlib.Path(c_trace.__file__).read_text()
-    found = rules.io_below_the_boundary({
+    found = python_rules.io_below_the_boundary({
         "path": "c_trace.py", "language": "python", "text": source,
         "tree": ast.parse(source), "readable": True, "unreadable_reason": ""})
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == [], found

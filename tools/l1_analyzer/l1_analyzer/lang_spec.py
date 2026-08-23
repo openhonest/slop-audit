@@ -87,6 +87,30 @@ class LangSpec(TypedDict, total=False):
     # neither, and a clause reading them names no language.
     fallback_methods: frozenset[str]
     fallback_operators: frozenset[str]
+    # Exceptions: the guarded statement, the handler hung off it, the node holding the
+    # handler's own statements, and the statement that sends a failure onward. Empty means
+    # the language has no exception at all. Go returns an error beside the value and Rust
+    # returns a Result, so a clause about handlers says the question cannot arise there
+    # rather than reporting those files clean.
+    try_types: tuple[str, ...]
+    handler_types: tuple[str, ...]
+    handler_body_types: tuple[str, ...]
+    raise_types: tuple[str, ...]
+    # Ruby spells its raise as an ordinary call, so no node type tells it apart. Naming the
+    # calls that send a failure onward is how that language is read without pretending it
+    # has a statement it does not have.
+    raise_names: frozenset[str]
+    # The values that are indistinguishable from a successful empty result. A handler
+    # returning one cannot be told from a call that found nothing, which is the swallow.
+    absent_types: tuple[str, ...]
+    # Signals that carry control flow rather than a failure. Catching one and returning is
+    # how a program stops cleanly, and the rule about swallowing errors is not about these.
+    # Empty where the language has no such signal.
+    control_flow_exceptions: frozenset[str]
+    # The statement that records a failure. A try body ending in one is ASSERTING that its
+    # call raised, so the handler beneath is the success condition and reaching the recorder
+    # is the defect. Keying on the handler alone made both readings look alike.
+    assertion_types: tuple[str, ...]
     # Literals that hold other values. `literal_types` carries the scalars; an empty list or
     # an empty map is just as much a value nobody chose, and is the default that bites.
     container_literal_types: frozenset[str]
@@ -325,6 +349,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         "default_param_name": "name",
         "fallback_methods": frozenset({"get"}),
         "fallback_operators": frozenset(),
+        "try_types": ("try_statement",),
+        "handler_types": ("except_clause",),
+        "handler_body_types": ("block",),
+        "raise_types": ("raise_statement",),
+        "raise_names": frozenset(),
+        "absent_types": ("none", "false"),
+        "control_flow_exceptions": frozenset({"SystemExit", "KeyboardInterrupt", "GeneratorExit"}),
+        "assertion_types": ("assert_statement", "raise_statement"),
         "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
@@ -411,6 +443,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         "default_param_name": "left",
         "fallback_methods": frozenset(),
         "fallback_operators": frozenset({"??", "||"}),
+        "try_types": ("try_statement",),
+        "handler_types": ("catch_clause",),
+        "handler_body_types": ("statement_block",),
+        "raise_types": ("throw_statement",),
+        "raise_names": frozenset(),
+        "absent_types": ("null", "undefined", "false"),
+        "control_flow_exceptions": frozenset(),
+        "assertion_types": ("throw_statement",),
         "container_literal_types": frozenset({"array", "object"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
@@ -487,6 +527,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         "default_param_name": "",
         "fallback_methods": frozenset({"getOrDefault"}),
         "fallback_operators": frozenset(),
+        "try_types": ("try_statement", "try_with_resources_statement"),
+        "handler_types": ("catch_clause",),
+        "handler_body_types": ("block",),
+        "raise_types": ("throw_statement",),
+        "raise_names": frozenset(),
+        "absent_types": ("null_literal", "false"),
+        "control_flow_exceptions": frozenset(),
+        "assertion_types": ("assert_statement", "throw_statement"),
         "container_literal_types": frozenset({"array_initializer"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
@@ -575,6 +623,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         "default_param_name": "name",
         "fallback_methods": frozenset({"GetValueOrDefault"}),
         "fallback_operators": frozenset({"??"}),
+        "try_types": ("try_statement",),
+        "handler_types": ("catch_clause",),
+        "handler_body_types": ("block",),
+        "raise_types": ("throw_statement",),
+        "raise_names": frozenset(),
+        "absent_types": ("null_literal", "false"),
+        "control_flow_exceptions": frozenset(),
+        "assertion_types": ("throw_statement",),
         "container_literal_types": frozenset({"array_creation_expression", "initializer_expression"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
@@ -656,6 +712,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         "default_param_name": "",
         "fallback_methods": frozenset({"unwrap_or", "unwrap_or_else", "unwrap_or_default"}),
         "fallback_operators": frozenset(),
+        "try_types": (),
+        "handler_types": (),
+        "handler_body_types": (),
+        "raise_types": (),
+        "raise_names": frozenset(),
+        "absent_types": ("unit_expression",),
+        "control_flow_exceptions": frozenset(),
+        "assertion_types": (),
         "container_literal_types": frozenset({"array_expression", "tuple_expression"}),
         "instance_ref_style": "member",
         "instance_enum": "self_usage",
@@ -743,6 +807,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         "default_param_name": "name",
         "fallback_methods": frozenset({"fetch", "dig"}),
         "fallback_operators": frozenset({"||"}),
+        "try_types": ("begin",),
+        "handler_types": ("rescue",),
+        "handler_body_types": ("then",),
+        "raise_types": (),
+        "raise_names": frozenset({"raise", "fail"}),
+        "absent_types": ("nil", "false"),
+        "control_flow_exceptions": frozenset({"SystemExit", "Interrupt"}),
+        "assertion_types": (),
         "container_literal_types": frozenset({"array", "hash"}),
         "instance_ref_style": "member",
         "instance_enum": "ruby_ivar",
@@ -830,6 +902,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         "default_param_name": "",
         "fallback_methods": frozenset(),
         "fallback_operators": frozenset(),
+        "try_types": (),
+        "handler_types": (),
+        "handler_body_types": (),
+        "raise_types": (),
+        "raise_names": frozenset(),
+        "absent_types": ("null",),
+        "control_flow_exceptions": frozenset(),
+        "assertion_types": (),
         "container_literal_types": frozenset({"initializer_list"}),
         "instance_ref_style": "identifier",
         "instance_enum": "none",
@@ -930,6 +1010,14 @@ LANG_SPEC: dict[str, LangSpec] = {
         "default_param_name": "",
         "fallback_methods": frozenset(),
         "fallback_operators": frozenset(),
+        "try_types": (),
+        "handler_types": (),
+        "handler_body_types": (),
+        "raise_types": (),
+        "raise_names": frozenset(),
+        "absent_types": ("nil",),
+        "control_flow_exceptions": frozenset(),
+        "assertion_types": (),
         "container_literal_types": frozenset({"composite_literal"}),
         "instance_ref_style": "member",
         "instance_enum": "none",

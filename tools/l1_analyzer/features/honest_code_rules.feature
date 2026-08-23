@@ -28,13 +28,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a method that reaches self only for data it could have been passed is a function wearing a class
     But a method that writes self or calls another method is doing something a free function could not, so it is left alone
 
-  Scenario: io_below_the_boundary finds I/O that has been pushed inward
-    Given a parsed source
-    When io_below_the_boundary reads the call graph and the effects of each function
-    Then a function that performs I/O and is itself called by a sibling has put the I/O below the boundary
-    And a declared boundary is reported as withheld rather than dropped, so the count of real suppressions is a fact rather than a guess made from the presence of a decorator
-    But an entry point that performs I/O is the boundary, which is where the I/O is supposed to be
-
   Scenario: inheritance_for_reuse finds a class inheriting to share code
     Given a parsed source and the node vocabulary of the language it is written in
     When inheritance_for_reuse reads the base classes through that vocabulary
@@ -60,30 +53,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a handler whose body only passes, or returns a stand-in, reports success for work that failed
     But a handler that re-raises, or that maps the error to a response at a boundary, is doing the thing the rule asks for
 
-  Scenario: unmeasured_caches finds a cache standing in for a query
-    Given a parsed source
-    When unmeasured_caches reads its imports and its decorators
-    Then a cache client or a memoising decorator is a second source of truth with an invalidation bug waiting
-    But whether anyone profiled the query first is not readable from any file, so the clause reports the cache and says the measurement is what it cannot see
-
-  Scenario: mock_heavy_tests finds a test carrying the function's hidden dependencies
-    Given a parsed test file
-    When mock_heavy_tests counts the mocks in each test
-    Then three or more in one test means the function under test has three hidden dependencies
-    But one or two is ordinary isolation, and the count is a readout on the code rather than on the test
-
-  Scenario: imperative_validation finds a check the type already made
-    Given a parsed source
-    When imperative_validation reads its guards
-    Then an isinstance check on a parameter the signature already types is distrust of your own contract
-    But a check at a boundary, on a value that arrived untyped from outside, is where validation belongs
-
-  Scenario: unscoped_resources finds a resource with a manual lifecycle
-    Given a parsed source
-    When unscoped_resources reads what is stored on self
-    Then a connection or a handle assigned to self, in a class with no __enter__, is a leak waiting for an exception
-    But a class that is a context manager has scoped the resource, which is the whole point of the rule
-
   Scenario: hidden_configuration finds behaviour depending on something no caller can see
     Given a parsed source
     When hidden_configuration reads what each function reaches for
@@ -96,95 +65,17 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a literal default cannot be told from a caller who chose that value, and it manufactures an input region no call site exercises
     But a default that binds a collaborator is a dependency made visible in the signature, which is the opposite failure and is what rule 13 asks for
 
-  Scenario: heavy_step_definitions finds a step carrying the architecture's hidden dependencies
-    Given a parsed step-definition file
-    When heavy_step_definitions measures each step's body
-    Then a step needing thirty lines of setup is a readout on the code under test rather than on the test
-    But a step that calls the function and checks the result is what a pure function makes possible
-
-  Scenario: lifecycle_hooks finds behaviour parked where the reader does not look
-    Given a parsed source
-    When lifecycle_hooks reads its registrations
-    Then an exit handler, a signal handler, an ORM callback or a mount effect puts behaviour somewhere nobody reads
-    But a call at the place it happens is not a hook, however much work it does
-
-  Scenario: strangler_migration records that nothing checked the migration
-    Given any parsed source
-    When strangler_migration is asked about it
-    Then it reports that the clause was not decided, and why
-    But it never returns a pass, because a rule nobody checked is not a rule that passed and this is the one clause no reader will ever decide
-
   Scenario: open_dispatch finds a table whose default re-opens the input space
     Given a parsed source
     When open_dispatch reads its lookups
     Then a get with a default files an input nobody wrote a rule for under an answer written for a different input
     But a subscript lets an unknown key raise, which records the gap in the table instead of hiding it
 
-  Scenario: check_then_act finds a guard that is not a guard
-    Given a parsed source
-    When check_then_act reads each function's reads and writes of shared values
-    Then a read of a shared value followed by a write to it lets two callers both believe they hold the thing
-    But an await between the two makes the race certain rather than occasional, and the finding says which it found
-
-  Scenario: _io_calls names the I/O one function performs
-    Given a function definition
-    When _io_calls reads its calls
-    Then an unambiguous name counts on its own and an ambiguous one counts only with a receiver that names a client
-    But reading the bare name reported this tool's own suffix table as I/O, because a dict lookup and an HTTP fetch are both spelled get
-
   Scenario: _line_of finds the first line holding a piece of text
     Given the file text and the string to find
     When _line_of scans the lines
     Then the first line carrying it comes back
     But a browser clause has no tree to read, so a line number found this way is the best locator available and the finding says what it names
-
-  Scenario: _swallows says whether a handler body throws the error away
-    Given the statements of one except handler
-    When _swallows reads them
-    Then a bare pass or a single return of a falsy stand-in is indistinguishable from a successful empty result
-    But a returned message names the failure and hands it to a caller that discloses it, which is the opposite of a swallow
-
-  Scenario: _bare_name names what a call is calling, without its receiver
-    Given a call node
-    When _bare_name reads it
-    Then the last segment of the dotted name comes back
-    But the receiver is dropped, so a caller that needs to tell two receivers apart has to read them separately
-
-  Scenario: _is_test_file says whether a path holds tests
-    Given a file path
-    When _is_test_file reads its name and its directory
-    Then the two test-scoped clauses know whether they have anything to read
-    But a project naming its tests some other way is not recognised, and the clause then reports itself not applicable rather than clean
-
-  Scenario: _module_level names what a module assigns at its top level
-    Given a parsed source
-    When _module_level reads its body
-    Then each module-level name comes back with what it was assigned
-    But an assignment inside a conditional at module level is read the same way, since a reader of the file sees one name either way
-
-  Scenario: _first_line finds where a name is first read or written in a function
-    Given a function, a name and the context to look for
-    When _first_line walks the tree
-    Then a write through a subscript counts as a write to the container
-    But the line order is what the clause reasons about, and a tree walk is not source order, so only the first of each is taken
-
-  Scenario: _caught_names names the exceptions one handler catches
-    Given an except handler, which may name one type, a tuple of them, or nothing
-    When _caught_names reads it
-    Then each name comes back without its module
-    But a bare except names none, which is a different fact from naming a type this clause has no opinion about
-
-  Scenario: _asserts_a_raise says whether a try body is asserting that its call raised
-    Given the statements of one try block
-    When _asserts_a_raise reads the last of them
-    Then a statement that records a failure makes the handler beneath the success condition, since it runs only when the call did not raise
-    But it cannot decide whether the recorded failure is the one the author meant, because a try ending in an unrelated append reads the same way
-
-  Scenario: _declares_a_boundary says whether a function is one of the project's own edges
-    Given a function definition and its decorators
-    When _declares_a_boundary reads what each decorator NAMES
-    Then a declared edge is conforming rather than violating, since the rule is that I/O belongs at the boundary
-    But a decorator merely carrying the word as data is not a declaration, which is the lesson clause 16 learned from a parametrize holding an exit handler
 
   @undecidable @not-implemented
   Scenario: undecidable whether a structure the clause allows was the right choice
@@ -228,3 +119,27 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _fallback_lookup reads both spellings through the language's vocabulary
     Then each yields the same three things, and the clause itself names neither spelling
     But an ordinary subscript supplies no fallback and yields nothing
+
+  Scenario: _throws_it_away says whether a handler discards the failure
+    Given one empty handler and one returning the message of the error it caught
+    When _throws_it_away reads the body through the language's vocabulary
+    Then only the first discards the failure
+    But a body mentioning the caught error is disclosing it rather than hiding it
+
+  Scenario: _guarded_body_asserts_a_raise says when the handler is the success condition
+    Given a try body ending in a statement that records a failure
+    When _guarded_body_asserts_a_raise reads the body the handler guards
+    Then reaching the recorder is the defect and the handler beneath is correct
+    But whether the recorded failure is the one the author meant is not readable here
+
+  Scenario: _caught_text says what one handler catches
+    Given a handler naming one exception type and one naming none
+    When _caught_text reads the handler's children other than its body
+    Then the first names its type and the second names nothing
+    But a handler catching everything is the one this clause is least able to excuse
+
+  Scenario: _caught_variable names what the handler binds the error to
+    Given a handler binding the error and one binding nothing
+    When _caught_variable takes the last identifier before the body
+    Then the bound name comes back for the first and nothing for the second
+    But all five grammars put it there whether they field it or not

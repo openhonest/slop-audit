@@ -17,7 +17,18 @@ dispatch chain, and counting it as one would teach a reader to ignore the number
 import ast
 
 import pytest
+from l1_analyzer import honest_code_python_rules as python_rules
+from l1_analyzer import honest_code_read as read
 from l1_analyzer import honest_code_rules as rules
+
+
+def _tree(text: str) -> dict:
+    """A source read through the shared node vocabulary, which the ported clauses read.
+
+    The cases below it are the ones a second language would spell identically or not at all,
+    so they stayed here when their clause moved. The both-direction fixtures live in
+    test_a_clause_means_the_same_in_every_language.py."""
+    return read.read_tree(text, "python")
 
 
 def _module(text: str) -> dict:
@@ -61,7 +72,7 @@ def _source(text: str, path: str, language: str) -> dict:
 def test_io_in_a_function_a_sibling_calls_is_found():
     """The I/O has been pushed inward: `price` cannot be tested without a filesystem, and
     `total` cannot be tested without mocking one."""
-    found = rules.io_below_the_boundary(_module(
+    found = python_rules.io_below_the_boundary(_module(
         "def price(path):\n    return int(path.read_text())\n\n\n"
         "def total(path):\n    return price(path) * 2\n"))
     assert [f["symbol"] for f in found] == ["price"]
@@ -69,7 +80,7 @@ def test_io_in_a_function_a_sibling_calls_is_found():
 
 def test_io_in_an_entry_point_is_the_boundary():
     """Nothing in the module calls it, so it IS the edge, which is where the I/O belongs."""
-    assert rules.io_below_the_boundary(_module(
+    assert python_rules.io_below_the_boundary(_module(
         "def load(path):\n    return path.read_text()\n")) == []
 
 
@@ -117,20 +128,20 @@ def test_driving_the_dom_by_hand_is_found():
 
 @pytest.mark.parametrize("body", ["pass", "return None", "return []", "return 0"])
 def test_a_handler_that_swallows_is_found(body):
-    found = rules.swallowed_exceptions(_module(
+    found = rules.swallowed_exceptions(_tree(
         f"def f(x):\n    try:\n        return g(x)\n    except ValueError:\n        {body}\n"))
     assert found, body
 
 
 def test_a_handler_that_reraises_is_left_alone():
-    assert rules.swallowed_exceptions(_module(
+    assert rules.swallowed_exceptions(_tree(
         "def f(x):\n    try:\n        return g(x)\n    except ValueError:\n        raise\n")) == []
 
 
 def test_a_handler_that_maps_the_error_is_left_alone():
     """The boundary catching and turning the type into a response is the rule, not the
     violation."""
-    assert rules.swallowed_exceptions(_module(
+    assert rules.swallowed_exceptions(_tree(
         "def route(x):\n    try:\n        return g(x)\n"
         "    except ValueError as error:\n        return respond(400, str(error))\n")) == []
 
@@ -140,7 +151,7 @@ def test_a_handler_that_maps_the_error_is_left_alone():
 # --------------------------------------------------------------------------
 
 def test_a_memoising_decorator_is_found():
-    found = rules.unmeasured_caches(_module(
+    found = python_rules.unmeasured_caches(_module(
         "from functools import lru_cache\n\n\n@lru_cache\ndef price(sku):\n    return query(sku)\n"))
     assert found
 
@@ -149,14 +160,14 @@ def test_the_cache_clause_says_what_it_cannot_see():
     """Whether anyone profiled the query first is not in any file. The clause reports the
     cache and names the half it cannot decide, rather than implying the whole rule was
     checked."""
-    found = rules.unmeasured_caches(_module(
+    found = python_rules.unmeasured_caches(_module(
         "import redis\n\n\ndef price(sku):\n    return redis.get(sku)\n"))
     assert found
     assert "profil" in found[0]["undecided"].lower()
 
 
 def test_a_file_with_no_cache_finds_nothing():
-    assert rules.unmeasured_caches(_module("def price(sku):\n    return query(sku)\n")) == []
+    assert python_rules.unmeasured_caches(_module("def price(sku):\n    return query(sku)\n")) == []
 
 
 # --------------------------------------------------------------------------
@@ -164,7 +175,7 @@ def test_a_file_with_no_cache_finds_nothing():
 # --------------------------------------------------------------------------
 
 def test_a_test_carrying_three_mocks_is_found():
-    found = rules.mock_heavy_tests(_source(
+    found = python_rules.mock_heavy_tests(_source(
         "def test_order():\n"
         "    a = Mock()\n    b = MagicMock()\n    c = patch('x')\n"
         "    assert place(a, b, c)\n", path="test_m.py", language="python"))
@@ -172,7 +183,7 @@ def test_a_test_carrying_three_mocks_is_found():
 
 
 def test_a_test_with_two_mocks_is_ordinary_isolation():
-    assert rules.mock_heavy_tests(_source(
+    assert python_rules.mock_heavy_tests(_source(
         "def test_order():\n    a = Mock()\n    b = Mock()\n    assert place(a, b)\n",
         path="test_m.py", language="python")) == []
 
@@ -180,7 +191,7 @@ def test_a_test_with_two_mocks_is_ordinary_isolation():
 def test_the_mock_clause_only_reads_test_files():
     """A file that is not a test has no tests to count mocks in, and a production file
     naming Mock is doing something else."""
-    assert rules.mock_heavy_tests(_source(
+    assert python_rules.mock_heavy_tests(_source(
         "def build():\n    return Mock(), Mock(), Mock()\n", path="m.py", language="python")) is None
 
 
@@ -190,7 +201,7 @@ def test_the_mock_clause_only_reads_test_files():
 
 def test_a_check_the_signature_already_made_is_found():
     """Re-checking a value the signature types is distrust of your own contract."""
-    found = rules.imperative_validation(_module(
+    found = python_rules.imperative_validation(_module(
         "def f(name: str) -> str:\n"
         "    if not isinstance(name, str):\n        raise TypeError('no')\n    return name\n"))
     assert found
@@ -198,7 +209,7 @@ def test_a_check_the_signature_already_made_is_found():
 
 def test_a_check_on_an_untyped_value_is_left_alone():
     """It arrived from outside with no contract, which is where validation belongs."""
-    assert rules.imperative_validation(_module(
+    assert python_rules.imperative_validation(_module(
         "def f(payload):\n"
         "    if not isinstance(payload, dict):\n        raise TypeError('no')\n    return payload\n")) == []
 
@@ -208,13 +219,13 @@ def test_a_check_on_an_untyped_value_is_left_alone():
 # --------------------------------------------------------------------------
 
 def test_a_resource_stored_on_self_is_found():
-    found = rules.unscoped_resources(_module(
+    found = python_rules.unscoped_resources(_module(
         "class Client:\n    def __init__(self, dsn):\n        self.connection = connect(dsn)\n"))
     assert [f["symbol"] for f in found] == ["Client.connection"]
 
 
 def test_a_class_that_is_a_context_manager_has_scoped_it():
-    assert rules.unscoped_resources(_module(
+    assert python_rules.unscoped_resources(_module(
         "class Client:\n"
         "    def __enter__(self):\n        self.connection = connect(self.dsn)\n        return self\n"
         "    def __exit__(self, *a):\n        self.connection.close()\n")) == []
@@ -244,13 +255,13 @@ def test_a_class_that_is_a_context_manager_has_scoped_it():
 
 def test_a_step_carrying_thirty_lines_of_setup_is_found():
     body = "\n".join(f"    line_{n} = {n}" for n in range(31))
-    found = rules.heavy_step_definitions(_source(
+    found = python_rules.heavy_step_definitions(_source(
         f"@given('a user')\ndef step(context):\n{body}\n", path="test_steps.py", language="python"))
     assert found
 
 
 def test_a_step_that_calls_and_checks_is_left_alone():
-    assert rules.heavy_step_definitions(_source(
+    assert python_rules.heavy_step_definitions(_source(
         "@when('it runs')\ndef step(context):\n    context.result = band(20)\n",
         path="test_steps.py", language="python")) == []
 
@@ -263,12 +274,12 @@ def test_a_step_that_calls_and_checks_is_left_alone():
     "atexit.register(cleanup)", "signal.signal(signal.SIGTERM, stop)",
 ])
 def test_behaviour_parked_in_a_hook_is_found(registration):
-    found = rules.lifecycle_hooks(_module(f"def setup():\n    {registration}\n"))
+    found = python_rules.lifecycle_hooks(_module(f"def setup():\n    {registration}\n"))
     assert found, registration
 
 
 def test_a_call_at_the_place_it_happens_is_not_a_hook():
-    assert rules.lifecycle_hooks(_module("def run():\n    cleanup()\n")) == []
+    assert python_rules.lifecycle_hooks(_module("def run():\n    cleanup()\n")) == []
 
 
 # --------------------------------------------------------------------------
@@ -284,7 +295,7 @@ def test_the_strangler_clause_never_returns_a_verdict():
     and found nothing. The refusal is loud now, and the two tests below say why: the gate
     answers before this is reached, so reaching it is itself the defect."""
     with pytest.raises(NotImplementedError):
-        rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))
+        python_rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))
 
 
 # --------------------------------------------------------------------------
@@ -302,7 +313,7 @@ def test_the_strangler_clause_never_returns_a_verdict():
 # --------------------------------------------------------------------------
 
 def test_a_read_then_write_of_a_shared_value_is_found():
-    found = rules.check_then_act(_module(
+    found = python_rules.check_then_act(_module(
         "LOCKS = {}\n\n\ndef claim(key):\n"
         "    if key in LOCKS:\n        return False\n    LOCKS[key] = True\n    return True\n"))
     assert found
@@ -311,7 +322,7 @@ def test_a_read_then_write_of_a_shared_value_is_found():
 def test_an_await_between_the_two_is_named_as_certain():
     """Between the read and the write another caller reads the same answer. An await makes
     that certain rather than occasional, and the finding has to say which it found."""
-    found = rules.check_then_act(_module(
+    found = python_rules.check_then_act(_module(
         "LOCKS = {}\n\n\nasync def claim(key):\n"
         "    if key in LOCKS:\n        return False\n"
         "    await settle()\n    LOCKS[key] = True\n    return True\n"))
@@ -320,7 +331,7 @@ def test_an_await_between_the_two_is_named_as_certain():
 
 
 def test_reading_a_shared_value_without_writing_it_is_not_a_race():
-    assert rules.check_then_act(_module(
+    assert python_rules.check_then_act(_module(
         "LOCKS = {}\n\n\ndef held(key):\n    return key in LOCKS\n")) == []
 
 
@@ -332,7 +343,7 @@ def test_a_dict_lookup_is_not_io():
     """`_SUFFIXES.get(suffix)` was reported as I/O below the boundary, because `get` is
     also how an HTTP client fetches a page. A bare name cannot tell the two apart, so the
     ambiguous ones are matched on the whole dotted call instead."""
-    assert rules.io_below_the_boundary(_module(
+    assert python_rules.io_below_the_boundary(_module(
         "TABLE = {'a': 1}\n\n\n"
         "def look(key):\n    return TABLE.get(key)\n\n\n"
         "def top(key):\n    return look(key)\n")) == []
@@ -341,7 +352,7 @@ def test_a_dict_lookup_is_not_io():
 @pytest.mark.parametrize("call", ["requests.get(url)", "httpx.post(url)", "session.get(url)",
                                   "subprocess.run(cmd)", "path.read_text()"])
 def test_a_named_client_call_is_still_io(call):
-    found = rules.io_below_the_boundary(_module(
+    found = python_rules.io_below_the_boundary(_module(
         f"def fetch(url, cmd, path, session, requests, httpx, subprocess):\n    return {call}\n\n\n"
         "def top(*a):\n    return fetch(*a)\n"))
     assert found, call
@@ -354,7 +365,7 @@ def test_a_handler_that_returns_a_reason_is_not_swallowing():
 
     Found by pointing the clause at this repository: it flagged three handlers and one of
     them was doing exactly the right thing."""
-    assert rules.swallowed_exceptions(_module(
+    assert rules.swallowed_exceptions(_tree(
         "def toolchains():\n    try:\n        return run(['rustup']).stdout\n"
         "    except OSError:\n        return 'could not query rustup toolchains'\n")) == []
 
@@ -363,7 +374,7 @@ def test_a_handler_that_returns_a_reason_is_not_swallowing():
 def test_a_handler_that_returns_a_falsy_stand_in_is_still_swallowing(stand_in):
     """A value indistinguishable from a successful empty result. The caller cannot tell
     "there were none" from "I could not look"."""
-    found = rules.swallowed_exceptions(_module(
+    found = rules.swallowed_exceptions(_tree(
         f"def f(x):\n    try:\n        return g(x)\n    except ValueError:\n        return {stand_in}\n"))
     assert found, stand_in
 
@@ -376,16 +387,16 @@ def test_a_decorator_that_merely_mentions_a_hook_is_not_a_hook():
     What a decorator does is decided by what it calls, not by what it carries."""
     source = ("@pytest.mark.parametrize('registration', ['atexit.register(cleanup)'])\n"
               "def test_it(registration):\n    assert registration\n")
-    assert rules.lifecycle_hooks(_source(source, path="test_m.py", language="python")) == []
+    assert python_rules.lifecycle_hooks(_source(source, path="test_m.py", language="python")) == []
 
 
 def test_a_decorator_that_is_a_hook_registration_is_still_found():
-    assert rules.lifecycle_hooks(_module(
+    assert python_rules.lifecycle_hooks(_module(
         "@atexit.register\ndef cleanup():\n    pass\n"))
 
 
 def test_a_framework_event_decorator_is_still_found():
-    assert rules.lifecycle_hooks(_module(
+    assert python_rules.lifecycle_hooks(_module(
         "@app.on_event('startup')\ndef begin():\n    pass\n"))
 
 
@@ -406,7 +417,7 @@ def test_a_catch_that_is_the_assertion_is_not_a_swallow():
               "        bad.append('startup_check should have raised')\n"
               "    except HonestCheckError:\n"
               "        pass\n")
-    assert rules.swallowed_exceptions(_module(source)) == []
+    assert rules.swallowed_exceptions(_tree(source)) == []
 
 
 @pytest.mark.parametrize("recorder", [
@@ -420,7 +431,7 @@ def test_a_catch_that_is_the_assertion_is_not_a_swallow():
 def test_the_shapes_that_count_as_recording_a_failure(recorder):
     source = (f"def check(bad):\n    try:\n        risky()\n        {recorder}\n"
               "    except ValueError:\n        pass\n")
-    assert rules.swallowed_exceptions(_module(source)) == [], recorder
+    assert rules.swallowed_exceptions(_tree(source)) == [], recorder
 
 
 def test_a_try_whose_last_statement_does_not_record_a_failure_is_still_a_swallow():
@@ -428,14 +439,14 @@ def test_a_try_whose_last_statement_does_not_record_a_failure_is_still_a_swallow
     error is the shape the clause exists for."""
     source = ("def load(path):\n    try:\n        raw = path.read_text()\n"
               "        return parse(raw)\n    except ValueError:\n        pass\n")
-    assert rules.swallowed_exceptions(_module(source))
+    assert rules.swallowed_exceptions(_tree(source))
 
 
 def test_a_single_statement_try_is_still_a_swallow():
     """There is no statement after the call, so nothing records a failure and nothing makes
     the catch an assertion."""
     source = "def load(p):\n    try:\n        return parse(p)\n    except ValueError:\n        pass\n"
-    assert rules.swallowed_exceptions(_module(source))
+    assert rules.swallowed_exceptions(_tree(source))
 
 
 @pytest.mark.parametrize("signal", ["SystemExit", "KeyboardInterrupt", "GeneratorExit"])
@@ -447,12 +458,12 @@ def test_a_control_flow_signal_is_not_an_error_this_clause_names(signal):
     What this does NOT decide: a program that swallows an exit it did not intend has a real
     defect, and it is a different one from the silent failure this clause names."""
     source = f"def probe():\n    try:\n        cli_main(['--help'])\n    except {signal}:\n        pass\n"
-    assert rules.swallowed_exceptions(_module(source)) == []
+    assert rules.swallowed_exceptions(_tree(source)) == []
 
 
 def test_an_ordinary_exception_is_still_caught_by_the_clause():
     source = "def probe():\n    try:\n        cli_main(['--help'])\n    except ValueError:\n        pass\n"
-    assert rules.swallowed_exceptions(_module(source))
+    assert rules.swallowed_exceptions(_tree(source))
 
 
 def test_the_clause_nothing_decides_is_never_asked():
@@ -480,4 +491,4 @@ def test_reaching_the_clause_nothing_decides_is_itself_a_defect():
     nothing. Reaching it means the gate that answers `never` has stopped working, and a
     silent None would let that failure arrive somewhere else as a clean result."""
     with pytest.raises(NotImplementedError):
-        rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))
+        python_rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))

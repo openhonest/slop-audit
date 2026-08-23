@@ -19,22 +19,19 @@ How a source is read, and the vocabulary a ported clause reads it through, live 
 `honest_code_read`.
 """
 
-import ast
 
 from tree_sitter import Node
 
 from l1_analyzer.honest_code_read import (
     Finding,
-    _called,
-    _classes,
     _finding,
-    _functions,
-    _methods,
     base_names,
     chain_subjects,
     class_nodes,
     first_name,
     function_nodes,
+    handler_body,
+    is_absent_value,
     is_chain_arm,
     is_constructor,
     method_nodes,
@@ -42,6 +39,7 @@ from l1_analyzer.honest_code_read import (
     names_written_in,
     node_text,
     reaches_receiver,
+    sends_failure_onward,
     walk,
     writes_receiver,
 )
@@ -71,24 +69,6 @@ RESOURCE_CALLS = frozenset({
     "Pool", "ClientSession", "connect_async", "acquire",
 })
 
-# Calls whose bare name is unambiguous: nothing but I/O is spelled this way.
-_IO_CALLS = frozenset({
-    "read_text", "read_bytes", "write_text", "write_bytes", "open", "iterdir", "glob",
-    "Popen", "check_output", "urlopen", "execute", "fetchall", "fetchone", "commit",
-    "listdir", "makedirs", "remove",
-})
-
-# Calls whose bare name is shared with something ordinary. `TABLE.get(key)` is a dict
-# lookup and `requests.get(url)` fetches a page, and reading the bare name reported this
-# tool's own suffix table as I/O. These are matched on the whole dotted call.
-_IO_RECEIVERS = frozenset({
-    "requests", "httpx", "session", "client", "urllib", "aiohttp", "subprocess",
-    "conn", "connection", "cursor", "db",
-})
-_AMBIGUOUS_IO = frozenset({"get", "post", "put", "delete", "patch", "request", "run", "head"})
-
-_CACHE_NAMES = frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache"})
-_CACHE_DECORATORS = frozenset({"lru_cache", "cache", "cached", "memoize", "cached_property"})
 
 # The languages that have a DOM to keep a second copy of state in. Declared once and read
 # both by the clause table and by the two checkers, so "not applicable" is decided in one
@@ -99,13 +79,6 @@ _STORE_LIBRARIES = ("redux", "zustand", "mobx", "vuex", "pinia", "recoil", "jota
 _DOM_CALLS = ("addEventListener", "querySelector", "querySelectorAll", "getElementById",
               "innerHTML", "createElement", "appendChild")
 
-_MOCK_NAMES = frozenset({"Mock", "MagicMock", "AsyncMock", "patch", "mock_open", "NonCallableMock"})
-_MOCK_LIMIT = 3
-
-_HOOK_CALLS = frozenset({"register", "signal", "on_event", "add_event_handler", "atexit"})
-_HOOK_DECORATORS = frozenset({"atexit", "on_event", "listens_for", "add_event_handler",
-                              "before_request", "after_request", "receiver"})
-_HOOK_MODULES = frozenset({"atexit", "signal"})
 
 # Calls that record a failure. The vocabulary is small on purpose: a try whose LAST
 # statement records a failure is asserting that the call above it raised, so the catch
@@ -116,14 +89,6 @@ _RECORDS_A_FAILURE = frozenset({"append", "add", "extend", "fail", "error", "ins
 # pass` around a `--help` invocation is argparse's normal exit for help, so it is the
 # expected terminal state of the thing under test.
 #
-# What this does NOT decide: a program that swallows an exit it did not intend has a real
-# defect, and it is a different one from the silent failure this clause names.
-_CONTROL_FLOW = frozenset({"SystemExit", "KeyboardInterrupt", "GeneratorExit"})
-
-_STEP_DECORATORS = frozenset({"given", "when", "then", "step"})
-_STEP_LIMIT = 30
-
-_TYPED_SCALARS = frozenset({"int", "str", "float", "bool", "bytes", "list", "dict", "set", "tuple"})
 
 
 # --------------------------------------------------------------------------
@@ -244,75 +209,10 @@ def methods_wearing_a_class(source: dict) -> list[Finding] | None:
 # 4. I/O at the boundary
 # --------------------------------------------------------------------------
 
-def io_below_the_boundary(source: dict) -> list[Finding] | None:
-    """A function that performs I/O and is itself called by a sibling.
-
-    A function nothing in the module calls IS the edge, which is where the I/O belongs.
-    One that a sibling calls has had the I/O pushed inward, and neither it nor its caller
-    can be tested without a mock.
-
-    Not decided: whether an uncalled function is truly an entry point. A module read only
-    from outside has every function looking like a boundary."""
-    functions = list(_functions(source))
-    called_by_siblings: set[str] = set()
-    for fn in functions:
-        called_by_siblings |= _called(fn) - {fn.name}
-    found: list[Finding] = []
-    for fn in functions:
-        if fn.name not in called_by_siblings:
-            continue
-        touched = sorted(_io_calls(fn))
-        if touched:
-            # Emitted and marked, not dropped. A suppression that suppresses nothing is
-            # invisible from outside the analyzer, so a consumer counting declarations had
-            # to infer from the presence of a decorator and was wrong three times in four.
-            withheld = "declaration" if _declares_a_boundary(fn) else ""
-            finding = _finding(
-                "L1.21.4", fn.name, fn.lineno,
-                f"performs I/O ({', '.join(touched)}) and is called by another function here",
-                "take the data as a parameter and let the caller at the edge do the I/O", "")
-            finding["withheld_by"] = withheld
-            found.append(finding)
-    return found
-
 
 # --------------------------------------------------------------------------
 # 5. Flat composition over inheritance
 # --------------------------------------------------------------------------
-
-def _declares_a_boundary(fn: ast.FunctionDef) -> bool:
-    """Whether this function is decorated as one of the project's own edges.
-
-    Read from what the decorator NAMES, not from its text: a parametrize carrying the word
-    as test data is not a declaration, which is the lesson clause 16 learned from one
-    carrying an exit handler."""
-    for decorator in fn.decorator_list:
-        named = decorator.func if isinstance(decorator, ast.Call) else decorator
-        if set(ast.unparse(named).split(".")) & BOUNDARY_DECORATORS:
-            return True
-    return False
-
-
-def _io_calls(fn: ast.FunctionDef) -> set[str]:
-    """The I/O this function performs, by name.
-
-    An unambiguous name counts on its own. An ambiguous one counts only with a receiver
-    that names a client, because `TABLE.get(key)` is a dict lookup and `requests.get(url)`
-    fetches a page."""
-    touched: set[str] = set()
-    for node in ast.walk(fn):
-        if not isinstance(node, ast.Call):
-            continue
-        bare = _bare_name(node)
-        if bare in _IO_CALLS:
-            touched.add(bare)
-            continue
-        if bare not in _AMBIGUOUS_IO or not isinstance(node.func, ast.Attribute):
-            continue
-        receiver = ast.unparse(node.func.value).split(".")[-1].lower()
-        if receiver in _IO_RECEIVERS:
-            touched.add(f"{receiver}.{bare}")
-    return touched
 
 
 def local_exception_roots(source: dict) -> set[str]:
@@ -419,231 +319,138 @@ def _line_of(text: str, needle: str) -> int:
 # --------------------------------------------------------------------------
 
 def swallowed_exceptions(source: dict) -> list[Finding] | None:
-    """A handler whose body only passes, or returns a stand-in.
+    """A handler whose body throws the error away.
 
-    Catch-and-swallow is the purest form of a silent failure: it reports success for work
-    that failed. A handler that re-raises, or that maps the error to a response, is doing
-    what the rule asks.
+    Read through the language's own node vocabulary. Catch-and-swallow is the purest form
+    of a silent failure: it reports success for work that failed. A handler that re-raises,
+    or that maps the error to a response, is doing what the rule asks.
 
     Not decided: whether the enclosing function is a boundary. A route handler catching and
-    mapping is right, and nothing in the file says which functions are routes."""
+    mapping is right, and nothing in the file says which functions are routes.
+
+    Not decided either: a language with no exception. Go returns an error beside the value
+    and Rust returns a Result, and neither is a handler this reads. Reporting those files
+    clean would claim they were checked."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["handler_types"]:
+        return None
     found: list[Finding] = []
-    for parent in ast.walk(source["tree"]):
-        if not isinstance(parent, ast.Try):
+    for node in walk(source["root"]):
+        if node.type not in spec["handler_types"]:
             continue
-        # The catch is the ASSERTION when the try's last statement records a failure: that
-        # statement runs only if the call above it did NOT raise, so reaching it is the
-        # defect and the handler is the success condition. Keying on the bare `pass` made
-        # both readings look alike.
-        if _asserts_a_raise(parent.body):
+        body = handler_body(node, spec)
+        if body is None or not _throws_it_away(body, node, spec, raw):
             continue
-        for node in parent.handlers:
-            if not _swallows(node.body):
-                continue
-            if _caught_names(node) <= _CONTROL_FLOW and _caught_names(node):
-                continue
-            caught = ast.unparse(node.type) if node.type else "everything"
-            found.append(_finding(
-                "L1.21.8", caught, node.lineno,
-                f"catches {caught} and reports success for work that failed",
-                "let it raise and map the type to a response at the boundary", ""))
+        # The catch is the ASSERTION when the guarded body's last statement records a
+        # failure: that statement runs only if the call above it did NOT raise, so reaching
+        # it is the defect and the handler is the success condition. Keying on the handler
+        # alone made both readings look alike.
+        if _guarded_body_asserts_a_raise(node, spec, raw):
+            continue
+        caught = _caught_text(node, spec, raw)
+        # A signal that carries control flow is not the failure this rule is about. Catching
+        # one and returning is how a program stops cleanly.
+        if caught and set(caught.split()) <= spec["control_flow_exceptions"]:
+            continue
+        found.append(_finding(
+            "L1.21.8", caught or "everything", node.start_point[0] + 1,
+            f"catches {caught or 'everything'} and reports success for work that failed",
+            "let it raise and map the type to a response at the boundary", ""))
     return found
 
 
-def _caught_names(handler: ast.ExceptHandler) -> set[str]:
-    """The exception names one handler catches, bare or in a tuple."""
-    if handler.type is None:
-        return set()
-    caught = handler.type.elts if isinstance(handler.type, ast.Tuple) else [handler.type]
-    return {ast.unparse(node).split(".")[-1] for node in caught}
+def _throws_it_away(body: Node, handler: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether a handler body discards the failure instead of disclosing it.
+
+    Empty, or one statement returning a value a caller cannot tell from success. A body
+    that mentions the caught error is disclosing it: a route mapping the message into a
+    response hands the caller something that names the failure."""
+    if sends_failure_onward(body, spec, raw):
+        return False
+    statements = [c for c in body.named_children if c.type != "pass_statement"]
+    if not statements:
+        return True
+    if len(statements) > 1:
+        return False
+    only = statements[0]
+    if only.type not in spec["return_types"]:
+        return False
+    returned = [c for c in only.named_children]
+    if not returned:
+        return True
+    caught_name = _caught_variable(handler, spec, raw)
+    if caught_name and caught_name in node_text(returned[0], raw):
+        return False
+    return is_absent_value(returned[0], spec, raw)
 
 
-def _asserts_a_raise(body: list[ast.stmt]) -> bool:
-    """Whether this try body is asserting that its call raised.
+def _guarded_body_asserts_a_raise(handler: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether the body this handler guards is asserting that its call raised.
 
     The shape is a call followed by a statement that records a failure. That statement runs
     only when the call did NOT raise, so the handler beneath is the success condition and
     the defect would be reaching the recorder.
 
-    What it does not decide: whether the recorded failure is the one the author meant. A
-    try ending in an unrelated append reads the same way, and separating them would need
-    the meaning of the collection rather than its shape."""
-    if len(body) < 2:
+    Not decided: whether the recorded failure is the one the author meant. A body ending in
+    an unrelated append reads the same way, and separating them would need the meaning of
+    the collection rather than its shape."""
+    guarded = handler.parent
+    if guarded is None or guarded.type not in spec["try_types"]:
         return False
-    last = body[-1]
-    if isinstance(last, (ast.Assert, ast.Raise)):
+    body = next((c for c in guarded.named_children
+                 if c.type in spec["handler_body_types"]), None)
+    if body is None:
+        return False
+    statements = [c for c in body.named_children if c.type != "pass_statement"]
+    if len(statements) < 2:
+        return False
+    last = statements[-1]
+    if last.type in spec["assertion_types"]:
         return True
-    if not isinstance(last, ast.Expr) or not isinstance(last.value, ast.Call):
-        return False
-    return _bare_name(last.value) in _RECORDS_A_FAILURE
-
-
-def _swallows(body: list[ast.stmt]) -> bool:
-    """Whether a handler body throws the error away.
-
-    A bare `pass`, or a single return of a FALSY stand-in: None, False, zero, an empty
-    string or an empty container. Each is indistinguishable from a successful empty result,
-    so the caller cannot tell "there were none" from "I could not look".
-
-    A return of a truthy constant is a REPORT, not a swallow. `return "could not query
-    rustup toolchains"` names the failure and hands it to a caller that discloses it. The
-    first version of this counted that as a swallow, which flagged the one handler in this
-    repository doing exactly the right thing."""
-    if any(isinstance(n, ast.Raise) for statement in body for n in ast.walk(statement)):
-        return False
-    meaningful = [s for s in body if not isinstance(s, ast.Pass)]
-    if not meaningful:
-        return True
-    if len(meaningful) > 1:
-        return False
-    only = meaningful[0]
-    if not isinstance(only, ast.Return):
-        return False
-    if only.value is None:
-        return True
-    if isinstance(only.value, ast.Constant):
-        return not only.value.value
-    if isinstance(only.value, (ast.List, ast.Set, ast.Tuple)):
-        return not only.value.elts
-    if isinstance(only.value, ast.Dict):
-        return not only.value.keys
+    for call in walk(last):
+        if call.type in spec["call_types"]:
+            fn = call.child_by_field_name(spec["call_fn"])
+            if fn is not None and node_text(fn, raw).split(".")[-1] in _RECORDS_A_FAILURE:
+                return True
     return False
+
+
+def _caught_text(handler: Node, spec: LangSpec, raw: bytes) -> str:
+    """What this handler says it catches, or nothing when it catches everything."""
+    parts = [node_text(c, raw) for c in handler.named_children
+             if c.type not in spec["handler_body_types"]]
+    return " ".join(p for p in parts if p).strip()
+
+
+def _caught_variable(handler: Node, spec: LangSpec, raw: bytes) -> str:
+    """The name the handler binds the error to, or nothing if it binds none.
+
+    The last identifier before the body, which is where all five grammars put it whether
+    they field it or not."""
+    before = [c for c in handler.named_children if c.type not in spec["handler_body_types"]]
+    names = [node_text(n, raw) for part in before for n in walk(part)
+             if n.type == "identifier"]
+    return names[-1] if names else ""
 
 
 # --------------------------------------------------------------------------
 # 9. SQL over application caches
 # --------------------------------------------------------------------------
 
-_UNPROFILED = ("whether the query was profiled first is not readable from any file, so "
-               "only the cache itself was checked")
-
-
-def unmeasured_caches(source: dict) -> list[Finding] | None:
-    """A cache client or a memoising decorator.
-
-    Partly decided, and the clause says which half. The cache is readable. Whether anyone
-    profiled the query before adding it is not in any file, and implying otherwise would
-    claim the whole rule was checked."""
-    found: list[Finding] = []
-    for node in ast.walk(source["tree"]):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            module = getattr(node, "module", "") or ""
-            names = [a.name.split(".")[0] for a in node.names] + [module.split(".")[0]]
-            for name in names:
-                if name in _CACHE_NAMES:
-                    found.append(_finding(
-                        "L1.21.9", name, node.lineno,
-                        f"{name} is a second source of truth with an invalidation bug waiting",
-                        "profile the query and add the index first", _UNPROFILED))
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            for decorator in node.decorator_list:
-                bare = ast.unparse(decorator).split("(")[0].split(".")[-1]
-                if bare in _CACHE_DECORATORS:
-                    found.append(_finding(
-                        "L1.21.9", node.name, node.lineno,
-                        f"@{bare} caches the result before anything measured the cost",
-                        "profile it and fix the query or the schema first", _UNPROFILED))
-    return found
-
 
 # --------------------------------------------------------------------------
 # 10. Pure-function assertions over mocks
 # --------------------------------------------------------------------------
-
-def mock_heavy_tests(source: dict) -> list[Finding] | None:
-    """Three or more mocks in one test.
-
-    The count is a readout on the CODE, not on the test: three mocks means the function
-    under test has three hidden dependencies. One or two is ordinary isolation.
-
-    Not applicable to a file that is not a test."""
-    if not _is_test_file(source["path"]):
-        return None
-    found: list[Finding] = []
-    for fn in _functions(source):
-        if not fn.name.startswith("test"):
-            continue
-        mocks = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
-                 and _bare_name(n) in _MOCK_NAMES]
-        if len(mocks) >= _MOCK_LIMIT:
-            found.append(_finding(
-                "L1.21.10", fn.name, fn.lineno,
-                f"{len(mocks)} mocks, so the function under test has {len(mocks)} hidden "
-                "dependencies",
-                "extract the pure logic and assert f(input) == expected on it directly", ""))
-    return found
-
-
-def _bare_name(call: ast.Call) -> str:
-    return ast.unparse(call.func).split(".")[-1]
-
-
-def _is_test_file(path: str) -> bool:
-    name = path.replace("\\", "/").split("/")[-1]
-    return name.startswith("test_") or name.endswith("_test.py") or "/tests/" in path
 
 
 # --------------------------------------------------------------------------
 # 11. Type declarations over imperative validation
 # --------------------------------------------------------------------------
 
-def imperative_validation(source: dict) -> list[Finding] | None:
-    """An `isinstance` check on a parameter the signature already types.
-
-    Re-checking a value the signature promised is distrust of your own contract. A check on
-    a value that arrived untyped from outside is where validation belongs, so only the
-    typed ones are counted.
-
-    Not decided: whether the function is a boundary receiving external input. A typed
-    parameter at a true boundary may still deserve a runtime check."""
-    found: list[Finding] = []
-    for fn in _functions(source):
-        typed = {a.arg for a in fn.args.args + fn.args.kwonlyargs
-                 if a.annotation is not None
-                 and ast.unparse(a.annotation).split("[")[0] in _TYPED_SCALARS}
-        for node in ast.walk(fn):
-            if not (isinstance(node, ast.Call) and _bare_name(node) == "isinstance"):
-                continue
-            if not node.args or not isinstance(node.args[0], ast.Name):
-                continue
-            if node.args[0].id in typed:
-                found.append(_finding(
-                    "L1.21.11", f"{fn.name}({node.args[0].id})", node.lineno,
-                    f"re-checks `{node.args[0].id}`, which the signature already types",
-                    "trust the contract in the interior and tighten the boundary or the "
-                    "type instead", ""))
-    return found
-
 
 # --------------------------------------------------------------------------
 # 12. Context managers over instance state
 # --------------------------------------------------------------------------
-
-def unscoped_resources(source: dict) -> list[Finding] | None:
-    """A resource assigned to `self` in a class that is not a context manager.
-
-    A connection with a manual lifecycle is a leak waiting for an exception. A class with
-    `__enter__` has scoped it, which is the whole point of the rule."""
-    found: list[Finding] = []
-    for node in _classes(source):
-        if any(m.name == "__enter__" or m.name == "__aenter__" for m in _methods(node)):
-            continue
-        for method in _methods(node):
-            for statement in ast.walk(method):
-                if not isinstance(statement, ast.Assign):
-                    continue
-                if not isinstance(statement.value, ast.Call):
-                    continue
-                if _bare_name(statement.value) not in RESOURCE_CALLS:
-                    continue
-                for target in statement.targets:
-                    if (isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name)
-                            and target.value.id == "self"):
-                        found.append(_finding(
-                            "L1.21.12", f"{node.name}.{target.attr}", statement.lineno,
-                            "a resource with a manual lifecycle, waiting for an exception",
-                            "scope it: `with create_connection(config) as conn:`", ""))
-    return found
 
 
 # --------------------------------------------------------------------------
@@ -691,19 +498,6 @@ def hidden_configuration(source: dict) -> list[Finding] | None:
                 f"take `{name.lower()}` as a parameter, so the dependency is in the "
                 "signature", _KNOB_UNDECIDED))
     return found
-
-
-def _module_level(source: dict) -> dict[str, ast.expr]:
-    """The names assigned at module level, and what they were assigned."""
-    assigned: dict[str, ast.expr] = {}
-    for node in source["tree"].body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    assigned[target.id] = node.value
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value:
-            assigned[node.target.id] = node.value
-    return assigned
 
 
 # --------------------------------------------------------------------------
@@ -770,82 +564,15 @@ def _is_literal_node(node: Node, spec: LangSpec) -> bool:
 # 15. Simple gherkin steps
 # --------------------------------------------------------------------------
 
-def heavy_step_definitions(source: dict) -> list[Finding] | None:
-    """A step definition longer than thirty lines.
-
-    Step length is a readout on the ARCHITECTURE, not on the test: a step needing thirty
-    lines of setup means the code under test has hidden dependencies.
-
-    Not applicable to a file holding no step definitions."""
-    steps = [fn for fn in _functions(source)
-             if any(ast.unparse(d).split("(")[0].split(".")[-1] in _STEP_DECORATORS
-                    for d in fn.decorator_list)]
-    if not steps:
-        return None
-    return [_finding(
-        "L1.21.15", fn.name, fn.lineno,
-        f"{fn.end_lineno - fn.lineno} lines of setup, which is a readout on the code under "
-        "test rather than on the test",
-        "make the function under test pure, so the step is call it and check the result", "")
-        for fn in steps if (fn.end_lineno or fn.lineno) - fn.lineno > _STEP_LIMIT]
-
 
 # --------------------------------------------------------------------------
 # 16. Declarative equivalents over lifecycle hooks
 # --------------------------------------------------------------------------
 
-def lifecycle_hooks(source: dict) -> list[Finding] | None:
-    """An exit handler, a signal handler, an ORM callback or a mount effect.
-
-    Each puts behaviour somewhere the reader does not look. A call at the place it happens
-    is not a hook, however much work it does."""
-    found: list[Finding] = []
-    for node in ast.walk(source["tree"]):
-        if not isinstance(node, ast.Call):
-            continue
-        whole = ast.unparse(node.func)
-        root = whole.split(".")[0]
-        if root in _HOOK_MODULES and _bare_name(node) in _HOOK_CALLS:
-            found.append(_finding(
-                "L1.21.16", whole, node.lineno,
-                f"{whole} parks behaviour where the reader does not look",
-                "declare it where it happens, so the sequence is visible at the call site", ""))
-    for node in ast.walk(source["tree"]):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for decorator in node.decorator_list:
-            # What a decorator DOES is decided by what it calls, not by what it carries.
-            # Matching the unparsed decorator as text read a parametrize whose test data
-            # was the string "atexit.register(cleanup)" as a registration.
-            called = decorator.func if isinstance(decorator, ast.Call) else decorator
-            whole = ast.unparse(called)
-            if any(name in whole.split(".") for name in _HOOK_DECORATORS):
-                found.append(_finding(
-                    "L1.21.16", node.name, node.lineno,
-                    f"@{whole} runs this somewhere nobody reads",
-                    "call it where it happens", ""))
-    return found
-
 
 # --------------------------------------------------------------------------
 # 17. Strangler pattern — the clause nothing decides
 # --------------------------------------------------------------------------
-
-def strangler_migration(source: dict) -> list[Finding] | None:
-    """Never a verdict, and never called.
-
-    A property of how a migration is sequenced over weeks. No file, and no set of files,
-    carries the sequence of the work that produced them, so a pass here would be a claim
-    nobody could support. It is the one clause excluded by its nature rather than by the
-    reach of this reader.
-
-    The gate answers `never` for this clause before any checker runs, so this body is
-    unreachable. It used to return None, which reads to a caller exactly like a clause that
-    ran and found nothing; reaching it means that gate has stopped working, and a silent
-    None would let the failure arrive somewhere else as a clean result."""
-    raise NotImplementedError(
-        "clause 17 has no checker: nothing decides the strangler pattern, and the gate "
-        "should have answered `never` before reaching this")
 
 
 # --------------------------------------------------------------------------
@@ -943,49 +670,3 @@ def _fallback_lookup(node: Node, spec: LangSpec, raw: bytes) -> tuple[str, Node,
 # --------------------------------------------------------------------------
 # 19. Atomic test-and-set over check-then-act
 # --------------------------------------------------------------------------
-
-
-def check_then_act(source: dict) -> list[Finding] | None:
-    """A read of a shared value followed by a write to it, inside one function.
-
-    Between the read and the write another caller reads the same answer, and both proceed
-    believing they hold the thing. An `await` in between makes the race certain rather than
-    occasional, and the finding says which it found.
-
-    Not decided: whether the value is genuinely shared across callers. A module-level
-    container is the readable case; a row in a database is not in this file."""
-    shared = {name for name, value in _module_level(source).items()
-              if isinstance(value, (ast.Dict, ast.List, ast.Set))}
-    found: list[Finding] = []
-    for fn in _functions(source):
-        for name in sorted(shared):
-            read = _first_line(fn, name, ast.Load, subscript=False)
-            write = _first_line(fn, name, ast.Store, subscript=True)
-            if read is None or write is None or write <= read:
-                continue
-            awaited = any(isinstance(n, ast.Await) and read < n.lineno < write
-                          for n in ast.walk(fn))
-            certainty = "certain" if awaited else "occasional"
-            found.append(_finding(
-                "L1.21.19", f"{fn.name}({name})", read,
-                f"reads `{name}` at line {read} and writes it at line {write}, so two "
-                f"callers can both believe they hold it. The race is {certainty}"
-                + (", because there is an await in between" if awaited else ""),
-                "one operation whose return value distinguishes I took it from someone "
-                "else holds it, carrying a token unique to the caller", ""))
-    return found
-
-
-def _first_line(fn: ast.FunctionDef, name: str, context: type, subscript: bool) -> int | None:
-    """The first line where `name` is used in the given context, or None.
-
-    A write through a subscript is a write to the container, so `LOCKS[key] = True` counts
-    even though the Name node itself is being loaded."""
-    for node in ast.walk(fn):
-        if (subscript and isinstance(node, ast.Subscript) and isinstance(node.ctx, context)
-                and isinstance(node.value, ast.Name) and node.value.id == name):
-            return node.lineno
-        if (not subscript and isinstance(node, ast.Name) and node.id == name
-                and isinstance(node.ctx, context)):
-            return node.lineno
-    return None

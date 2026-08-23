@@ -27,6 +27,7 @@ from typing import TypedDict
 
 from tree_sitter import Language, Node, Parser
 
+from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.honest_code_read import read_tree
 from l1_analyzer.honest_code_rules import BROWSER_LANGUAGES, Finding
@@ -215,7 +216,7 @@ CLAUSES: tuple[Clause, ...] = (
             reads=_TREE_READER),
     _clause(3, "Pure functions over methods", _TREE, rules.methods_wearing_a_class,
             reads=_TREE_READER),
-    _clause(4, "I/O at the boundary", _TREE, rules.io_below_the_boundary),
+    _clause(4, "I/O at the boundary", _TREE, python_rules.io_below_the_boundary),
     _clause(5, "Flat composition over inheritance", _TREE, rules.inheritance_for_reuse,
             reads=_TREE_READER),
     # The only two that read the file's TEXT, which is why they work on a language this
@@ -224,23 +225,24 @@ CLAUSES: tuple[Clause, ...] = (
             reads=_TEXT_READER),
     _clause(7, "HTML attributes over imperative DOM", _TREE, rules.imperative_dom,
             BROWSER_LANGUAGES, reads=_TEXT_READER),
-    _clause(8, "Typed exceptions at the boundary", _TREE, rules.swallowed_exceptions),
-    _clause(9, "SQL over application caches", _PARTLY, rules.unmeasured_caches),
-    _clause(10, "Pure-function assertions over mocks", _TREE, rules.mock_heavy_tests),
+    _clause(8, "Typed exceptions at the boundary", _TREE, rules.swallowed_exceptions,
+            reads=_TREE_READER),
+    _clause(9, "SQL over application caches", _PARTLY, python_rules.unmeasured_caches),
+    _clause(10, "Pure-function assertions over mocks", _TREE, python_rules.mock_heavy_tests),
     _clause(11, "Type declarations over imperative validation", _TREE,
-            rules.imperative_validation),
-    _clause(12, "Context managers over instance state", _TREE, rules.unscoped_resources),
+            python_rules.imperative_validation),
+    _clause(12, "Context managers over instance state", _TREE, python_rules.unscoped_resources),
     _clause(13, "Configuration as parameters", _TREE, rules.hidden_configuration,
             reads=_TREE_READER),
     _clause(14, "No implicit defaults", _TREE, rules.implicit_defaults,
             reads=_TREE_READER),
     _clause(15, "Simple gherkin steps signal honest architecture", _TREE,
-            rules.heavy_step_definitions),
-    _clause(16, "Declarative equivalents over lifecycle hooks", _TREE, rules.lifecycle_hooks),
-    _clause(17, "Strangler pattern for migration", _NOTHING, rules.strangler_migration),
+            python_rules.heavy_step_definitions),
+    _clause(16, "Declarative equivalents over lifecycle hooks", _TREE, python_rules.lifecycle_hooks),
+    _clause(17, "Strangler pattern for migration", _NOTHING, python_rules.strangler_migration),
     _clause(18, "Dispatch tables close open input", _TREE, rules.open_dispatch,
             reads=_TREE_READER),
-    _clause(19, "Atomic test-and-set over check-then-act", _TREE, rules.check_then_act),
+    _clause(19, "Atomic test-and-set over check-then-act", _TREE, python_rules.check_then_act),
 )
 
 _WHY_NOT = {

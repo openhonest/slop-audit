@@ -396,3 +396,47 @@ def _written_name(target: Node, spec: LangSpec, raw: bytes) -> set[str]:
         if inner is not None and inner.type == "identifier":
             return {node_text(inner, raw)}
     return set()
+
+
+def handler_body(node: Node, spec: LangSpec) -> Node | None:
+    """The node holding one handler's own statements.
+
+    The one shape these grammars disagree about. JavaScript, Java and C# name a `body`
+    field; Python and Ruby do not, and their block is an ordinary child. Both are read here
+    so no clause has to know which kind its language is."""
+    named = node.child_by_field_name("body")
+    if named is not None:
+        return named
+    return next((c for c in node.children if c.type in spec["handler_body_types"]), None)
+
+
+def sends_failure_onward(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether anything under this node raises, throws, or re-raises.
+
+    Ruby spells its raise as an ordinary call, so the names are read as well as the node
+    types. Reading only the types would have made every Ruby handler that re-raises look
+    like one that swallowed."""
+    for inner in walk(node):
+        if inner.type in spec["raise_types"]:
+            return True
+        if inner.type in spec["call_types"] and spec["raise_names"]:
+            fn = inner.child_by_field_name(spec["call_fn"])
+            if fn is not None and node_text(fn, raw).split(".")[-1] in spec["raise_names"]:
+                return True
+    return False
+
+
+def is_absent_value(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether a value is indistinguishable from a successful empty result.
+
+    Nothing, false, zero, an empty string, an empty container. A caller receiving one cannot
+    tell "there were none" from "I could not look". A TRUTHY constant is a report rather
+    than a stand-in: `return "could not query rustup toolchains"` names the failure and
+    hands it to a caller that discloses it."""
+    if node.type in spec["absent_types"]:
+        return True
+    if node.type in spec["container_literal_types"]:
+        return not node.named_children
+    if node.type in spec["literal_types"]:
+        return node_text(node, raw).strip("\"'`") in ("", "0")
+    return False

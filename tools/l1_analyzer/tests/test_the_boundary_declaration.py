@@ -13,7 +13,7 @@ import ast
 import pathlib
 
 from l1_analyzer import boundary, c_trace
-from l1_analyzer import honest_code_rules as rules
+from l1_analyzer import honest_code_python_rules as python_rules
 
 
 def test_the_declaration_changes_nothing_at_runtime():
@@ -38,7 +38,7 @@ def _findings(module) -> list[dict]:
     """The findings that survive as violations. A declared boundary is emitted and marked
     withheld rather than dropped, so a consumer can count real suppressions."""
     source = pathlib.Path(module.__file__).read_text()
-    found = rules.io_below_the_boundary({
+    found = python_rules.io_below_the_boundary({
         "path": pathlib.Path(module.__file__).name, "language": "python", "text": source,
         "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
     return [f for f in found if f["withheld_by"] == ""]
@@ -64,7 +64,7 @@ def test_an_undeclared_reader_is_still_reported():
               "@boundary\ndef declared(path):\n    return path.read_text()\n\n\n"
               "def undeclared(path):\n    return path.read_text()\n\n\n"
               "def run(path):\n    return declared(path), undeclared(path)\n")
-    found = rules.io_below_the_boundary({
+    found = python_rules.io_below_the_boundary({
         "path": "m.py", "language": "python", "text": source,
         "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["undeclared"]
