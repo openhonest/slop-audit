@@ -125,6 +125,33 @@ class Assessed(TypedDict):
     declared: list[Allowed]
 
 
+# How much of a string constant has to parse as another language before it is worth
+# naming. Five lines, because one line of something that parses is a fragment rather than
+# content nobody examined, and a reader told about fragments stops reading the notices.
+_BLOCK_LINES = 5
+
+# A cheap gate before nine grammars are tried on a string. Trying them all on every long
+# docstring cost 203ms on this package's most fixture-heavy file, over the budget that keeps
+# this usable behind a write hook.
+#
+# Its only failure mode is SILENCE. A block that carries none of these is not reported, which
+# is exactly what happened before any of this existed; it can never invent a block that is not
+# there. That direction is the reason it is acceptable and the reason it is written down.
+_CODE_MARKS = (";", "{", "}", "=>", "func ", "def ", "class ", "fn ", "public ", "var ")
+
+
+class Unexamined(TypedDict):
+    """A block inside a readable file that no clause looked at.
+
+    Not a clause and not graded. The Python in a file holding a JavaScript widget really
+    does hold every clause that read it, and saying otherwise would invent a violation.
+    This says the other true thing: the file's substance was never examined."""
+
+    language: str
+    line: int
+    lines: int
+
+
 class Assessment(TypedDict):
     """One file, measured against every clause that applies to it."""
 
@@ -134,6 +161,7 @@ class Assessment(TypedDict):
     conformity: float | None
     band: str
     decided_clauses: int
+    unexamined: list[Unexamined]
     unreadable_reason: str
 
 
@@ -407,6 +435,7 @@ def assess_file_text(text: str, path: str) -> Assessment:
         "path": str(path), "language": source["language"], "clauses": assessed,
         "conformity": share, "band": band_of(share),
         "decided_clauses": len([c for c in assessed if c["decided"]]),
+        "unexamined": unexamined_blocks(source),
         "unreadable_reason": source["unreadable_reason"],
     }
 
@@ -415,6 +444,81 @@ def assess_file(path: Path) -> Assessment:
     """One file on disk, measured."""
     path = Path(path)
     return assess_file_text(path.read_text(errors="replace"), str(path))
+
+
+def unexamined_blocks(source: dict) -> list[Unexamined]:
+    """Substantial string constants that parse cleanly as another language this tool knows.
+
+    A Python file holding a JavaScript widget scored 100 per cent with fourteen clauses
+    decided and no findings, and the JavaScript in it had a dispatch chain and a swallowed
+    error. Every clause examined the Python correctly; nothing examined the substance.
+
+    Nothing is guessed from resemblance. A block is named only when a real grammar accepts
+    the WHOLE of it with no error node, which is what keeps prose out: run over this
+    package's own source, 355 long string literals produced eleven hits and every one was
+    genuine embedded source held as a test fixture."""
+    if not source["readable"] or source["language"] not in _PARSED:
+        return []
+    documentation = _docstrings(source["tree"])
+    found: list[Unexamined] = []
+    for node in ast.walk(source["tree"]):
+        if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+            continue
+        if id(node) in documentation:
+            continue
+        lines = node.value.count("\n") + 1
+        if lines < _BLOCK_LINES or not any(mark in node.value for mark in _CODE_MARKS):
+            continue
+        language = _parses_cleanly_as(node.value, source["language"])
+        if language:
+            found.append({"language": language, "line": node.lineno, "lines": lines})
+    return found
+
+
+def _docstrings(tree: ast.AST) -> set[int]:
+    """The string constants this file declares as documentation.
+
+    Skipped, because a docstring IS declared documentation and source inside one is an
+    example rather than shipped content. It is also where nearly all the cost was: 342 of
+    this package's 355 long string literals are docstrings and not one of its eleven real
+    embedded blocks is, so trying nine grammars on each of them bought nothing and cost
+    25 milliseconds a file.
+
+    The limit, stated because its failure mode is silence: a template genuinely held in a
+    docstring is missed."""
+    declared: set[int] = set()
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if not isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
+                                 ast.ClassDef)) or not body:
+            continue
+        first = body[0]
+        if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)):
+            declared.add(id(first.value))
+    return declared
+
+
+def _parses_cleanly_as(text: str, own: str) -> str:
+    """The language whose grammar accepts this text whole, or nothing.
+
+    Only a grammar OTHER than the file's own, and only a parse with no error node and some
+    named structure in it. tree-sitter accepts almost anything and reports the trouble as
+    error nodes rather than as a failure, so the absence of them is the test."""
+    for language in sorted(_VOCABULARY):
+        if language == own:
+            continue
+        try:
+            tree = read_tree(text, language)
+        except (KeyError, ValueError):
+            continue
+        root = tree["root"]
+        nodes = rules.walk(root)
+        if any(n.type == "ERROR" or n.is_missing for n in nodes):
+            continue
+        if root.named_child_count:
+            return language
+    return ""
 
 
 def report(assessment: Assessment) -> str:
@@ -429,6 +533,10 @@ def report(assessment: Assessment) -> str:
                f"{assessment['decided_clauses']} of 19 clauses that were decided"), ""]
     if assessment["unreadable_reason"]:
         lines += [f"> {assessment['unreadable_reason']}", ""]
+    for block in assessment["unexamined"]:
+        lines += [(f"> line {block['line']}: {block['lines']} lines that parse as "
+                   f"{block['language']}, and no clause examined them. The share above is "
+                   "over this file's own language only."), ""]
 
     broken = [c for c in assessment["clauses"] if c["decided"] and c["findings"]]
     held = [c for c in assessment["clauses"] if c["decided"] and not c["findings"]]
@@ -484,6 +592,11 @@ def hook_report(assessment: Assessment) -> str:
     too."""
     name = assessment["path"]
     lines: list[str] = []
+    for block in assessment["unexamined"]:
+        # Not a violation, so no remedy line. It is the one thing that stops a clean hook
+        # result reading as a clean file.
+        lines.append(f"{name}:{block['line']} {block['lines']} lines parse as "
+                     f"{block['language']} and no clause examined them")
     for clause in assessment["clauses"]:
         for finding in clause["findings"]:
             lines.append(f"{name}:{finding['line']} {clause['code']} {finding['detail']}")
@@ -513,11 +626,14 @@ def analyze(repo: Path, lang: str) -> dict:
     declared_exceptions: list[Allowed] = []
     boundary_declarations: list[Allowed] = []
     unreadable = 0
+    unexamined_blocks_seen = 0
     for read, wanted in ((production, False), (tests, True)):
         for path, text in read:
             assessed = assess_file_text(text, str(path))
             if wanted is False and assessed["unreadable_reason"]:
                 unreadable += 1
+            if wanted is False:
+                unexamined_blocks_seen += len(assessed["unexamined"])
             for clause in assessed["clauses"]:
                 if (clause["code"] in TEST_SCOPED) != wanted or not clause["decided"]:
                     continue
@@ -535,7 +651,7 @@ def analyze(repo: Path, lang: str) -> dict:
         return {"value": "n/a", "band": "n/a", "details": nothing,
                 "findings": [], "undecided": never_decided,
                 "allowed": declared_exceptions, "declared": boundary_declarations,
-                "unreadable_files": unreadable}
+                "unreadable_files": unreadable, "unexamined": unexamined_blocks_seen}
 
     share = round((len(decided) - len(broken)) / len(decided) * 100, 1)
     # The count is stated even when it is zero, and with no conditional anywhere in the
@@ -548,8 +664,12 @@ def analyze(repo: Path, lang: str) -> dict:
               f"{unreadable} file(s) could not be read. "
               f"{len(boundary_declarations)} boundary declaration"
               f"{'' if len(boundary_declarations) == 1 else 's'} withheld a finding. "
+              f"{unexamined_blocks_seen} block"
+              f"{'' if unexamined_blocks_seen == 1 else 's'} of another language were not "
+              "examined. "
               f"Not decided ({len(never_decided)}): " + ", ".join(never_decided))
     return {"value": share, "band": band_of(share), "details": detail,
             "findings": [f for group in broken.values() for f in group],
             "undecided": never_decided, "allowed": declared_exceptions,
-            "declared": boundary_declarations, "unreadable_files": unreadable}
+            "declared": boundary_declarations, "unreadable_files": unreadable,
+            "unexamined": unexamined_blocks_seen}

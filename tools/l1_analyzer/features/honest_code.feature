@@ -121,6 +121,24 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     Then a site an allow comment excused and a site a boundary decorator excused are both set apart, and each says which withheld it
     But a declaration that withheld nothing produces no record, since a marker on a function the clause would never have spoken about suppressed nothing and counting it punishes the declaration it was added to encourage
 
+  Scenario: unexamined_blocks names content inside a readable file that no clause looked at
+    Given a file that parsed, and the string constants it holds
+    When unexamined_blocks tries each substantial one against the grammars of the other languages
+    Then a block that parses with no error node is reported with its language, its line and its size, and it is not graded
+    But nothing is guessed from resemblance, since a block is only named when a real grammar accepts the whole of it, and 355 of this package's own long strings produced eleven hits and every one was genuine source
+
+  Scenario: _docstrings names the strings a file declares as documentation
+    Given a parsed file
+    When _docstrings reads the first statement of the module, each class and each function
+    Then those strings are skipped, since a docstring IS declared documentation and source inside one is an example rather than shipped content
+    But a template genuinely held in a docstring is missed, and that limit is stated because its failure mode is silence
+
+  Scenario: _parses_cleanly_as names the language whose grammar accepts a block whole
+    Given the text of a string constant and the language of the file holding it
+    When _parses_cleanly_as tries the grammars of the other languages
+    Then a parse with no error node and some named structure in it names that language
+    But tree-sitter accepts almost anything and reports trouble as error nodes rather than as failure, so the absence of them is the test and resemblance is never enough
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Clause 17, the strangler pattern, is a property of how a migration is sequenced over weeks.
