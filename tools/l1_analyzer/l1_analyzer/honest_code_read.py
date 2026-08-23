@@ -317,11 +317,14 @@ def module_level_bindings(root: Node, spec: LangSpec, raw: bytes) -> dict[str, N
     site and name it in a field. Both are read here so no clause has to know which kind its
     language is.
 
-    Only the top level: a name bound inside a function is that function's own, and reading
-    it is not reaching past a signature."""
+    Only the top level. A name bound inside a function is that function's own, and reading
+    it is not reaching past a signature. The walk therefore stops at every function and
+    class body: a function definition IS a top-level statement, so walking each statement
+    to its leaves made every local variable in the file read as module scope, and reported
+    three of this package's own locals as configuration somebody turns."""
     bound: dict[str, Node] = {}
     for statement in root.named_children:
-        for node in walk(statement):
+        for node in _walk_own_scope(statement, spec):
             site = spec["binding_sites"].get(node.type)
             if site is not None:
                 name = node.child_by_field_name(site)
@@ -335,6 +338,24 @@ def module_level_bindings(root: Node, spec: LangSpec, raw: bytes) -> dict[str, N
                 if left is not None and left.type == "identifier":
                     bound[node_text(left, raw)] = right if right is not None else node
     return bound
+
+
+def _walk_own_scope(node: Node, spec: LangSpec) -> list[Node]:
+    """Every node under this one that belongs to the same scope, this one included.
+
+    A function or class body opens a new scope, so the walk records the definition and
+    stops there rather than descending. Exempting the starting node from that rule was the
+    first attempt and it defeated the whole purpose: the statement handed in IS the
+    function, so the walk descended into exactly the scope it was written to stay out of."""
+    seen, stack = [], [node]
+    boundaries = (*spec["func_types"], *spec["class_types"], *spec["constructor_types"])
+    while stack:
+        current = stack.pop()
+        seen.append(current)
+        if current.type in boundaries:
+            continue
+        stack.extend(current.children)
+    return seen
 
 
 def names_written_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:

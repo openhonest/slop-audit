@@ -512,3 +512,123 @@ def test_the_configuration_clause_says_what_it_cannot_see(language):
     found = rules.hidden_configuration(read.read_tree(SUBSCRIPT_KNOB[language], language))
     assert found
     assert found[0]["undecided"].strip()
+
+
+# --------------------------------------------------------------------------
+# Clause 18, the dispatch table that answers for an input nobody wrote a rule for
+#
+# The meaning is shared and the spelling is not. Python supplies the fallback as a second
+# argument to a method, JavaScript as an operator to the right of the lookup, Java as a
+# differently named method. The rule is the same in all three: a table read closed and a
+# fallback that files an unknown key under an answer written for a different key.
+#
+# The table has to be one this file declares. `options.timeout ?? 30` reaches into an
+# argument nobody in this file wrote the rules for, and calling that an open dispatch would
+# flag most of the JavaScript ever written.
+# --------------------------------------------------------------------------
+
+OPEN_TABLE = {
+    "python": ("HANDLERS = {'a': one, 'b': two}\n\n\n"
+               "def send(kind):\n    return HANDLERS.get(kind, fallback)\n"),
+    "javascript": ("const handlers = {a: one, b: two};\n\n"
+                   "function send(kind) {\n  return handlers[kind] ?? fallback;\n}\n"),
+}
+
+CLOSED_TABLE = {
+    "python": ("HANDLERS = {'a': one, 'b': two}\n\n\n"
+               "def send(kind):\n    return HANDLERS[kind]\n"),
+    "javascript": ("const handlers = {a: one, b: two};\n\n"
+                   "function send(kind) {\n  return handlers[kind];\n}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_table_read_with_a_fallback_is_found_in_this_language(language):
+    found = rules.open_dispatch(read.read_tree(OPEN_TABLE[language], language))
+    assert [f["symbol"] for f in found] == [
+        "handlers" if language == "javascript" else "HANDLERS"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_same_table_read_by_subscript_is_quiet(language):
+    """A subscript lets an unknown key raise, which records the gap in the table instead of
+    hiding it. That is the whole of what the clause asks for."""
+    assert rules.open_dispatch(read.read_tree(CLOSED_TABLE[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_fallback_built_from_the_key_records_the_gap_rather_than_hiding_it(language):
+    """`COPY.get(key, key)` brings the unknown key back visible as itself, which is the
+    opposite of filing it under an answer written for a different input."""
+    source = {"python": ("COPY = {'a': 'A'}\n\n\ndef label(key):\n"
+                         "    return COPY.get(key, key)\n"),
+              "javascript": ("const copy = {a: 'A'};\n\n"
+                             "function label(key) {\n  return copy[key] ?? key;\n}\n")}
+    assert rules.open_dispatch(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_fallback_on_something_this_file_never_declared_is_not_a_dispatch_table(language):
+    """Reaching into an argument is not reading a table whose rules this file wrote.
+    Flagging it would flag most of the JavaScript ever written."""
+    source = {"python": "def send(options):\n    return options.get('timeout', 30)\n",
+              "javascript": ("function send(options) {\n"
+                             "  return options['timeout'] ?? 30;\n}\n")}
+    assert rules.open_dispatch(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_fallback_naming_the_key_in_a_message_records_the_gap(language):
+    """The key need not be the whole fallback. A message built around it still brings the
+    unknown key back visible, which is the opposite of hiding it."""
+    source = {"python": ("REASONS = {2: 'interrupted'}\n\n\n"
+                         "def why(code):\n    return REASONS.get(code, f'unknown exit {code}')\n"),
+              "javascript": ("const reasons = {2: 'interrupted'};\n\n"
+                             "function why(code) {\n"
+                             "  return reasons[code] ?? `unknown exit ${code}`;\n}\n")}
+    assert rules.open_dispatch(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_fallback_that_is_a_shared_constant_is_still_open(language):
+    """The shape the rule is about: a key the table does not know renders identically to a
+    key that was never measured, and nothing downstream can tell them apart."""
+    source = {"python": ("WORDS = {'Healthy': 'good'}\n\n\n"
+                         "def word(band):\n    return WORDS.get(band, 'No data')\n"),
+              "javascript": ("const words = {Healthy: 'good'};\n\n"
+                             "function word(band) {\n  return words[band] ?? 'No data';\n}\n")}
+    assert rules.open_dispatch(read.read_tree(source[language], language))
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_fallback_naming_a_different_row_is_still_open(language):
+    """The worst case of all, because the answer looks deliberate. An unknown kind is
+    handled by the rule somebody wrote for kind `a`."""
+    source = {"python": ("HANDLERS = {'a': one, 'b': two}\n\n\n"
+                         "def run(kind):\n    return HANDLERS.get(kind, one)\n"),
+              "javascript": ("const handlers = {a: one, b: two};\n\n"
+                             "function run(kind) {\n  return handlers[kind] ?? one;\n}\n")}
+    assert rules.open_dispatch(read.read_tree(source[language], language))
+
+
+def test_a_language_with_neither_spelling_says_it_could_not_decide():
+    """Go returns presence beside the value and C has no table type at all, so there is
+    nothing to read either way and the empty list would claim the file was checked."""
+    for absent in ("go", "c"):
+        assert rules.open_dispatch(read.read_tree("", absent)) is None, absent
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_name_bound_inside_a_function_is_not_bound_at_module_level(language):
+    """The reader walked each top-level statement to its leaves, and a function definition
+    IS a top-level statement, so every local variable in the file read as module scope. It
+    reported three of this package's own locals as configuration somebody turns."""
+    source = {"python": ("def read(path):\n    raw = path.read_bytes()\n    return raw\n\n\n"
+                         "def size(path):\n    raw = read(path)\n    return len(raw)\n"),
+              "javascript": ("function read(path) {\n  const raw = load(path);\n  return raw;\n}\n\n"
+                             "function size(path) {\n  const raw = read(path);\n"
+                             "  return raw.length;\n}\n")}
+    tree = read.read_tree(source[language], language)
+    bound = read.module_level_bindings(tree["root"], tree["spec"], tree["raw"])
+    assert "raw" not in bound, bound
+    assert rules.hidden_configuration(tree) == []

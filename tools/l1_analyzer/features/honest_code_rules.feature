@@ -168,12 +168,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then a write through a subscript counts as a write to the container
     But the line order is what the clause reasons about, and a tree walk is not source order, so only the first of each is taken
 
-  Scenario: _mentions says whether a default was built from the key it stands in for
-    Given the default expression of a lookup and the key expression beside it
-    When _mentions compares them
-    Then a default carrying the key records the gap, since the unknown key comes back visible as itself
-    But a default that is a shared constant files the unknown input under an answer written for a different one, which is the whole of rule 18
-
   Scenario: _caught_names names the exceptions one handler catches
     Given an except handler, which may name one type, a tuple of them, or nothing
     When _caught_names reads it
@@ -222,3 +216,15 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _is_literal_node reads it through the language's literal and container types
     Then the first two are values nobody chose
     But the third is a dependency made visible in the signature, which rule 13 asks for
+
+  Scenario: _is_table says whether a module-level binding holds a dispatch table
+    Given one name bound to a map literal and one bound to a number
+    When _is_table reads the value through the language's container literal types
+    Then only the map is a table whose rules this file wrote
+    But a table built by a call rather than written as a literal is not read here
+
+  Scenario: _fallback_lookup names the table, key and fallback of one lookup
+    Given a lookup passing the fallback as an argument and one putting it to the right
+    When _fallback_lookup reads both spellings through the language's vocabulary
+    Then each yields the same three things, and the clause itself names neither spelling
+    But an ordinary subscript supplies no fallback and yields nothing

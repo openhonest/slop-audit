@@ -853,43 +853,96 @@ def strangler_migration(source: dict) -> list[Finding] | None:
 # --------------------------------------------------------------------------
 
 def open_dispatch(source: dict) -> list[Finding] | None:
-    """A `.get(key, default)` on a module-level table.
+    """A read of a table this file declares that supplies a value for an absent key.
 
-    The default files an input nobody wrote a rule for under an answer written for a
-    different input, and re-opens the space while the code still reads closed. A subscript
-    lets an unknown key raise, which records the gap in the table instead of hiding it."""
-    tables = {name for name, value in _module_level(source).items()
-              if isinstance(value, ast.Dict)}
+    Two spellings, read through the language's own vocabulary. Python and Java pass the
+    fallback as an argument to a method; JavaScript and C# put it to the right of an
+    ordinary lookup as an operator. The rule is the same in both: the fallback files an
+    input nobody wrote a rule for under an answer written for a different input, and
+    re-opens the space while the code still reads closed. A subscript lets an unknown key
+    raise, which records the gap in the table instead of hiding it.
+
+    Only a table this file declares. Reaching into an argument is not reading a table whose
+    rules this file wrote, and calling that an open dispatch would flag most of the
+    JavaScript ever written.
+
+    Not decided: a language with neither spelling. Go returns presence beside the value and
+    C has no table type at all, so there is nothing here to read either way."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["fallback_methods"] and not spec["fallback_operators"]:
+        return None
+    tables = {name for name, value in module_level_bindings(
+        source["root"], spec, raw).items() if _is_table(value, spec)}
+    if not tables:
+        return []
     found: list[Finding] = []
-    for node in ast.walk(source["tree"]):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+    for node in walk(source["root"]):
+        looked_up = _fallback_lookup(node, spec, raw)
+        if looked_up is None:
             continue
-        if node.func.attr != "get" or len(node.args) < 2:
+        table, key, fallback = looked_up
+        if table not in tables:
             continue
-        # A default DERIVED FROM THE KEY records the gap rather than hiding it. The rule's
-        # objection is that a default files an unknown input under an answer written for a
-        # different input; `COPY.get(key, key)` and `REASONS.get(code, f"unknown {code}")`
-        # do the opposite, and the unknown key comes back visible as itself.
-        if _mentions(node.args[1], node.args[0]):
+        # A fallback DERIVED FROM THE KEY records the gap rather than hiding it. The rule's
+        # objection is that a fallback files an unknown input under an answer written for a
+        # different input; `COPY.get(key, key)` does the opposite, and the unknown key comes
+        # back visible as itself.
+        if node_text(key, raw) and node_text(key, raw) in node_text(fallback, raw):
             continue
-        if isinstance(node.func.value, ast.Name) and node.func.value.id in tables:
-            found.append(_finding(
-                "L1.21.18", node.func.value.id, node.lineno,
-                f"`{node.func.value.id}.get(key, default)` answers for an input nobody wrote "
-                "a rule for",
-                f"read it by subscript, `{node.func.value.id}[key]`, and record the unknown "
-                "key as a gap in the table", ""))
+        found.append(_finding(
+            "L1.21.18", table, node.start_point[0] + 1,
+            f"`{table}` is read with a fallback, which answers for an input nobody wrote "
+            "a rule for",
+            f"read it by subscript, `{table}[key]`, and record the unknown key as a gap "
+            "in the table", ""))
     return found
+
+
+def _is_table(node: Node, spec: LangSpec) -> bool:
+    """Whether a module-level binding holds a map literal, which is what a dispatch table
+    is in every language here."""
+    return node.type in spec["container_literal_types"]
+
+
+def _fallback_lookup(node: Node, spec: LangSpec, raw: bytes) -> tuple[str, Node, Node] | None:
+    """The table, key and fallback of one lookup that answers for an absent key.
+
+    Nothing if this node is not such a lookup. Both spellings are read here so the clause
+    itself names neither."""
+    if node.type in spec["call_types"]:
+        fn = node.child_by_field_name(spec["call_fn"])
+        args = node.child_by_field_name(spec["call_args"])
+        if fn is None or args is None or fn.type not in spec["member_types"]:
+            return None
+        if node_text(fn, raw).split(".")[-1] not in spec["fallback_methods"]:
+            return None
+        given = [c for c in args.named_children]
+        obj = fn.child_by_field_name("object") or fn.child_by_field_name("value")
+        if obj is None or obj.type != "identifier" or len(given) < 2:
+            return None
+        return node_text(obj, raw), given[0], given[1]
+
+    if node.type in spec["comparison_types"] or node.type == "binary_expression":
+        operator = node.child_by_field_name("operator")
+        left = node.child_by_field_name("left")
+        right = node.child_by_field_name("right")
+        if operator is None or left is None or right is None:
+            return None
+        if node_text(operator, raw) not in spec["fallback_operators"]:
+            return None
+        if left.type not in spec["subscript_types"]:
+            return None
+        table = left.child_by_field_name("object") or left.child_by_field_name("value")
+        key = left.child_by_field_name("index") or left.child_by_field_name("subscript")
+        if table is None or table.type != "identifier" or key is None:
+            return None
+        return node_text(table, raw), key, right
+    return None
 
 
 # --------------------------------------------------------------------------
 # 19. Atomic test-and-set over check-then-act
 # --------------------------------------------------------------------------
-
-def _mentions(default: ast.expr, key: ast.expr) -> bool:
-    """Whether the default expression is built from the key it is standing in for."""
-    wanted = ast.dump(key)
-    return any(ast.dump(node) == wanted for node in ast.walk(default))
 
 
 def check_then_act(source: dict) -> list[Finding] | None:

@@ -238,7 +238,8 @@ CLAUSES: tuple[Clause, ...] = (
             rules.heavy_step_definitions),
     _clause(16, "Declarative equivalents over lifecycle hooks", _TREE, rules.lifecycle_hooks),
     _clause(17, "Strangler pattern for migration", _NOTHING, rules.strangler_migration),
-    _clause(18, "Dispatch tables close open input", _TREE, rules.open_dispatch),
+    _clause(18, "Dispatch tables close open input", _TREE, rules.open_dispatch,
+            reads=_TREE_READER),
     _clause(19, "Atomic test-and-set over check-then-act", _TREE, rules.check_then_act),
 )
 

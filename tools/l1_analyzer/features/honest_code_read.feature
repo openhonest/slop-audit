@@ -187,3 +187,9 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When _written_name reaches through the subscript to the thing subscripted
     Then both report the name another function could mention
     But a write to something that is not a name at all reports nothing
+
+  Scenario: _walk_own_scope visits what belongs to one scope and stops at the next
+    Given a top-level function holding a local variable
+    When _walk_own_scope records the definition and refuses to descend into its body
+    Then the local stays the function's own
+    But exempting the starting node would defeat the rule, because that node is the function

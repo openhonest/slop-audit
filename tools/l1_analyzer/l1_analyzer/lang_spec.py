@@ -81,6 +81,12 @@ class LangSpec(TypedDict, total=False):
     # is the grammar's own answer rather than a per-language guess.
     default_param_types: tuple[str, ...]
     default_param_name: str
+    # The two ways a language supplies a value for a key that is not in a table. One is a
+    # method taking the key and the answer to give when it is absent; the other is an
+    # operator to the right of an ordinary lookup. A language may have both, either, or
+    # neither, and a clause reading them names no language.
+    fallback_methods: frozenset[str]
+    fallback_operators: frozenset[str]
     # Literals that hold other values. `literal_types` carries the scalars; an empty list or
     # an empty map is just as much a value nobody chose, and is the default that bites.
     container_literal_types: frozenset[str]
@@ -317,6 +323,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "constructor_types": (),
         "default_param_types": ("default_parameter", "typed_default_parameter"),
         "default_param_name": "name",
+        "fallback_methods": frozenset({"get"}),
+        "fallback_operators": frozenset(),
         "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
@@ -401,6 +409,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "constructor_types": (),
         "default_param_types": ("assignment_pattern",),
         "default_param_name": "left",
+        "fallback_methods": frozenset(),
+        "fallback_operators": frozenset({"??", "||"}),
         "container_literal_types": frozenset({"array", "object"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
@@ -475,6 +485,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "constructor_types": ("constructor_declaration",),
         "default_param_types": (),
         "default_param_name": "",
+        "fallback_methods": frozenset({"getOrDefault"}),
+        "fallback_operators": frozenset(),
         "container_literal_types": frozenset({"array_initializer"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
@@ -561,6 +573,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "constructor_types": ("constructor_declaration",),
         "default_param_types": ("parameter",),
         "default_param_name": "name",
+        "fallback_methods": frozenset({"GetValueOrDefault"}),
+        "fallback_operators": frozenset({"??"}),
         "container_literal_types": frozenset({"array_creation_expression", "initializer_expression"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
@@ -640,6 +654,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "constructor_types": (),
         "default_param_types": (),
         "default_param_name": "",
+        "fallback_methods": frozenset({"unwrap_or", "unwrap_or_else", "unwrap_or_default"}),
+        "fallback_operators": frozenset(),
         "container_literal_types": frozenset({"array_expression", "tuple_expression"}),
         "instance_ref_style": "member",
         "instance_enum": "self_usage",
@@ -725,6 +741,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "constructor_types": (),
         "default_param_types": ("optional_parameter",),
         "default_param_name": "name",
+        "fallback_methods": frozenset({"fetch", "dig"}),
+        "fallback_operators": frozenset({"||"}),
         "container_literal_types": frozenset({"array", "hash"}),
         "instance_ref_style": "member",
         "instance_enum": "ruby_ivar",
@@ -810,6 +828,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "constructor_types": (),
         "default_param_types": (),
         "default_param_name": "",
+        "fallback_methods": frozenset(),
+        "fallback_operators": frozenset(),
         "container_literal_types": frozenset({"initializer_list"}),
         "instance_ref_style": "identifier",
         "instance_enum": "none",
@@ -908,6 +928,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "constructor_types": (),
         "default_param_types": (),
         "default_param_name": "",
+        "fallback_methods": frozenset(),
+        "fallback_operators": frozenset(),
         "container_literal_types": frozenset({"composite_literal"}),
         "instance_ref_style": "member",
         "instance_enum": "none",

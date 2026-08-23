@@ -291,17 +291,10 @@ def test_the_strangler_clause_never_returns_a_verdict():
 # 18. Dispatch tables close open input
 # --------------------------------------------------------------------------
 
-def test_a_lookup_with_a_default_is_found():
-    """It files an input nobody wrote a rule for under an answer written for a different
-    input, and the default re-opens the space while the code still reads closed."""
-    found = rules.open_dispatch(_module(
-        "HANDLERS = {'a': one, 'b': two}\n\n\ndef run(kind):\n    return HANDLERS.get(kind, one)(1)\n"))
-    assert found
-
-
-def test_a_subscript_lets_an_unknown_key_raise():
-    assert rules.open_dispatch(_module(
-        "HANDLERS = {'a': one}\n\n\ndef run(kind):\n    return HANDLERS[kind](1)\n")) == []
+# Its cases live in test_a_clause_means_the_same_in_every_language.py now. The clause reads
+# the shared node vocabulary. Two languages pass the fallback as an argument and two put it
+# to the right of the lookup as an operator, so a fixture in one language alone would leave
+# half the rule unmeasured.
 
 
 # --------------------------------------------------------------------------
@@ -373,38 +366,6 @@ def test_a_handler_that_returns_a_falsy_stand_in_is_still_swallowing(stand_in):
     found = rules.swallowed_exceptions(_module(
         f"def f(x):\n    try:\n        return g(x)\n    except ValueError:\n        return {stand_in}\n"))
     assert found, stand_in
-
-
-def test_a_default_derived_from_the_key_records_the_gap():
-    """Rule 18's objection is that a default files an input nobody wrote a rule for UNDER
-    AN ANSWER WRITTEN FOR A DIFFERENT INPUT. A default that is the key itself does the
-    opposite: the unknown key comes back as itself, so it cannot be mistaken for a row
-    somebody wrote, and a reader sees exactly which key had no rule.
-
-    Three sites in this package do that deliberately, one of them with a docstring saying
-    so in almost these words, and the clause was convicting all three."""
-    assert rules.open_dispatch(_module(
-        "COPY = {'a': 'A'}\n\n\ndef render(key):\n    return COPY.get(key, key)\n")) == []
-
-
-def test_a_default_that_names_the_key_in_a_message_records_the_gap():
-    assert rules.open_dispatch(_module(
-        "REASONS = {2: 'interrupted'}\n\n\n"
-        "def why(code):\n    return REASONS.get(code, f'unknown exit {code}')\n")) == []
-
-
-def test_a_default_that_is_a_shared_constant_is_still_open():
-    """`_BAND_WORD.get(band, "No data")` is the shape the rule is about: a band the card
-    does not know renders identically to a band that was never measured."""
-    found = rules.open_dispatch(_module(
-        "WORDS = {'Healthy': 'good'}\n\n\ndef word(band):\n    return WORDS.get(band, 'No data')\n"))
-    assert found
-
-
-def test_a_default_naming_a_different_row_is_still_open():
-    found = rules.open_dispatch(_module(
-        "HANDLERS = {'a': one, 'b': two}\n\n\ndef run(kind):\n    return HANDLERS.get(kind, one)\n"))
-    assert found
 
 
 def test_a_decorator_that_merely_mentions_a_hook_is_not_a_hook():
