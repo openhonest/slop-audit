@@ -1,6 +1,6 @@
 [project]
 name = "slop-audit-l1"
-version = "0.1.0"
+version = "1.0.0"
 description = "Reference Python implementation of Slop Audit Layer 1 indicators (L1.1-L1.20). Language-agnostic where possible; tree-sitter based for source analysis (Python, Java, JavaScript, TypeScript, C#, Ruby, Go, Rust, C)."
 authors = [{ name = "Open Honest Foundation" }]
 license = { text = "Apache-2.0" }

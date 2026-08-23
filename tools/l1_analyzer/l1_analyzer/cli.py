@@ -23,6 +23,39 @@ from l1_analyzer import (
 )
 from l1_analyzer.incomplete import IncompleteCode
 from l1_analyzer.indicators import detect_primary_language
+
+# Which indicators each stage computes. One table, read by the branches below.
+#
+# These were three literal tuples inside three `if` conditions, so nothing held the set of
+# valid indicators and nothing could refuse a value outside it. `--indicators banana`
+# selected no stage, produced an empty panel and exited 0, and a caller could not tell that
+# from an audit that ran and found nothing. An input space left open by a dispatch that
+# reads closed is L1.21.18, and this tool reports that clause against other people's code.
+_GIT_INDICATORS = frozenset({"1", "2", "3", "4", "5", "6", "7", "8"})
+_CONFIG_INDICATORS = frozenset({"9", "10", "11"})
+_SOURCE_INDICATORS = frozenset({"12", "13", "14", "15", "16", "17", "18", "19", "20"})
+
+INDICATORS = _GIT_INDICATORS | _CONFIG_INDICATORS | _SOURCE_INDICATORS
+
+
+def _selected_indicators(given: str) -> frozenset[str] | None:
+    """The indicators the caller asked for, or None for every one of them.
+
+    Refuses a value no stage can run. Exiting 0 with an empty panel told a caller their
+    audit found nothing, when what happened is that nothing recognised what they typed."""
+    if given == "all":
+        return None
+    asked = frozenset(part.strip() for part in given.split(",") if part.strip())
+    unknown = sorted(asked - INDICATORS)
+    if unknown or not asked:
+        # Printed here rather than carried on the exception. A message riding on SystemExit
+        # is shown by the interpreter, so anything embedding this CLI gets the exit code
+        # and no reason at all.
+        print(f"--indicators: cannot run {', '.join(unknown) or 'an empty list'}. "
+              f"It takes bare numbers or 'all', so L1.17 is written 17. "
+              f"Known: {', '.join(sorted(INDICATORS, key=int))}.", file=sys.stderr)
+        raise SystemExit(2)
+    return asked
 from l1_analyzer.scope import PRODUCTION
 
 # Why the thread-safety meter has no reading, by the verdict it returned instead of one. A
@@ -806,22 +839,22 @@ def main(argv: list[str] | None) -> int:
     # string and the additive payloads, and a reader must narrow before use.
     results: dict[str, object] = {}
 
-    inds = [i.strip() for i in args.indicators.split(",")] if args.indicators != "all" else None
+    inds = _selected_indicators(args.indicators)
 
     # L1.1-8: git based, language agnostic
-    if inds is None or any(i in ("1","2","3","4","5","6","7","8","all") for i in (inds or [])):
+    if inds is None or inds & _GIT_INDICATORS:
         git_results = indicators.compute_git_indicators(
             args.repo, since=args.since, until=args.until
         )
         results.update(git_results)
 
     # L1.9-11: config presence
-    if inds is None or any(i in ("9","10","11","all") for i in (inds or [])):
+    if inds is None or inds & _CONFIG_INDICATORS:
         config_results = indicators.compute_config_indicators(args.repo)
         results.update(config_results)
 
     # L1.12-20: source based -> tree-sitter, plus the runtime L1.19/L1.20 harness
-    if inds is None or any(i in ("12","13","14","15","16","17","18","19","20","all") for i in (inds or [])):
+    if inds is None or inds & _SOURCE_INDICATORS:
         source_results = indicators.compute_source_indicators(
             args.repo, lang=args.lang, exec_tests=not args.no_exec, timeout_seconds=args.timeout,
             classify_state_bounds=not args.no_state_bounds, python_executable=args.python,

@@ -110,3 +110,9 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     When _report_facets audits the pair
     Then it prints the coverage and the Silence index beside each other, then every silent facet grouped by kind
     But undeclared domains are listed apart from the index, because those are closed by declaring a type rather than by adding a test, so counting them would blame the suite for a gap in the signature
+
+  Scenario: _selected_indicators refuses an indicator no stage can run
+    Given a caller who typed L1.17 where the flag takes 17
+    When _selected_indicators checks what they asked for against the one table of indicators
+    Then it names the value, shows the form that would have worked, and exits 2
+    But "all" selects every stage, which is the absence of a filter rather than an empty one

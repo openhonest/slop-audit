@@ -72,11 +72,13 @@ docker run --rm -v "/path/to/repo:/repo:ro" slop-audit
 
 ### 3. The Python reference
 
+**Version 1.0.0.** The tool is versioned separately from the methodology, and only the tool is at 1.0. The flags, the `--format json` document, and the exit codes are stable from here; see [`tools/l1_analyzer/CHANGELOG.md`](tools/l1_analyzer/CHANGELOG.md) for what that covers and what it does not. The methodology itself is still a v0 frame draft: the eighteen-dimension catalog in `spec/dimensions/` is a stub, which its own README says.
+
 The canonical instrument. It computes every indicator the portable binary does, plus the finite-testability analysis (L1.18, L1.18b), the runtime indicators (L1.19 coverage, L1.20 determinism), the additive thread-surface and path-cover checks, and the opt-in prove loops.
 
 ```bash
 cd tools/l1_analyzer
-uv sync --extra dev
+uv sync --extra dev                             # Python 3.13, pinned by .python-version
 uv run slop-audit-l1 /path/to/repo              # report card
 uv run slop-audit-l1 /path/to/repo --no-exec    # skip running the target's test suite
 uv run slop-audit-l1 /path/to/repo --format json
