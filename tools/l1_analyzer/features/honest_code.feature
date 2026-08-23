@@ -133,9 +133,9 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     Then those strings are skipped, since a docstring IS declared documentation and source inside one is an example rather than shipped content
     But a template genuinely held in a docstring is missed, and that limit is stated because its failure mode is silence
 
-  Scenario: _parses_cleanly_as names the language whose grammar accepts a block whole
+  Scenario: _accepted_by lists every grammar that takes a block whole
     Given the text of a string constant and the language of the file holding it
-    When _parses_cleanly_as tries the grammars of the other languages
+    When _accepted_by tries the grammars of every language but the file's own
     Then a parse with no error node and some named structure in it names that language
     But tree-sitter accepts almost anything and reports trouble as error nodes rather than as failure, so the absence of them is the test and resemblance is never enough
 
@@ -180,3 +180,9 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     When someone asks whether the migration was sequenced correctly
     Then the clause records that nothing checked it
     But no file, and no set of files, carries the sequence of the work that produced them
+
+  Scenario: _findings_in runs the clauses on one embedded block
+    Given a block of another language inside a readable file
+    When _findings_in reads it through that language's own vocabulary and runs every clause that can
+    Then the findings travel with the block, at the block's own lines
+    But a block nobody could name has no vocabulary to read it through and yields nothing

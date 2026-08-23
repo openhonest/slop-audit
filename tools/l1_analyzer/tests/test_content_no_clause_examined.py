@@ -107,7 +107,10 @@ def test_the_report_says_the_file_was_not_fully_examined():
     looked at is a reading a person can act on; a hundred per cent alone is not."""
     printed = honest_code.report(honest_code.assess_file_text(WIDGET, "m.py"))
     assert "javascript" in printed.lower()
-    assert "no clause examined" in printed.lower()
+    # The disclosure, not its wording. This pinned the phrase "no clause examined" until the
+    # blocks began carrying what the clauses found in them, at which point the sentence
+    # became false: the clauses did examine it, separately, and that is the useful part.
+    assert "does not cover" in printed
 
 
 def test_the_hook_says_it_too():
@@ -310,3 +313,94 @@ def test_the_grammars_this_reader_loaded_are_stated_rather_than_discovered_per_c
     """A table built once at import, so a caller asks what is there instead of parsing and
     catching to find out."""
     assert set(honest_code.GRAMMARS) >= {"html", "css"}
+
+
+# ---------------------------------------------------------------------------
+# Naming the language was never the point
+#
+# A peer measuring real work hit a twelve-line SQL query inside a PostgreSQL driver,
+# reported as ruby. The ruby grammar accepts it whole, there is no SQL grammar, so that
+# label can never be right, and a database driver holds dozens of those. A field that
+# reports a wrong name and nothing else teaches a reader to skip it, which costs the case
+# it was built for.
+#
+# The fix is not a better guess at the language. Run the clauses on the block and report
+# what they say. Measured on three blocks: the SQL misnamed as ruby fires nothing, because
+# it is not ruby and has none of ruby's shapes. A real embedded widget fires three clauses.
+# A block whose language is ambiguous between five grammars still fires the clause that was
+# true of it whichever name it was given.
+#
+# So a wrong name costs nothing once the findings travel with the block, and the reader gets
+# the thing they can act on instead of a label they cannot.
+# ---------------------------------------------------------------------------
+
+SQL_IN_A_DRIVER = (
+    "def primary_key(table):\n"
+    "    return QUERY\n\n\n"
+    "QUERY = '''\n"
+    "SELECT a.attname as column_name\n"
+    "FROM pg_index i\n"
+    "JOIN pg_attribute a ON a.attrelid = i.indrelid\n"
+    "WHERE i.indisprimary\n"
+    "ORDER BY a.attnum;\n"
+    "'''\n"
+)
+
+WIDGET_IN_A_PAGE = (
+    "SCRIPT = '''\n"
+    "function send(channel, data) {\n"
+    "  try { return go(data); } catch (e) { return null; }\n"
+    "}\n"
+    "'''\n"
+)
+
+
+def test_a_block_carries_what_the_clauses_found_in_it():
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET_IN_A_PAGE, "m.py"))
+    assert found, "the widget is embedded source and has to be seen"
+    assert found[0]["findings"], "a block with no findings attached tells a reader nothing"
+    assert any(f["clause"] == "L1.21.8" for f in found[0]["findings"]), found[0]["findings"]
+
+
+def test_a_misnamed_block_reports_nothing_because_it_is_not_that_language():
+    """The SQL case, and the whole argument. It is named ruby because ruby accepts it, and
+    every ruby clause then finds nothing in it, because it is not ruby."""
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(SQL_IN_A_DRIVER, "m.py"))
+    assert found, "the block is still disclosed: the share above did not cover it"
+    assert found[0]["findings"] == [], found[0]["findings"]
+
+
+def test_the_report_shows_a_block_that_found_something_and_not_one_that_did_not():
+    """A driver holding dozens of queries must not produce dozens of lines that say only
+    that a name was guessed."""
+    noisy = honest_code.report(honest_code.assess_file_text(SQL_IN_A_DRIVER, "m.py"))
+    useful = honest_code.report(honest_code.assess_file_text(WIDGET_IN_A_PAGE, "m.py"))
+    assert "swallow" in useful.lower() or "reports success" in useful
+    assert "ruby" not in noisy
+
+
+def test_the_name_is_a_pick_and_the_other_candidates_travel_with_it():
+    """The naming is UNSOLVED, and this test records how far it got rather than hiding it.
+
+    Counting acceptors was tried first, on the theory that many of them means the name is a
+    coin flip. Two one-line functions are taken whole by five grammars, and naming that
+    block `c` gave a finding whose symbols read "function, function", which is a grammar's
+    confusion reaching a person as a fact about their code.
+
+    The theory failed under measurement. A REAL embedded widget is taken by three grammars,
+    csharp among them, so every cut that refused the five refused the widget too, and the
+    widget is the case this field exists for. Alphabetical order then names that widget
+    csharp, which is wrong.
+
+    So the ambiguity is disclosed rather than acted on. A missed widget is the silence this
+    was built to stop; a finding under a doubtful name is noise a reader can discount, once
+    they are shown the other candidates."""
+    real = ("WIDGET = '''\n"
+            "function send(channel, data) {\n"
+            "  try { return go(data); } catch (e) { return null; }\n"
+            "}\n"
+            "'''\n")
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(real, "m.py"))
+    assert found[0]["findings"], "the case this field exists for"
+    assert "javascript" in found[0]["also_accepted_by"], found[0]
+    assert found[0]["language"] not in found[0]["also_accepted_by"]

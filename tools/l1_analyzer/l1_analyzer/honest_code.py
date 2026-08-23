@@ -158,6 +158,7 @@ _STYLESHEET = "css"
 _EMBEDDING_ELEMENTS = ("script_element", "style_element")
 
 
+
 def _grammars() -> dict[str, Language]:
     """The grammars for the languages no clause reads, loaded once and stated.
 
@@ -180,11 +181,25 @@ class Unexamined(TypedDict):
 
     Not a clause and not graded. The Python in a file holding a JavaScript widget really
     does hold every clause that read it, and saying otherwise would invent a violation.
-    This says the other true thing: the file's substance was never examined."""
+    This says the other true thing: the file's substance was never examined.
+
+    THE FINDINGS ARE THE POINT, NOT THE LANGUAGE. A twelve-line SQL query inside a database
+    driver is accepted whole by the ruby grammar, there is no SQL grammar, so that name can
+    never be right and a driver holds dozens of such queries. Reporting a guessed name and
+    nothing else teaches a reader to skip the field, which costs the embedded-widget case it
+    was built for.
+
+    So the clauses are run on the block and travel with it. A misnamed block reports nothing,
+    because it is not that language and has none of that language's shapes. A real one
+    reports what a reader can act on, and the name it was given stops mattering."""
 
     language: str
     line: int
     lines: int
+    findings: list[Finding]
+    # The other grammars that also took this block whole. A name is a pick among these, and
+    # a reader discounting a finding needs to see how much of a pick it was.
+    also_accepted_by: list[str]
 
 
 class Assessment(TypedDict):
@@ -512,7 +527,36 @@ def unexamined_blocks(source: dict) -> list[Unexamined]:
         if lines < _BLOCK_LINES or not any(mark in node.value for mark in _CODE_MARKS):
             continue
         found += _blocks_in(node.value, source["language"], node.lineno)
-    return found
+    examined: list[Unexamined] = []
+    for block in found:
+        # The block's own text travels only this far. A reader wants the findings, and
+        # carrying every embedded block's source into the published record would put the
+        # file back into the report that is about the file.
+        text = block.pop("text")
+        examined.append({**block, "findings": _findings_in(block, text)})
+    return examined
+
+
+def _findings_in(block: Unexamined, text: str) -> list[Finding]:
+    """What every clause that reads the shared vocabulary says about one embedded block.
+
+    Only those clauses: the ones written against Python's own parser would be handed a tree
+    the runner did not build for this text. A clause that raises on the block is skipped
+    rather than reported, because a reader cannot act on this reader's own failure to parse
+    something it already said it could parse."""
+    # An unnamed block has no clauses to run: nobody knows which language's vocabulary to
+    # read it through, which is exactly what the empty name records.
+    if block["language"] not in _VOCABULARY:
+        return []
+    source = read_tree(text, block["language"])
+    source.update({"path": "", "language": block["language"], "text": text,
+                   "readable": True, "unreadable_reason": ""})
+    found: list[Finding] = []
+    for clause in CLAUSES:
+        if clause["reads"] != _TREE_READER:
+            continue
+        found += clause["check"](source) or []
+    return [{**f, "line": f["line"] + block["line"] - 1} for f in found]
 
 
 def _blocks_in(text: str, own: str, line: int) -> list[Unexamined]:
@@ -549,12 +593,26 @@ def _blocks_in(text: str, own: str, line: int) -> list[Unexamined]:
         # string is named markup. The block is unexamined content either way and only the
         # name is wrong, which is the direction to be wrong in.
         if any(n.type == "element" for n in rules.walk(wrapper)):
-            return [{"language": _MARKUP, "line": line, "lines": text.count("\n") + 1}]
+            return [{"language": _MARKUP, "line": line, "lines": text.count("\n") + 1,
+                     "findings": [], "text": text, "also_accepted_by": []}]
 
-    language = _parses_cleanly_as(text, own)
-    if not language:
+    accepted = _accepted_by(text, own)
+    if not accepted:
         return []
-    return [{"language": language, "line": line, "lines": text.count("\n") + 1}]
+    # The name is a pick among candidates, and the candidates travel with it. Counting them
+    # was tried first, on the theory that many acceptors means the name is a coin flip: two
+    # one-line functions are taken whole by five grammars, and naming that block `c` gave a
+    # finding whose symbols read "function, function". But a REAL embedded widget is taken
+    # by three, csharp among them, so any cut that refused the five refused the widget too,
+    # and the widget is the case this field exists for.
+    #
+    # So the pick stands and the ambiguity is disclosed beside it rather than acted on. A
+    # missed widget is the silence this was built to stop; a finding under a doubtful name
+    # is noise a reader can discount, once they are told.
+    language = accepted[0]
+    return [{"language": language, "line": line,
+             "lines": text.count("\n") + 1, "findings": [], "text": text,
+             "also_accepted_by": accepted[1:]}]
 
 
 def _docstrings(tree: ast.AST) -> set[int]:
@@ -581,26 +639,24 @@ def _docstrings(tree: ast.AST) -> set[int]:
     return declared
 
 
-def _parses_cleanly_as(text: str, own: str) -> str:
-    """The language whose grammar accepts this text whole, or nothing.
+def _accepted_by(text: str, own: str) -> list[str]:
+    """Every grammar OTHER than the file's own that takes this text whole, in name order.
 
-    Only a grammar OTHER than the file's own, and only a parse with no error node and some
-    named structure in it. tree-sitter accepts almost anything and reports the trouble as
-    error nodes rather than as a failure, so the absence of them is the test.
+    A parse with no error node and some named structure in it. tree-sitter accepts almost
+    anything and reports the trouble as error nodes rather than as a failure, so the absence
+    of them is the test.
 
-    Markup is not tried here at all. Its caller tries it first and goes one grammar deeper
-    when it finds an element, because it is the most permissive grammar in this set and
-    would otherwise claim blocks a stricter one should have."""
-    # Markup that CARRIES an embedded element is tried first, because that is the strongest
-    # signal available and the alternatives are not merely weaker but wrong. TypeScript's
-    # grammar reads `<script>` as JSX and accepts a whole HTML block, so a plain sweep of
-    # the languages in name order claimed markup as TypeScript, and which one won was
-    # alphabetical rather than decided.
-    for language in sorted({*_VOCABULARY, _STYLESHEET} - {own}):
-        root = _accepts_whole(text, language)
-        if root is not None and root.named_child_count:
-            return language
-    return ""
+    The LIST rather than a winner, because the count is the evidence. Returning one name
+    made "nothing accepted this" and "everything accepted this" the same answer, and they
+    are opposite facts: the first is not a block at all, the second is a block whose name
+    nobody can know.
+
+    Markup is not tried here. Its caller tries it first and goes one grammar deeper when it
+    finds an element, because it is the most permissive grammar in this set and would
+    otherwise claim blocks a stricter one should have."""
+    return [language for language in sorted({*_VOCABULARY, _STYLESHEET} - {own})
+            if (root := _accepts_whole(text, language)) is not None
+            and root.named_child_count]
 
 
 def _markup_parts(root: "Node", text: str) -> list[tuple[str, int]]:
@@ -662,9 +718,22 @@ def report(assessment: Assessment) -> str:
     if assessment["unreadable_reason"]:
         lines += [f"> {assessment['unreadable_reason']}", ""]
     for block in assessment["unexamined"]:
-        lines += [(f"> line {block['line']}: {block['lines']} lines that parse as "
-                   f"{block['language']}, and no clause examined them. The share above is "
-                   "over this file's own language only."), ""]
+        # The language is named only where the findings corroborate it. A block that fires
+        # nothing may well not be the language a grammar accepted it as: twelve lines of SQL
+        # are accepted whole by the ruby grammar, there is no SQL grammar, and a database
+        # driver holds dozens of them. Printing that guess dozens of times teaches a reader
+        # to skip the field, which costs the embedded-widget case it exists for.
+        if not block["findings"]:
+            lines += [(f"> line {block['line']}: {block['lines']} lines are not this file's "
+                       "language. Every clause that could read them found nothing, and they "
+                       "are outside the share above either way."), ""]
+            continue
+        lines += [(f"> line {block['line']}: {block['lines']} lines of {block['language']} "
+                   f"that the share above does not cover. {len(block['findings'])} finding(s) "
+                   "in them:"), ""]
+        for finding in block["findings"]:
+            lines.append(f"- `{finding['clause']}:{finding['line']}` — {finding['detail']}")
+        lines.append("")
 
     broken = [c for c in assessment["clauses"] if c["decided"] and c["findings"]]
     held = [c for c in assessment["clauses"] if c["decided"] and not c["findings"]]
@@ -721,10 +790,15 @@ def hook_report(assessment: Assessment) -> str:
     name = assessment["path"]
     lines: list[str] = []
     for block in assessment["unexamined"]:
-        # Not a violation, so no remedy line. It is the one thing that stops a clean hook
-        # result reading as a clean file.
-        lines.append(f"{name}:{block['line']} {block['lines']} lines parse as "
-                     f"{block['language']} and no clause examined them")
+        # A block that fires nothing is not worth an agent's attention mid-edit. It was read
+        # by every clause that could read it and they found nothing, and the language it was
+        # named as may well be wrong: a database driver's SQL is accepted whole by the ruby
+        # grammar and there is no SQL grammar. Printing that guess on every query is what
+        # teaches an agent to skip the output.
+        for finding in block["findings"]:
+            lines.append(f"{name}:{finding['line']} {finding['clause']} "
+                         f"in embedded {block['language']}: {finding['detail']}")
+            lines.append(f"    instead: {finding['instead']}")
     for clause in assessment["clauses"]:
         for finding in clause["findings"]:
             lines.append(f"{name}:{finding['line']} {clause['code']} {finding['detail']}")
