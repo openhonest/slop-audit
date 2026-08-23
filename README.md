@@ -86,6 +86,23 @@ uv run slop-audit-l1 /path/to/repo --format json
 
 L1.19 and L1.20 run the target repo's own test suite under the target's own runtime, which the tool detects from the repo (`.venv`, rustup, `go.mod`, `global.json`, nvm, rbenv). Pass `--no-exec` to skip that half. Nothing else in Layer 1 executes the code under audit.
 
+### L1.21, the Honest Code conformity check — optional, and strict
+
+**Nothing above runs it.** L1.21 is not part of the audit, it is not in the grade, and no panel includes it. It runs only when you ask for it by name:
+
+```bash
+uv run slop-audit-l1 --honest-code path/to/file.py [more files ...]
+uv run slop-audit-l1 path/to/repo --honest-code-clauses    # the per-clause panel
+```
+
+**It holds your code to the Honest Code and Honest Framework standards, not to a general one.** Nineteen clauses, one for each principle: no classes holding only data, no methods that should be free functions, I/O only at the boundary, no swallowed exceptions, no implicit defaults, no dispatch table left open, and the rest. Those are opinions about how software should be built, and the two standards state them. Every other indicator in this repository grades a stranger's codebase against a published band and hedges where it cannot decide. This one does not hedge, because nobody meets it who has not chosen it.
+
+**So it is deliberately harsh, and it fails.** A violation exits non-zero in every output format, which makes it usable as a commit hook or a build step. Clause 1 will tell you that two three-line functions differing by one word are two rows of a table you wrote as code. That is the standard, stated plainly, and it is the reason this is opt-in.
+
+**Where you disagree, say so in the file.** A comment `# honest-code-allow: L1.21.N - <your reason>` withholds one finding, and the reason is required. Withheld findings are still reported, separately, so a reader can audit the reasons instead of discovering silence.
+
+**What it can read.** Eight of the nineteen clauses read all nine languages. Two read the file's text. The remaining nine read Python only and report `unreadable` with a reason on anything else, so a score is always over the clauses that actually read your file, never over nineteen.
+
 ### What each one measures today
 
 | | Portable binary | Python reference |

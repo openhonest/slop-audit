@@ -429,14 +429,19 @@ def _report_honest_code(paths: list[Path], output_format: str) -> int:
     from l1_analyzer import honest_code
 
     assessments = [honest_code.assess_file(path) for path in paths]
+    # A broken clause exits non-zero in every shape, not only the hook's. L1.21 is opt-in
+    # and states an opinion, so running it and finding a violation IS the gate failing,
+    # which is what exit 1 has always meant here. The hook shape already did this and the
+    # other two returned 0 while printing violations, so a caller could not gate on them.
+    broken = any(c["decided"] and c["findings"] for a in assessments for c in a["clauses"])
     if output_format == "json":
         one = assessments[0] if len(assessments) == 1 else assessments
         print(json.dumps(one, indent=2, default=str))
-        return 0
+        return 1 if broken else 0
     if output_format == "text":
         for assessment in assessments:
             print(honest_code.report(assessment))
-        return 0
+        return 1 if broken else 0
 
     lines: list[str] = []
     for path, assessment in zip(paths, assessments):

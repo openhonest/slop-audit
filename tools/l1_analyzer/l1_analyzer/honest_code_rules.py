@@ -104,6 +104,10 @@ def dispatch_chains(source: dict) -> list[Finding] | None:
     Two or more elif arms, because one `if` and one `else` is a binary choice and a table
     starts where the third case would otherwise be another arm.
 
+    Reported beside the functions that are one function. One principle, two ways of
+    breaking it: a chain that should be a table, and a table filled with code where its
+    rows should have carried the words.
+
     Not decided: whether the axis of variation is worth naming. The rule says to build a
     table when you can name the axis and it has a finite set of kinds, and nothing here
     reads that."""
@@ -119,7 +123,63 @@ def dispatch_chains(source: dict) -> list[Finding] | None:
                 f"{len(names)} arms dispatch on `{names[0]}` to select behaviour",
                 "a dict mapping each value to the function that handles it, read by "
                 "subscript so an unknown key raises", ""))
+    return found + functions_of_one_shape(source)
+
+
+# A body big enough to have a shape at all. Deliberately low, because this clause is an
+# opinion and L1.21 is opt-in: anyone running it has already accepted that two functions
+# differing by a word are a table with two rows, however short they are.
+#
+# The floor buys almost nothing anyway, which is why it can be this low. Measured against
+# this package: a floor of 6 reports 13 groups, 12 reports 13, and 16 reports 12. Real code
+# does not sit near the boundary, so the strict end costs one extra finding and reads the
+# one-line pair the principle is actually about.
+_SHAPE_TOKENS = 8
+
+
+def functions_of_one_shape(source: dict) -> list[Finding]:
+    """Functions that are one function with different words in them.
+
+    Every name and every quoted string is erased and only the shape is kept, so two
+    functions that differ by a table name and a keyword read identically. This is clause 1
+    read from the other side: the chain became a table, and then the table was filled with
+    sixteen functions where its rows should have carried the text.
+
+    This clause is an OPINION, and it says so rather than hedging. L1.21 is opt-in and
+    nobody reaches it by accident, so the finding states the Honest position: two functions
+    differing by a word are two rows of a table somebody wrote as code. A reader who
+    disagrees on a given group declares it, which is what the allow marker is for."""
+    from l1_analyzer.clone_detect import normalized_tokens
+
+    spec, raw = source["spec"], source["raw"]
+    shapes: dict[str, list[Node]] = {}
+    for fn in function_nodes(source["root"], spec):
+        symbols = [symbol for symbol, _ in normalized_tokens(fn, source["language"])]
+        if len(symbols) < _SHAPE_TOKENS:
+            continue
+        shapes.setdefault(" ".join(symbols), []).append(fn)
+
+    found: list[Finding] = []
+    for group in shapes.values():
+        if len(group) < 2:
+            continue
+        # In file order, both the line and the names. `walk` promises no order, so the
+        # group was reported at whichever member came back first, and for one fixture that
+        # was the second function in the file. The line a reader is given is where they put
+        # the allow marker, so an anchor that can move between runs is a marker that stops
+        # working for a reason nobody can see.
+        group = sorted(group, key=lambda fn: fn.start_point)
+        names = [node_text(fn.child_by_field_name("name"), raw) or first_name(fn, raw)
+                 for fn in group]
+        found.append(_finding(
+            "L1.21.1", ", ".join(names), group[0].start_point[0] + 1,
+            f"{len(names)} functions leave one shape behind once every name and quoted "
+            f"string is erased, so what separates them is words: {', '.join(names)}",
+            "one function over a table, where each row carries the words that function "
+            "would have pasted in", ""))
     return found
+
+
 
 
 def data_classes(source: dict) -> list[Finding] | None:

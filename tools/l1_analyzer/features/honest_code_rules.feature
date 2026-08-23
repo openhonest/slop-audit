@@ -143,3 +143,9 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _caught_variable takes the last identifier before the body
     Then the bound name comes back for the first and nothing for the second
     But all five grammars put it there whether they field it or not
+
+  Scenario: functions_of_one_shape finds functions that are one function with other words
+    Given two generators differing only in a table name and a keyword
+    When functions_of_one_shape erases every name and quoted string and compares what is left
+    Then both leave the same shape and the pair is reported at the earlier of the two
+    But two functions doing genuinely different work leave different shapes and stay quiet
