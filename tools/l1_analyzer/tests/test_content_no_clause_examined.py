@@ -404,3 +404,40 @@ def test_the_name_is_a_pick_and_the_other_candidates_travel_with_it():
     assert found[0]["findings"], "the case this field exists for"
     assert "javascript" in found[0]["also_accepted_by"], found[0]
     assert found[0]["language"] not in found[0]["also_accepted_by"]
+
+
+# ---------------------------------------------------------------------------
+# Two renderings of one fact, and the test that fails when they drift
+#
+# `report` and `hook_report` each write their own sentence about a block, from the same
+# list. Both are legitimate: one is a document a person reads, the other is one line an
+# agent gets mid-edit, and collapsing them would serve neither. What is not legitimate is
+# that nothing failed when they disagreed, and on 2026-08-23 they did: the text rendering
+# was changed to stop naming a language nothing corroborated, and the hook kept printing
+# the old sentence for the rest of the session.
+#
+# A second renderer for a fact cannot be kept current by anyone, because nothing fails when
+# it drifts. Where the second renderer is worth keeping, this is the thing that has to
+# exist instead of the drift.
+# ---------------------------------------------------------------------------
+
+def test_both_renderings_carry_every_finding_from_an_embedded_block():
+    assessment = honest_code.assess_file_text(WIDGET_IN_A_PAGE, "m.py")
+    embedded = [f for b in assessment["unexamined"] for f in b["findings"]]
+    assert embedded, "the fixture has to produce findings or this asserts nothing"
+    text = honest_code.report(assessment)
+    hook = honest_code.hook_report(assessment)
+    for finding in embedded:
+        for rendering, name in ((text, "report"), (hook, "hook_report")):
+            assert finding["clause"] in rendering, (name, finding["clause"])
+            assert str(finding["line"]) in rendering, (name, finding["line"])
+
+
+def test_neither_rendering_names_a_language_nothing_corroborated():
+    """The drift that actually happened, in the direction it happened."""
+    assessment = honest_code.assess_file_text(SQL_IN_A_DRIVER, "m.py")
+    silent = [b for b in assessment["unexamined"] if not b["findings"]]
+    assert silent, "the fixture has to produce a silent block or this asserts nothing"
+    for rendering in (honest_code.report(assessment), honest_code.hook_report(assessment)):
+        for block in silent:
+            assert block["language"] not in rendering, block["language"]

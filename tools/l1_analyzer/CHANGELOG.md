@@ -8,6 +8,8 @@ The first release that promises a stable surface.
 
 **What is stable from here.** The `slop-audit-l1` command's flags and their meanings. The JSON document from `--format json`: its top-level keys, the `results` map keyed by indicator code, and `analyzer_version`, which reads from this package so the JSON and the package can never disagree. The exit codes: 0 for a completed run, 1 for a gate that failed, 2 for a refused argument. Breaking any of those means 2.0.0.
 
+**L1.21 is outside the promise, and it moves.** The Honest Code conformity check is opt-in, states an opinion, and is still being built out. Its output shape and its exit behaviour changed twice on the day 1.0.0 shipped, both times additively. Treat its JSON as unstable and read the README section before consuming it.
+
 **What is not covered by the promise.** The prose in reports and cards, which is written for a person and will keep improving. The `research/candidates/` directory, which is candidate work by definition. Anything behind `--prove`, which calls a model and is opt-in.
 
 **What this version can and cannot read.** Twenty-six indicators across nine languages. The L1.21 Honest Code assessment carries nineteen clauses; ten read every language the node vocabulary covers, two read the file's text, and nine still read Python's own parser and report `unreadable` with a reason on any other language. That count is published per file rather than assumed, so a share is always over the clauses that actually read the file.
