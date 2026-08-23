@@ -159,7 +159,10 @@ def test_the_card_makes_no_capability_claim_when_the_classifier_admitted_nothing
 def test_the_card_says_what_it_could_not_read(tmp_path):
     result = _classify(tmp_path, "m.rs", RUST_UNVISITED_FIELD, "rust")
     md = card.card_markdown(card.build_card("o/r", "rust", _results(result), ran_tests=False, analyzer_version="test"))
-    assert "insufficient basis" in md.lower()
+    # The card has to say it could not read, not say it in one fixed phrase. It led with
+    # "Insufficient basis" until 2026-08-23; that lead was two words of the tool's own
+    # vocabulary, and it now says the same thing in words a reader outside this project has.
+    assert "we do not have enough to grade this" in md.lower()
 
 
 def test_a_classifier_that_read_the_code_still_grades(tmp_path):
@@ -313,7 +316,11 @@ def test_one_visited_declaration_carries_the_unvisited_ones_and_the_report_says_
     assert model["grade"] is not None, "the disclosure belongs on a card that GRADED"
     for rendered in (card.card_markdown(model), card.card_html(model)):
         assert "a field declared inside a record type" in rendered
-        assert "never reached" in rendered
+        # The disclaimer, not its wording. Pinning the phrase measured the prose, and the
+        # prose was rewritten on 2026-08-23 because it was written in the vocabulary of the
+        # people who built the tool rather than the vocabulary of the person reading the card.
+        assert "never looked at" in rendered
+        assert "Nothing in the grade above counts" in rendered
 
 
 # --------------------------------------------------------------------------
