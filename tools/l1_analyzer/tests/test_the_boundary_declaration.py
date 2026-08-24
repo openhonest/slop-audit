@@ -69,3 +69,33 @@ def test_an_undeclared_reader_is_still_reported():
         "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["undeclared"]
     assert [f["symbol"] for f in found if f["withheld_by"] == "declaration"] == ["declared"]
+
+
+# ---------------------------------------------------------------------------
+# The shared edge
+#
+# Three tracers each read one small file and decided something from what it said. Splitting
+# them one at a time was producing the same declared reader three times, which is the shape
+# clause 1 names: three functions that are one function. It is one function here, in the
+# module that declares what a boundary is.
+# ---------------------------------------------------------------------------
+
+def test_the_shared_reader_hands_back_text():
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = pathlib.Path(directory) / "f"
+        path.write_text("18.17.0\n")
+        assert boundary.text_or_empty(path) == "18.17.0\n"
+
+
+def test_an_absent_or_unreadable_file_is_the_same_answer():
+    """Both mean the caller has nothing to read, and none of the three callers has anything
+    different to do about the two."""
+    assert boundary.text_or_empty(pathlib.Path("/no/such/file")) == ""
+
+
+def test_the_shared_reader_is_declared():
+    source = pathlib.Path(boundary.__file__).read_text()
+    declared = source.split("def text_or_empty")[0]
+    assert declared.rstrip().endswith("@boundary")

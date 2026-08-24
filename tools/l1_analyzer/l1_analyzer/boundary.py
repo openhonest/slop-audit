@@ -16,6 +16,7 @@ nothing here can tell the two apart.
 """
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import TypeVar
 
 F = TypeVar("F", bound=Callable[..., object])
@@ -28,3 +29,20 @@ def boundary(fn: F) -> F:
     a statement, and it would put a frame between a reader and the thing they came to
     read."""
     return fn
+
+
+@boundary
+def text_or_empty(path: Path) -> str:
+    """One small file's text, or nothing when it is absent or unreadable.
+
+    Absent and unreadable are one answer on purpose. Every caller here is asking whether a
+    repository says something in a file, and a file that says nothing and a file that cannot
+    be read are the same answer to that question: it does not say it.
+
+    Shared because splitting the tracers one at a time was producing this function three
+    times over, which is a table of one row written as three."""
+    try:
+        return path.read_text()
+    # honest-code-allow: L1.21.8 - the empty string IS the answer, not a stand-in for one: no caller can tell an absent file from an unreadable one because neither says the thing being asked about
+    except OSError:
+        return ""

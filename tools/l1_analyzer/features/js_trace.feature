@@ -142,3 +142,21 @@ Feature: js_trace — running a JavaScript or TypeScript project's own suite to 
     Then it returns a refusal and no package.json, or the parsed package.json and no refusal, so exactly one of the two is ever populated
     And both L1.19 and L1.20 ask it, so the two indicators cannot come to hold different preconditions for the same repo
 
+
+  Scenario: pin_in reads the version an .nvmrc selects
+    Given the text of an .nvmrc file
+    When pin_in takes its first line
+    Then that is the version nvm selected for this repository
+    But an empty file pins nothing, which is what an absent one says too
+
+  Scenario: major_in reads the major version an installed package.json declares
+    Given the text of a package.json inside node_modules
+    When major_in parses it and strips any range marker from the version
+    Then the major number comes back, or nothing with a reason naming the package
+    But a reason is always given, because a version nobody could read once proceeded to the measurement
+
+  Scenario: _read_installed hands back an installed package.json's text
+    Given the path of a package inside node_modules
+    When _read_installed reads it at the boundary
+    Then the text comes back for the decider to parse
+    But a file that cannot be read comes back as nothing, and the caller names that as the reason

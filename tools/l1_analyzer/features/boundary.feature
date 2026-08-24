@@ -33,3 +33,9 @@ Feature: boundary — declaring where this package meets the world
     When someone asks whether the decision was really lifted out of it
     Then the declaration is recorded and read by the clause
     But nothing here can tell an earned declaration from a stamp, so the split is a discipline rather than a check
+
+  Scenario: text_or_empty hands back one small file's text, or nothing
+    Given a path that may or may not exist
+    When text_or_empty reads it
+    Then the text comes back, and an absent or unreadable file comes back as nothing
+    But those two are one answer on purpose, because neither says the thing the caller is asking about

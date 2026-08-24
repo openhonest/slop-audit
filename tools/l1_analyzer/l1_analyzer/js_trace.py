@@ -31,6 +31,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -82,20 +83,29 @@ def _runtime_name(repo: Path, timeout_seconds: float) -> str:
     """The Node runtime that ran, named so the result says which environment measured it.
     Under nvm the version is the one `.nvmrc` selected; the pin is appended for confirmation."""
     version = _node_version(repo, timeout_seconds)
-    nvmrc = repo / ".nvmrc"
-    try:
-        pin = _first_line(nvmrc.read_text()) if nvmrc.exists() else ""
-    except OSError:
-        pin = ""
+    pin = pin_in(text_or_empty(repo / ".nvmrc"))
     pinned = f" (.nvmrc pins {pin})" if pin and pin != "no output" else ""
     return f"{version}{_using_nvm()}{pinned}"
+
+
+def pin_in(text: str) -> str:
+    """The version an `.nvmrc` selects, from its text. Nothing if it names none."""
+    return _first_line(text) if text else ""
+
+
 
 
 def _node_modules_present(repo: Path) -> bool:
     return (repo / "node_modules").is_dir()
 
 
+@boundary
 def _package_json(repo: Path) -> dict | None:
+    """The repository's own package.json, parsed, or nothing when it cannot be had.
+
+    Declared the boundary rather than split: there is no decision here to lift out. It
+    obtains bytes and hands back what they parse to, and the caller turns None into a
+    refusal to measure."""
     try:
         return json.loads((repo / "package.json").read_text())
     # honest-code-allow: L1.21.8 - the caller turns this None into _na("no readable package.json in the repo"), which covers absent and malformed alike and is a refusal to measure rather than a clean reading
@@ -118,11 +128,20 @@ def _installed_major(repo: Path, package: str) -> tuple[int | None, str]:
     The reason travels with the absence because the caller's guard used to read
     `if major is not None and major < 30`, so a version nobody could read PROCEEDED to the
     measurement. Unknown has to be its own answer, or an assumption is measured as a fact."""
-    installed = repo / "node_modules" / package / "package.json"
-    try:
-        version = json.loads(installed.read_text())["version"]
-    except OSError:
+    text = _read_installed(repo / "node_modules" / package / "package.json")
+    if text is None:
         return None, f"{package}'s installed package.json could not be read"
+    return major_in(text, package)
+
+
+def major_in(text: str, package: str) -> tuple[int | None, str]:
+    """The major version an installed package.json declares, and why it is unknown.
+
+    Every reason names the package and what was wrong with it, because a caller's guard
+    once read `if major is not None and major < 30` and a version nobody could read
+    PROCEEDED to the measurement."""
+    try:
+        version = json.loads(text)["version"]
     except json.JSONDecodeError:
         return None, f"{package}'s installed package.json is not valid JSON"
     except KeyError:
@@ -131,6 +150,16 @@ def _installed_major(repo: Path, package: str) -> tuple[int | None, str]:
         return int(str(version).lstrip("^~=v").split(".", 1)[0]), ""
     except ValueError:
         return None, f"{package}'s installed version {version!r} has no readable major number"
+
+
+@boundary
+def _read_installed(path: Path) -> str | None:
+    """One installed package.json's text, or nothing when it cannot be read."""
+    try:
+        return path.read_text()
+    # honest-code-allow: L1.21.8 - the None is the caller's "could not be read" reason, which it names and hands on, so nothing is reported as success
+    except OSError:
+        return None
 
 
 # ---------------------------------------------------------------------------

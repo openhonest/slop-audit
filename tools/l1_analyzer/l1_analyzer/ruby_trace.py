@@ -29,6 +29,7 @@ import re
 import shutil
 from pathlib import Path
 
+from l1_analyzer.boundary import text_or_empty
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -67,13 +68,11 @@ def _on_path(tool: str) -> str | None:
 
 
 def _lock_has_rspec(repo: Path) -> bool:
-    """True when Gemfile.lock names rspec - the third RSpec signal, so a repo whose specs
-    live outside a top-level spec/ directory is still detected as RSpec."""
-    try:
-        return "rspec" in (repo / "Gemfile.lock").read_text()
-    # honest-code-allow: L1.21.8 - this is the third of three RSpec signals and the other two are read independently, so an unreadable lock file cannot by itself decide the answer, and when no signal fires the caller refuses with a reason
-    except OSError:
-        return False
+    """True when Gemfile.lock names rspec, the third of three RSpec signals.
+
+    The other two are read independently, so a lock file that says nothing cannot by itself
+    decide the answer, and when no signal fires the caller refuses with a reason."""
+    return "rspec" in text_or_empty(repo / "Gemfile.lock")
 
 
 def _detect_runner(repo: Path) -> str | None:
