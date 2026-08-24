@@ -14,16 +14,22 @@ language or a reason, never the name of the request.
 
 import pathlib
 
-from l1_analyzer import cli, indicators
+from l1_analyzer import cli, gate, indicators
 
 
 def test_the_cli_resolves_the_language_in_one_place():
     """Counted over code only. The helper's own docstring quotes the pattern it replaced,
     and a check that cannot tell a description of a defect from the defect is a check
     nobody can keep green."""
-    lines = pathlib.Path(cli.__file__).read_text().split("\n")
-    reads = [n for n, line in enumerate(lines, start=1)
-             if 'results.get("lang"' in line.split("#", 1)[0] and not line.strip().startswith(("\"\"\"", "*", "REQUESTED"))
+    # Across the package rather than in one file. This read cli.py alone until
+    # `_audited_language` moved to gate.py on 2026-08-23, at which point it found zero and
+    # failed for the move rather than for a second copy. Where the resolver lives is not
+    # the invariant; that there is one of it is.
+    reads = [f"{path.name}:{n}"
+             for path in sorted(pathlib.Path(cli.__file__).parent.glob("*.py"))
+             for n, line in enumerate(path.read_text().split("\n"), start=1)
+             if 'results.get("lang"' in line.split("#", 1)[0]
+             and not line.strip().startswith(("\"\"\"", "*", "REQUESTED"))
              and "spelled" not in line]
     assert len(reads) == 1, (
         f"the audited language is read in {len(reads)} places ({reads}); copies can settle it differently"
@@ -32,8 +38,8 @@ def test_the_cli_resolves_the_language_in_one_place():
 
 def test_a_settled_language_is_taken_from_the_results(tmp_path):
     """When the source pass ran, its answer is the audited language, whatever was asked for."""
-    assert cli._audited_language({"lang": "rust"}, "auto", tmp_path) == "rust"
-    assert cli._audited_language({"lang": "rust"}, "python", tmp_path) == "rust"
+    assert gate._audited_language({"lang": "rust"}, "auto", tmp_path) == "rust"
+    assert gate._audited_language({"lang": "rust"}, "python", tmp_path) == "rust"
 
 
 def test_auto_is_settled_rather_than_passed_on(tmp_path):
@@ -41,11 +47,11 @@ def test_auto_is_settled_rather_than_passed_on(tmp_path):
     source pass would, rather than handing the word `auto` to a stage that will report it
     as an unsupported language."""
     (tmp_path / "a.py").write_text("x = 1\n")
-    resolved = cli._audited_language({}, "auto", tmp_path)
+    resolved = gate._audited_language({}, "auto", tmp_path)
     assert resolved != "auto"
     assert resolved == indicators.detect_primary_language(tmp_path)
 
 
 def test_an_explicit_request_stands_when_nothing_measured_it(tmp_path):
     """`--lang rust` with no source pass is an instruction, not a guess, so it is kept."""
-    assert cli._audited_language({}, "rust", tmp_path) == "rust"
+    assert gate._audited_language({}, "rust", tmp_path) == "rust"

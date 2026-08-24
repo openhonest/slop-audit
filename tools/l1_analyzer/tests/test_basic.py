@@ -8,7 +8,7 @@ import os
 import subprocess
 
 import pytest
-from l1_analyzer import indicators, pytest_trace, scope
+from l1_analyzer import gate, indicators, pytest_trace, scope
 from l1_analyzer.incomplete import IncompleteCode
 from l1_analyzer.indicators import (
     analyze_mutable_state,
@@ -325,10 +325,9 @@ def test_l1_15_java_comment_mentioning_suppresswarnings_is_documentation(tmp_pat
 def test_l1_15_the_ratchet_counts_what_the_indicator_counts(tmp_path):
     """The pre-commit gate and L1.15 must count by one rule. They unpacked the
     vocabulary separately, so a vocabulary added to one was invisible to the other."""
-    from l1_analyzer import cli
 
     (tmp_path / "A.java").write_text("class A {\n    @SuppressWarnings(\"unchecked\")\n    void m() {}\n}\n")
-    assert cli._count_type_escapes(tmp_path, "java") == 1
+    assert gate._count_type_escapes(tmp_path, "java") == 1
     assert indicators._compute_type_escapes(tmp_path, "java")["details"].startswith("1 escapes")
 
 

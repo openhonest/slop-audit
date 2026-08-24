@@ -39,11 +39,21 @@ repos:
         files: ^tools/l1_analyzer/(l1_analyzer/.*\.py|features/.*\.feature)$
 
       - id: slop-audit-self
-        name: slop audit (dogfood - god-files + finite-testability + type-escape ratchet)
+        name: slop audit (dogfood - god-files + finite-testability + type-escape and Honest Code ratchets)
         # --max-type-escapes is the Any / # type: ignore baseline: a new escape fails
         # the commit. Lower it as escapes are typed away; raising it is a deliberate,
         # reviewable change here in the config.
-        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 0
+        # --max-honest-code is the L1.21 baseline. This package is not at a hundred per
+        # cent, so a bright line would block every commit; the ratchet fails a NEW clause
+        # finding instead. Nothing enforced L1.21 here until 2026-08-23: it ran only when
+        # somebody typed the command, which is the condition under which a number drifts.
+        # Lower it as findings are fixed or declared; raising it is a deliberate change here.
+        #
+        # 45, not the 24 in the analyzer package. Running the check by hand had only ever
+        # covered l1_analyzer, so the other Python in this repository had never been
+        # measured against L1.21 at all: the Rust bundle's helper scripts, ui-audit, the
+        # paper arms, edit-replay and variance-decomposition carry 21 findings between them.
+        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 0 --max-honest-code 45
         language: system
         pass_filenames: false
         files: ^tools/l1_analyzer/.*\.py$
