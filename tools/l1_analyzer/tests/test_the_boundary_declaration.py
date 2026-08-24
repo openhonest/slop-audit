@@ -99,3 +99,30 @@ def test_the_shared_reader_is_declared():
     source = pathlib.Path(boundary.__file__).read_text()
     declared = source.split("def text_or_empty")[0]
     assert declared.rstrip().endswith("@boundary")
+
+
+# ---------------------------------------------------------------------------
+# Every declaration in the package, checked against what a declaration claims
+# ---------------------------------------------------------------------------
+
+def test_every_declared_boundary_actually_obtains_something():
+    """A declaration says "this function is an edge". A function that reaches nothing
+    outside the process is not an edge, and the decorator on it is a stamp.
+
+    This cannot tell a declaration from a suppression in general, which the module's own
+    docstring says. It can tell one thing: whether the function under the decorator touches
+    the world at all. Every one that does not is a suppression by construction."""
+    import re
+
+    package = pathlib.Path(boundary.__file__).parent
+    reaches = ("read_text", "read_bytes", "write_text", "write_bytes", "open(",
+               "subprocess", "Popen", "rglob", "which(", "stat(", "is_file", "is_dir",
+               "exists(", "iterdir", "TemporaryDirectory")
+    stamps = []
+    for path in sorted(package.glob("*.py")):
+        source = path.read_text()
+        for match in re.finditer(r"@boundary\n(?:@[\w.()=]+\n)*def (\w+)", source):
+            body = source[match.end():].split("\ndef ")[0]
+            if not any(reach in body for reach in reaches):
+                stamps.append(f"{path.name}:{match.group(1)}")
+    assert stamps == [], f"declared as edges and reach nothing outside the process: {stamps}"

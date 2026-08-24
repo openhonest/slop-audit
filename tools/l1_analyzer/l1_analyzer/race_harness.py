@@ -33,6 +33,7 @@ import subprocess
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import _run_untrusted
 
 RACE_OBSERVED = "race-observed"
@@ -115,6 +116,7 @@ def _na(reason: str, tool: str) -> RaceResult:
     return {"verdict": NA, "value": "n/a", "band": "n/a", "tool": tool, "findings": [], "details": reason}
 
 
+@boundary
 def _rust_toolchain_reason() -> str | None:
     """Why the Rust race toolchain can't run, or None if it looks available. A loud
     reason beats a false clean: absence is disclosed, never measured as safe."""
@@ -122,21 +124,40 @@ def _rust_toolchain_reason() -> str | None:
         return "needs cargo + rustup on PATH"
     try:
         toolchains = subprocess.run(["rustup", "toolchain", "list"], capture_output=True, text=True, timeout=30, check=False).stdout
+    # honest-code-allow: L1.21.8 - the reason IS the return value here, and it names the failure rather than hiding it: the caller refuses to measure and quotes this sentence
     except (subprocess.SubprocessError, OSError):
         return "could not query rustup toolchains"
+    return toolchain_reason_in(toolchains)
+
+
+def toolchain_reason_in(toolchains: str) -> str | None:
+    """Why the installed toolchains cannot run the sanitizer, or nothing if they can.
+
+    Read from what `rustup toolchain list` printed. Lifted out of the run above, which
+    could not be exercised on a machine without Rust, which is most machines that run this
+    suite."""
     if "nightly" not in toolchains:
         return "needs a nightly toolchain for -Zsanitizer=thread (rustup toolchain install nightly)"
     return None
 
 
+@boundary
 def _host_target() -> str | None:
     try:
         out = subprocess.run(["rustc", "-vV"], capture_output=True, text=True, timeout=30, check=False).stdout
     # honest-code-allow: L1.21.8 - the caller turns this None into _na("could not determine the host target triple for the sanitizer"), a refusal that names the same cause for both ways of getting here
     except (subprocess.SubprocessError, OSError):
         return None
-    m = re.search(r"^host:\s*(\S+)", out, re.MULTILINE)
-    return m.group(1) if m else None
+    return host_target_in(out)
+
+
+def host_target_in(banner: str) -> str | None:
+    """The host triple named in `rustc -vV`'s banner, or nothing.
+
+    Nothing rather than a guess: the caller turns it into a refusal that names the cause,
+    and a sanitizer pointed at the wrong target measures a machine nobody has."""
+    found = re.search(r"^host:\s*(\S+)", banner, re.MULTILINE)
+    return found.group(1) if found else None
 
 
 def _rust_tsan_command(target: str) -> list[str]:

@@ -53,7 +53,7 @@ repos:
         # covered l1_analyzer, so the other Python in this repository had never been
         # measured against L1.21 at all: the Rust bundle's helper scripts, ui-audit, the
         # paper arms, edit-replay and variance-decomposition carry 21 findings between them.
-        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 0 --max-honest-code 40
+        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 0 --max-honest-code 36
         language: system
         pass_filenames: false
         files: ^tools/l1_analyzer/.*\.py$

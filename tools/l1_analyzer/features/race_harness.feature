@@ -96,3 +96,15 @@ Feature: race_harness — running a repository's own tests under a race detector
     When confirmed_surface compares each finding's primary site and both conflicting sites against those files, matching on either path ending in the other
     Then it returns the findings that match, which are the sites where the static warning and the runtime observation agree
     And it matches by file rather than by line on purpose, because a race lands on the access line while the static finding sits on the declaration line of the same file
+
+  Scenario: toolchain_reason_in says why the installed toolchains cannot run the sanitizer
+    Given the output of rustup toolchain list
+    When toolchain_reason_in looks for a nightly among them
+    Then a list naming one gives no reason to refuse
+    But a list without one says what to install, because absence is disclosed rather than measured as safe
+
+  Scenario: host_target_in finds the host triple in the compiler's banner
+    Given the output of rustc -vV
+    When host_target_in reads the host line
+    Then the triple comes back for the sanitizer to target
+    But a banner naming no host yields nothing rather than a guess, because a sanitizer pointed at the wrong target measures a machine nobody has

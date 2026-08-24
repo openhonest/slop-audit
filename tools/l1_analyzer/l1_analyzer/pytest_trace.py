@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from l1_analyzer import incomplete
+from l1_analyzer.boundary import boundary
 
 
 class L1Result(TypedDict):
@@ -54,6 +55,7 @@ class L1Result(TypedDict):
     details: str
 
 
+@boundary
 def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str], timeout_seconds: float) -> subprocess.CompletedProcess[str]:
     """Run untrusted test code in a new process group; kill the whole group on
     timeout. Mirrors umbra.process.run_untrusted. Returncode 124 signals timeout.
@@ -143,6 +145,7 @@ def resolve_via_shim(repo: Path, tool: str, timeout_seconds: float) -> tuple[str
     return None, ""
 
 
+@boundary
 def _module_available(module: str, python_executable: str | None) -> tuple[bool, str]:
     """Whether `import module` succeeds in the interpreter that will run the suite, and why
     it did not.
