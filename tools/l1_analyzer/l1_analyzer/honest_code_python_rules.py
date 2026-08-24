@@ -234,7 +234,7 @@ def unscoped_resources(source: dict) -> list[Finding] | None:
                         found.append(_finding(
                             "L1.21.12", f"{node.name}.{target.attr}", statement.lineno,
                             "a resource with a manual lifecycle, waiting for an exception",
-                            "scope it: `with create_connection(config) as conn:`", ""))
+                            "make the resource a context manager and take it in a `with` block, so it is released on the path that raises as well as the one that returns", ""))
     return found
 
 
@@ -273,7 +273,7 @@ def lifecycle_hooks(source: dict) -> list[Finding] | None:
             found.append(_finding(
                 "L1.21.16", whole, node.lineno,
                 f"{whole} parks behaviour where the reader does not look",
-                "declare it where it happens, so the sequence is visible at the call site", ""))
+                "call the work directly at the point it is needed, so the sequence is visible at the call site rather than in a registration", ""))
     for node in ast.walk(source["tree"]):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -287,7 +287,7 @@ def lifecycle_hooks(source: dict) -> list[Finding] | None:
                 found.append(_finding(
                     "L1.21.16", node.name, node.lineno,
                     f"@{whole} runs this somewhere nobody reads",
-                    "call it where it happens", ""))
+                    "call the work directly at the point it is needed, so a reader sees it in the flow rather than in a registration that runs later", ""))
     return found
 
 

@@ -175,8 +175,8 @@ def functions_of_one_shape(source: dict) -> list[Finding]:
             "L1.21.1", ", ".join(names), group[0].start_point[0] + 1,
             f"{len(names)} functions leave one shape behind once every name and quoted "
             f"string is erased, so what separates them is words: {', '.join(names)}",
-            "one function over a table, where each row carries the words that function "
-            "would have pasted in", ""))
+            "replace them with one function over a table, where each row carries the "
+            "words that function would have pasted in", ""))
     return found
 
 
@@ -215,7 +215,7 @@ def data_classes(source: dict) -> list[Finding] | None:
             found.append(_finding(
                 "L1.21.2", name, node.start_point[0] + 1,
                 "the class holds data and does nothing a dict could not",
-                f"a TypedDict: `{name} = TypedDict(\"{name}\", {{...}})`", ""))
+                f"make `{name}` a TypedDict of the fields the constructor assigns, and move each accessor to a function taking that dict", ""))
     return found
 
 
@@ -261,7 +261,7 @@ def methods_wearing_a_class(source: dict) -> list[Finding] | None:
             found.append(_finding(
                 "L1.21.3", f"{owner}.{name}", method.start_point[0] + 1,
                 "the method reaches the receiver only for data it could have been passed",
-                f"a free function: `{name}_{owner.lower()}(data)`", ""))
+                f"move `{name}` to a module-level function taking the fields it reads, and let its callers pass those fields instead of the object", ""))
     return found
 
 
@@ -318,8 +318,8 @@ def inheritance_for_reuse(source: dict) -> list[Finding] | None:
             found.append(_finding(
                 "L1.21.5", name, node.start_point[0] + 1,
                 f"inherits from {', '.join(inherited)}, which hides where behaviour comes from",
-                "compose the steps at the point of assembly: `pipe(validate, authenticate, "
-                "create)`", ""))
+                "make each step its own function and call them in order at the point of "
+                "assembly, so a reader sees what runs without opening the parent", ""))
     return found
 
 
@@ -363,7 +363,7 @@ def imperative_dom(source: dict) -> list[Finding] | None:
     return [_finding(
         "L1.21.7", call, _line_of(text, call),
         f"{call} describes how, somewhere the reader has to go and find",
-        "an attribute that declares intent: hx-post, hx-target, hx-trigger", "")
+        "replace the listener with an attribute that declares the intent, such as hx-post, hx-target or hx-trigger, so the behaviour reads off the element", "")
         for call in _DOM_CALLS if call in text]
 
 
