@@ -122,3 +122,9 @@ Feature: scope — deciding which files are the code under audit and which are s
     When _read_text_files walks the whole tree, keeps the files whose suffix is in the set, and drops the ones in a vendored or scoped-out directory
     Then it returns the files it read with their text, decoded so an undecodable byte is replaced rather than raising, and a count of the files it could not read
     But it applies only the scope's directory markers, so a documentation file, a conventional tooling file or a loose root script that the source reader would have set aside is read here
+
+  Scenario: holds_a_test_marker says whether a file's first bytes name a test framework
+    Given the first 4 KiB of a file inside a directory named like a test directory
+    When holds_a_test_marker looks for the framework markers
+    Then a file importing a test framework corroborates the directory
+    But the file name is judged elsewhere, because a renamed directory must not corroborate itself

@@ -81,3 +81,9 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     When _selected_indicators checks what they asked for against the one table of indicators
     Then it names the value, shows the form that would have worked, and exits 2
     But "all" selects every stage, which is the absence of a filter rather than an empty one
+
+  Scenario: window_around takes the thirty lines either side of one
+    Given the lines of a file and the line a hazard sits on
+    When window_around clips thirty either side to what the file holds
+    Then a hazard near the top does not run off the start, and one near the bottom does not run off the end
+    But the window is chosen by index, so a hazard on line 50 is shown lines 21 to 80

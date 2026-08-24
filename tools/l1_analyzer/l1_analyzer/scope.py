@@ -16,6 +16,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer.boundary import boundary
+
 # The .NET and JVM file convention, in its original casing. Also used by L1.8.
 _TEST_STEM_SUFFIXES = ("Test", "Tests", "Spec", "Specs")
 
@@ -137,6 +139,7 @@ _TEST_FRAMEWORK_MARKERS = (
 
 
 # honest-code-allow: L1.21.9 - measured, not argued. One walk of this project's test tree costs 1.8ms over 464 entries and it is called once per file scoped underneath it, so uncached that one directory costs 464 walks and the cost grows as the square of the tree. test_a_cache_earns_its_place_or_goes.py measures the margin and fails if it stops holding. The sibling cache on the tree-sitter parser was measured the same way, found to save milliseconds across a whole audit, and deleted.
+@boundary
 @lru_cache(maxsize=4096)
 def _test_dir_corroborated(directory: Path) -> bool:
     """True when a directory named like a test directory actually holds test code.
@@ -161,9 +164,17 @@ def _test_dir_corroborated(directory: Path) -> bool:
             head = f.read_bytes()[:4096]
         except OSError:
             continue
-        if any(marker in head for marker in _TEST_FRAMEWORK_MARKERS):
+        if holds_a_test_marker(head):
             return True
     return False
+
+
+def holds_a_test_marker(head: bytes) -> bool:
+    """Whether the first bytes of a file name a test framework.
+
+    Lifted out of the walk above. The walk is a boundary and this is the question it asks of
+    each file, which could not be asked without a directory to walk."""
+    return any(marker in head for marker in _TEST_FRAMEWORK_MARKERS)
 
 
 def _test_file_by_name(path: Path) -> bool:

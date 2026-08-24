@@ -28,6 +28,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -79,6 +80,7 @@ def _tests_run(output: str) -> tuple[int, int]:
 # L1.19 decision-space coverage (region coverage via cargo-llvm-cov)
 # ---------------------------------------------------------------------------
 
+@boundary
 def _llvm_cov_report(repo: Path, timeout_seconds: float) -> tuple[dict | None, str]:
     """Run cargo-llvm-cov on the real crate once and return (parsed export JSON, reason).
     The JSON's data[0].files carries every file's coverage in one build, so a whole-repo

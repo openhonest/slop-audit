@@ -20,6 +20,7 @@ from l1_analyzer import (
     prove,
     thread_surface,
 )
+from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.gate import _audited_language, _run_gate
 from l1_analyzer.incomplete import IncompleteCode
 
@@ -78,15 +79,22 @@ def _selected_indicators(given: str) -> frozenset[str] | None:
 
 def _hazard_context(repo: Path, finding: dict[str, object]) -> str:
     """The code around a located hazard, handed to the generator as the only context."""
-    path = repo / finding["file"]
-    try:
-        lines = path.read_text(errors="ignore").splitlines()
-    except OSError:
-        return f"Located hazard: {finding['kind']} on {finding['symbol']} at {finding['file']}:{finding['line']}."
-    lo, hi = max(0, finding["line"] - 30), min(len(lines), finding["line"] + 30)
-    window = "\n".join(lines[lo:hi])
-    return (f"Located hazard: {finding['kind']} on `{finding['symbol']}` at "
-            f"{finding['file']}:{finding['line']}.\nSurrounding Rust source:\n{window}")
+    located = (f"Located hazard: {finding['kind']} on `{finding['symbol']}` at "
+               f"{finding['file']}:{finding['line']}.")
+    text = text_or_empty(repo / finding["file"])
+    if not text:
+        return located
+    return f"{located}\nSurrounding Rust source:\n{window_around(text.splitlines(), finding['line'])}"
+
+
+def window_around(lines: list[str], line: int) -> str:
+    """The thirty lines either side of one, clipped to what the file holds.
+
+    Lifted out of the reader above, which read a file and then chose from it in one
+    function, so a question as small as what a hazard near the top of a five-line file looks
+    like needed a temporary directory to ask."""
+    low, high = max(0, line - 30), min(len(lines), line + 30)
+    return "\n".join(lines[low:high])
 
 
 def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: int, timeout: float) -> dict[str, object]:
@@ -257,9 +265,10 @@ def _report_call_map(module: Path, tests: tuple[Path, ...], layer: str) -> int:
 
     from l1_analyzer import callmap, runtime_probe
 
+    source = text_or_empty(module)
     seen = runtime_probe.watch(module, tests)
     watched = runtime_probe.verdicts(seen["observations"])
-    roles = callmap.classify(ast.parse(module.read_text()), watched)
+    roles = callmap.classify(ast.parse(source), watched)
     if seen["reason"]:
         print(f"# the suite could not be watched, so no write is charged to the pure lane: "
               f"{seen['reason']}")
@@ -326,7 +335,13 @@ def run() -> int:
     return main(sys.argv[1:])
 
 
+@boundary
 def main(argv: list[str] | None) -> int:
+    """The command line, and the only thing in this package that IS one.
+
+    Declared rather than split, because there is nothing here to lift out:
+    argparse in, exit code out, and every decision already lives in a module
+    this calls."""
     # The name the console script is installed under, so `--help` prints a command the
     # reader can actually run. argparse defaults `prog` to sys.argv[0], which is right
     # only by accident; naming it wrong sends a new adopter to a command that does not
