@@ -48,6 +48,7 @@ import tree_sitter_rust
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
+from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.dead_code_defs import (
     COLLECTORS,
     EXCLUDED,
@@ -354,6 +355,33 @@ def _harvest_source(root: Node, relpath: str, corpus: Corpus) -> None:
     walk(root)
 
 
+def entry_paths_in(data: dict, base: Path, repo: Path) -> set[str]:
+    """The entry points one package manifest declares, relative to the repository.
+
+    Five keys name a single path and `bin` names a map of them. A `bin` that is a bare
+    string is legal npm and is NOT a map: reading it as one iterates the characters of the
+    string, which is why the type is checked rather than assumed."""
+    found: set[str] = set()
+    for key in ("main", "module", "browser", "types", "typings"):
+        value = data.get(key)
+        if isinstance(value, str):
+            found.add(str((base / value).relative_to(repo)))
+    binaries = data.get("bin")
+    for value in (binaries.values() if isinstance(binaries, dict) else ()):
+        if isinstance(value, str):
+            found.add(str((base / value).relative_to(repo)))
+    return found
+
+
+def metaprogramming_in(text: str) -> str:
+    """The first metaprogramming marker this Ruby source uses, or nothing.
+
+    One marker is enough for the repository-level gate above, which decides whether any
+    dead-code reading of Ruby is publishable at all."""
+    return next((marker for marker in _METAPROGRAMMING if marker in text), "")
+
+
+@boundary
 def _read_corpus(repo: Path) -> Corpus:
     """Boundary reader. Every file in the repository is a possible reference site: a
     sibling module, a test, a CI workflow that names an entry point, a README. Vendored
@@ -373,20 +401,41 @@ def _read_corpus(repo: Path) -> Corpus:
         except OSError:
             corpus["unreadable"] += 1
             continue
-        if b"\0" in raw[:8192]:
-            continue
-        entry = _EXT_LANG.get(path.suffix.lower())
-        if entry is not None:
-            _harvest_source(parser(entry[0]).parse(raw).root_node, relpath, corpus)
-        else:
-            words = _WORD.findall(raw.decode("utf8", errors="ignore"))
-            bucket = "docs" if path.suffix.lower() in _DOC_EXTS else "config"
-            corpus["words"][bucket].update(words)
+        classify_into(corpus, relpath, path.suffix.lower(), raw)
     return corpus
 
 
+def classify_into(corpus: Corpus, relpath: str, suffix: str, raw: bytes) -> None:
+    """What one file contributes to the corpus, decided from its bytes and its suffix.
+
+    Lifted out of the walk above, which read and decided in one loop, so a question as
+    ordinary as "does a binary file contribute words" needed a temporary directory to ask.
+    This touches nothing, which is what makes the walk's declaration honest rather than a
+    stamp.
+
+    A file this package has a grammar for is parsed, so a name is a name rather than a run
+    of letters that happens to match one. Everything else contributes words, split into
+    documentation and configuration because the two carry different weight downstream.
+
+    Binary contributes nothing. A null byte in the first 8 KiB is the test, which is what
+    `git` uses and is wrong only for text that legitimately holds one."""
+    if b"\0" in raw[:8192]:
+        return
+    entry = _EXT_LANG.get(suffix)
+    if entry is not None:
+        _harvest_source(parser(entry[0]).parse(raw).root_node, relpath, corpus)
+        return
+    words = _WORD.findall(raw.decode("utf8", errors="ignore"))
+    bucket = "docs" if suffix in _DOC_EXTS else "config"
+    corpus["words"][bucket].update(words)
+
+
+@boundary
 def _repo_facts(repo: Path, lang: str) -> RepoFacts:
-    """The three repository-level questions a single file cannot answer."""
+    """The three repository-level questions a single file cannot answer.
+
+    A walk, and the two decisions it used to make inline are below. What is left obtains
+    manifests and Ruby sources and hands their contents to functions that touch nothing."""
     rust_is_library = (repo / "src" / "lib.rs").exists() or any(
         True for _ in _rglob_files(repo, "lib.rs"))
     entries: set[str] = set()
@@ -397,14 +446,7 @@ def _repo_facts(repo: Path, lang: str) -> RepoFacts:
             data = json.loads(manifest.read_text(errors="ignore"))
         except (OSError, ValueError):
             continue
-        base = manifest.parent
-        for key in ("main", "module", "browser", "types", "typings"):
-            value = data.get(key)
-            if isinstance(value, str):
-                entries.add(str((base / value).relative_to(repo)))
-        for value in (data.get("bin") or {}).values() if isinstance(data.get("bin"), dict) else ():
-            if isinstance(value, str):
-                entries.add(str((base / value).relative_to(repo)))
+        entries |= entry_paths_in(data, manifest.parent, repo)
     marker = ""
     if lang == "ruby":
         for path in _rglob_files(repo, "*.rb"):
@@ -414,9 +456,8 @@ def _repo_facts(repo: Path, lang: str) -> RepoFacts:
                 text = path.read_text(errors="ignore")
             except OSError:
                 continue
-            hit = next((m for m in _METAPROGRAMMING if m in text), "")
-            if hit:
-                marker = hit
+            marker = metaprogramming_in(text)
+            if marker:
                 break
     return {"rust_is_library": rust_is_library,
             "js_entry_files": frozenset(entries),
@@ -453,8 +494,13 @@ def _has_module_level_call(body: str) -> bool:
     return any(isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) for node in tree.body)
 
 
+@boundary
 def _runnable_islands(repo: Path, islands: frozenset[str], production_files: frozenset[str]) -> frozenset[str]:
     """The island modules that can actually be RUN, so their module level executes.
+
+    A walk. Both decisions it used to make inline are functions below that touch nothing:
+    which console scripts a manifest declares, and whether a module's own text says somebody
+    can run it.
 
     This is the clause that decides whether seeding roots from module-level code is
     honest. An island is never imported, so its top level runs only if somebody runs the
@@ -482,30 +528,41 @@ def _runnable_islands(repo: Path, islands: frozenset[str], production_files: fro
     roots and stays alive."""
     if len(production_files) == 1:
         return islands
-    declared: set[str] = set()
-    pyproject = repo / "pyproject.toml"
-    if pyproject.is_file():
-        try:
-            text = pyproject.read_text(encoding="utf8", errors="ignore")
-        except OSError:
-            text = ""
-        for match in re.finditer(r'=\s*"([\w.]+):', text):
-            declared.add(match.group(1).rsplit(".", 1)[-1])
+    declared = declared_scripts_in(text_or_empty(repo / "pyproject.toml"))
     runnable: set[str] = set()
     for relpath in islands:
-        stem = relpath.rsplit("/", 1)[-1][:-3]
-        if stem in declared:
+        if relpath.rsplit("/", 1)[-1][:-3] in declared:
             runnable.add(relpath)
             continue
-        path = repo / relpath
         try:
-            body = path.read_text(encoding="utf8", errors="ignore")
+            body = (repo / relpath).read_text(encoding="utf8", errors="ignore")
         except OSError:
             runnable.add(relpath)      # unreadable: do not accuse on a file we could not open
             continue
-        if "__main__" in body and re.search(r'__name__\s*==\s*["\']__main__["\']', body) or _has_module_level_call(body):
+        if can_be_run(body):
             runnable.add(relpath)
     return frozenset(runnable)
+
+
+def declared_scripts_in(text: str) -> set[str]:
+    """The module names a pyproject declares as console scripts.
+
+    The last segment only: a script points at `package.module:function` and what matters
+    here is which MODULE somebody can run."""
+    return {match.group(1).rsplit(".", 1)[-1]
+            for match in re.finditer(r'=\s*"([\w.]+):', text)}
+
+
+def can_be_run(body: str) -> bool:
+    """Whether this module's own text says somebody can run it.
+
+    A `__main__` guard, which is what a runnable module carries, or a module-level CALL
+    statement, which is a script doing its work at import time. A declaration is neither:
+    `TABLE = {"a": handler}` builds a value and binds it. Without that distinction a module
+    written in the dispatch-table style certified itself, because naming forty functions in
+    a table at module level made all forty roots."""
+    guarded = "__main__" in body and re.search(r'__name__\s*==\s*["\']__main__["\']', body)
+    return bool(guarded) or _has_module_level_call(body)
 
 
 def _owner_at(spans: list[tuple[int, int, str]], offset: int) -> str | None:

@@ -169,3 +169,33 @@ Feature: dead_code — finding unreachable statements and unreferenced definitio
     And every definition a language or a framework can reach by a route a syntactic scan cannot follow is called undecidable, listed with its reason, and left out of the numerator, which is what makes the published number a lower bound rather than a claim
     And a file the grammar could not parse is not analyzed and its lines are removed from the analyzed total, while its identifiers still count as references, so an unparsed file can spare a definition and never condemn one
     But an unwired language, no production source, a repository using runtime metaprogramming, or a grammar that parsed under four-fifths of the production files each returns a not-applicable naming the reason, and a repository with zero production lines still returns a ratio of zero and the Healthy band rather than refusing
+
+  Scenario: classify_into decides what one file contributes from its bytes and its suffix
+    Given the bytes of a file and the suffix that names its kind
+    When classify_into reads it without touching the filesystem
+    Then a language this package can parse contributes names, and anything else contributes words
+    But a file holding a null byte in its first 8 KiB is binary and contributes nothing
+
+  Scenario: entry_paths_in reads the entry points a package manifest declares
+    Given the parsed data of a package.json and the directory holding it
+    When entry_paths_in reads the five single-path keys and the bin map
+    Then each declared path comes back relative to the repository
+    But a bin that is a bare string is legal npm and is not a map, so its characters are not iterated
+
+  Scenario: metaprogramming_in names the first metaprogramming marker a Ruby source uses
+    Given the text of a Ruby file
+    When metaprogramming_in looks for the markers that make a dead-code reading unsafe
+    Then the first one found comes back
+    But one marker is enough, because the gate it feeds is repository-wide rather than per file
+
+  Scenario: declared_scripts_in reads the modules a pyproject declares as console scripts
+    Given the text of a pyproject
+    When declared_scripts_in takes the last segment of each script target
+    Then the module names somebody can run come back
+    But the function named after the colon is not read, because what matters is which module runs
+
+  Scenario: can_be_run says whether a module's own text lets somebody run it
+    Given the source of a module that is never imported
+    When can_be_run looks for a __main__ guard or a module-level call statement
+    Then either one means its top level executes when somebody runs the file
+    But a declaration is neither, or a module naming forty functions in a table would certify itself
