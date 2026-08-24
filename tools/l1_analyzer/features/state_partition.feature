@@ -119,3 +119,9 @@ Feature: state_partition — what a finite verdict carries beside the word "fini
     Then a bare name is the analyzer's own gap, and a name reached through another object is the adopter's boundary
     And a method reached through the receiver of the class under analysis counts as ours, by the spec's scoping rule
     But a callee that is not a name at all is chosen while the program runs, which nobody can enumerate by reading
+
+  Scenario: _reach builds one of the three reaches that carry no detail beyond their kind
+    Given a kind and whether that kind has an order to reach
+    When _reach fills the fields every one of the three shares
+    Then write, output and unbounded differ by the kind and the one boolean
+    But a reach carrying a key, a class count or a silence is built elsewhere, because it is not this shape

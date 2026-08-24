@@ -106,32 +106,36 @@ def _classify_file(path: str) -> str:
         return "code"
     return "other"
 
-def _doc_line_share(doc_added: int, total_added: int) -> L1Result:
-    """L1.4: the share of added lines that are documentation.
+# The two ratio indicators, as rows. They were two functions that became identical once the
+# labels, the thresholds and the two numbers were erased, which is the shape clause 1 names.
+# Each row is the label a refusal quotes, the sentence that says why an absent denominator is
+# absent rather than zero, the two band thresholds, and how the counts read back.
+_RATIOS = {
+    "L1.4": ("L1.4 documentation line share",
+             ("no line was added in the measured range, so the share of them that is "
+              "documentation is absent and not zero"),
+             25, 5, "{numerator} doc / {denominator} total lines added"),
+    "L1.5": ("L1.5 delete-to-add ratio",
+             ("no CODE line was added in the measured range, so a ratio against them is "
+              "absent and not zero"),
+             60, 30, "{numerator} deleted / {denominator} added code lines"),
+}
 
-    Raises rather than substituting 0.0, which is what stood here. A share of no added lines
-    is absent, and 0.0 with higher_is_better lands below the Slop threshold, so the
-    substitution did not merely publish a wrong number, it published a BAD one over a range
-    that had added nothing. Found by vacuity.check.
-    """
-    pct = ratio(doc_added, total_added, "L1.4 documentation line share",
-                "no line was added in the measured range, so the share of them that is "
-                "documentation is absent and not zero")
-    return {"value": round(pct, 1), "band": band(pct, 25, 5, higher_is_better=True),
-            "details": f"{doc_added} doc / {total_added} total lines added"}
 
+def _ratio_indicator(code: str, numerator: int, denominator: int) -> L1Result:
+    """One of the ratio indicators, by its row.
 
-def _delete_to_add_ratio(code_deleted: int, code_added: int) -> L1Result:
-    """L1.5: deleted lines as a share of added ones, the refactoring signal.
+    Both raise rather than substituting 0.0, which is what stood here for L1.4. A share of
+    no added lines is absent, and 0.0 with higher_is_better lands below the Slop threshold,
+    so the substitution did not merely publish a wrong number, it published a BAD one over a
+    range that had added nothing. Found by vacuity.check.
 
-    Same substitution, same direction, and this one is load-bearing: L1.5 is one of the four
-    indicators that separated the controls in the 2026-08-17 validation run.
-    """
-    pct = ratio(code_deleted, code_added, "L1.5 delete-to-add ratio",
-                "no CODE line was added in the measured range, so a ratio against them is "
-                "absent and not zero")
-    return {"value": round(pct, 1), "band": band(pct, 60, 30, higher_is_better=True),
-            "details": f"{code_deleted} deleted / {code_added} added code lines"}
+    L1.5 is load-bearing: it is one of the four indicators that separated the controls in
+    the 2026-08-17 validation run."""
+    label, absent, high, low, details = _RATIOS[code]
+    pct = ratio(numerator, denominator, label, absent)
+    return {"value": round(pct, 1), "band": band(pct, high, low, higher_is_better=True),
+            "details": details.format(numerator=numerator, denominator=denominator)}
 
 
 def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> dict[str, L1Result]:
@@ -249,8 +253,8 @@ def compute_git_indicators(repo: Path, since: str | None, until: str | None) -> 
     # Through the one boundary, like every other measure. Both divide by added lines, so both
     # can meet a range that added none, and _measure is what turns the refusal into an n/a
     # carrying its reason instead of a fabricated Slop.
-    results["L1.4"] = _measure(_doc_line_share, doc_added, total_added)
-    results["L1.5"] = _measure(_delete_to_add_ratio, code_deleted, code_added)
+    results["L1.4"] = _measure(_ratio_indicator, "L1.4", doc_added, total_added)
+    results["L1.5"] = _measure(_ratio_indicator, "L1.5", code_deleted, code_added)
 
     l6 = net_negative_commits / total_commits * 100
     results["L1.6"] = {"value": round(l6, 1), "band": band(l6, 15, 5, higher_is_better=True),

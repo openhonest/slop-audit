@@ -207,19 +207,27 @@ def _not(terms: list[bool | None]) -> bool | None:
     return None if inner is None else not inner
 
 
-def _all(terms: list[bool | None]) -> bool | None:
-    if any(t is False for t in terms):
-        return False
-    return True if all(t is True for t in terms) else None
+def _quantified(terms: list[bool | None], dominant: bool) -> bool | None:
+    """`all` and `any` over three values, which are one function with the polarity flipped.
+
+    One term equal to the dominant value settles it: a single False settles `all`, a single
+    True settles `any`. Every term equal to the other value settles it the other way. Any
+    remaining mixture holds an undecided term that could still go either way, so the answer
+    is undecided too.
+
+    They were two functions in the table below, identical once the two literals were erased,
+    which is the shape clause 1 is about."""
+    if any(term is dominant for term in terms):
+        return dominant
+    return not dominant if all(term is not dominant and term is not None
+                               for term in terms) else None
 
 
-def _any(terms: list[bool | None]) -> bool | None:
-    if any(t is True for t in terms):
-        return True
-    return False if all(t is False for t in terms) else None
-
-
-_COMBINE = {"not": _not, "all": _all, "any": _any}
+# The rows carry the polarity. `not` stays a function because it is unary and shares no
+# shape with the other two.
+_COMBINE = {"not": _not,
+            "all": lambda terms: _quantified(terms, dominant=False),
+            "any": lambda terms: _quantified(terms, dominant=True)}
 
 
 def cfg_excluded(predicate: str | None, host: frozenset[str]) -> bool:

@@ -31,7 +31,6 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     And when higher is better the tests are inclusive, while when lower is better they are strict, so a value sitting exactly on a lower-is-better healthy threshold lands in the middle band
     But it has no answer for "not measured": every caller needing one writes the n/a band itself
 
-
   Scenario: _classify_file sorts one commit path into doc, code or other
     Given one repository-relative path taken from a commit
     When _classify_file reads the end of the lowercased path
@@ -117,18 +116,6 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     When _god_file_reason applies the shared production scope and then the generated-code test
     Then it returns the reason the file is out of scope, or nothing at all when the file counts
     And the generated-code test lives here rather than in the shared scope rule, so excluding a machine-written file moves the god-file number and no other
-
-  Scenario: _doc_line_share reports L1.4, or refuses when nothing was added
-    Given the documentation lines added and the total lines added in the measured range
-    When _doc_line_share divides them
-    Then it returns the share and its band, higher being better
-    But a total of zero refuses, because a share of no added lines is absent and 0.0 would band Slop
-
-  Scenario: _delete_to_add_ratio reports L1.5, or refuses when nothing was added
-    Given the lines deleted and the lines added in the measured range
-    When _delete_to_add_ratio divides them
-    Then it returns the ratio and its band, higher being better
-    But a total of zero refuses rather than publishing a fabricated Slop over a range that added nothing
 
   Scenario: _measure runs one measure and turns its refusal to answer into a named n/a
     Given a measure that may raise IncompleteCode rather than publish a value it has no basis for
@@ -237,3 +224,9 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     Then it returns L1.13 as the percentage it read and banded, or n/a naming the reason when the tool is absent, could not be executed, or printed nothing it could parse
     And the tool's non-zero exit is read rather than used to throw the output away, because crossing a duplication threshold is exactly what makes it exit non-zero
     But it takes the first percentage anywhere in the output as the duplication figure, and the language it is handed is never used at all
+
+  Scenario: _ratio_indicator measures one of the ratio indicators by its row
+    Given the code of a ratio indicator and its numerator and denominator
+    When _ratio_indicator reads the row for its label, thresholds and wording
+    Then the share is banded and the counts read back in that row's own words
+    But a denominator of zero is absent rather than zero, and the row says why in the refusal

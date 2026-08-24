@@ -103,19 +103,29 @@ class Partition(TypedDict):
     counted: bool
 
 
-def write() -> Reach:
-    return {"kind": WRITE, "classes": 0, "ordered": True, "counted": True, "key": "",
+def _reach(kind: str, ordered: bool) -> Reach:
+    """One of the three reaches that carry no detail beyond their kind.
+
+    They were three functions, identical once the kind and the one boolean were erased,
+    which is the shape clause 1 names. Every other field is the same in all three, and
+    writing it out three times is how they would drift."""
+    return {"kind": kind, "classes": 0, "ordered": ordered, "counted": True, "key": "",
             "silence": "", "construct": ""}
+
+
+def write() -> Reach:
+    """A write reaches its own value, in order."""
+    return _reach(WRITE, ordered=True)
 
 
 def output() -> Reach:
-    return {"kind": OUTPUT, "classes": 0, "ordered": True, "counted": True, "key": "",
-            "silence": "", "construct": ""}
+    """An output reaches what it emitted, in order."""
+    return _reach(OUTPUT, ordered=True)
 
 
 def unbounded() -> Reach:
-    return {"kind": UNBOUNDED, "classes": 0, "ordered": False, "counted": True, "key": "",
-            "silence": "", "construct": ""}
+    """Unbounded state has no order to reach, because there is no last one."""
+    return _reach(UNBOUNDED, ordered=False)
 
 
 def undecided(reason: str) -> Reach:

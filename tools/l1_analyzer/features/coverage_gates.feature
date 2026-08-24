@@ -106,20 +106,6 @@ Feature: coverage_gates — the deterministic retention gates that separate a pr
     Then an unknown term stays unknown
     But an empty term list is unknown too, rather than defaulting to true
 
-  Scenario: _all combines the terms of a cfg conjunction
-    Given the evaluated terms of an all(...) predicate
-    When _all combines them
-    Then one term proven false makes the whole predicate false, whatever the others are
-    And every term proven true makes it true, which also means a predicate with no terms is true
-    But a mixture of true and unknown is unknown
-
-  Scenario: _any combines the terms of a cfg disjunction
-    Given the evaluated terms of an any(...) predicate
-    When _any combines them
-    Then one term proven true makes the whole predicate true
-    And every term proven false makes it false, which also means a predicate with no terms is false
-    But a mixture of false and unknown is unknown
-
   Scenario: cfg_excluded says whether the host provably never compiles a branch
     Given a branch's cfg predicate and the host's cfg set
     When cfg_excluded evaluates the predicate
@@ -138,3 +124,9 @@ Feature: coverage_gates — the deterministic retention gates that separate a pr
     Then an attributed panic is a divergence, or wrong_channel when the function returns a deferred handle
     And an unattributed panic is an invalid fixture when the body carries a fabrication marker, and an incidental panic otherwise
     But with no panic at all it still returns incidental_panic, because it is only ever asked about a run that already failed
+
+  Scenario: _quantified answers all and any over three values with one function
+    Given a list of terms where some are undecided
+    When _quantified is asked with the dominant value for all, then for any
+    Then one term equal to the dominant value settles it and a unanimous list settles it the other way
+    But any remaining mixture holds a term that could still go either way, so the answer is undecided

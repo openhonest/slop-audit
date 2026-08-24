@@ -18,18 +18,6 @@ Feature: ruby_trace — running a Ruby repository's own suite to measure branch 
     And the operator opts in for that run only, after the whole payload is printed rather than summarised
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
-  Scenario: _ruby finds the Ruby interpreter on the search path
-    Given the current search path
-    When _ruby looks for the ruby program on it
-    Then it returns the path to ruby
-    But it returns nothing when ruby is not installed, and both measurements turn that into a not-applicable naming Ruby and Bundler as the missing tools
-
-  Scenario: _bundle finds Bundler, the program that runs the suite with the project's own gems
-    Given the current search path
-    When _bundle looks for the bundle program on it
-    Then it returns the path to bundle
-    But it returns nothing when Bundler is not installed, which stops both measurements with a not-applicable rather than a score
-
   Scenario: _lock_has_rspec reads the lock file for the third signal that a repository uses RSpec
     Given a repository
     When _lock_has_rspec reads its gem lock file and looks for rspec in the text
@@ -103,3 +91,9 @@ Feature: ruby_trace — running a Ruby repository's own suite to measure branch 
     Then it returns the passing count over the total, banded Healthy when all pass, Not Healthy when one short, and Slop below that, with the failing seeds' summary lines in the detail line
     And both runners randomize on their own, so no extra plugin is needed and the seed is passed straight through
     But a missing interpreter or Bundler, no detected suite, a run that times out, or a run in which no test executed each returns a not-applicable naming that reason, rather than the misleading score of zero passes
+
+  Scenario: _on_path says where a tool is, or that it is not there
+    Given the name of a tool this tracer needs
+    When _on_path looks it up on PATH
+    Then the path comes back, or nothing when the tool is not installed
+    But nothing here decides whether an absent tool means the language is absent too

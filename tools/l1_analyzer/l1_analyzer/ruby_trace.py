@@ -58,12 +58,12 @@ _COVERAGE_COMMAND = {
 }
 
 
-def _ruby() -> str | None:
-    return shutil.which("ruby")
+def _on_path(tool: str) -> str | None:
+    """Where a tool is on PATH, or nothing.
 
-
-def _bundle() -> str | None:
-    return shutil.which("bundle")
+    One function and the tool's name at the call site. It was two, `_ruby` and `_bundle`,
+    identical once the one string in each was erased, which is the shape clause 1 names."""
+    return shutil.which(tool)
 
 
 def _lock_has_rspec(repo: Path) -> bool:
@@ -94,10 +94,10 @@ def _pin(repo: Path, timeout_seconds: float) -> tuple[str | None, str | None, di
     it. Falls back to the ambient ruby/bundle (env {}, no provenance suffix)."""
     ruby_path, note = resolve_via_shim(repo, "ruby", timeout_seconds)
     if ruby_path is None:
-        return _ruby(), _bundle(), {}, ""
+        return _on_path("ruby"), _on_path("bundle"), {}, ""
     bindir = Path(ruby_path).parent
     pinned_bundle = bindir / "bundle"
-    bundle = str(pinned_bundle) if pinned_bundle.exists() else _bundle()
+    bundle = str(pinned_bundle) if pinned_bundle.exists() else _on_path("bundle")
     return ruby_path, bundle, {"PATH": str(bindir) + os.pathsep + os.environ.get("PATH", "")}, f", {note}"
 
 
