@@ -43,13 +43,29 @@ class Event:
     replace_all: bool
 
 
-def _events_for(suffix: str) -> list[Event]:
+def boundary(fn):
+    """Mark a function as one of this script's edges, and change nothing about it."""
+    return fn
+
+
+@boundary
+def _events_for(suffix: str) -> tuple[list[Event], int]:
     """Every Write and Edit against a path ending in `suffix`, oldest first.
+
+    A walk. What one transcript line holds is `events_in` below, which reads a string:
+    getting that shape wrong loses edits and says nothing, and it could only be exercised
+    against a real transcript directory before.
+
+    Returns the events AND the number of lines that mentioned the file and could not be
+    parsed. That count has to travel: a corrupt line silently contributing nothing is a
+    reconstruction missing an edit and saying it is complete, which is exactly what this
+    tool exists to detect in somebody else's transcript.
 
     Deduplicated on (timestamp, kind, payload): a transcript can replay the same tool call
     in more than one record, and counting it twice would apply an edit twice."""
     seen: set[tuple] = set()
     out: list[Event] = []
+    unreadable = 0
     for path in glob.glob(os.path.expanduser("~/.claude/projects/**/*.jsonl"), recursive=True):
         try:
             handle = open(path, errors="ignore")
@@ -57,35 +73,54 @@ def _events_for(suffix: str) -> list[Event]:
             continue
         with handle:
             for line in handle:
+                # A cheap refusal before parsing. Most lines in most transcripts have
+                # nothing to do with the file being replayed.
                 if suffix not in line:
                     continue
                 try:
-                    record = json.loads(line)
+                    found = events_in(line, suffix)
                 except ValueError:
+                    unreadable += 1
                     continue
-                ts = record.get("timestamp", "")
-                message = record.get("message") or {}
-                for block in message.get("content") or []:
-                    if not isinstance(block, dict) or block.get("type") != "tool_use":
-                        continue
-                    name = block.get("name")
-                    if name not in ("Write", "Edit"):
-                        continue
-                    payload = block.get("input") or {}
-                    if not str(payload.get("file_path", "")).endswith(suffix):
-                        continue
-                    if name == "Write":
-                        event = Event(ts, "write", payload.get("content") or "", "", "", False)
-                    else:
-                        event = Event(ts, "edit", "", payload.get("old_string") or "",
-                                      payload.get("new_string") or "",
-                                      bool(payload.get("replace_all")))
+                for event in found:
                     key = (event.ts, event.kind, event.content, event.old, event.new)
                     if key in seen:
                         continue
                     seen.add(key)
                     out.append(event)
-    return sorted(out, key=lambda e: e.ts)
+    return sorted(out, key=lambda e: e.ts), unreadable
+
+
+def events_in(line: str, suffix: str) -> list[Event]:
+    """The Write and Edit events one transcript line holds, for paths ending in `suffix`.
+
+    A line can carry several tool calls, so this returns a list rather than one event or
+    none. A line carrying no tool call, or one against another file, holds no events, and
+    both are ordinary.
+
+    A line that is not JSON is NOT ordinary, and it raises. Returning the empty list for it
+    made a corrupt record read exactly like a record with nothing in it, so a
+    reconstruction could be missing an edit and report itself complete."""
+    record = json.loads(line)
+    ts = record.get("timestamp", "")
+    message = record.get("message") or {}
+    found: list[Event] = []
+    for block in message.get("content") or []:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        name = block.get("name")
+        if name not in ("Write", "Edit"):
+            continue
+        payload = block.get("input") or {}
+        if not str(payload.get("file_path", "")).endswith(suffix):
+            continue
+        if name == "Write":
+            found.append(Event(ts, "write", payload.get("content") or "", "", "", False))
+        else:
+            found.append(Event(ts, "edit", "", payload.get("old_string") or "",
+                               payload.get("new_string") or "",
+                               bool(payload.get("replace_all"))))
+    return found
 
 
 def replay(events: list[Event]) -> tuple[list[tuple[str, str]], dict[str, int]]:
@@ -150,10 +185,13 @@ def main() -> int:
     out_dir = next((sys.argv[i + 1] for i, a in enumerate(sys.argv) if a == "--out"), None)
     verify = next((sys.argv[i + 1] for i, a in enumerate(sys.argv) if a == "--verify"), None)
 
-    events = _events_for(suffix)
+    events, unreadable = _events_for(suffix)
     states, tally = replay(events)
 
     print(f"events found      : {len(events)}")
+    if unreadable:
+        print(f"  UNREADABLE LINES: {unreadable} mentioned this file and did not parse; "
+              "an edit in any of them is missing from what follows")
     print(f"  writes (anchors): {tally['writes']}")
     print(f"  edits applied   : {tally['edits_applied']}")
     print(f"  divergences     : {tally['divergences']}")

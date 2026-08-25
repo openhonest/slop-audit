@@ -23,11 +23,20 @@ from pathlib import Path
 
 from validate import diff_panels
 
+def boundary(fn):
+    """Mark a function as one of this script's edges, and change nothing about it.
+
+    Spelled here rather than imported, for the same reason `validate.py` spells it: this is
+    a Rust crate's helper, not part of the Python package whose clause reads the name."""
+    return fn
+
+
 HERE = Path(__file__).resolve().parent
 MANIFEST = HERE / "corpus.toml"
 CACHE = Path(os.environ.get("SLOP_AUDIT_CORPUS", Path.home() / ".cache" / "slop-audit-corpus"))
 
 
+@boundary
 def clone_at(slug: str, commit: str) -> Path:
     """The repo at the pinned commit, cloned on first use and reused after. Returns the
     checkout path. A cached clone that does not have the commit is fetched again, which

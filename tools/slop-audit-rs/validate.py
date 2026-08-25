@@ -19,10 +19,21 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+def boundary(fn):
+    """Mark a function as one of this script's edges, and change nothing about it.
+
+    The analyzer package declares its edges with a decorator of this name and its clause
+    reads it. This script sits beside that package rather than inside it, so it says the
+    same thing in its own words rather than importing across the boundary between a Rust
+    crate's helper and the Python tool it validates."""
+    return fn
+
+
 REFERENCE = HERE.parent / "l1_analyzer"
 BINARY = HERE / "target" / "release" / "slop-audit-rs"
 
 
+@boundary
 def python_panel(repo: Path, lang: str) -> dict[str, dict]:
     """The reference panel, keyed L1.x. Run from the reference package so `uv run`
     resolves that project's environment, not this directory's."""
@@ -33,12 +44,24 @@ def python_panel(repo: Path, lang: str) -> dict[str, dict]:
     return json.loads(out)["results"]
 
 
+@boundary
 def rust_panel(repo: Path, lang: str) -> dict[str, dict]:
     """The portable panel, parsed from --tsv."""
     args = [str(BINARY), str(repo), "--tsv"]
     if lang != "auto":
         args += ["--lang", lang]
-    out = subprocess.run(args, capture_output=True, text=True, check=True).stdout
+    return panel_from_tsv(subprocess.run(args, capture_output=True, text=True, check=True).stdout)
+
+
+def panel_from_tsv(out: str) -> dict[str, dict]:
+    """The portable tool's tab-separated output, as a panel keyed by indicator code.
+
+    Lifted out of the run above, which ran the binary and read what it printed in one
+    function, so the reading could be exercised only by building the binary first.
+
+    A short row is padded rather than refused: the tool prints a value with no band and no
+    details for some indicators, and treating that as malformed would refuse a panel it
+    prints on purpose."""
     panel: dict[str, dict] = {}
     for line in out.splitlines():
         parts = line.split("\t")
@@ -128,6 +151,7 @@ def diff_panels(repo: Path, lang: str, *, quiet: bool) -> tuple[int, int]:
     return diffs, len(codes)
 
 
+@boundary
 def _reference_version() -> str:
     """The Python reference's build, asked of the tool rather than read from a file.
 
@@ -135,13 +159,24 @@ def _reference_version() -> str:
     project's environment rather than this directory's."""
     run = subprocess.run(["uv", "run", "slop-audit-l1", "--version"], cwd=REFERENCE,
                          capture_output=True, text=True, check=False)
-    return run.stdout.strip() or "slop-audit-l1 (version not reported)"
+    return version_or_unnamed(run.stdout, "slop-audit-l1")
 
 
+@boundary
 def _ported_version() -> str:
     """The portable bundle's build, asked of the binary the same way."""
     run = subprocess.run([str(BINARY), "--version"], capture_output=True, text=True, check=False)
-    return run.stdout.strip() or "slop-audit-rs (version not reported)"
+    return version_or_unnamed(run.stdout, "slop-audit-rs")
+
+
+def version_or_unnamed(printed: str, tool: str) -> str:
+    """What a tool said its version is, or a sentence saying it did not say.
+
+    The two askers above were one function with the tool's name in it, which is what put
+    the same fallback sentence in two places. A version that came back empty must not read
+    as a version: this comparison is published, and a blank beside a real build number
+    would look like agreement."""
+    return printed.strip() or f"{tool} (version not reported)"
 
 
 def main() -> int:
