@@ -26,12 +26,17 @@ def test_the_declaration_changes_nothing_at_runtime():
 
 
 def test_a_declared_function_still_behaves_exactly_as_written():
-    @boundary.boundary
+    """Applied as a call rather than with decorator syntax, deliberately.
+
+    Clause 4 reports a declaration on a function that obtains nothing, because such a
+    declaration states an edge that is not there. This fixture doubles a number, so written
+    with `@boundary` it was exactly that, and the clause found it here first."""
     def double(n: int) -> int:
         return n * 2
 
-    assert double(21) == 42
-    assert double.__name__ == "double"
+    declared = boundary.boundary(double)
+    assert declared(21) == 42
+    assert declared.__name__ == "double"
 
 
 def _findings(module) -> list[dict]:
@@ -106,29 +111,32 @@ def test_the_shared_reader_is_declared():
 # ---------------------------------------------------------------------------
 
 def test_every_declared_boundary_actually_obtains_something():
-    """A declaration says "this function is an edge". A function that reaches nothing
-    outside the process is not an edge, and the decorator on it is a stamp.
+    """A declaration says "this function is an edge". A function reaching nothing outside
+    the process is not one, and the decorator on it states an edge that is not there.
 
-    This cannot tell a declaration from a suppression in general, which the module's own
-    docstring says. It can tell one thing: whether the function under the decorator touches
-    the world at all. Every one that does not is a suppression by construction."""
-    import re
+    This walked the tree itself until the check moved into clause 4, where it belongs: it
+    is a finding about anyone's code, not a fact about this repository. What is left here
+    asserts the clause covers this repository and reports nothing, so the invariant stays
+    named in the suite without a second implementation of it drifting from the first."""
+    import ast
 
-    # The whole repository, not this package. Three scripts outside it spell `boundary`
-    # themselves, because they sit beside this package rather than inside it, and the first
-    # version of this check globbed the package alone so it never saw them. A check narrower
-    # than its subject reports on what nobody wrote.
+    from l1_analyzer import honest_code_python_rules as python_rules
+
     repo = pathlib.Path(boundary.__file__).parent.parent.parent.parent
-    reaches = ("read_text", "read_bytes", "write_text", "write_bytes", "open(",
-               "subprocess", "Popen", "rglob", "which(", "stat(", "is_file", "is_dir",
-               "exists(", "iterdir", "TemporaryDirectory")
     stamps = []
     for path in sorted(repo.rglob("*.py")):
         if any(part in (".venv", "node_modules", "__pycache__") for part in path.parts):
             continue
-        source = path.read_text(errors="replace")
-        for match in re.finditer(r"@boundary\n(?:@[\w.()=]+\n)*def (\w+)", source):
-            body = source[match.end():].split("\ndef ")[0]
-            if not any(reach in body for reach in reaches):
-                stamps.append(f"{path.name}:{match.group(1)}")
+        text = path.read_text(errors="replace")
+        if "@boundary" not in text:
+            continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+        found = python_rules.io_below_the_boundary({
+            "path": path.name, "language": "python", "text": text,
+            "tree": tree, "readable": True, "unreadable_reason": ""}) or []
+        stamps += [f"{path.name}:{f['symbol']}" for f in found
+                   if "states an edge that is not there" in f["detail"]]
     assert stamps == [], f"declared as edges and reach nothing outside the process: {stamps}"

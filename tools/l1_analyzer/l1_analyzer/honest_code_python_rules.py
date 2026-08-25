@@ -70,6 +70,26 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
         called_by_siblings |= _called(fn) - {fn.name}
     found: list[Finding] = []
     for fn in functions:
+        # A DECLARATION THAT IS NOT TRUE. The decorator says this function is an edge, and
+        # a function reaching nothing outside the process is not one. Nothing reported it
+        # before: the clause never fires on such a function anyway, so the declaration
+        # silenced nothing and sat there looking like a fact.
+        #
+        # This is the one case where a stamp is computable. Telling a real declaration from
+        # a stamp in general is not, which the boundary module's own docstring says. A peer
+        # maintaining the write hook built a detector that counted markers rather than
+        # markers that withheld anything, found it wrong three times in four, and removed
+        # it. Reported whether or not a sibling calls it: the uncalled-function exemption
+        # exists because such a function may be the entry point, and an entry point that
+        # obtains nothing is still not an edge.
+        if _declares_a_boundary(fn) and not _io_calls(fn):
+            found.append(_finding(
+                "L1.21.4", fn.name, fn.lineno,
+                "declares itself a boundary and obtains nothing outside the process, so "
+                "the declaration states an edge that is not there",
+                "take the decorator off, or move the read or the call this function was "
+                "meant to be the edge for into it", ""))
+            continue
         if fn.name not in called_by_siblings:
             continue
         touched = sorted(_io_calls(fn))
