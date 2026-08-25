@@ -87,3 +87,9 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     When window_around clips thirty either side to what the file holds
     Then a hazard near the top does not run off the start, and one near the bottom does not run off the end
     But the window is chosen by index, so a hazard on line 50 is shown lines 21 to 80
+
+  Scenario: build_stamp names the commit a build came from
+    Given the directory a build was installed from
+    When build_stamp asks git which commit it is at and whether anything is uncommitted
+    Then the commit follows the release number, and an edited tree is marked dirty
+    But a directory in no repository yields nothing, because inventing a commit is worse than the release number alone

@@ -316,10 +316,41 @@ def version() -> str:
     marketplace never served while `plugin update` reported the plugin current.
 
     A measurement that cannot name the build behind it cannot be cited later, and the bands
-    and the denominators in this instrument have both moved under readers before."""
+    and the denominators in this instrument have both moved under readers before.
+
+    THAT SENTENCE WAS HERE AND THE FUNCTION DID NOT DO IT. This reported 1.0.0 for 225
+    commits, one of which changed the L1.21 rules. An adopter quoted numbers from a build
+    they could not name, and nothing in the output could have told them, because a release
+    number names a promise about the interface and not the code behind it. The commit is
+    appended for a build from a source checkout, which is what identifies it."""
     from importlib import metadata
 
-    return metadata.version("slop-audit-l1")
+    return metadata.version("slop-audit-l1") + build_stamp(str(Path(__file__).parent))
+
+
+@boundary
+def build_stamp(directory: str) -> str:
+    """The commit this build came from, as a suffix, or nothing.
+
+    Nothing when the directory is not in a git checkout: installed from a wheel there is no
+    commit to name, and inventing one would be worse than the release number alone.
+
+    `.dirty` when the tree has uncommitted changes, because a measurement taken from an
+    edited checkout did not come from that commit, and a reader comparing it against the
+    commit would be comparing it against different code."""
+    import subprocess
+
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short=8", "HEAD"], cwd=directory,
+                                capture_output=True, text=True, timeout=10, check=True).stdout.strip()
+        changed = subprocess.run(["git", "status", "--porcelain"], cwd=directory,
+                                 capture_output=True, text=True, timeout=10, check=True).stdout.strip()
+    # honest-code-allow: L1.21.8 - the empty string IS the answer for a build with no repository behind it, which is the ordinary case for an installed wheel, and the caller publishes the release number alone rather than a commit nobody can check
+    except (subprocess.SubprocessError, OSError):
+        return ""
+    if not commit:
+        return ""
+    return f"+g{commit}" + (".dirty" if changed else "")
 
 
 def run() -> int:

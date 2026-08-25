@@ -46,9 +46,14 @@ def test_the_tool_reports_a_version(capsys):
 
 
 def test_the_reported_version_is_the_one_the_package_declares():
-    """One source. A constant in the source would be the second owner this exists to
-    remove, and nothing would check the two agreed."""
-    assert cli.version() == metadata.version("slop-audit-l1")
+    """One source for the RELEASE number. A constant in the source would be the second
+    owner this exists to remove, and nothing would check the two agreed.
+
+    The release is now followed by the commit the build came from, which is a different
+    fact with its own single owner: the checkout. It is not a second spelling of the
+    release, so the invariant is that the string starts with what the metadata says, not
+    that it equals it."""
+    assert cli.version().startswith(metadata.version("slop-audit-l1"))
 
 
 def test_the_declared_version_matches_the_packaging_metadata():
@@ -56,7 +61,7 @@ def test_the_declared_version_matches_the_packaging_metadata():
     check whose absence let an adopter ship a release that the marketplace never served
     while `plugin update` reported the plugin current."""
     declared = tomllib.loads((REPO / "pyproject.toml").read_text())["project"]["version"]
-    assert cli.version() == declared, (
+    assert cli.version().startswith(declared), (
         "the installed package and pyproject.toml disagree; reinstall or reconcile them")
 
 
