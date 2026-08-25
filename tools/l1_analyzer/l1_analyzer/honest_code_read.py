@@ -128,6 +128,9 @@ _OPTION_TYPES = ("keyword_argument", "named_argument", "assignment_expression")
 # their absence is not a missing shape but a different rule about the same write.
 _SCOPE_DECLARATIONS = ("global_statement", "nonlocal_statement")
 
+# Bases that make a class a list of signatures rather than an implementation.
+_SIGNATURE_ONLY_BASES = frozenset({"Protocol", "ABC", "ABCMeta"})
+
 _BASE_HOLDERS = ("argument_list", "class_heritage", "superclass", "extends_clause",
                  "type_parameters", "implements_clause")
 
@@ -440,3 +443,35 @@ def is_absent_value(node: Node, spec: LangSpec, raw: bytes) -> bool:
     if node.type in spec["literal_types"]:
         return node_text(node, raw).strip("\"'`") in ("", "0")
     return False
+
+
+def names_a_table_holds(root: Node, spec: LangSpec, raw: bytes) -> set[str]:
+    """Every name used as a VALUE in a map literal anywhere in this file.
+
+    A function a table names is that table's row. An adopter classified all 71 sites clause
+    1 reported in their source and 46 were the two halves of a two-entry table: the clause
+    saw two functions with one shape and told them to build a table, and they were already
+    its rows.
+
+    Anywhere, not only at the top: a table built inside a function is still a table, and
+    scoping this to module level would have exempted only some of them for a reason nobody
+    could see from the finding."""
+    named: set[str] = set()
+    for node in walk(root):
+        if node.type not in spec["container_literal_types"]:
+            continue
+        for pair in node.named_children:
+            value = pair.child_by_field_name("value")
+            if value is not None and value.type == "identifier":
+                named.add(node_text(value, raw))
+    return named
+
+
+def declares_only_signatures(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether a class is a list of method signatures rather than an implementation.
+
+    Every method in one has the shape of every other by construction, so reporting them as
+    one shape asks an author to collapse the interface they were declaring. Read from the
+    bases, which is where a language says it: `Protocol` and `ABC` in Python, and the same
+    names anywhere else that borrows them."""
+    return bool(set(base_names(node, spec, raw)) & _SIGNATURE_ONLY_BASES)

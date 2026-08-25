@@ -143,3 +143,69 @@ def test_the_group_is_reported_at_its_first_function_in_the_file():
     found = rules.functions_of_one_shape(source)
     assert found[0]["line"] == 1, found
     assert found[0]["symbol"] == "rename_table, rename_column", found
+
+
+# ---------------------------------------------------------------------------
+# The rows of a table are not a table waiting to be written
+#
+# An adopter classified all 71 sites this clause reported in their source. Forty-six were
+# the two halves of a two-entry dispatch table: the clause saw two functions with one shape
+# and said "make it a table", and they ARE the table's rows. Four more were method
+# declarations on a Protocol, where a list of names with no bodies is the entire point.
+#
+# Fifty of seventy-one, which is the rate at which a reader learns to skip a field. The
+# nineteen real ones were the finding, and they were buried.
+#
+# Both exemptions are computable. A function named as a value in a table this file declares
+# is that table's row. A method on a Protocol is a signature, and every signature in one
+# looks like every other by construction.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_two_functions_a_table_names_are_that_table_s_rows(language):
+    source = {"python": ("def send_email(data):\n    return post('/email', data)\n\n\n"
+                         "def send_sms(data):\n    return post('/sms', data)\n\n\n"
+                         "HANDLERS = {'email': send_email, 'sms': send_sms}\n"),
+              "javascript": ("function sendEmail(data) {\n  return post('/email', data);\n}\n\n"
+                             "function sendSms(data) {\n  return post('/sms', data);\n}\n\n"
+                             "const handlers = {email: sendEmail, sms: sendSms};\n")}
+    assert rules.functions_of_one_shape(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_same_two_functions_with_no_table_are_still_reported(language):
+    """The other direction, and the one that keeps the clause worth having. Without the
+    table they are two functions that differ by a word, which is what it exists to find."""
+    source = {"python": ("def send_email(data):\n    return post('/email', data)\n\n\n"
+                         "def send_sms(data):\n    return post('/sms', data)\n"),
+              "javascript": ("function sendEmail(data) {\n  return post('/email', data);\n}\n\n"
+                             "function sendSms(data) {\n  return post('/sms', data);\n}\n")}
+    assert rules.functions_of_one_shape(read.read_tree(source[language], language))
+
+
+def test_a_table_naming_only_one_of_the_pair_still_reports_the_pair():
+    """Half a table is not a table. If one of the two is a row and the other is not, the
+    two are still a pair somebody wrote twice."""
+    source = ("def send_email(data):\n    return post('/email', data)\n\n\n"
+              "def send_sms(data):\n    return post('/sms', data)\n\n\n"
+              "HANDLERS = {'email': send_email}\n")
+    assert rules.functions_of_one_shape(read.read_tree(source, "python"))
+
+
+def test_method_declarations_on_a_protocol_are_signatures_rather_than_a_table():
+    """A Protocol is a list of names with no bodies, so every method in one has the shape
+    of every other by construction. Reporting them asks an author to collapse the interface
+    they were declaring."""
+    source = ("class Reader(Protocol):\n"
+              "    def read_one(self, path: str) -> bytes:\n        ...\n\n"
+              "    def read_all(self, path: str) -> bytes:\n        ...\n")
+    assert rules.functions_of_one_shape(read.read_tree(source, "python")) == []
+
+
+def test_methods_on_an_ordinary_class_are_still_reported():
+    """The exemption is the Protocol, not the class. Two identical methods on a real class
+    are two methods somebody wrote twice."""
+    source = ("class Sender:\n"
+              "    def send_email(self, data):\n        return post('/email', data)\n\n"
+              "    def send_sms(self, data):\n        return post('/sms', data)\n")
+    assert rules.functions_of_one_shape(read.read_tree(source, "python"))

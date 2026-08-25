@@ -211,3 +211,15 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When is_absent_value reads it through the language's absent, container and literal types
     Then the first two are stand-ins a caller cannot tell from success
     But a truthy constant names the failure and hands it to a caller that discloses it
+
+  Scenario: names_a_table_holds finds every name used as a value in a map literal
+    Given a file declaring a dispatch table whose values are function names
+    When names_a_table_holds reads the map literals through the language's vocabulary
+    Then each function the table names comes back, because a function a table names is that table's row
+    But a table built inside a function counts too, since scoping this to the top would exempt only some of them for a reason nobody could see
+
+  Scenario: declares_only_signatures says whether a class lists signatures rather than code
+    Given a class deriving from Protocol and an ordinary class beside it
+    When declares_only_signatures reads the bases
+    Then only the first is a list of signatures, where every method has the shape of every other by construction
+    But the exemption is the Protocol and not the class, so two identical methods on a real class are still two methods somebody wrote twice

@@ -28,6 +28,7 @@ from l1_analyzer.honest_code_read import (
     base_names,
     chain_subjects,
     class_nodes,
+    declares_only_signatures,
     first_name,
     function_nodes,
     handler_body,
@@ -36,6 +37,7 @@ from l1_analyzer.honest_code_read import (
     is_constructor,
     method_nodes,
     module_level_bindings,
+    names_a_table_holds,
     names_written_in,
     node_text,
     reaches_receiver,
@@ -152,8 +154,18 @@ def functions_of_one_shape(source: dict) -> list[Finding]:
     from l1_analyzer.clone_detect import normalized_tokens
 
     spec, raw = source["spec"], source["raw"]
+    # Two exemptions, both computable, and both were most of what this reported. A function
+    # a table names is that table's row, and a method on a class of signatures has the shape
+    # of every other by construction.
+    tabled = names_a_table_holds(source["root"], spec, raw)
+    signatures = {method
+                  for node in class_nodes(source["root"], spec)
+                  if declares_only_signatures(node, spec, raw)
+                  for method in method_nodes(node, spec)}
     shapes: dict[str, list[Node]] = {}
     for fn in function_nodes(source["root"], spec):
+        if fn in signatures:
+            continue
         symbols = [symbol for symbol, _ in normalized_tokens(fn, source["language"])]
         if len(symbols) < _SHAPE_TOKENS:
             continue
@@ -162,6 +174,11 @@ def functions_of_one_shape(source: dict) -> list[Finding]:
     found: list[Finding] = []
     for group in shapes.values():
         if len(group) < 2:
+            continue
+        names_here = {node_text(fn.child_by_field_name("name"), raw) for fn in group}
+        # EVERY member, not any. Half a table is not a table: if one of a pair is a row and
+        # the other is not, the two are still a pair somebody wrote twice.
+        if names_here and names_here <= tabled:
             continue
         # In file order, both the line and the names. `walk` promises no order, so the
         # group was reported at whichever member came back first, and for one fixture that
