@@ -84,14 +84,14 @@ def main():
 
     # Phase 2: visual verification (optional)
     if args.visual:
-        from .lib.visual import run_visual_audit
+        from .lib.visual import DEFAULT_SCREENSHOT_DIR, run_visual_audit
 
         url = args.url or config.get('visual', {}).get('url')
         if not url:
             print('\nError: --url or config.visual.url required for visual testing', file=sys.stderr)
             sys.exit(1)
 
-        screenshot_dir = args.screenshots or config.get('visual', {}).get('screenshotDir', '.audit/screenshots')
+        screenshot_dir = args.screenshots or config.get('visual', {}).get('screenshotDir', DEFAULT_SCREENSHOT_DIR)
 
         # Get raw audit results for Phase 2
         raw_results = audit(
@@ -109,6 +109,9 @@ def main():
             url=url,
             audit_results=raw_results,
             screenshot_dir=screenshot_dir,
+            # Stated. The audit exists to look at what failed, and a run over everything is
+            # a different request somebody would have to make.
+            only_failures=True,
         )
 
         for vr in visual_results:

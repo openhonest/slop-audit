@@ -9,11 +9,19 @@ Requires: playwright (optional dependency)
 
 import asyncio
 from pathlib import Path
+# Where the audit puts what it captures, and how it finds a playground on the page. Named
+# here rather than defaulted onto the functions below: a default absorbed the caller's
+# omission, so nothing could tell a caller who wanted the usual place from one who forgot
+# to say. The call sites pass these, and a caller wanting something else passes that.
+DEFAULT_SCREENSHOT_DIR = '.audit/screenshots'
+PLAYGROUND_SELECTOR = '[data-playground]'
+
+
 async def verify_components(
     url: str,
     components: list[dict],
-    screenshot_dir: str = '.audit/screenshots',
-    playground_selector: str = '[data-playground]',
+    screenshot_dir: str,
+    playground_selector: str,
 ) -> list[dict]:
     """
     Visually verify flagged components using Playwright.
@@ -197,8 +205,13 @@ async def _test_hover_control(
             'control_type': 'hover',
         }
 
-    except Exception:
-        return None
+    # Naming the failure, as _test_dead_control above already does. Returning None here
+    # meant a caller could not tell "there was no hover control to test", which the three
+    # returns above say deliberately, from "testing it raised". Both reached the report as
+    # a control that was simply not exercised.
+    except Exception as error:
+        return {'state': f'hover-{matched["opt"]}-error', 'error': str(error),
+                'control_type': 'hover'}
 
 
 # ── Sync wrapper ─────────────────────────────────────────────────────
@@ -206,8 +219,8 @@ async def _test_hover_control(
 def run_visual_audit(
     url: str,
     audit_results: list[dict],
-    screenshot_dir: str = '.audit/screenshots',
-    only_failures: bool = True,
+    screenshot_dir: str,
+    only_failures: bool,
 ) -> list[dict]:
     """
     Synchronous entry point for visual verification.
@@ -223,4 +236,5 @@ def run_visual_audit(
     else:
         components = audit_results
 
-    return asyncio.run(verify_components(url, components, screenshot_dir))
+    return asyncio.run(verify_components(url, components, screenshot_dir,
+                                         PLAYGROUND_SELECTOR))

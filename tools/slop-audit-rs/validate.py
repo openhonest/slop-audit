@@ -56,7 +56,7 @@ def render(value) -> str:
     return value if isinstance(value, str) else json.dumps(value)
 
 
-def diff_panels(repo: Path, lang: str = "auto", *, quiet: bool = False) -> tuple[int, int]:
+def diff_panels(repo: Path, lang: str, *, quiet: bool) -> tuple[int, int]:
     """Run both tools on `repo` and report each shared indicator EQUAL or DIFF.
     Returns (diffs, compared). `quiet` prints only the disagreements, which is what a
     corpus run wants when it is walking several repositories."""
@@ -155,7 +155,9 @@ def main() -> int:
     # be attributed to a change in either side.
     print(f"reference: {_reference_version()}")
     print(f"ported:    {_ported_version()}\n")
-    diffs, compared = diff_panels(repo, lang)
+    # Stated: one repository, and a reader wants every line of the comparison. The
+    # corpus walker asks for quiet because it is walking several.
+    diffs, compared = diff_panels(repo, lang, quiet=False)
     # "16/16" on its own reads as a complete audit. It is a statement about the indicators
     # that were compared, and saying so is the whole lesson of this differ's own blind spot.
     print(f"\n{compared - diffs}/{compared} COMPARED indicators equal on {repo}")

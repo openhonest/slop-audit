@@ -23,8 +23,8 @@ from .lib.report import format_text, format_summary, format_json
 def audit(
     playground_source: str,
     enhance_source: str,
-    attr_prefix: str = 'ux-',
-    output: str = 'text',
+    attr_prefix: str,
+    output: str,
 ) -> str | list[dict]:
     """
     Run a full audit: extract, compare, report.

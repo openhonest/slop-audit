@@ -41,6 +41,12 @@ import random
 import statistics as st
 import sys
 
+# The interval both estimators report, named once. It was two facts in two spellings:
+# `alpha=0.05` as a default on the exact interval, and 0.025/0.975 written into the
+# bootstrap's cut points. Nothing checked they agreed, and a default meant a caller who
+# omitted alpha could not be told from one who chose it.
+ALPHA = 0.05
+
 BOOTSTRAP_DRAWS = 4000
 SEED = 20260814
 
@@ -70,7 +76,7 @@ def anova_icc(groups: list[list[float]]) -> tuple[float, float, float]:
     return (msb - msw) / (msb + (n - 1) * msw), msb, msw
 
 
-def exact_interval(groups: list[list[float]], alpha: float = 0.05) -> tuple[float, float]:
+def exact_interval(groups: list[list[float]], alpha: float) -> tuple[float, float]:
     """The F-based interval for the one-way ANOVA ICC. No cluster resampling, so it does
     not carry the duplicate-cluster bias. It assumes normality within groups, which is why
     the rank transform matters and why this should be run on more than raw values."""
@@ -85,7 +91,7 @@ def exact_interval(groups: list[list[float]], alpha: float = 0.05) -> tuple[floa
     return (lower_f - 1) / (lower_f + n - 1), (upper_f - 1) / (upper_f + n - 1)
 
 
-def bootstrap(groups: list[list[float]], draws: int = BOOTSTRAP_DRAWS) -> tuple[float, float, float]:
+def bootstrap(groups: list[list[float]], draws: int, alpha: float) -> tuple[float, float, float]:
     """Percentile interval from a cluster bootstrap, plus the bias diagnostic.
 
     Returns (low, high, percentile_of_point_estimate). Read the percentile first: if it is
@@ -100,7 +106,8 @@ def bootstrap(groups: list[list[float]], draws: int = BOOTSTRAP_DRAWS) -> tuple[
             draws_out.append(value)
     draws_out.sort()
     percentile = 100 * sum(1 for d in draws_out if d < point) / len(draws_out)
-    return draws_out[int(0.025 * len(draws_out))], draws_out[int(0.975 * len(draws_out))], percentile
+    return (draws_out[int(alpha / 2 * len(draws_out))],
+            draws_out[int((1 - alpha / 2) * len(draws_out))], percentile)
 
 
 TRANSFORMS = {
@@ -121,9 +128,9 @@ def decompose(panel: dict[str, list[float]]) -> None:
         groups = [[lookup[v] for v in group] for group in panel.values()]
         point = moment_icc(groups)
         a_icc, _, _ = anova_icc(groups)
-        lo, hi, pct = bootstrap(groups)
+        lo, hi, pct = bootstrap(groups, BOOTSTRAP_DRAWS, ALPHA)
         try:
-            exact_lo, exact_hi = exact_interval(groups)
+            exact_lo, exact_hi = exact_interval(groups, ALPHA)
             exact = f"[{exact_lo:5.2f}, {exact_hi:5.2f}]"
         except ImportError:
             exact = "scipy not installed"

@@ -24,7 +24,7 @@ def _extract_brace_block(source: str, start: int) -> str:
     return source[start:]
 # ── Playground extraction ────────────────────────────────────────────
 
-def extract_playground_components(source: str, attr_prefix: str = 'ux-') -> dict[str, dict]:
+def extract_playground_components(source: str, attr_prefix: str) -> dict[str, dict]:
     """
     Extract component configs from playground source text.
 
