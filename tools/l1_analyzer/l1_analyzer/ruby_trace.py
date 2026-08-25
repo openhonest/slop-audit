@@ -29,7 +29,7 @@ import re
 import shutil
 from pathlib import Path
 
-from l1_analyzer.boundary import text_or_empty
+from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -86,6 +86,7 @@ def _detect_runner(repo: Path) -> str | None:
     return None
 
 
+@boundary
 def _pin(repo: Path, timeout_seconds: float) -> tuple[str | None, str | None, dict, str]:
     """(ruby, bundle, env, provenance): pin ruby via a shim manager (rbenv/asdf/mise which
     ruby) when one resolves it for this repo, so a homebrew ruby ahead of the shim on PATH

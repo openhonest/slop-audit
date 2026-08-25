@@ -107,6 +107,10 @@ class LangSpec(TypedDict, total=False):
     # how a program stops cleanly, and the rule about swallowing errors is not about these.
     # Empty where the language has no such signal.
     control_flow_exceptions: frozenset[str]
+    # Where the runtime is guaranteed to hand another caller a turn. Between a read and a
+    # write of something shared, one of these turns an occasional race into a certain one.
+    # Empty where the language has no such point, which is not the same as having no races.
+    suspension_types: tuple[str, ...]
     # The statement that records a failure. A try body ending in one is ASSERTING that its
     # call raised, so the handler beneath is the success condition and reaching the recorder
     # is the defect. Keying on the handler alone made both readings look alike.
@@ -356,6 +360,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "raise_names": frozenset(),
         "absent_types": ("none", "false"),
         "control_flow_exceptions": frozenset({"SystemExit", "KeyboardInterrupt", "GeneratorExit"}),
+        "suspension_types": ("await",),
         "assertion_types": ("assert_statement", "raise_statement"),
         "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
         "instance_ref_style": "member",
@@ -450,6 +455,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "raise_names": frozenset(),
         "absent_types": ("null", "undefined", "false"),
         "control_flow_exceptions": frozenset(),
+        "suspension_types": ("await_expression",),
         "assertion_types": ("throw_statement",),
         "container_literal_types": frozenset({"array", "object"}),
         "instance_ref_style": "member",
@@ -534,6 +540,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "raise_names": frozenset(),
         "absent_types": ("null_literal", "false"),
         "control_flow_exceptions": frozenset(),
+        "suspension_types": (),
         "assertion_types": ("assert_statement", "throw_statement"),
         "container_literal_types": frozenset({"array_initializer"}),
         "instance_ref_style": "identifier",
@@ -630,6 +637,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "raise_names": frozenset(),
         "absent_types": ("null_literal", "false"),
         "control_flow_exceptions": frozenset(),
+        "suspension_types": ("await_expression",),
         "assertion_types": ("throw_statement",),
         "container_literal_types": frozenset({"array_creation_expression", "initializer_expression"}),
         "instance_ref_style": "identifier",
@@ -719,6 +727,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "raise_names": frozenset(),
         "absent_types": ("unit_expression",),
         "control_flow_exceptions": frozenset(),
+        "suspension_types": ("await_expression",),
         "assertion_types": (),
         "container_literal_types": frozenset({"array_expression", "tuple_expression"}),
         "instance_ref_style": "member",
@@ -814,6 +823,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "raise_names": frozenset({"raise", "fail"}),
         "absent_types": ("nil", "false"),
         "control_flow_exceptions": frozenset({"SystemExit", "Interrupt"}),
+        "suspension_types": (),
         "assertion_types": (),
         "container_literal_types": frozenset({"array", "hash"}),
         "instance_ref_style": "member",
@@ -909,6 +919,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "raise_names": frozenset(),
         "absent_types": ("null",),
         "control_flow_exceptions": frozenset(),
+        "suspension_types": (),
         "assertion_types": (),
         "container_literal_types": frozenset({"initializer_list"}),
         "instance_ref_style": "identifier",
@@ -1017,6 +1028,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "raise_names": frozenset(),
         "absent_types": ("nil",),
         "control_flow_exceptions": frozenset(),
+        "suspension_types": (),
         "assertion_types": (),
         "container_literal_types": frozenset({"composite_literal"}),
         "instance_ref_style": "member",

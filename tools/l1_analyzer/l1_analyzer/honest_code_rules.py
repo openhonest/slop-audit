@@ -747,3 +747,82 @@ def _fallback_lookup(node: Node, spec: LangSpec, raw: bytes) -> tuple[str, Node,
 # --------------------------------------------------------------------------
 # 19. Atomic test-and-set over check-then-act
 # --------------------------------------------------------------------------
+
+
+# --------------------------------------------------------------------------
+# 19. Atomic test-and-set over check-then-act
+# --------------------------------------------------------------------------
+
+def check_then_act(source: dict) -> list[Finding] | None:
+    """A read of a shared value followed by a write to it, inside one function.
+
+    Read through the language's own node vocabulary. Between the read and the write another
+    caller reads the same answer, and both proceed believing they hold the thing. A
+    suspension point in between makes the race certain rather than occasional, because the
+    runtime is guaranteed to give another caller the turn, and the finding says which it
+    found: a reader deciding what to fix first needs to know.
+
+    Only what the file declares at the top. A container built inside a function is that
+    call's own, and no second caller can see it.
+
+    Not decided: whether the value is genuinely shared across callers. A module-level
+    container is the readable case; a row in a database is not in this file."""
+    spec, raw = source["spec"], source["raw"]
+    shared = {name for name, value in module_level_bindings(source["root"], spec, raw).items()
+              if _is_table(value, spec)}
+    if not shared:
+        return []
+    found: list[Finding] = []
+    for fn in function_nodes(source["root"], spec):
+        owner = node_text(fn.child_by_field_name("name"), raw) or first_name(fn, raw)
+        for name in sorted(shared):
+            read_at = _first_plain_read(fn, name, spec, raw)
+            wrote_at = _first_keyed_write(fn, name, spec, raw)
+            if read_at is None or wrote_at is None or wrote_at <= read_at:
+                continue
+            suspended = any(n.type in spec["suspension_types"]
+                            and read_at < n.start_point[0] + 1 < wrote_at
+                            for n in walk(fn))
+            certainty = "certain" if suspended else "occasional"
+            found.append(_finding(
+                "L1.21.19", f"{owner}({name})", read_at,
+                f"reads `{name}` at line {read_at} and writes it at line {wrote_at}, so two "
+                f"callers can both believe they hold it. The race is {certainty}"
+                + (", because the runtime hands another caller a turn in between"
+                   if suspended else ""),
+                "one operation whose return value distinguishes I took it from someone "
+                "else holds it, carrying a token unique to the caller", ""))
+    return found
+
+
+def _first_plain_read(fn: "Node", name: str, spec: "LangSpec", raw: bytes) -> int | None:
+    """The first line where this function reads the name without writing a key of it.
+
+    Plain, because the write below is what the read is being checked against: counting the
+    subscript on the left of an assignment as a read would make every write its own race."""
+    lines = [n.start_point[0] + 1 for n in walk(fn)
+             if n.type == "identifier" and node_text(n, raw) == name
+             and not _is_keyed_write_target(n, spec)]
+    return min(lines) if lines else None
+
+
+def _first_keyed_write(fn: "Node", name: str, spec: "LangSpec", raw: bytes) -> int | None:
+    """The first line where this function writes a key of the name."""
+    lines = [n.start_point[0] + 1 for n in walk(fn)
+             if n.type == "identifier" and node_text(n, raw) == name
+             and _is_keyed_write_target(n, spec)]
+    return min(lines) if lines else None
+
+
+def _is_keyed_write_target(node: "Node", spec: "LangSpec") -> bool:
+    """Whether this name is the thing being subscripted on the left of an assignment."""
+    subscript = node.parent
+    if subscript is None or subscript.type not in spec["subscript_types"]:
+        return False
+    assignment = subscript.parent
+    if assignment is None or assignment.type not in spec["assign_types"]:
+        return False
+    # Compared with == rather than is. The same node comes back from an accessor as a
+    # distinct object, so identity is False for a node that IS the assignment's left side.
+    # tree-sitter implements equality and hashing on the node itself.
+    return assignment.child_by_field_name(spec["assign_left"]) == subscript

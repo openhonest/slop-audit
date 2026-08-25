@@ -149,3 +149,27 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When functions_of_one_shape erases every name and quoted string and compares what is left
     Then both leave the same shape and the pair is reported at the earlier of the two
     But two functions doing genuinely different work leave different shapes and stay quiet
+
+  Scenario: check_then_act finds a guard that is not a guard
+    Given a parsed source
+    When check_then_act reads each function's reads and writes of shared values
+    Then a read of a shared value followed by a write to it lets two callers both believe they hold the thing
+    But an await between the two makes the race certain rather than occasional, and the finding says which it found
+
+  Scenario: _first_plain_read names the line a function first reads a shared name
+    Given a function that checks a shared table and then writes a key of it
+    When _first_plain_read looks for the name without a subscript on the left of an assignment
+    Then the line of the check comes back
+    But the write's own subscript is not counted, or every write would be its own race
+
+  Scenario: _first_keyed_write names the line a function first writes a key
+    Given the same function
+    When _first_keyed_write looks for the name being subscripted on the left of an assignment
+    Then the line of the write comes back
+    But a read of a key is not a write, however it is spelled
+
+  Scenario: _is_keyed_write_target says whether a name is being written through a key
+    Given a name inside a subscript
+    When _is_keyed_write_target checks whether that subscript is the assignment's left side
+    Then only a write reports true
+    But the comparison is by equality, because the same node comes back from an accessor as a distinct object

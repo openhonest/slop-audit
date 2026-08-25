@@ -257,7 +257,8 @@ CLAUSES: tuple[Clause, ...] = (
     _clause(17, "Strangler pattern for migration", _NOTHING, python_rules.strangler_migration),
     _clause(18, "Dispatch tables close open input", _TREE, rules.open_dispatch,
             reads=_TREE_READER),
-    _clause(19, "Atomic test-and-set over check-then-act", _TREE, python_rules.check_then_act),
+    _clause(19, "Atomic test-and-set over check-then-act", _TREE, rules.check_then_act,
+            reads=_TREE_READER),
 )
 
 _WHY_NOT = {

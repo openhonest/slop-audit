@@ -703,3 +703,83 @@ def test_a_language_with_no_handler_says_the_question_cannot_arise():
     this clause reads, and reporting the empty list would claim the file was checked."""
     for absent in ("go", "rust"):
         assert rules.swallowed_exceptions(read.read_tree("", absent)) is None, absent
+
+
+# --------------------------------------------------------------------------
+# Clause 19, check-then-act on something two callers share
+#
+# A read of a shared value followed by a write to it, inside one function. Between the two,
+# another caller reads the same answer, and both proceed believing they hold the thing.
+#
+# An await in between makes the race certain rather than occasional, because the runtime is
+# guaranteed to give another caller the chance. Both languages spell it `await` and both
+# needed the node type named, since the vocabulary carried no key for it.
+# --------------------------------------------------------------------------
+
+RACE = {
+    "python": ("SEATS = {}\n\n\n"
+               "def claim(seat, who):\n"
+               "    if seat in SEATS:\n        return False\n"
+               "    SEATS[seat] = who\n    return True\n"),
+    "javascript": ("const seats = {};\n\n"
+                   "function claim(seat, who) {\n"
+                   "  if (seats[seat]) { return false; }\n"
+                   "  seats[seat] = who;\n  return true;\n}\n"),
+}
+
+AWAITED = {
+    "python": ("SEATS = {}\n\n\n"
+               "async def claim(seat, who):\n"
+               "    if seat in SEATS:\n        return False\n"
+               "    await settle(seat)\n"
+               "    SEATS[seat] = who\n    return True\n"),
+    "javascript": ("const seats = {};\n\n"
+                   "async function claim(seat, who) {\n"
+                   "  if (seats[seat]) { return false; }\n"
+                   "  await settle(seat);\n"
+                   "  seats[seat] = who;\n  return true;\n}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_read_then_a_write_of_a_shared_container_is_found(language):
+    found = rules.check_then_act(read.read_tree(RACE[language], language))
+    assert [f["symbol"].split("(")[0] for f in found] == ["claim"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_writing_without_reading_first_is_not_a_race(language):
+    """The other direction. A function that only writes cannot have decided anything from
+    what it read, so there is nothing for a second caller to have decided too."""
+    source = {"python": "SEATS = {}\n\n\ndef claim(seat, who):\n    SEATS[seat] = who\n",
+              "javascript": ("const seats = {};\n\n"
+                             "function claim(seat, who) {\n  seats[seat] = who;\n}\n")}
+    assert rules.check_then_act(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_an_await_between_them_makes_the_race_certain(language):
+    found = rules.check_then_act(read.read_tree(AWAITED[language], language))
+    assert found and "certain" in found[0]["detail"], found
+    assert "occasional" not in found[0]["detail"]
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_without_an_await_the_race_is_reported_as_occasional(language):
+    """The distinction is the finding. A reader deciding what to fix first needs to know
+    which of the two they are looking at."""
+    found = rules.check_then_act(read.read_tree(RACE[language], language))
+    assert found and "occasional" in found[0]["detail"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_local_container_is_not_shared_with_anyone(language):
+    """Only what the file declares at the top. A container built inside the function is
+    that call's own, and no second caller can see it."""
+    source = {"python": ("def claim(seat, who):\n    seats = {}\n"
+                         "    if seat in seats:\n        return False\n"
+                         "    seats[seat] = who\n    return True\n"),
+              "javascript": ("function claim(seat, who) {\n  const seats = {};\n"
+                             "  if (seats[seat]) { return false; }\n"
+                             "  seats[seat] = who;\n  return true;\n}\n")}
+    assert rules.check_then_act(read.read_tree(source[language], language)) == []

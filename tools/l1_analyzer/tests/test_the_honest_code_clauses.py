@@ -312,28 +312,9 @@ def test_the_strangler_clause_never_returns_a_verdict():
 # 19. Atomic test-and-set over check-then-act
 # --------------------------------------------------------------------------
 
-def test_a_read_then_write_of_a_shared_value_is_found():
-    found = python_rules.check_then_act(_module(
-        "LOCKS = {}\n\n\ndef claim(key):\n"
-        "    if key in LOCKS:\n        return False\n    LOCKS[key] = True\n    return True\n"))
-    assert found
-
-
-def test_an_await_between_the_two_is_named_as_certain():
-    """Between the read and the write another caller reads the same answer. An await makes
-    that certain rather than occasional, and the finding has to say which it found."""
-    found = python_rules.check_then_act(_module(
-        "LOCKS = {}\n\n\nasync def claim(key):\n"
-        "    if key in LOCKS:\n        return False\n"
-        "    await settle()\n    LOCKS[key] = True\n    return True\n"))
-    assert found
-    assert "certain" in found[0]["detail"]
-
-
-def test_reading_a_shared_value_without_writing_it_is_not_a_race():
-    assert python_rules.check_then_act(_module(
-        "LOCKS = {}\n\n\ndef held(key):\n    return key in LOCKS\n")) == []
-
+# Its cases live in test_a_clause_means_the_same_in_every_language.py now. The clause reads
+# the shared node vocabulary, and a read followed by a write of something two callers share
+# is the same race in every language that has one.
 
 # --------------------------------------------------------------------------
 # What the clauses learned from being pointed at themselves

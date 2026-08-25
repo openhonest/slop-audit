@@ -164,3 +164,39 @@ def test_the_calls_on_those_modules_that_do_reach_something_still_fire(call):
     found = _findings(f"import {module}\n\n\ndef emit(msg, host, logger):\n    return {call}\n\n\n"
                       f"def run(m, h, lg):\n    return emit(m, h, lg)\n")
     assert [f for f in found if "performs I/O" in f["detail"]], call
+
+
+@pytest.mark.parametrize("call", [
+    "os.environ.get('HOME')",
+    "loader.exec_module(module)",
+    "importlib.util.spec_from_file_location('m', path)",
+])
+def test_reading_the_environment_or_loading_a_module_reaches_outside(call):
+    """An adopter named six calls this reader did not count. Three of them reach outside.
+
+    The environment is ambient input a caller cannot see, which is what rule 4 is about.
+    Loading a module reads a Python file off disk and executes it, which is as much an edge
+    as opening a socket."""
+    module = call.split(".")[0]
+    found = _findings(f"import {module}\n\n\ndef edge(path, loader, module):\n"
+                      f"    return {call}\n\n\ndef run(p, l, m):\n    return edge(p, l, m)\n")
+    assert [f for f in found if "performs I/O" in f["detail"]], call
+
+
+@pytest.mark.parametrize("call", [
+    "asyncio.run(main())",
+    "asyncio.create_task(go())",
+    "asyncio.get_running_loop()",
+    "uuid.uuid4()",
+])
+def test_scheduling_and_randomness_are_not_io(call):
+    """The other three of the six, and one this clause must keep refusing.
+
+    They are non-determinism and scheduling, which another checker treats as a boundary
+    privilege alongside I/O. This clause is about I/O alone, and folding the other two in
+    would make it a different rule wearing the same number. A `uuid4` in the interior is a
+    real problem and it is not this one."""
+    module = call.split(".")[0]
+    found = _findings(f"import {module}\n\n\ndef pure(main, go):\n    return {call}\n\n\n"
+                      f"def run(m, g):\n    return pure(m, g)\n")
+    assert [f for f in found if "performs I/O" in f["detail"]] == [], call

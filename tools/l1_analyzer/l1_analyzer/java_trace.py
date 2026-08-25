@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from l1_analyzer import incomplete
+from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -74,6 +75,7 @@ def _unsupported_reason(repo: Path) -> str | None:
     return None
 
 
+@boundary
 def _pin_jdk(repo: Path, timeout_seconds: float) -> tuple[dict, str]:
     """(env, provenance): pin the JDK via a version manager (jenv/asdf/mise which java) when
     one resolves it for this repo, setting JAVA_HOME so Maven uses it rather than letting a

@@ -41,12 +41,6 @@ Feature: Clauses this reader still reads through Python's own parser
     Then each module-level name comes back with what it was assigned
     But an assignment inside a conditional at module level is read the same way, since a reader of the file sees one name either way
 
-  Scenario: check_then_act finds a guard that is not a guard
-    Given a parsed source
-    When check_then_act reads each function's reads and writes of shared values
-    Then a read of a shared value followed by a write to it lets two callers both believe they hold the thing
-    But an await between the two makes the race certain rather than occasional, and the finding says which it found
-
   Scenario: heavy_step_definitions finds a step carrying the architecture's hidden dependencies
     Given a parsed step-definition file
     When heavy_step_definitions measures each step's body
@@ -104,3 +98,9 @@ Feature: Clauses this reader still reads through Python's own parser
     When someone asks whether the shared vocabulary can carry it yet
     Then the answer is in the grammars of eight other languages, not in this file
     But nothing here can read those grammars to find out
+
+  Scenario: _named_in_a_table finds every bare name a map literal holds as a value
+    Given a dispatch table whose values are function names
+    When _named_in_a_table reads the map literals in the file
+    Then each function the table holds counts as reached, because the table is how it is called
+    But a table of strings names no function, or a table mentioning a name would reach it

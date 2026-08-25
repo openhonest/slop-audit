@@ -73,6 +73,13 @@ _IO_DOTTED = frozenset({
     "socket.gethostbyaddr", "socket.getaddrinfo", "socket.getfqdn", "socket.create_server",
     "tempfile.mkdtemp", "tempfile.NamedTemporaryFile", "tempfile.TemporaryDirectory",
     "mmap.mmap",
+    # Ambient input a caller cannot see, and a module read off disk and executed. Named by
+    # an adopter, alongside three this clause refuses: `asyncio.run`, `asyncio.create_task`
+    # and `uuid.uuid4` are non-determinism and scheduling. Another checker treats those as a
+    # boundary privilege beside I/O; this clause is about I/O alone, and folding them in
+    # would make it a different rule wearing the same number.
+    "environ.get", "environ.setdefault", "util.spec_from_file_location",
+    "loader.exec_module", "spec.loader",
 })
 
 # Names that mean I/O only with a receiver that names a client. `TABLE.get(key)` is a dict
@@ -103,7 +110,6 @@ _UNPROFILED = ("whether the query was profiled first is not readable from any fi
                "only the cache itself was checked")
 
 
-
 def io_below_the_boundary(source: dict) -> list[Finding] | None:
     """A function that performs I/O and is itself called by a sibling.
 
@@ -114,9 +120,22 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
     Not decided: whether an uncalled function is truly an entry point. A module read only
     from outside has every function looking like a boundary."""
     functions = list(_functions(source))
-    called_by_siblings: set[str] = set()
+    called_by_siblings = _named_in_a_table(source)
     for fn in functions:
         called_by_siblings |= _called(fn) - {fn.name}
+    # A function that CALLS a declared boundary is reaching an edge through the thing that
+    # made the claim. An adopter measured 14 sites here and eight were the error-handling
+    # layer directly above the I/O: a function whose whole job is catching what a boundary
+    # raised, holding no I/O of its own.
+    #
+    # It was a real conflict rather than a preference. Another checker grants a boundary the
+    # right to catch and refuses a non-boundary that catch, so such a function must carry
+    # the marker there and must not carry it here, and no marking satisfied both.
+    #
+    # One step, not transitively. A declaration is a claim about the function carrying it,
+    # and following further would let a declaration three calls away excuse a function that
+    # reaches nothing.
+    declared_here = {fn.name for fn in functions if _declares_a_boundary(fn)}
     found: list[Finding] = []
     for fn in functions:
         # A DECLARATION THAT IS NOT TRUE. The decorator says this function is an edge, and
@@ -131,7 +150,7 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
         # it. Reported whether or not a sibling calls it: the uncalled-function exemption
         # exists because such a function may be the entry point, and an entry point that
         # obtains nothing is still not an edge.
-        if _declares_a_boundary(fn) and not _io_calls(fn):
+        if _declares_a_boundary(fn) and not _io_calls(fn) and not (_called(fn) & declared_here):
             found.append(_finding(
                 "L1.21.4", fn.name, fn.lineno,
                 "declares itself a boundary and makes no call this reader counts as I/O, "
@@ -154,6 +173,28 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
             finding["withheld_by"] = withheld
             found.append(finding)
     return found
+
+
+def _named_in_a_table(source: dict) -> set[str]:
+    """Every bare name a map literal holds as a value, anywhere in the file.
+
+    A function a dispatch table holds IS called: the table is how it is reached. Clause 4
+    built its call graph from calls by name, so a function that is only ever a table value
+    was reached by nothing as far as this reader could see, and it was silent in both
+    directions on such a function.
+
+    An adopter found it, and the irony is the point: this instrument tells people to replace
+    if/elif chains with dispatch tables, and a reader following named calls only is blind to
+    most of the interior of a codebase written that way.
+
+    Only a bare name. A table of strings is data about names rather than a call graph, and
+    reading one as an edge would reach anything a table happens to mention."""
+    named: set[str] = set()
+    for node in ast.walk(source["tree"]):
+        if not isinstance(node, ast.Dict):
+            continue
+        named |= {value.id for value in node.values if isinstance(value, ast.Name)}
+    return named
 
 
 def _declares_a_boundary(fn: ast.FunctionDef) -> bool:
@@ -382,37 +423,6 @@ def strangler_migration(source: dict) -> list[Finding] | None:
     raise NotImplementedError(
         "clause 17 has no checker: nothing decides the strangler pattern, and the gate "
         "should have answered `never` before reaching this")
-
-
-def check_then_act(source: dict) -> list[Finding] | None:
-    """A read of a shared value followed by a write to it, inside one function.
-
-    Between the read and the write another caller reads the same answer, and both proceed
-    believing they hold the thing. An `await` in between makes the race certain rather than
-    occasional, and the finding says which it found.
-
-    Not decided: whether the value is genuinely shared across callers. A module-level
-    container is the readable case; a row in a database is not in this file."""
-    shared = {name for name, value in _module_level(source).items()
-              if isinstance(value, (ast.Dict, ast.List, ast.Set))}
-    found: list[Finding] = []
-    for fn in _functions(source):
-        for name in sorted(shared):
-            read = _first_line(fn, name, ast.Load, subscript=False)
-            write = _first_line(fn, name, ast.Store, subscript=True)
-            if read is None or write is None or write <= read:
-                continue
-            awaited = any(isinstance(n, ast.Await) and read < n.lineno < write
-                          for n in ast.walk(fn))
-            certainty = "certain" if awaited else "occasional"
-            found.append(_finding(
-                "L1.21.19", f"{fn.name}({name})", read,
-                f"reads `{name}` at line {read} and writes it at line {write}, so two "
-                f"callers can both believe they hold it. The race is {certainty}"
-                + (", because there is an await in between" if awaited else ""),
-                "one operation whose return value distinguishes I took it from someone "
-                "else holds it, carrying a token unique to the caller", ""))
-    return found
 
 
 def _first_line(fn: ast.FunctionDef, name: str, context: type, subscript: bool) -> int | None:

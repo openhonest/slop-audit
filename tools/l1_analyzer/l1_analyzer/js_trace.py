@@ -49,6 +49,7 @@ def _node() -> str | None:
     return shutil.which("node")
 
 
+@boundary
 def _nvm_dir() -> Path | None:
     """The nvm install, or None. nvm is a shell function sourced from `$NVM_DIR/nvm.sh`
     (default `~/.nvm/nvm.sh`) - there is nowhere else for it to be - so it cannot be found on
