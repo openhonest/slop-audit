@@ -56,7 +56,12 @@ repos:
         entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 0 --max-honest-code 20
         language: system
         pass_filenames: false
-        files: ^tools/l1_analyzer/.*\.py$
+        # Any Python in the repository, because the entry audits the whole repository.
+        # It matched only tools/l1_analyzer until 2026-08-25, so a commit that added a
+        # finding to ui-audit or the paper arms never ran the gate at all: the ratchet
+        # covered code the trigger could not see. A hook whose trigger is narrower than
+        # its subject is a hook that reports on what nobody changed.
+        files: \.py$
 
       # Reference: the meter's verdict on honest-framework's reference server (a
       # vendored, verbatim snapshot) must stay a clean bill. Guards against a
