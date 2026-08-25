@@ -58,6 +58,7 @@ from pathlib import Path
 from re import Pattern
 from typing import TypedDict
 
+from l1_analyzer.boundary import boundary
 from l1_analyzer.dead_code import _EXT_LANG, parser
 from l1_analyzer.scope import (
     PRODUCTION,
@@ -352,6 +353,7 @@ def _band_for(hits: int) -> str:
 _BINARY_PROBE_BYTES = 8192
 
 
+@boundary
 def _read_text_bytes(path: Path, max_bytes: int) -> bytes | None:
     """The file's bytes, or None when it is binary, too large, or unreadable.
 

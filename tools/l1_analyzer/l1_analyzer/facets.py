@@ -38,6 +38,8 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer.boundary import boundary
+
 # The five kinds, named as a closed set. A facet nobody wrote a rule for must be absent
 # loudly rather than missing from the denominator, which would raise the evidenced share.
 FACET_KINDS = (
@@ -477,6 +479,7 @@ def import_root(module: Path) -> Path:
     return directory
 
 
+@boundary
 def _coverage(module: Path, tests: tuple[Path, ...]) -> tuple[frozenset[int], float | None, bool]:
     """Uncovered lines, the branch percentage, and whether the suite succeeded.
 
@@ -502,13 +505,25 @@ def _coverage(module: Path, tests: tuple[Path, ...]) -> tuple[frozenset[int], fl
             return frozenset(), None, False
         if made.returncode != 0 or not report.exists():
             return frozenset(), None, run.returncode == 0
-        payload = json.loads(report.read_text())
-        files = payload.get("files", {})
-        entry = next((v for k, v in files.items() if Path(k).name == module.name), None)
-        if entry is None:
-            return frozenset(), None, run.returncode == 0
-        pct = entry["summary"].get("percent_covered")
-        return frozenset(entry.get("missing_lines", [])), pct, run.returncode == 0
+        missing, pct = coverage_in(json.loads(report.read_text()), module.name)
+        return missing, pct, run.returncode == 0
+
+
+def coverage_in(payload: dict, module_name: str) -> tuple[frozenset[int], float | None]:
+    """What a coverage payload says about one module: its missing lines and its percentage.
+
+    Nothing measured is not nothing missing. A payload naming no such module yields an empty
+    set AND no percentage, because reporting an empty set with a number would say the module
+    was fully covered by a run that never saw it.
+
+    Matched on file NAME, because the payload keys are the paths coverage.py resolved and
+    the caller holds the module it asked about."""
+    entry = next((value for key, value in payload.get("files", {}).items()
+                  if Path(key).name == module_name), None)
+    if entry is None:
+        return frozenset(), None
+    return (frozenset(entry.get("missing_lines", [])),
+            entry.get("summary", {}).get("percent_covered"))
 
 
 def audit(module: Path, tests: Path | tuple[Path, ...]) -> Audit:

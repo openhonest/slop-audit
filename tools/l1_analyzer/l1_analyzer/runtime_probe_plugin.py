@@ -20,6 +20,8 @@ from collections.abc import Callable
 from functools import partial
 from typing import TypedDict
 
+from l1_analyzer.boundary import boundary
+
 
 class Observation(TypedDict):
     """One watched call. `before` and `after` are the reprs of the positional arguments on
@@ -191,6 +193,7 @@ def pytest_unconfigure(config: object) -> None:
     write_observations(getattr(config, STASH, []), os.environ.get(OUTPUT_VARIABLE, ""))
 
 
+@boundary
 def write_observations(seen: list[Observation], destination: str) -> bool:
     """Write the observations where the probe asked, and say whether it did.
 

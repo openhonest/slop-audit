@@ -31,6 +31,7 @@ from pathlib import Path
 
 from l1_analyzer import budget, coverage_prove, pytest_trace, python_facets
 from l1_analyzer import model_call as llm
+from l1_analyzer.boundary import boundary
 from l1_analyzer.coverage_prove import (
     CoverageProof,
     SweepProgress,
@@ -340,6 +341,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 
+@boundary
 def _uncovered_lines(repo: Path, interpreter: str, timeout_seconds: float) -> dict:
     """{measured, files: {relpath: frozenset(missing lines)}, reason} from one branch-coverage
     run of the target's suite, via coverage.py's per-file missing_lines."""
@@ -362,6 +364,15 @@ def _uncovered_lines(repo: Path, interpreter: str, timeout_seconds: float) -> di
             report = json.loads(report_file.read_text())
         except (OSError, json.JSONDecodeError):
             return {"measured": False, "files": {}, "reason": "coverage report was unreadable"}
+    return {"measured": True, "files": missing_by_file(report, repo), "reason": ""}
+
+
+def missing_by_file(report: dict, repo: Path) -> dict[str, frozenset[int]]:
+    """The uncovered lines a coverage report holds, for this repository's files only.
+
+    A suite that imports an installed package reports coverage for it too, and those lines
+    are not this repository's to answer for. A file with nothing missing is left out rather
+    than carried as an empty set: the caller asks this what is uncovered."""
     root = repo.resolve()
     files: dict[str, frozenset[int]] = {}
     for path_str, data in report.get("files", {}).items():
@@ -371,4 +382,4 @@ def _uncovered_lines(repo: Path, interpreter: str, timeout_seconds: float) -> di
         resolved = (repo / path_str).resolve()
         if root == resolved or root in resolved.parents:
             files[str(resolved.relative_to(root))] = frozenset(int(n) for n in missing)
-    return {"measured": True, "files": files, "reason": ""}
+    return files

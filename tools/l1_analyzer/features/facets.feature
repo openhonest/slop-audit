@@ -149,3 +149,9 @@ Feature: facets — closeable facets and the Silence index for one module and it
     Then only a decorated fixture lends its regions to a test parameter of the same name
     But a plain helper whose name collides with a parameter did not produce the parameter, so the collision is not evidence
 
+
+  Scenario: coverage_in says what a coverage payload holds about one module
+    Given the parsed payload of a coverage json report and the name of a module
+    When coverage_in finds the entry whose file name matches
+    Then its missing lines and its percentage come back
+    But a payload naming no such module yields no percentage either, because an empty set with a number would say a run that never saw it covered it fully

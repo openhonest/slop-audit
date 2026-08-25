@@ -102,3 +102,9 @@ Feature: python_coverage_prove — the pytest coverage-gap prove loop, where an 
     When body_asserts parses it
     Then a body whose assertion runs is usable, including one inside a loop, a branch or a with-block, since those execute what they hold
     But a body whose only assertion sits inside a nested function nobody calls is not, because that function is defined and never entered, so the proof passes having measured nothing
+
+  Scenario: missing_by_file keeps the uncovered lines this repository answers for
+    Given a coverage report holding entries for the repository and for installed packages
+    When missing_by_file resolves each path against the repository root
+    Then only the files inside it come back, keyed by their relative path
+    But a file with nothing missing is left out, because the caller is asking what is uncovered

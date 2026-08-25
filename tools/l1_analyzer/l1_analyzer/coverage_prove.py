@@ -37,6 +37,7 @@ from typing import TypedDict
 
 from l1_analyzer import budget, coverage_gates, rust_facets, rust_trace
 from l1_analyzer import model_call as llm
+from l1_analyzer.boundary import boundary
 
 # The retention buckets, in report order. Only `divergence` is a proven bug and retained;
 # the rest name why a failing test is the tool's own noise, surfaced and never hidden.
@@ -250,6 +251,7 @@ def _fail_bucket(output: str, proof_label: str, body: str, return_type: str | No
     return coverage_gates.classify_failure(body, return_type, panic)
 
 
+@boundary
 def _append_and_run(repo: Path, module_relpath: str, test_source: str, test_filter: str, timeout_seconds: float) -> tuple[int, str]:
     """Append a proof module to the file, run `cargo test <filter>`, and restore the file
     byte-for-byte. Returns (returncode, combined output). The file is always restored."""
