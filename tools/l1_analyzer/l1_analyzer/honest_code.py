@@ -320,6 +320,7 @@ def read_source_text(text: str, path: str) -> dict:
     return source
 
 
+# honest-code-allow: L1.21.1 - read_source and assess_file are two edges of this module, one obtaining text and one obtaining a file, and each is a name a caller reaches for. Collapsing them puts a mode argument in front of two things nobody calls together
 def read_source(path: Path) -> dict:
     """The one function here that touches the filesystem, so every clause below it stays a
     pure function of a tree."""

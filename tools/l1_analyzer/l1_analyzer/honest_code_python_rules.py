@@ -26,18 +26,55 @@ from l1_analyzer.honest_code_rules import (
 )
 
 # Calls whose bare name is unambiguous: nothing but I/O is spelled this way.
+# Calls whose bare name means I/O wherever it appears.
+#
+# `print` and `input` were missing, and that one absence produced two symptoms a peer found
+# by running this and another checker over one codebase: 34 functions where this called a
+# boundary declaration false and the other did not, and 28 declarations they had removed on
+# this reader's word and then restored. Every case was a name absent here. Printing is
+# output, and rule 4 is about I/O in both directions rather than intake alone.
+#
+# Adding them halved the findings on this package and the adopter's together, 62 to 31,
+# because most of what they had produced was this clause calling a true declaration false.
 _IO_CALLS = frozenset({
     "read_text", "read_bytes", "write_text", "write_bytes", "open", "iterdir", "glob",
     "Popen", "check_output", "urlopen", "execute", "fetchall", "fetchone", "commit",
     "listdir", "makedirs", "remove",
+    "print", "input",
 })
 # Calls whose bare name is shared with something ordinary. `TABLE.get(key)` is a dict
 # lookup and `requests.get(url)` fetches a page, and reading the bare name reported this
 # tool's own suffix table as I/O. These are matched on the whole dotted call.
+# Adding a bare `write` or `read` here instead more than doubled the findings on two real
+# codebases, because those are ordinary method names on ordinary objects: `buffer.write(x)`
+# is not I/O. As receivers they cost nothing measurable and close every gap the peer named.
 _IO_RECEIVERS = frozenset({
     "requests", "httpx", "session", "client", "urllib", "aiohttp", "subprocess",
     "conn", "connection", "cursor", "db",
+    "engine",
 })
+# Receivers whose every call reaches outside the process. `os.path.join` is not one of
+# these: the receiver there is `path`, not `os`, because the last segment is what is read.
+_IO_MODULES = frozenset({
+    "stdout", "stderr", "stdin",
+    "logging", "logger", "log",
+    "psycopg2", "psycopg", "asyncpg", "sqlite3", "aiosqlite", "pymongo", "redis",
+    "smtplib", "ftplib", "imaplib", "poplib",
+})
+
+# Named one call at a time rather than by their module, because most of what these modules
+# hold is not I/O. `os.getenv` reads process state and `os.path.join` joins strings, and
+# taking the whole of `os` reported both. `shutil.which` asks PATH whether a tool exists,
+# which every tracer here does once, and taking the whole of `shutil` reported eight of them.
+_IO_DOTTED = frozenset({
+    "os.read", "os.write", "os.rename", "os.mkdir", "os.rmdir", "os.walk", "os.remove",
+    "os.system", "os.popen", "os.fork", "os.execvp",
+    "shutil.copy", "shutil.copyfile", "shutil.move", "shutil.rmtree",
+    "socket.socket", "socket.create_connection",
+    "tempfile.mkdtemp", "tempfile.NamedTemporaryFile", "tempfile.TemporaryDirectory",
+    "mmap.mmap",
+})
+
 _AMBIGUOUS_IO = frozenset({"get", "post", "put", "delete", "patch", "request", "run", "head"})
 _CACHE_NAMES = frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache"})
 _CACHE_DECORATORS = frozenset({"lru_cache", "cache", "cached", "memoize", "cached_property"})
@@ -85,8 +122,8 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
         if _declares_a_boundary(fn) and not _io_calls(fn):
             found.append(_finding(
                 "L1.21.4", fn.name, fn.lineno,
-                "declares itself a boundary and obtains nothing outside the process, so "
-                "the declaration states an edge that is not there",
+                "declares itself a boundary and makes no call this reader counts as I/O, "
+                "so the declaration states an edge that is not there",
                 "take the decorator off, or move the read or the call this function was "
                 "meant to be the edge for into it", ""))
             continue
@@ -134,10 +171,17 @@ def _io_calls(fn: ast.FunctionDef) -> set[str]:
         if bare in _IO_CALLS:
             touched.add(bare)
             continue
-        if bare not in _AMBIGUOUS_IO or not isinstance(node.func, ast.Attribute):
+        if not isinstance(node.func, ast.Attribute):
             continue
         receiver = ast.unparse(node.func.value).split(".")[-1].lower()
-        if receiver in _IO_RECEIVERS:
+        # A module that only does I/O makes every call on it I/O, whatever the call is
+        # named: `os.walk`, `redis.Redis`, `sys.stderr.write`. Read from the receiver alone
+        # because the names are open-ended and listing them would go stale by the next
+        # release of any of these.
+        if receiver in _IO_MODULES or f"{receiver}.{bare}" in _IO_DOTTED:
+            touched.add(f"{receiver}.{bare}")
+            continue
+        if bare in _AMBIGUOUS_IO and receiver in _IO_RECEIVERS:
             touched.add(f"{receiver}.{bare}")
     return touched
 

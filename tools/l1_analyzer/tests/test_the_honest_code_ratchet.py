@@ -35,9 +35,17 @@ def test_a_baseline_at_the_current_count_passes():
     assert _gate(now) == 0
 
 
-def test_a_baseline_below_the_current_count_fails():
-    """What a new violation looks like: the count rises past the number in the config."""
-    assert _gate(0) != 0
+def test_a_baseline_below_the_current_count_fails(tmp_path):
+    """What a new violation looks like: the count rises past the number in the config.
+
+    Over a fixture, because this repository reached zero findings and a baseline of zero is
+    then correct rather than a failure. The test asserted against the live tree and would
+    have gone quiet at exactly the moment the ratchet started meaning something."""
+    (tmp_path / "m.py").write_text(
+        "def send_email(d):\n    return post('/email', d)\n\n\n"
+        "def send_sms(d):\n    return post('/sms', d)\n")
+    assert gate._run_gate(tmp_path, "python", max_type_escapes=None,
+                          max_thread_exposed=None, max_honest_code=0) != 0
 
 
 def test_a_baseline_above_the_current_count_fails_as_slack(capsys):

@@ -35,8 +35,16 @@ def test_no_finding_carries_an_absolute_path():
     assert absolute == [], absolute
 
 
-def test_the_path_is_relative_to_the_repository_that_was_audited():
-    found = honest_code.analyze(_REPO, "python")["findings"]
-    assert found, "the fixture needs at least one finding or this asserts nothing"
+def test_the_path_is_relative_to_the_repository_that_was_audited(tmp_path):
+    """Over a fixture, not this repository. It read the live tree until this repository
+    reached zero findings, at which point it asserted over an empty list and passed for the
+    wrong reason before failing on its own guard."""
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "m.py").write_text(
+        "def send_email(d):\n    return post('/email', d)\n\n\n"
+        "def send_sms(d):\n    return post('/sms', d)\n")
+    found = honest_code.analyze(tmp_path, "python")["findings"]
+    assert found, "the fixture has to produce a finding or this asserts nothing"
     for finding in found:
-        assert (_REPO / finding["file"]).is_file(), finding["file"]
+        assert finding["file"] == "pkg/m.py", finding["file"]
+        assert (tmp_path / finding["file"]).is_file()

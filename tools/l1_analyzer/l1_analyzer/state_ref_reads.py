@@ -128,6 +128,7 @@ def method_name(call: Node, sp: LangSpec) -> str:
     return _text(_field(_field(call, sp["call_fn"]), sp["mem_attr"]))
 
 
+# honest-code-allow: L1.21.1 - result_discarded and is_deleted ask different questions of a parent node through different vocabulary keys, and each carries the reason its language can or cannot answer. Collapsing them would put both reasons on one function that answers neither
 def result_discarded(call: Node, sp: LangSpec) -> bool:
     """The call's result is thrown away. Java's `Map.put` and Rust's `HashMap::insert`
     return the value previously stored at the key, so they write and nothing more only where

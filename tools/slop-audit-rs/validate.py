@@ -79,11 +79,15 @@ def render(value) -> str:
     return value if isinstance(value, str) else json.dumps(value)
 
 
+@boundary
 def diff_panels(repo: Path, lang: str, *, quiet: bool) -> tuple[int, int]:
     """Run both tools on `repo` and report each shared indicator EQUAL or DIFF.
     Returns (diffs, compared). `quiet` prints only the disagreements, which is what a
     corpus run wants when it is walking several repositories."""
+    @boundary
     def say(line: str) -> None:
+        """The output half of `quiet`, which is the only reason this closure exists: a
+        corpus run walking several repositories wants the disagreements and nothing else."""
         if not quiet:
             print(line)
 

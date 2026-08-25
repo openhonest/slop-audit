@@ -683,6 +683,7 @@ _DETERMINISM_HARNESS = {
 }
 
 
+# honest-code-allow: L1.21.1 - _runtime_coverage and _runtime_determinism each look up a different harness table and refuse differently when the language has none. Two tables, two refusals, and the shape they share is the lookup rather than the work
 def _runtime_coverage(repo: Path, lang: str, timeout_seconds: float, python_executable: str | None) -> L1Result:
     """Dispatch to the language's runtime coverage harness (the seam above), or n/a."""
     harness = _COVERAGE_HARNESS.get(lang)

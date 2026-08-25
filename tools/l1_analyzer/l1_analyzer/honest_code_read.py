@@ -242,6 +242,7 @@ def first_name(node: Node, raw: bytes) -> str:
     return ""
 
 
+# honest-code-allow: L1.21.1 - class_nodes and function_nodes differ by which vocabulary key they read. Collapsing them means passing that key as a string at every call site, which moves a name the checker verifies into text it cannot
 def class_nodes(root: Node, spec: LangSpec) -> list[Node]:
     """Every class definition in the tree, by this language's own node types."""
     return [n for n in walk(root) if n.type in spec["class_types"]]

@@ -215,6 +215,7 @@ _ASSERT_MACROS = frozenset({
 })
 
 
+# honest-code-allow: L1.21.1 - render_module and _outcome_detail both build one f-string and share nothing else: one wraps a Rust test in a proof module, the other counts what generated tests became. A table of two rows whose only column is the whole body is the body written twice with a lookup in front
 def render_module(body: str) -> str:
     """Wrap a test body in a #[cfg(test)] proof module. `use super::*;` reaches the function
     in its own module scope, so private and crate-internal functions are callable. The body

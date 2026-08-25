@@ -48,14 +48,22 @@ def _selected_indicators(given: str) -> frozenset[str] | None:
     asked = frozenset(part.strip() for part in given.split(",") if part.strip())
     unknown = sorted(asked - INDICATORS)
     if unknown or not asked:
-        # Printed here rather than carried on the exception. A message riding on SystemExit
-        # is shown by the interpreter, so anything embedding this CLI gets the exit code
-        # and no reason at all.
-        print(f"--indicators: cannot run {', '.join(unknown) or 'an empty list'}. "
-              f"It takes bare numbers or 'all', so L1.17 is written 17. "
-              f"Known: {', '.join(sorted(INDICATORS, key=int))}.", file=sys.stderr)
-        raise SystemExit(2)
+        # The refusal is RETURNED, not printed. It was printed here, which put output in a
+        # function whose whole job is to decide, so the deciding could not be checked
+        # without capturing stdout. The caller at the edge prints it and exits 2.
+        raise Refused(
+            f"--indicators: cannot run {', '.join(unknown) or 'an empty list'}. "
+            f"It takes bare numbers or 'all', so L1.17 is written 17. "
+            f"Known: {', '.join(sorted(INDICATORS, key=int))}.")
     return asked
+
+
+class Refused(Exception):
+    """An argument this tool cannot act on, carrying the sentence a reader needs.
+
+    Typed rather than a printed message and an exit code, so the deciding and the saying
+    are separate: rule 8 asks for exactly this, and the boundary maps the type to a
+    response."""
 
 # Why the thread-safety meter has no reading, by the verdict it returned instead of one. A
 # dict rather than a chain of ifs, and one entry per way of not reading, so a new way added to
@@ -97,6 +105,7 @@ def window_around(lines: list[str], line: int) -> str:
     return "\n".join(lines[low:high])
 
 
+@boundary
 def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: int, timeout: float) -> dict[str, object]:
     """Locate -> generate -> run -> retain over the review-tier findings. Deterministic
     locate; the model only fills a located gap; the execution gate keeps only what fires."""
@@ -149,6 +158,7 @@ _OUTSIDE_THE_INDEX = (
 )
 
 
+@boundary
 def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str,
                    proof_cap: int) -> int:
     """One module's closeable facets, printed for a reader or as JSON.
@@ -209,6 +219,7 @@ def _report_facets(module: Path, tests: tuple[Path, ...], output_format: str,
     return 0
 
 
+@boundary
 def _report_honest_code(paths: list[Path], output_format: str) -> int:
     """L1.21 for the files named, in whichever of the three shapes the caller asked for.
 
@@ -256,6 +267,7 @@ def _report_honest_code(paths: list[Path], output_format: str) -> int:
     return 1
 
 
+@boundary
 def _report_call_map(module: Path, tests: tuple[Path, ...], layer: str) -> int:
     """The module's four-column map, as a `.hd` file on stdout.
 
@@ -276,6 +288,7 @@ def _report_call_map(module: Path, tests: tuple[Path, ...], layer: str) -> int:
     return 0
 
 
+@boundary
 def _prove_facet(module: Path, tests: tuple[Path, ...], index: int, proposal: dict,
                  output_format: str) -> int:
     """Run one caller-written proposal through the execution gate.
@@ -691,7 +704,11 @@ def main(argv: list[str] | None) -> int:
     # string and the additive payloads, and a reader must narrow before use.
     results: dict[str, object] = {}
 
-    inds = _selected_indicators(args.indicators)
+    try:
+        inds = _selected_indicators(args.indicators)
+    except Refused as refusal:
+        print(str(refusal), file=sys.stderr)
+        return 2
 
     # L1.1-8: git based, language agnostic
     if inds is None or inds & _GIT_INDICATORS:

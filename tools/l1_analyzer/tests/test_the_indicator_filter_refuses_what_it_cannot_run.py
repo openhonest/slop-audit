@@ -16,14 +16,14 @@ from l1_analyzer import cli
 
 @pytest.mark.parametrize("given", ["banana", "99", "L1.17", "1,banana", "18b"])
 def test_an_indicator_nobody_can_run_is_refused_rather_than_selected_quietly(given):
-    with pytest.raises(SystemExit) as exit_code:
-        cli.main([".", "--no-exec", "--format", "json", "--indicators", given])
-    assert exit_code.value.code != 0
+    """Returned rather than raised. The refusal used to be printed inside the deciding
+    function and carried out on SystemExit, which put output in a function whose whole job
+    is to decide. It raises a typed refusal now and the boundary maps it to exit 2."""
+    assert cli.main([".", "--no-exec", "--format", "json", "--indicators", given]) == 2
 
 
 def test_the_refusal_names_the_value_and_what_would_have_worked(capsys):
-    with pytest.raises(SystemExit):
-        cli.main([".", "--no-exec", "--format", "json", "--indicators", "L1.17"])
+    assert cli.main([".", "--no-exec", "--format", "json", "--indicators", "L1.17"]) == 2
     said = capsys.readouterr()
     message = said.err + said.out
     assert "L1.17" in message, "a refusal that does not name the value cannot be acted on"

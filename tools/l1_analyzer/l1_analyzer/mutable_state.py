@@ -351,6 +351,7 @@ _MODULE_SCANS: dict[str, Callable[[Node, LangCfg], set[str]]] = {
 }
 
 
+# honest-code-allow: L1.21.1 - _find_module_mutable_names and _receiver_names each dispatch into a different table, and the second reads a per-language key the first does not. What they have in common is being one line long
 def _find_module_mutable_names(root: Node, cfg: LangCfg) -> set[str]:
     """The names in one file that L1.18 treats as external mutable state.
 

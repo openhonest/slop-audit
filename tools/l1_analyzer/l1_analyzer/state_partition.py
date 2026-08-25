@@ -113,6 +113,7 @@ def _reach(kind: str, ordered: bool) -> Reach:
             "silence": "", "construct": ""}
 
 
+# honest-code-allow: L1.21.1 - write, output and unbounded are three names 35 call sites read. The duplicated record they each built is gone: all three fill it through _reach now, and what is left is the naming
 def write() -> Reach:
     """A write reaches its own value, in order."""
     return _reach(WRITE, ordered=True)

@@ -45,6 +45,11 @@ import sys
 # `alpha=0.05` as a default on the exact interval, and 0.025/0.975 written into the
 # bootstrap's cut points. Nothing checked they agreed, and a default meant a caller who
 # omitted alpha could not be told from one who chose it.
+def boundary(fn):
+    """Mark a function as one of this script's edges, and change nothing about it."""
+    return fn
+
+
 ALPHA = 0.05
 
 BOOTSTRAP_DRAWS = 4000
@@ -118,6 +123,7 @@ TRANSFORMS = {
 }
 
 
+@boundary
 def decompose(panel: dict[str, list[float]]) -> None:
     """Print every estimator and both intervals for one indicator's panel."""
     flat = [v for group in panel.values() for v in group]
