@@ -93,3 +93,9 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     When build_stamp asks git which commit it is at and whether anything is uncommitted
     Then the commit follows the release number, and an edited tree is marked dirty
     But a directory in no repository yields nothing, because inventing a commit is worse than the release number alone
+
+  Scenario: _stamp_written_at_build reads the commit the build recorded
+    Given a package carrying the file its build wrote
+    When _stamp_written_at_build reads the commit out of it
+    Then that is the build's identity, whether or not a repository is anywhere near it
+    But a package with no such file yields nothing at all, so the caller falls through to asking git

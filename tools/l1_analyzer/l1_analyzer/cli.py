@@ -342,6 +342,23 @@ def version() -> str:
 
 
 @boundary
+def _stamp_written_at_build(directory: str) -> str | None:
+    """The stamp the build wrote, or nothing when this build carries none.
+
+    None rather than the empty string: a build with no stamp has to fall through to asking
+    git, and a build stamped with no commit has already answered."""
+    stamp = Path(directory) / "_build.py"
+    if not stamp.is_file():
+        return None
+    read: dict[str, object] = {}
+    exec(compile(stamp.read_text(), str(stamp), "exec"), read)  # noqa: S102
+    commit = read.get("COMMIT")
+    if not isinstance(commit, str) or not commit:
+        return ""
+    return f"+g{commit}" + (".dirty" if read.get("DIRTY") else "")
+
+
+@boundary
 def build_stamp(directory: str) -> str:
     """The commit this build came from, as a suffix, or nothing.
 
@@ -350,7 +367,15 @@ def build_stamp(directory: str) -> str:
 
     `.dirty` when the tree has uncommitted changes, because a measurement taken from an
     edited checkout did not come from that commit, and a reader comparing it against the
-    commit would be comparing it against different code."""
+    commit would be comparing it against different code.
+
+    The file written at build time is read first. Asking git only works from a checkout,
+    and an installed package sits outside one, which is how the tool is actually used and
+    the case that let an adopter quote three builds all calling themselves 1.0.0."""
+    written = _stamp_written_at_build(directory)
+    if written is not None:
+        return written
+
     import subprocess
 
     try:

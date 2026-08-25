@@ -307,7 +307,13 @@ def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
 
 
 # Conventional build/test/dev tooling recognised by filename, not by directory.
-_TOOLING_FILES = frozenset({"setup.py", "noxfile.py", "conftest.py", "tasks.py", "manage.py"})
+#
+# `hatch_build.py` joins them for the same reason the rest are here: a build tool reads it
+# and calls what it finds, and the program never does. Hatchling discovers the hook class by
+# scanning the module for a subclass of its interface, so nothing in the source references
+# it and the dead-code reader was right to say so and wrong to count it.
+_TOOLING_FILES = frozenset({"setup.py", "noxfile.py", "conftest.py", "tasks.py", "manage.py",
+                            "hatch_build.py"})
 
 # Strong, low-false-positive sentinels that machine-generated source carries in its
 # header: the machine-readable @generated convention (tree-sitter and many others),

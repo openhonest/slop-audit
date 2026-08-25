@@ -1,0 +1,70 @@
+"""Write the commit into the package at build time, so an installed build can name itself.
+
+`--version` reported 1.0.0 across 225 commits, and an adopter quoted numbers from three
+builds that all called themselves that, then had to retract two of them. The first fix read
+the commit from git at runtime, which works from a checkout and does nothing once the
+package is copied out of one, and copied out of one is how the tool is used.
+
+So the commit is written here, at the moment the wheel is built, into a file the package
+carries. `custom` is one of hatchling's own build hooks and hatchling is already the build
+backend, so nothing was added to the dependency list to do this.
+
+The file is build output and is gitignored. A checkout with no file falls back to asking
+git, which is what a developer running from source gets.
+"""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+from typing import Any
+
+from hatchling.builders.hooks.plugin.interface import BuildHookInterface
+
+
+def boundary(fn):
+    """Mark a function as one of this file's edges, and change nothing about it.
+
+    Spelled here rather than imported: this runs during the build, before the package it
+    stamps is importable."""
+    return fn
+
+_WRITTEN = Path("l1_analyzer") / "_build.py"
+
+
+# honest-code-allow: L1.21.5 - hatchling finds a build hook by scanning the module for a subclass of its interface, so the inheritance IS the registration and there is no composition that would be found
+class BuildStampHook(BuildHookInterface):
+    """Records which commit this build came from."""
+
+    PLUGIN_NAME = "custom"
+
+    # honest-code-allow: L1.21.3 - the method signature is hatchling's, and self.root is how the framework hands a hook the directory it is building. A free function taking that directory could not be called by anything
+    def initialize(self, version: str, build_data: dict[str, Any]) -> None:
+        """Write the stamp before the wheel is assembled.
+
+        A build from an unpacked sdist has no repository, and the file is written empty
+        rather than skipped: a missing file and an empty one are the same answer at runtime,
+        and writing it always means the package's shape does not depend on where it was
+        built."""
+        commit, dirty = _commit_of(Path(self.root))
+        target = Path(self.root) / _WRITTEN
+        target.write_text(f'COMMIT = "{commit}"\nDIRTY = {dirty}\n')
+        build_data.setdefault("force_include", {})[str(target)] = str(_WRITTEN)
+
+
+@boundary
+def _commit_of(root: Path) -> tuple[str, bool]:
+    """The commit this source came from, and whether the tree had uncommitted changes.
+
+    Empty when there is no repository, which is an ordinary case: an sdist unpacked
+    somewhere else is still a valid thing to build."""
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short=8", "HEAD"], cwd=root,
+                                capture_output=True, text=True, timeout=10,
+                                check=True).stdout.strip()
+        changed = subprocess.run(["git", "status", "--porcelain"], cwd=root,
+                                 capture_output=True, text=True, timeout=10,
+                                 check=True).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return "", False
+    return commit, bool(changed)
