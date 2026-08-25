@@ -186,3 +186,9 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     When _findings_in reads it through that language's own vocabulary and runs every clause that can
     Then the findings travel with the block, at the block's own lines
     But a block nobody could name has no vocabulary to read it through and yields nothing
+
+  Scenario: _named_under names one file the same way however the repository was spelled
+    Given a file inside the repository being audited
+    When _named_under takes its path relative to that repository
+    Then the same file gets the same name whether the caller said "." or the absolute path
+    But a path outside the repository keeps the spelling it arrived with, because inventing a name for it would be worse than saying what was read

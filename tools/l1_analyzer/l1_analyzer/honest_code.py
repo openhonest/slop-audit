@@ -806,6 +806,26 @@ def hook_report(assessment: Assessment) -> str:
     return "\n".join(lines)
 
 
+def _named_under(repo: Path, path: Path) -> str:
+    """One file's name, relative to the repository being audited.
+
+    The same string however the caller spelled the repository. `analyze` reported
+    `tools/x/y.py` when handed `.` and `/Users/.../tools/x/y.py` when handed the same
+    directory absolutely, and every consumer keys findings on that string, so one file read
+    as two and a rule tracked across runs looked like it had moved rather than persisted.
+
+    Relative rather than resolved, because that is the only spelling stable across machines
+    as well as across callers. An absolute path also names one file, and names a different
+    one on the next machine.
+
+    A path outside the repository keeps the spelling it arrived with. Nothing here produces
+    one, and inventing a name for it would be worse than saying what was read."""
+    try:
+        return str(path.resolve().relative_to(repo.resolve()))
+    except ValueError:
+        return str(path)
+
+
 def analyze(repo: Path, lang: str) -> dict:
     """L1.21 over a whole repository.
 
@@ -831,7 +851,7 @@ def analyze(repo: Path, lang: str) -> dict:
     unexamined_blocks_seen = 0
     for read, wanted in ((production, False), (tests, True)):
         for path, text in read:
-            assessed = assess_file_text(text, str(path))
+            assessed = assess_file_text(text, _named_under(repo, path))
             if wanted is False and assessed["unreadable_reason"]:
                 unreadable += 1
             if wanted is False:
