@@ -114,13 +114,19 @@ def test_every_declared_boundary_actually_obtains_something():
     the world at all. Every one that does not is a suppression by construction."""
     import re
 
-    package = pathlib.Path(boundary.__file__).parent
+    # The whole repository, not this package. Three scripts outside it spell `boundary`
+    # themselves, because they sit beside this package rather than inside it, and the first
+    # version of this check globbed the package alone so it never saw them. A check narrower
+    # than its subject reports on what nobody wrote.
+    repo = pathlib.Path(boundary.__file__).parent.parent.parent.parent
     reaches = ("read_text", "read_bytes", "write_text", "write_bytes", "open(",
                "subprocess", "Popen", "rglob", "which(", "stat(", "is_file", "is_dir",
                "exists(", "iterdir", "TemporaryDirectory")
     stamps = []
-    for path in sorted(package.glob("*.py")):
-        source = path.read_text()
+    for path in sorted(repo.rglob("*.py")):
+        if any(part in (".venv", "node_modules", "__pycache__") for part in path.parts):
+            continue
+        source = path.read_text(errors="replace")
         for match in re.finditer(r"@boundary\n(?:@[\w.()=]+\n)*def (\w+)", source):
             body = source[match.end():].split("\ndef ")[0]
             if not any(reach in body for reach in reaches):
