@@ -124,3 +124,43 @@ def test_the_message_says_what_the_reader_actually_checked():
     found = _findings(DECORATOR + "@boundary\ndef edge(n):\n    return n + 1\n")
     assert "obtains nothing outside the process" not in found[0]["detail"]
     assert "I/O" in found[0]["detail"] or "reader" in found[0]["detail"]
+
+
+@pytest.mark.parametrize("call", [
+    "logging.getLogger(name)",
+    "tempfile.gettempdir()",
+    "socket.inet_aton(text)",
+])
+def test_a_pure_call_on_a_module_that_also_does_io_is_not_io(call):
+    """The direction that costs more than a missing entry.
+
+    A missing entry leaves real I/O unmarked in the interior. A false one demands a boundary
+    declaration on a function that is pure, and this package's own boundary module says what
+    that produces: a declaration on a function that still decides things is a suppression
+    wearing a declaration's name, and nothing can tell the two apart.
+
+    `getLogger` returns an object from a registry, `gettempdir` returns a path string and
+    `inet_aton` converts bytes. None of the three reaches anything. Taking `logging` as a
+    whole module made the first one I/O here, which a peer found in their own list first and
+    checked mine against.
+
+    Measured when I first took whole modules: 62 findings became 138."""
+    module = call.split(".")[0]
+    found = _findings(f"import {module}\n\n\ndef pure(name, text):\n    return {call}\n\n\n"
+                      f"def run(n, t):\n    return pure(n, t)\n")
+    assert [f for f in found if "performs I/O" in f["detail"]] == [], call
+
+
+@pytest.mark.parametrize("call", [
+    "logging.info(msg)",
+    "logger.warning(msg)",
+    "tempfile.NamedTemporaryFile()",
+    "socket.gethostbyname(host)",
+])
+def test_the_calls_on_those_modules_that_do_reach_something_still_fire(call):
+    """The other direction. A list that refuses everything on a module reports nothing, and
+    this is the fixture that catches such a list."""
+    module = call.split(".")[0]
+    found = _findings(f"import {module}\n\n\ndef emit(msg, host, logger):\n    return {call}\n\n\n"
+                      f"def run(m, h, lg):\n    return emit(m, h, lg)\n")
+    assert [f for f in found if "performs I/O" in f["detail"]], call

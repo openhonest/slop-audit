@@ -51,13 +51,12 @@ _IO_CALLS = frozenset({
 _IO_RECEIVERS = frozenset({
     "requests", "httpx", "session", "client", "urllib", "aiohttp", "subprocess",
     "conn", "connection", "cursor", "db",
-    "engine",
+    "engine", "logging", "logger", "log",
 })
 # Receivers whose every call reaches outside the process. `os.path.join` is not one of
 # these: the receiver there is `path`, not `os`, because the last segment is what is read.
 _IO_MODULES = frozenset({
     "stdout", "stderr", "stdin",
-    "logging", "logger", "log",
     "psycopg2", "psycopg", "asyncpg", "sqlite3", "aiosqlite", "pymongo", "redis",
     "smtplib", "ftplib", "imaplib", "poplib",
 })
@@ -70,12 +69,25 @@ _IO_DOTTED = frozenset({
     "os.read", "os.write", "os.rename", "os.mkdir", "os.rmdir", "os.walk", "os.remove",
     "os.system", "os.popen", "os.fork", "os.execvp",
     "shutil.copy", "shutil.copyfile", "shutil.move", "shutil.rmtree",
-    "socket.socket", "socket.create_connection",
+    "socket.socket", "socket.create_connection", "socket.gethostbyname",
+    "socket.gethostbyaddr", "socket.getaddrinfo", "socket.getfqdn", "socket.create_server",
     "tempfile.mkdtemp", "tempfile.NamedTemporaryFile", "tempfile.TemporaryDirectory",
     "mmap.mmap",
 })
 
-_AMBIGUOUS_IO = frozenset({"get", "post", "put", "delete", "patch", "request", "run", "head"})
+# Names that mean I/O only with a receiver that names a client. `TABLE.get(key)` is a dict
+# lookup and `requests.get(url)` fetches a page.
+#
+# The logging calls are here rather than `logging` being a whole module, which is where they
+# were until a peer found the same fault in their own list and checked mine. `getLogger`
+# returns an object from a registry and reaches nothing, and taking the module whole made it
+# I/O. A false entry is worse than a missing one: a missing entry leaves real I/O unmarked
+# in the interior, and a false one demands a boundary declaration on a function that is
+# pure, which is a suppression wearing a declaration's name.
+_AMBIGUOUS_IO = frozenset({
+    "get", "post", "put", "delete", "patch", "request", "run", "head",
+    "debug", "info", "warning", "warn", "error", "exception", "critical", "basicConfig",
+})
 _CACHE_NAMES = frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache"})
 _CACHE_DECORATORS = frozenset({"lru_cache", "cache", "cached", "memoize", "cached_property"})
 _MOCK_NAMES = frozenset({"Mock", "MagicMock", "AsyncMock", "patch", "mock_open", "NonCallableMock"})
