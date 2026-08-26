@@ -1,2 +1,2 @@
-COMMIT = "302a582a"
+COMMIT = "54239e19"
 DIRTY = True

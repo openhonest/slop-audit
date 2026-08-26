@@ -216,8 +216,22 @@ class Assessment(TypedDict):
 
 
 def _clause(rule: int, name: str, decides: str, check: Callable[[dict], list[Finding] | None],
-            languages: frozenset[str] = _ALL, reads: str = _PYTHON_AST) -> Clause:
+            nothing_to_read: str, languages: frozenset[str] = _ALL,
+            reads: str = _PYTHON_AST) -> Clause:
+    """One row of the table.
+
+    `nothing_to_read` is the sentence for a clause whose check finds nothing it can read in
+    a file, where that is NOT the same as the question failing to arise. Clause 15 is the
+    case: the rule is a bijection between functions and scenarios, a bijection needs the
+    feature files as well as the source, and a file with no step definitions in it told a
+    reader "not applicable" when the rule applies to every file in the repository.
+
+    Required, with no default. It had one for about an hour and clause 14 reported it here
+    on the next run: a default absorbs the omission, so a row that meant "the generic
+    sentence is right for me" could not be told from a row nobody thought about. The empty
+    string is passed deliberately by the rows that mean it."""
     return {"code": f"L1.21.{rule}", "rule": rule, "name": name, "decides": decides,
+            "nothing_to_read": nothing_to_read,
             "reads": reads, "languages": languages, "check": check}
 
 
@@ -225,39 +239,44 @@ def _clause(rule: int, name: str, decides: str, check: Callable[[dict], list[Fin
 # to the module that checks Lookup Polymorphism.
 CLAUSES: tuple[Clause, ...] = (
     # Ported to the shared vocabulary: decided for every language the spec covers.
-    _clause(1, "Lookup Polymorphism", _TREE, rules.dispatch_chains,
+    _clause(1, "Lookup Polymorphism", _TREE, rules.dispatch_chains, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(2, "Pure Functions Over Methods (typed dicts over classes)", _TREE, rules.data_classes,
+    _clause(2, "Pure Functions Over Methods (typed dicts over classes)", _TREE, rules.data_classes, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(3, "Pure Functions Over Methods", _TREE, rules.methods_wearing_a_class,
+    _clause(3, "Pure Functions Over Methods", _TREE, rules.methods_wearing_a_class, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(4, "I/O at the Boundary", _TREE, python_rules.io_below_the_boundary),
-    _clause(5, "Composition Over Inheritance", _TREE, rules.inheritance_for_reuse,
+    _clause(4, "I/O at the Boundary", _TREE, python_rules.io_below_the_boundary, nothing_to_read=""),
+    _clause(5, "Composition Over Inheritance", _TREE, rules.inheritance_for_reuse, nothing_to_read="",
             reads=_TREE_READER),
     # The only two that read the file's TEXT, which is why they work on a language this
     # package has no parser for.
-    _clause(6, "DOM as State (DATAOS)", _TREE, rules.client_side_state, BROWSER_LANGUAGES,
-            reads=_TEXT_READER),
+    _clause(6, "DOM as State (DATAOS)", _TREE, rules.client_side_state,
+            nothing_to_read="", languages=BROWSER_LANGUAGES, reads=_TEXT_READER),
     _clause(7, "HTML Attributes Over Imperative DOM Manipulation", _TREE, rules.imperative_dom,
-            BROWSER_LANGUAGES, reads=_TEXT_READER),
-    _clause(8, "Typed Exceptions at the Boundary", _TREE, rules.swallowed_exceptions,
+            nothing_to_read="", languages=BROWSER_LANGUAGES, reads=_TEXT_READER),
+    _clause(8, "Typed Exceptions at the Boundary", _TREE, rules.swallowed_exceptions, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(9, "SQL Over Application Caches", _PARTLY, python_rules.unmeasured_caches),
-    _clause(10, "Pure Function Assertions Over Mocks", _TREE, python_rules.mock_heavy_tests),
+    _clause(9, "SQL Over Application Caches", _PARTLY, python_rules.unmeasured_caches, nothing_to_read=""),
+    _clause(10, "Pure Function Assertions Over Mocks", _TREE, python_rules.mock_heavy_tests, nothing_to_read=""),
     _clause(11, "Type Declarations Over Imperative Validation", _TREE,
-            python_rules.imperative_validation),
-    _clause(12, "Context Managers Over Instance State", _TREE, python_rules.unscoped_resources),
-    _clause(13, "Configuration as Parameters", _TREE, rules.hidden_configuration,
+            python_rules.imperative_validation, nothing_to_read=""),
+    _clause(12, "Context Managers Over Instance State", _TREE, python_rules.unscoped_resources, nothing_to_read=""),
+    _clause(13, "Configuration as Parameters", _TREE, rules.hidden_configuration, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(14, "No Implicit Defaults", _TREE, rules.implicit_defaults,
+    _clause(14, "No Implicit Defaults", _TREE, rules.implicit_defaults, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(15, "One Gherkin Per Function", _TREE,
-            python_rules.heavy_step_definitions),
-    _clause(16, "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE, python_rules.lifecycle_hooks),
-    _clause(17, "Strangler Pattern for Migration", _NOTHING, python_rules.strangler_migration),
-    _clause(18, "Dispatch Tables Close Open Input", _TREE, rules.open_dispatch,
+    _clause(15, "One Gherkin Per Function", _PARTLY,
+            python_rules.heavy_step_definitions,
+            nothing_to_read=(
+                "the rule is a bijection between functions and scenarios, and a bijection "
+                "needs the feature files as well as the source. This reader sees one file, "
+                "so it reads the secondary signal only, the length of a step definition, "
+                "and there are none here")),
+    _clause(16, "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE, python_rules.lifecycle_hooks, nothing_to_read=""),
+    _clause(17, "Strangler Pattern for Migration", _NOTHING, python_rules.strangler_migration, nothing_to_read=""),
+    _clause(18, "Dispatch Tables Close Open Input", _TREE, rules.open_dispatch, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(19, "Atomic Test-and-Set Over Check-Then-Act", _TREE, rules.check_then_act,
+    _clause(19, "Atomic Test-and-Set Over Check-Then-Act", _TREE, rules.check_then_act, nothing_to_read="",
             reads=_TREE_READER),
 )
 
@@ -379,9 +398,14 @@ def assess(source: dict) -> list[Assessed]:
             # does not know which file it came from.
             finding["file"] = source["path"]
         if findings is None and not reason:
-            kind = NOT_APPLICABLE
-            reason = (f"not applicable to a {source['language']} file, so nothing here was "
-                      "checked")
+            # A clause that names what it could not read says so, and it is UNREADABLE
+            # rather than NOT APPLICABLE: the rule applies and this reader could not see
+            # it, which is a gap in the instrument rather than a question that did not
+            # arise. Only one of those two is a failure.
+            kind = UNREADABLE if clause["nothing_to_read"] else NOT_APPLICABLE
+            reason = clause["nothing_to_read"] or (
+                f"not applicable to a {source['language']} file, so nothing here was "
+                "checked")
         kept, allowed, by_declaration = _split_withheld(findings or [], declared)
         assessed.append({
             "code": clause["code"], "name": clause["name"],
