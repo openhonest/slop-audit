@@ -86,9 +86,17 @@ def test_every_clause_names_a_principle_that_exists():
 
 @pytest.mark.skipif(not _CANON.is_file(), reason="the principles repository is not checked out here")
 def test_the_principles_no_clause_measures_are_named_here():
-    """Three principles have no clause. Naming them in a test rather than leaving the gap
-    silent, so the next person to read this knows the instrument covers eighteen of
-    twenty-one and which three it does not.
+    """Two principles have no clause. Naming them in a test rather than leaving the gap
+    silent, so the next person to read this knows which the instrument does not cover.
+
+    It was three, then two when Logging Is a Declared Boundary got a clause, then three
+    again an hour later: Trust the Contract in the Interior landed as the twenty-second
+    principle and is what clause 11 had been measuring all along under the neighbouring
+    name. Type Declarations Over Imperative Validation is the one nothing measures now, and
+    it is a different failure: a hand-written check copying a constraint declared in a
+    schema or a form, rather than one re-checking the function's own signature.
+
+    The list moves because the document moves, which is why this reads the document.
 
     A conformity share over the clauses that exist cannot see a principle nobody wrote a
     clause for, which is the same failure this instrument reports in other people's code."""
@@ -99,6 +107,6 @@ def test_the_principles_no_clause_measures_are_named_here():
                   if h not in measured and not h.startswith("Typed Dicts")}
     assert unmeasured == {
         "References Resolve Statically",
-        "Logging Is a Declared Boundary, and an Error Is Returned",
         "Constrain AI with Data Shape Contracts",
+        "Type Declarations Over Imperative Validation",
     }, unmeasured

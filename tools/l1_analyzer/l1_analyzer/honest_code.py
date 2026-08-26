@@ -258,7 +258,7 @@ CLAUSES: tuple[Clause, ...] = (
             reads=_TREE_READER),
     _clause(9, "SQL Over Application Caches", _PARTLY, python_rules.unmeasured_caches, nothing_to_read=""),
     _clause(10, "Pure Function Assertions Over Mocks", _TREE, python_rules.mock_heavy_tests, nothing_to_read=""),
-    _clause(11, "Type Declarations Over Imperative Validation", _TREE,
+    _clause(11, "Trust the Contract in the Interior", _TREE,
             python_rules.imperative_validation, nothing_to_read=""),
     _clause(12, "Context Managers Over Instance State", _TREE, python_rules.unscoped_resources, nothing_to_read=""),
     _clause(13, "Configuration as Parameters", _TREE, rules.hidden_configuration, nothing_to_read="",
@@ -278,6 +278,12 @@ CLAUSES: tuple[Clause, ...] = (
             reads=_TREE_READER),
     _clause(19, "Atomic Test-and-Set Over Check-Then-Act", _TREE, rules.check_then_act, nothing_to_read="",
             reads=_TREE_READER),
+    _clause(20, "Logging Is a Declared Boundary, and an Error Is Returned", _PARTLY,
+            rules.undeclared_logging, reads=_TREE_READER,
+            nothing_to_read=(
+                "nothing here writes a log line through a receiver this reader knows, so "
+                "there was no edge to read. A language with no logging convention named in "
+                "the vocabulary is undecided rather than clean")),
 )
 
 _WHY_NOT = {

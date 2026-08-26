@@ -783,3 +783,81 @@ def test_a_local_container_is_not_shared_with_anyone(language):
                              "  if (seats[seat]) { return false; }\n"
                              "  seats[seat] = who;\n  return true;\n}\n")}
     assert rules.check_then_act(read.read_tree(source[language], language)) == []
+
+
+# --------------------------------------------------------------------------
+# Clause 20, logging is a declared boundary and an error is returned
+#
+# A principle with no clause until now. A log line written from inside a function is a
+# return value that skipped the type system: the function produces an observable output its
+# signature never admits, so no caller can see it, no test can assert on it without
+# capturing output, and no caller can decline it.
+#
+# Two rules follow and this reads both. An error is RETURNED, never written: a function that
+# logs a failure and carries on has reported it somewhere the caller cannot reach, which is
+# how a failure gets lost. And information goes through one logging function of your own,
+# declared as a boundary, because `logger.info(...)` reaches a global you did not declare
+# and cannot substitute, so twenty-four call sites become twenty-four independent edges.
+# --------------------------------------------------------------------------
+
+LOGS_A_FAILURE = {
+    "python": ("def save(row):\n"
+               "    if not row:\n        logger.error('empty row')\n        return None\n"
+               "    return store(row)\n"),
+    "javascript": ("function save(row) {\n"
+                   "  if (!row) {\n    console.error('empty row');\n    return null;\n  }\n"
+                   "  return store(row);\n}\n"),
+}
+
+RAISES_INSTEAD = {
+    "python": ("def save(row):\n"
+               "    if not row:\n        raise ValueError('empty row')\n"
+               "    return store(row)\n"),
+    "javascript": ("function save(row) {\n"
+                   "  if (!row) { throw new Error('empty row'); }\n"
+                   "  return store(row);\n}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_logging_a_failure_and_carrying_on_is_found(language):
+    found = rules.undeclared_logging(read.read_tree(LOGS_A_FAILURE[language], language))
+    assert [f["symbol"] for f in found] == ["save"], found
+    assert "carries on" in found[0]["detail"], found[0]["detail"]
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_raising_instead_of_logging_is_what_the_rule_asks_for(language):
+    assert rules.undeclared_logging(read.read_tree(RAISES_INSTEAD[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_function_that_only_reports_information_is_still_an_edge(language):
+    """The second half. It loses nothing, and it is one of however many independent edges
+    the file opens onto a global nobody declared."""
+    source = {"python": "def save(row):\n    logger.info('saving')\n    return store(row)\n",
+              "javascript": ("function save(row) {\n  console.log('saving');\n"
+                             "  return store(row);\n}\n")}
+    found = rules.undeclared_logging(read.read_tree(source[language], language))
+    assert [f["symbol"] for f in found] == ["save"], found
+    assert "carries on" not in found[0]["detail"]
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_finding_says_how_many_edges_the_file_opens(language):
+    """A reader deciding whether to build one logging function needs the count, not one
+    site at a time."""
+    source = {"python": ("def a(x):\n    logger.info('a')\n    return x\n\n\n"
+                         "def b(x):\n    logger.info('b')\n    return x\n"),
+              "javascript": ("function a(x) {\n  console.log('a');\n  return x;\n}\n\n"
+                             "function b(x) {\n  console.log('b');\n  return x;\n}\n")}
+    found = rules.undeclared_logging(read.read_tree(source[language], language))
+    assert len(found) == 2
+    assert "2" in found[0]["detail"], found[0]["detail"]
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_function_that_logs_nothing_is_quiet(language):
+    source = {"python": "def save(row):\n    return store(row)\n",
+              "javascript": "function save(row) {\n  return store(row);\n}\n"}
+    assert rules.undeclared_logging(read.read_tree(source[language], language)) == []

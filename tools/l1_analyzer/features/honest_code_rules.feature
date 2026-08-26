@@ -173,3 +173,15 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _is_keyed_write_target checks whether that subscript is the assignment's left side
     Then only a write reports true
     But the comparison is by equality, because the same node comes back from an accessor as a distinct object
+
+  Scenario: undeclared_logging finds a function that writes a log line
+    Given one function logging a failure and carrying on, and one logging information
+    When undeclared_logging reads both through the language's logging vocabulary
+    Then the first is reported for losing the failure and the second for opening an edge onto a global nothing declared
+    But whether the return value already names the failure is not readable from the callee alone
+
+  Scenario: _log_levels_in names the logging calls one function makes
+    Given a call on a logger and a call named info on something that is not one
+    When _log_levels_in matches the receiver and the call together
+    Then only the logger's call counts
+    But both halves are ordinary words alone, so matching either by itself would report a field named info

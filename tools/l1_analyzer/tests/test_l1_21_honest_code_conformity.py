@@ -60,10 +60,17 @@ DIRTY = textwrap.dedent('''
 # The clause table
 # --------------------------------------------------------------------------
 
-def test_there_is_one_clause_per_principle():
-    """Nineteen, in the Honest Framework's numbering, so a clause number means one thing
-    across every Open Honest artifact."""
-    assert [c["code"] for c in honest_code.CLAUSES] == [f"L1.21.{n}" for n in range(1, 20)]
+def test_the_clause_numbers_are_contiguous_from_one():
+    """Contiguous rather than a fixed count. It asserted nineteen until Logging Is a
+    Declared Boundary got a clause, which is one of three principles nothing measured, and
+    the other two are still open. A test pinning the number fails on the work rather than on
+    a defect.
+
+    Contiguous is the property worth holding: a gap in the numbering would mean a clause was
+    removed and its number left behind, and a reader comparing two reports could not tell a
+    missing clause from one that never existed."""
+    codes = [c["code"] for c in honest_code.CLAUSES]
+    assert codes == [f"L1.21.{n}" for n in range(1, len(codes) + 1)]
 
 
 def test_every_clause_names_the_principle_it_measures():
@@ -132,7 +139,7 @@ def test_a_clause_for_this_language_applies():
 
 def test_every_clause_reports_whether_it_was_decided():
     assessed = honest_code.assess(honest_code.read_source_text(CLEAN, "m.py"))
-    assert len(assessed) == 19
+    assert len(assessed) == len(honest_code.CLAUSES)
     assert all(c["decided"] in (True, False) for c in assessed)
 
 
@@ -173,7 +180,7 @@ def test_only_decided_clauses_are_in_the_denominator():
     assessment = honest_code.assess_file_text(CLEAN, "m.py")
     decided = [c for c in assessment["clauses"] if c["decided"]]
     assert assessment["decided_clauses"] == len(decided)
-    assert assessment["decided_clauses"] < 19, "something undecidable was counted as decided"
+    assert assessment["decided_clauses"] < len(honest_code.CLAUSES), "something undecidable was counted as decided"
 
 
 def test_a_file_where_nothing_could_be_decided_has_no_conformity():
@@ -483,7 +490,7 @@ def test_a_file_that_could_not_be_read_says_unreadable_on_the_clauses_it_stopped
     kinds = {}
     for clause in assessed:
         kinds[clause["undecided"]] = kinds.get(clause["undecided"], 0) + 1
-    assert kinds == {"unreadable": 18, "never": 1}
+    assert kinds == {"unreadable": len(honest_code.CLAUSES) - 1, "never": 1}
     assert next(c for c in assessed if c["code"] == "L1.21.17")["undecided"] == "never"
 
 
@@ -614,7 +621,7 @@ def test_the_share_for_such_a_file_is_over_the_clauses_that_read_it():
     rather than against a number that moves each time."""
     assessment = honest_code.assess_file_text(DIRTY_JS, "app.js")
     decided = [c for c in assessment["clauses"] if c["decided"]]
-    assert 0 < len(decided) < 19
+    assert 0 < len(decided) < len(honest_code.CLAUSES)
     assert assessment["decided_clauses"] == len(decided)
     broken = [c for c in decided if c["findings"]]
     assert assessment["conformity"] == round(
@@ -625,7 +632,7 @@ def test_a_clean_javascript_file_is_not_reported_as_broadly_conformant():
     """The other half of the same defect. A file with no store and no imperative DOM used
     to report every tree clause as holding, which is a claim about code nobody parsed."""
     assessment = honest_code.assess_file_text("const x = 1;\n", "app.js")
-    assert assessment["decided_clauses"] < 19
+    assert assessment["decided_clauses"] < len(honest_code.CLAUSES)
     assert assessment["conformity"] == 100.0, "the clauses that did read it found nothing"
 
 

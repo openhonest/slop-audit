@@ -826,3 +826,86 @@ def _is_keyed_write_target(node: "Node", spec: "LangSpec") -> bool:
     # distinct object, so identity is False for a node that IS the assignment's left side.
     # tree-sitter implements equality and hashing on the node itself.
     return assignment.child_by_field_name(spec["assign_left"]) == subscript
+
+
+# --------------------------------------------------------------------------
+# 20. Logging is a declared boundary, and an error is returned
+# --------------------------------------------------------------------------
+
+def undeclared_logging(source: dict) -> list[Finding] | None:
+    """A function that writes a log line, and whether it lost a failure doing it.
+
+    A log line written from inside a function is a return value that skipped the type
+    system. The function produces an observable output its signature never admits, so no
+    caller can see it, no test can assert on it without capturing output, and no caller can
+    decline it.
+
+    Two rules, and this reads both. An error is RETURNED, never written: a function that
+    logs a failure and carries on has reported it somewhere the caller cannot reach, which
+    is how a failure gets lost. And information goes through one logging function of your
+    own, declared as a boundary, because reaching a global nobody declared makes every call
+    site an independent edge that decides its own format, level and destination.
+
+    One finding per function rather than per call, and the failure reading comes first: a
+    function that lost an error has a worse problem than one that opened an edge.
+
+    The count of edges travels with each finding. A reader deciding whether to build one
+    logging function needs to know how many there are, and a site at a time never says.
+
+    Not decided: whether the function's return value already names the failure. A caller
+    handed something that says what went wrong has not lost it, and no reading of the
+    callee alone can tell that from a caller handed nothing.
+
+    Not decided either: a language with no logging convention this reader knows. Rust and C
+    have none here, so the clause says it could not decide rather than reporting them clean."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["log_receivers"]:
+        return None
+    writing = [(fn, levels) for fn in function_nodes(source["root"], spec)
+               if (levels := _log_levels_in(fn, spec, raw))]
+    # An empty list, not None. A file where nothing logs has no violation of a rule about
+    # what logging functions do, the same way a file with no handler conforms to the rule
+    # about swallowing. Undecided is reserved for a LANGUAGE this reader knows no logging
+    # convention for, which is the case above.
+    edges = len(writing)
+    found: list[Finding] = []
+    for fn, levels in writing:
+        name = node_text(fn.child_by_field_name("name"), raw) or first_name(fn, raw)
+        lost = levels & spec["log_failure_calls"] and not sends_failure_onward(fn, spec, raw)
+        detail = (f"logs a failure and carries on, so the caller cannot see it. This file "
+                  f"opens {edges} logging edge(s) onto a global nothing declared"
+                  if lost else
+                  f"writes a log line the signature does not admit. This file opens "
+                  f"{edges} logging edge(s) onto a global nothing declared")
+        found.append(_finding(
+            "L1.21.20", name, fn.start_point[0] + 1, detail,
+            "return the failure to the caller, and route what is left through one logging "
+            "function of your own that every other function calls",
+            _LOGGING_UNDECIDED))
+    return found
+
+
+_LOGGING_UNDECIDED = ("whether the return value already names the failure is not readable "
+                      "from the callee alone, and a caller handed something that says what "
+                      "went wrong has not lost it")
+
+
+def _log_levels_in(fn: "Node", spec: "LangSpec", raw: bytes) -> set[str]:
+    """The logging calls this function makes, by level.
+
+    Matched on the receiver AND the call, because both halves are ordinary words on their
+    own: `log` names plenty of things that are not a logger, and `info` is a field name."""
+    levels: set[str] = set()
+    for node in walk(fn):
+        if node.type not in spec["call_types"]:
+            continue
+        called = node.child_by_field_name(spec["call_fn"])
+        if called is None or called.type not in spec["member_types"]:
+            continue
+        receiver = called.child_by_field_name("object") or called.child_by_field_name("value")
+        level = node_text(called, raw).rsplit(".", 1)[-1]
+        if receiver is None or level not in spec["log_calls"]:
+            continue
+        if node_text(receiver, raw).rsplit(".", 1)[-1] in spec["log_receivers"]:
+            levels.add(level)
+    return levels

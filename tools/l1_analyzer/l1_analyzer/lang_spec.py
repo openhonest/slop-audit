@@ -111,6 +111,12 @@ class LangSpec(TypedDict, total=False):
     # write of something shared, one of these turns an occasional race into a certain one.
     # Empty where the language has no such point, which is not the same as having no races.
     suspension_types: tuple[str, ...]
+    # Where a program writes information for a person to read later. The receivers a global
+    # logger is reached through, and which of its calls report a failure rather than
+    # information. Empty where the language has no such convention this reader knows.
+    log_receivers: frozenset[str]
+    log_calls: frozenset[str]
+    log_failure_calls: frozenset[str]
     # The statement that records a failure. A try body ending in one is ASSERTING that its
     # call raised, so the handler beneath is the success condition and reaching the recorder
     # is the defect. Keying on the handler alone made both readings look alike.
@@ -361,6 +367,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "absent_types": ("none", "false"),
         "control_flow_exceptions": frozenset({"SystemExit", "KeyboardInterrupt", "GeneratorExit"}),
         "suspension_types": ("await",),
+        "log_receivers": frozenset({"logger", "logging", "log", "_logger", "LOGGER"}),
+        "log_calls": frozenset({"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}),
+        "log_failure_calls": frozenset({"warning", "warn", "error", "exception", "critical"}),
         "assertion_types": ("assert_statement", "raise_statement"),
         "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
         "instance_ref_style": "member",
@@ -456,6 +465,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "absent_types": ("null", "undefined", "false"),
         "control_flow_exceptions": frozenset(),
         "suspension_types": ("await_expression",),
+        "log_receivers": frozenset({"console", "logger", "log"}),
+        "log_calls": frozenset({"debug", "info", "warn", "error", "log", "trace"}),
+        "log_failure_calls": frozenset({"warn", "error"}),
         "assertion_types": ("throw_statement",),
         "container_literal_types": frozenset({"array", "object"}),
         "instance_ref_style": "member",
@@ -541,6 +553,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "absent_types": ("null_literal", "false"),
         "control_flow_exceptions": frozenset(),
         "suspension_types": (),
+        "log_receivers": frozenset({"logger", "LOGGER", "log"}),
+        "log_calls": frozenset({"debug", "info", "warn", "error", "trace", "fatal"}),
+        "log_failure_calls": frozenset({"warn", "error", "fatal"}),
         "assertion_types": ("assert_statement", "throw_statement"),
         "container_literal_types": frozenset({"array_initializer"}),
         "instance_ref_style": "identifier",
@@ -638,6 +653,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "absent_types": ("null_literal", "false"),
         "control_flow_exceptions": frozenset(),
         "suspension_types": ("await_expression",),
+        "log_receivers": frozenset({"logger", "_logger", "Logger", "log"}),
+        "log_calls": frozenset({"LogDebug", "LogInformation", "LogWarning", "LogError", "LogCritical"}),
+        "log_failure_calls": frozenset({"LogWarning", "LogError", "LogCritical"}),
         "assertion_types": ("throw_statement",),
         "container_literal_types": frozenset({"array_creation_expression", "initializer_expression"}),
         "instance_ref_style": "identifier",
@@ -728,6 +746,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "absent_types": ("unit_expression",),
         "control_flow_exceptions": frozenset(),
         "suspension_types": ("await_expression",),
+        "log_receivers": frozenset(),
+        "log_calls": frozenset(),
+        "log_failure_calls": frozenset(),
         "assertion_types": (),
         "container_literal_types": frozenset({"array_expression", "tuple_expression"}),
         "instance_ref_style": "member",
@@ -824,6 +845,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "absent_types": ("nil", "false"),
         "control_flow_exceptions": frozenset({"SystemExit", "Interrupt"}),
         "suspension_types": (),
+        "log_receivers": frozenset({"logger", "log", "Rails"}),
+        "log_calls": frozenset({"debug", "info", "warn", "error", "fatal"}),
+        "log_failure_calls": frozenset({"warn", "error", "fatal"}),
         "assertion_types": (),
         "container_literal_types": frozenset({"array", "hash"}),
         "instance_ref_style": "member",
@@ -920,6 +944,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "absent_types": ("null",),
         "control_flow_exceptions": frozenset(),
         "suspension_types": (),
+        "log_receivers": frozenset(),
+        "log_calls": frozenset(),
+        "log_failure_calls": frozenset(),
         "assertion_types": (),
         "container_literal_types": frozenset({"initializer_list"}),
         "instance_ref_style": "identifier",
@@ -1029,6 +1056,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "absent_types": ("nil",),
         "control_flow_exceptions": frozenset(),
         "suspension_types": (),
+        "log_receivers": frozenset({"log", "logger", "slog"}),
+        "log_calls": frozenset({"Print", "Printf", "Println", "Error", "Warn", "Info", "Debug"}),
+        "log_failure_calls": frozenset({"Error", "Warn", "Fatal"}),
         "assertion_types": (),
         "container_literal_types": frozenset({"composite_literal"}),
         "instance_ref_style": "member",

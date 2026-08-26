@@ -303,6 +303,14 @@ def _is_test_file(path: str) -> bool:
 def imperative_validation(source: dict) -> list[Finding] | None:
     """An `isinstance` check on a parameter the signature already types.
 
+    This measures Trust the Contract in the Interior, not Type Declarations Over Imperative
+    Validation, and it was named after the second until the two were separated upstream.
+    They are different failures. This one is a branch nothing can reach: in a correct
+    program the caller has already been excluded by the declaration, and in an incorrect one
+    it fires where the type checker should have. The other is a hand-written check that
+    copies a constraint declared somewhere else, a schema column or a form field, and drifts
+    from it. Nothing here measures that one.
+
     Re-checking a value the signature promised is distrust of your own contract. A check on
     a value that arrived untyped from outside is where validation belongs, so only the
     typed ones are counted.
