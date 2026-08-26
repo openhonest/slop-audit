@@ -62,7 +62,7 @@ class Refused(Exception):
     """An argument this tool cannot act on, carrying the sentence a reader needs.
 
     Typed rather than a printed message and an exit code, so the deciding and the saying
-    are separate: rule 8 asks for exactly this, and the boundary maps the type to a
+    are separate: Typed Exceptions at the Boundary asks for exactly this, and the boundary maps the type to a
     response."""
 
 # Why the thread-safety meter has no reading, by the verdict it returned instead of one. A

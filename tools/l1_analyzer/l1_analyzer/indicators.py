@@ -555,7 +555,7 @@ def god_file_language(ext: str) -> str | None:
     "this extension has no grammar" and a grammar key, and the literal-node table was then
     asked about it as though it were a language.
 
-    A one-argument `.get` is what rule 18 asks for and a two-argument one is what it
+    A one-argument `.get` is what Dispatch Tables Close Open Input asks for and a two-argument one is what it
     forbids. The rule's objection is to filing an unknown key under an answer written for a
     different key; `None` is not such an answer, it is the absence of one, and the caller
     below reads it as absence."""

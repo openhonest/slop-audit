@@ -586,7 +586,7 @@ def implicit_defaults(source: dict) -> list[Finding] | None:
 
     Read through the language's own node vocabulary. A default that binds a collaborator is
     the opposite failure: it makes a dependency visible in the signature, which is what
-    rule 13 asks for, and flagging it would push the code back toward the module-level
+    Configuration as Parameters asks for, and flagging it would push the code back toward the module-level
     lookup the rule exists to remove.
 
     Not decided: a language with no default parameter. Java, Go, C and Rust have none, so

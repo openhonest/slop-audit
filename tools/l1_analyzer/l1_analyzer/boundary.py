@@ -1,6 +1,6 @@
 """Declaring where this package meets the world.
 
-Honest Code rule 4 puts I/O at the boundary and pure logic in the middle. L1.21.4 infers
+Honest Code's I/O at the Boundary puts I/O at the edges and pure logic in the middle. L1.21.4 infers
 the boundary from the call graph, because most projects say nothing, and that inference
 cannot tell a function that is ONLY I/O from business logic that has swallowed a read.
 

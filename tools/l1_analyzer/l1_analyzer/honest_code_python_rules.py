@@ -32,7 +32,7 @@ from l1_analyzer.honest_code_rules import (
 # by running this and another checker over one codebase: 34 functions where this called a
 # boundary declaration false and the other did not, and 28 declarations they had removed on
 # this reader's word and then restored. Every case was a name absent here. Printing is
-# output, and rule 4 is about I/O in both directions rather than intake alone.
+# output, and I/O at the Boundary is about I/O in both directions rather than intake alone.
 #
 # Adding them halved the findings on this package and the adopter's together, 62 to 31,
 # because most of what they had produced was this clause calling a true declaration false.

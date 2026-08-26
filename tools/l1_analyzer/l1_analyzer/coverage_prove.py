@@ -298,7 +298,7 @@ def _batch_status(batch: dict[int, str], index: int) -> str:
     """This test's verdict, or `unreported` when the classifier never mentioned it.
 
     Read by subscript with a NAMED miss rather than by `.get(i, "error")`, which is the
-    open-input default Honest Code rule 14 refuses: it answered a question about a test
+    open-input default Honest Code's No Implicit Defaults refuses: it answered a question about a test
     the runner said nothing about with the answer written for a test that failed to
     compile.
 

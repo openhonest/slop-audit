@@ -221,43 +221,43 @@ def _clause(rule: int, name: str, decides: str, check: Callable[[dict], list[Fin
             "reads": reads, "languages": languages, "check": check}
 
 
-# The table IS the measure. Adding a principle is adding a row, which is rule 1 applied to
-# the module that checks rule 1.
+# The table IS the measure. Adding a principle is adding a row, which is Lookup Polymorphism applied
+# to the module that checks Lookup Polymorphism.
 CLAUSES: tuple[Clause, ...] = (
     # Ported to the shared vocabulary: decided for every language the spec covers.
-    _clause(1, "Dict-lookup polymorphism over if/elif chains", _TREE, rules.dispatch_chains,
+    _clause(1, "Lookup Polymorphism", _TREE, rules.dispatch_chains,
             reads=_TREE_READER),
-    _clause(2, "Typed dicts over classes", _TREE, rules.data_classes,
+    _clause(2, "Pure Functions Over Methods (typed dicts over classes)", _TREE, rules.data_classes,
             reads=_TREE_READER),
-    _clause(3, "Pure functions over methods", _TREE, rules.methods_wearing_a_class,
+    _clause(3, "Pure Functions Over Methods", _TREE, rules.methods_wearing_a_class,
             reads=_TREE_READER),
-    _clause(4, "I/O at the boundary", _TREE, python_rules.io_below_the_boundary),
-    _clause(5, "Flat composition over inheritance", _TREE, rules.inheritance_for_reuse,
+    _clause(4, "I/O at the Boundary", _TREE, python_rules.io_below_the_boundary),
+    _clause(5, "Composition Over Inheritance", _TREE, rules.inheritance_for_reuse,
             reads=_TREE_READER),
     # The only two that read the file's TEXT, which is why they work on a language this
     # package has no parser for.
-    _clause(6, "DOM as state", _TREE, rules.client_side_state, BROWSER_LANGUAGES,
+    _clause(6, "DOM as State (DATAOS)", _TREE, rules.client_side_state, BROWSER_LANGUAGES,
             reads=_TEXT_READER),
-    _clause(7, "HTML attributes over imperative DOM", _TREE, rules.imperative_dom,
+    _clause(7, "HTML Attributes Over Imperative DOM Manipulation", _TREE, rules.imperative_dom,
             BROWSER_LANGUAGES, reads=_TEXT_READER),
-    _clause(8, "Typed exceptions at the boundary", _TREE, rules.swallowed_exceptions,
+    _clause(8, "Typed Exceptions at the Boundary", _TREE, rules.swallowed_exceptions,
             reads=_TREE_READER),
-    _clause(9, "SQL over application caches", _PARTLY, python_rules.unmeasured_caches),
-    _clause(10, "Pure-function assertions over mocks", _TREE, python_rules.mock_heavy_tests),
-    _clause(11, "Type declarations over imperative validation", _TREE,
+    _clause(9, "SQL Over Application Caches", _PARTLY, python_rules.unmeasured_caches),
+    _clause(10, "Pure Function Assertions Over Mocks", _TREE, python_rules.mock_heavy_tests),
+    _clause(11, "Type Declarations Over Imperative Validation", _TREE,
             python_rules.imperative_validation),
-    _clause(12, "Context managers over instance state", _TREE, python_rules.unscoped_resources),
-    _clause(13, "Configuration as parameters", _TREE, rules.hidden_configuration,
+    _clause(12, "Context Managers Over Instance State", _TREE, python_rules.unscoped_resources),
+    _clause(13, "Configuration as Parameters", _TREE, rules.hidden_configuration,
             reads=_TREE_READER),
-    _clause(14, "No implicit defaults", _TREE, rules.implicit_defaults,
+    _clause(14, "No Implicit Defaults", _TREE, rules.implicit_defaults,
             reads=_TREE_READER),
-    _clause(15, "Simple gherkin steps signal honest architecture", _TREE,
+    _clause(15, "One Gherkin Per Function", _TREE,
             python_rules.heavy_step_definitions),
-    _clause(16, "Declarative equivalents over lifecycle hooks", _TREE, python_rules.lifecycle_hooks),
-    _clause(17, "Strangler pattern for migration", _NOTHING, python_rules.strangler_migration),
-    _clause(18, "Dispatch tables close open input", _TREE, rules.open_dispatch,
+    _clause(16, "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE, python_rules.lifecycle_hooks),
+    _clause(17, "Strangler Pattern for Migration", _NOTHING, python_rules.strangler_migration),
+    _clause(18, "Dispatch Tables Close Open Input", _TREE, rules.open_dispatch,
             reads=_TREE_READER),
-    _clause(19, "Atomic test-and-set over check-then-act", _TREE, rules.check_then_act,
+    _clause(19, "Atomic Test-and-Set Over Check-Then-Act", _TREE, rules.check_then_act,
             reads=_TREE_READER),
 )
 
