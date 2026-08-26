@@ -117,6 +117,14 @@ class LangSpec(TypedDict, total=False):
     log_receivers: frozenset[str]
     log_calls: frozenset[str]
     log_failure_calls: frozenset[str]
+    # Reaching outside the process. `io_calls` are names that mean I/O wherever they appear;
+    # `io_receivers` are modules and clients whose every call does; `io_dotted` names one
+    # call at a time where most of a module is not I/O. Empty means this reader knows no I/O
+    # vocabulary for the language, and a clause about edges says so rather than reporting a
+    # file clean.
+    io_calls: frozenset[str]
+    io_receivers: frozenset[str]
+    io_dotted: frozenset[str]
     # The statement that records a failure. A try body ending in one is ASSERTING that its
     # call raised, so the handler beneath is the success condition and reaching the recorder
     # is the defect. Keying on the handler alone made both readings look alike.
@@ -370,6 +378,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset({"logger", "logging", "log", "_logger", "LOGGER"}),
         "log_calls": frozenset({"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}),
         "log_failure_calls": frozenset({"warning", "warn", "error", "exception", "critical"}),
+        "io_calls": frozenset({"read_text", "read_bytes", "write_text", "write_bytes", "open", "iterdir",
+                          "glob", "Popen", "check_output", "urlopen", "execute", "fetchall",
+                          "fetchone", "commit", "listdir", "makedirs", "remove", "print", "input"}),
+        "io_receivers": frozenset({"requests", "httpx", "session", "client", "urllib", "aiohttp", "subprocess",
+                              "conn", "connection", "cursor", "db", "stdout", "stderr", "stdin",
+                              "psycopg2", "psycopg", "asyncpg", "sqlite3", "aiosqlite", "pymongo",
+                              "redis", "smtplib", "ftplib", "imaplib", "poplib"}),
+        "io_dotted": frozenset({"os.read", "os.write", "os.walk", "os.remove", "os.system", "os.popen",
+                           "shutil.copy", "shutil.move", "shutil.rmtree", "socket.socket",
+                           "tempfile.mkdtemp", "environ.get", "loader.exec_module"}),
         "assertion_types": ("assert_statement", "raise_statement"),
         "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
         "instance_ref_style": "member",
@@ -468,6 +486,13 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset({"console", "logger", "log"}),
         "log_calls": frozenset({"debug", "info", "warn", "error", "log", "trace"}),
         "log_failure_calls": frozenset({"warn", "error"}),
+        "io_calls": frozenset({"fetch", "readFile", "readFileSync", "writeFile", "writeFileSync",
+                          "appendFile", "readdir", "readdirSync", "unlink", "mkdir",
+                          "createReadStream", "createWriteStream", "query", "exec", "execSync",
+                          "spawn", "spawnSync", "request"}),
+        "io_receivers": frozenset({"fs", "fsp", "axios", "http", "https", "net", "process", "child_process",
+                              "db", "pool", "client", "connection", "redis", "mongo"}),
+        "io_dotted": frozenset({"process.exit", "process.env", "localStorage.getItem", "localStorage.setItem"}),
         "assertion_types": ("throw_statement",),
         "container_literal_types": frozenset({"array", "object"}),
         "instance_ref_style": "member",
@@ -556,6 +581,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset({"logger", "LOGGER", "log"}),
         "log_calls": frozenset({"debug", "info", "warn", "error", "trace", "fatal"}),
         "log_failure_calls": frozenset({"warn", "error", "fatal"}),
+        "io_calls": frozenset(),
+        "io_receivers": frozenset(),
+        "io_dotted": frozenset(),
         "assertion_types": ("assert_statement", "throw_statement"),
         "container_literal_types": frozenset({"array_initializer"}),
         "instance_ref_style": "identifier",
@@ -656,6 +684,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset({"logger", "_logger", "Logger", "log"}),
         "log_calls": frozenset({"LogDebug", "LogInformation", "LogWarning", "LogError", "LogCritical"}),
         "log_failure_calls": frozenset({"LogWarning", "LogError", "LogCritical"}),
+        "io_calls": frozenset(),
+        "io_receivers": frozenset(),
+        "io_dotted": frozenset(),
         "assertion_types": ("throw_statement",),
         "container_literal_types": frozenset({"array_creation_expression", "initializer_expression"}),
         "instance_ref_style": "identifier",
@@ -749,6 +780,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset(),
         "log_calls": frozenset(),
         "log_failure_calls": frozenset(),
+        "io_calls": frozenset(),
+        "io_receivers": frozenset(),
+        "io_dotted": frozenset(),
         "assertion_types": (),
         "container_literal_types": frozenset({"array_expression", "tuple_expression"}),
         "instance_ref_style": "member",
@@ -848,6 +882,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset({"logger", "log", "Rails"}),
         "log_calls": frozenset({"debug", "info", "warn", "error", "fatal"}),
         "log_failure_calls": frozenset({"warn", "error", "fatal"}),
+        "io_calls": frozenset(),
+        "io_receivers": frozenset(),
+        "io_dotted": frozenset(),
         "assertion_types": (),
         "container_literal_types": frozenset({"array", "hash"}),
         "instance_ref_style": "member",
@@ -947,6 +984,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset(),
         "log_calls": frozenset(),
         "log_failure_calls": frozenset(),
+        "io_calls": frozenset(),
+        "io_receivers": frozenset(),
+        "io_dotted": frozenset(),
         "assertion_types": (),
         "container_literal_types": frozenset({"initializer_list"}),
         "instance_ref_style": "identifier",
@@ -1059,6 +1099,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset({"log", "logger", "slog"}),
         "log_calls": frozenset({"Print", "Printf", "Println", "Error", "Warn", "Info", "Debug"}),
         "log_failure_calls": frozenset({"Error", "Warn", "Fatal"}),
+        "io_calls": frozenset(),
+        "io_receivers": frozenset(),
+        "io_dotted": frozenset(),
         "assertion_types": (),
         "container_literal_types": frozenset({"composite_literal"}),
         "instance_ref_style": "member",

@@ -26,18 +26,22 @@ from l1_analyzer.honest_code_read import (
     Finding,
     _finding,
     base_names,
+    called_names_in,
     chain_subjects,
     class_nodes,
+    declares_a_boundary,
     declares_only_signatures,
     first_name,
     function_nodes,
     handler_body,
+    io_calls_in,
     is_absent_value,
     is_chain_arm,
     is_constructor,
     method_nodes,
     module_level_bindings,
     names_a_table_holds,
+    names_handed_on,
     names_written_in,
     node_text,
     reaches_receiver,
@@ -909,3 +913,66 @@ def _log_levels_in(fn: "Node", spec: "LangSpec", raw: bytes) -> set[str]:
         if node_text(receiver, raw).rsplit(".", 1)[-1] in spec["log_receivers"]:
             levels.add(level)
     return levels
+
+
+# --------------------------------------------------------------------------
+# 4. I/O at the boundary
+# --------------------------------------------------------------------------
+
+def io_below_the_boundary(source: dict) -> list[Finding] | None:
+    """A function that performs I/O and is itself reached by a sibling.
+
+    Read through the language's own node vocabulary. A function nothing in the file reaches
+    IS the edge, which is where the I/O belongs. One that a sibling reaches has had the I/O
+    pushed inward, and neither it nor its caller can be tested without a mock.
+
+    Reached, not called: a function a dispatch table holds is reached BY the table, and
+    building the graph from named calls alone left this reader blind to most of a codebase
+    written the way clause 1 asks for. A function that reaches a DECLARED boundary is at an
+    edge too, through the thing that made the claim, one step and not transitively.
+
+    A declaration that names no I/O is reported. The decorator says the function is an edge
+    and a function reaching nothing outside the process is not one, which is the only case
+    where a stamp is computable.
+
+    Not decided: whether an uncalled function is truly an entry point. A module read only
+    from outside has every function looking like a boundary.
+
+    Not decided either: a language this reader knows no I/O vocabulary for. Reporting those
+    files clean would claim they were checked."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["io_calls"] and not spec["io_receivers"]:
+        return None
+    functions = function_nodes(source["root"], spec)
+    named = {}
+    for fn in functions:
+        named[node_text(fn.child_by_field_name("name"), raw) or first_name(fn, raw)] = fn
+    declared = {name for name, fn in named.items() if declares_a_boundary(fn, spec, raw)}
+    reached = names_a_table_holds(source["root"], spec, raw)
+    for name, fn in named.items():
+        reached |= (called_names_in(fn, spec, raw)
+                    | names_handed_on(fn, spec, raw)) - {name}
+
+    found: list[Finding] = []
+    for name, fn in named.items():
+        touched = sorted(io_calls_in(fn, spec, raw))
+        if name in declared and not touched and not (called_names_in(fn, spec, raw) & declared):
+            found.append(_finding(
+                "L1.21.4", name, fn.start_point[0] + 1,
+                "declares itself a boundary and makes no call this reader counts as I/O, "
+                "so the declaration states an edge that is not there",
+                "take the declaration off, or move the read or the call this function was "
+                "meant to be the edge for into it", ""))
+            continue
+        if name not in reached or not touched:
+            continue
+        # Emitted and marked, not dropped. A suppression that suppresses nothing is
+        # invisible from outside, so a consumer counting declarations had to infer from the
+        # presence of a decorator and was wrong three times in four.
+        finding = _finding(
+            "L1.21.4", name, fn.start_point[0] + 1,
+            f"performs I/O ({', '.join(touched)}) and is reached by another function here",
+            "take the data as a parameter and let the caller at the edge do the I/O", "")
+        finding["withheld_by"] = "declaration" if name in declared else ""
+        found.append(finding)
+    return found

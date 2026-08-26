@@ -185,3 +185,9 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _log_levels_in matches the receiver and the call together
     Then only the logger's call counts
     But both halves are ordinary words alone, so matching either by itself would report a field named info
+
+  Scenario: io_below_the_boundary finds I/O a sibling reaches
+    Given a function that reads a file and another that reaches it
+    When io_below_the_boundary builds the call graph from calls, table entries and names handed on
+    Then the reader is reported, because neither it nor its caller can be tested without a mock
+    But a function nothing reaches IS the edge, and whether it is truly an entry point is not readable here

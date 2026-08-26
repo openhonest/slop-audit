@@ -193,7 +193,12 @@ def _classify(output: str, returncode: int) -> str:
     return "incidental"  # collection/usage error, or the file did not import
 
 
+@boundary
 def _run(repo: Path, interpreter: str, test_source: str, timeout_seconds: float) -> tuple[int, str]:
+    """Write one generated test into a temporary directory and run it.
+
+    An edge. What the run MEANS is decided by the caller; this obtains an exit code and the
+    output, and removes the directory either way."""
     with tempfile.TemporaryDirectory(prefix="l1-pyproof-") as directory:
         test_file = Path(directory) / "test_l1_coverage_proof.py"
         test_file.write_text(test_source)

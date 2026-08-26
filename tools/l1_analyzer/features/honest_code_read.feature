@@ -223,3 +223,27 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When declares_only_signatures reads the bases
     Then only the first is a list of signatures, where every method has the shape of every other by construction
     But the exemption is the Protocol and not the class, so two identical methods on a real class are still two methods somebody wrote twice
+
+  Scenario: io_calls_in names the I/O one node performs
+    Given a call by an unambiguous name, one on a receiver that only reaches outside, and one named a call at a time
+    When io_calls_in reads all three through the language's vocabulary
+    Then each is I/O and reports the name it was reached by
+    But a call on a module whose other calls are pure is read one at a time, or os.getenv and os.path.join count too
+
+  Scenario: called_names_in names every function one node calls
+    Given a function calling two others by name
+    When called_names_in takes the bare name at each call site
+    Then both come back
+    But a method on a receiver is named by its last segment, because that is what the call site says
+
+  Scenario: names_handed_on names every bare name handed to a call
+    Given a function passed to map by name rather than called
+    When names_handed_on reads the arguments of each call
+    Then that function is reached, because passing it by name calls it for every element
+    But a literal argument names no function, so only a bare identifier counts
+
+  Scenario: declares_a_boundary says whether a function calls itself one of the project's edges
+    Given a decorated function and one whose name carries the prefix instead
+    When declares_a_boundary reads the decorator's name and the function's own
+    Then both declare, because a decorator is Python's spelling and most languages have none
+    But the bare marker is not a prefix, or every project's own boundary decorator declares itself an edge

@@ -245,7 +245,11 @@ CLAUSES: tuple[Clause, ...] = (
             reads=_TREE_READER),
     _clause(3, "Pure Functions Over Methods", _TREE, rules.methods_wearing_a_class, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(4, "I/O at the Boundary", _TREE, python_rules.io_below_the_boundary, nothing_to_read=""),
+    _clause(4, "I/O at the Boundary", _TREE, rules.io_below_the_boundary,
+            reads=_TREE_READER,
+            nothing_to_read=(
+                "this reader knows no I/O vocabulary for this language, so it had no way to "
+                "tell an edge from the interior")),
     _clause(5, "Composition Over Inheritance", _TREE, rules.inheritance_for_reuse, nothing_to_read="",
             reads=_TREE_READER),
     # The only two that read the file's TEXT, which is why they work on a language this

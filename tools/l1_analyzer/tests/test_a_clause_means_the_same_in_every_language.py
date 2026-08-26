@@ -861,3 +861,75 @@ def test_a_function_that_logs_nothing_is_quiet(language):
     source = {"python": "def save(row):\n    return store(row)\n",
               "javascript": "function save(row) {\n  return store(row);\n}\n"}
     assert rules.undeclared_logging(read.read_tree(source[language], language)) == []
+
+
+# --------------------------------------------------------------------------
+# Clause 4, I/O at the boundary
+#
+# The clause adopters meet most, and the last one still written against Python's own parser.
+#
+# A declaration needs a spelling every language has. Python's is a decorator, which most
+# languages do not have; the Honest Framework's own architecture format spells the same fact
+# as a `boundary_in` or `boundary_out` prefix on the function's NAME, and a name is
+# something every language has. Both are read, so a project declares its edges in whichever
+# its language gives it.
+# --------------------------------------------------------------------------
+
+IO_BELOW = {
+    "python": ("def price(sku):\n    return open(sku).read()\n\n\n"
+               "def total(skus):\n    return sum(price(s) for s in skus)\n"),
+    "javascript": ("function price(sku) {\n  return fs.readFileSync(sku);\n}\n\n"
+                   "function total(skus) {\n  return skus.map(price);\n}\n"),
+}
+
+DECLARED_BY_NAME = {
+    "python": ("def boundary_in_price(sku):\n    return open(sku).read()\n\n\n"
+               "def total(skus):\n    return sum(boundary_in_price(s) for s in skus)\n"),
+    "javascript": ("function boundary_in_price(sku) {\n  return fs.readFileSync(sku);\n}\n\n"
+                   "function total(skus) {\n  return skus.map(boundary_in_price);\n}\n"),
+}
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_io_in_a_function_a_sibling_calls_is_found_in_this_language(language):
+    found = rules.io_below_the_boundary(read.read_tree(IO_BELOW[language], language))
+    assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["price"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_function_nothing_calls_is_the_edge_and_is_left_alone(language):
+    """A function nothing in the file calls IS where the I/O belongs. Not decided: whether
+    an uncalled function is truly an entry point, because a module read only from outside
+    has every function looking like one."""
+    source = {"python": "def price(sku):\n    return open(sku).read()\n",
+              "javascript": "function price(sku) {\n  return fs.readFileSync(sku);\n}\n"}
+    assert rules.io_below_the_boundary(read.read_tree(source[language], language)) == []
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_name_prefix_declares_the_edge_in_any_language(language):
+    """The spelling every language has. A decorator is Python's, and most languages have
+    none, so the framework's own architecture format puts it in the name instead."""
+    found = rules.io_below_the_boundary(read.read_tree(DECLARED_BY_NAME[language], language))
+    assert [f["symbol"] for f in found if f["withheld_by"] == ""] == [], found
+    assert [f["symbol"] for f in found if f["withheld_by"] == "declaration"] == ["boundary_in_price"]
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_function_a_table_holds_is_called_here_too(language):
+    """The blind spot an adopter found in the Python reading: a function reached only
+    through a dispatch table was reached by nothing as far as the call graph could see."""
+    source = {"python": ("def price(sku):\n    return open(sku).read()\n\n\n"
+                         "HANDLERS = {'price': price}\n"),
+              "javascript": ("function price(sku) {\n  return fs.readFileSync(sku);\n}\n\n"
+                             "const handlers = {price: price};\n")}
+    found = rules.io_below_the_boundary(read.read_tree(source[language], language))
+    assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["price"], found
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_function_that_touches_nothing_outside_is_quiet(language):
+    source = {"python": "def price(n):\n    return n * 2\n\n\ndef total(n):\n    return price(n)\n",
+              "javascript": ("function price(n) {\n  return n * 2;\n}\n\n"
+                             "function total(n) {\n  return price(n);\n}\n")}
+    assert rules.io_below_the_boundary(read.read_tree(source[language], language)) == []

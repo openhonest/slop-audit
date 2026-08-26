@@ -353,6 +353,7 @@ def compute_config_indicators(repo: Path) -> dict[str, L1Result]:
                         "no Dockerfile and no docker-compose.yml at the repository root"),
         },
     }
+from l1_analyzer.boundary import boundary
 from l1_analyzer.lang_cfg import (  # noqa: F401 - re-exported: every reader imports these from here
     LANG_CFG,
     TYPESCRIPT_CFG_OVERRIDES,
@@ -599,6 +600,7 @@ def _god_file_reason(f: Path, repo: Path, has_packages: bool) -> str | None:
     return None
 
 
+@boundary
 def _god_files(repo: Path) -> L1Result:
     """L1.17: concentration of production files over 1k LOC (any file over 4k forces
     Slop). Discloses which large files were scoped out and why, so the drop is

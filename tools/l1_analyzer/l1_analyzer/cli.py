@@ -369,13 +369,12 @@ def build_stamp(directory: str) -> str:
     edited checkout did not come from that commit, and a reader comparing it against the
     commit would be comparing it against different code.
 
-    The file written at build time is read first. Asking git only works from a checkout,
-    and an installed package sits outside one, which is how the tool is actually used and
-    the case that let an adopter quote three builds all calling themselves 1.0.0."""
-    written = _stamp_written_at_build(directory)
-    if written is not None:
-        return written
-
+    Git is asked FIRST and the file written at build time is the fallback. A checkout knows
+    its own commit and the file records the commit at the moment the wheel was built, so in
+    a working tree the file is already stale: a developer running the suite after one commit
+    was told the commit before it. The file is what an installed package has, which is how
+    the tool is actually used and the case that let an adopter quote three builds all
+    calling themselves 1.0.0."""
     import subprocess
 
     try:
@@ -383,11 +382,11 @@ def build_stamp(directory: str) -> str:
                                 capture_output=True, text=True, timeout=10, check=True).stdout.strip()
         changed = subprocess.run(["git", "status", "--porcelain"], cwd=directory,
                                  capture_output=True, text=True, timeout=10, check=True).stdout.strip()
-    # honest-code-allow: L1.21.8 - the empty string IS the answer for a build with no repository behind it, which is the ordinary case for an installed wheel, and the caller publishes the release number alone rather than a commit nobody can check
+    # honest-code-allow: L1.21.8 - a build with no repository is the ordinary installed case, and the answer is the stamp the build wrote, which the next line reads
     except (subprocess.SubprocessError, OSError):
-        return ""
+        return _stamp_written_at_build(directory) or ""
     if not commit:
-        return ""
+        return _stamp_written_at_build(directory) or ""
     return f"+g{commit}" + (".dirty" if changed else "")
 
 

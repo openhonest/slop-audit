@@ -28,8 +28,13 @@ def test_the_build_hook_exists_and_names_the_file_it_writes():
     assert "_build.py" in hook.read_text()
 
 
-def test_a_stamp_written_at_build_time_is_read_in_preference_to_git(tmp_path):
-    """The installed case. A directory with no repository still names its commit."""
+def test_a_stamp_written_at_build_time_is_read_where_there_is_no_repository(tmp_path):
+    """The installed case. A directory with no repository still names its commit.
+
+    Git is asked first and this is the fallback, which is the opposite of the first draft.
+    A checkout knows its own commit and the file records the commit the wheel was built at,
+    so in a working tree the file is stale by however many commits have landed since: the
+    suite failed on exactly that within the hour."""
     (tmp_path / "_build.py").write_text('COMMIT = "abcd1234"\nDIRTY = False\n')
     assert cli.build_stamp(str(tmp_path)) == "+gabcd1234"
 

@@ -131,6 +131,12 @@ _SCOPE_DECLARATIONS = ("global_statement", "nonlocal_statement")
 # Bases that make a class a list of signatures rather than an implementation.
 _SIGNATURE_ONLY_BASES = frozenset({"Protocol", "ABC", "ABCMeta"})
 
+# How a project says a function is one of its edges, in a decorator's name or the
+# function's own. The framework's architecture format uses the name, which is the spelling
+# every language has.
+_BOUNDARY_MARKERS = frozenset({"boundary", "boundary_in", "boundary_out", "edge",
+                               "entrypoint", "entry_point"})
+
 _BASE_HOLDERS = ("argument_list", "class_heritage", "superclass", "extends_clause",
                  "type_parameters", "implements_clause")
 
@@ -476,3 +482,97 @@ def declares_only_signatures(node: Node, spec: LangSpec, raw: bytes) -> bool:
     bases, which is where a language says it: `Protocol` and `ABC` in Python, and the same
     names anywhere else that borrows them."""
     return bool(set(base_names(node, spec, raw)) & _SIGNATURE_ONLY_BASES)
+
+
+def io_calls_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:
+    """The I/O this node performs, by name.
+
+    Three readings, because a name means different things in different company. An
+    unambiguous name counts on its own. A call on a receiver that only reaches outside
+    counts whatever it is called, since those names are open-ended. And a call named one at
+    a time counts where most of its module is not I/O: `os.getenv` reads process state and
+    `os.path.join` joins strings, and taking the whole of `os` reported both."""
+    touched: set[str] = set()
+    for inner in walk(node):
+        if inner.type not in spec["call_types"]:
+            continue
+        called = inner.child_by_field_name(spec["call_fn"])
+        if called is None:
+            continue
+        bare = node_text(called, raw).rsplit(".", 1)[-1].strip()
+        if bare in spec["io_calls"]:
+            touched.add(bare)
+            continue
+        if called.type not in spec["member_types"]:
+            continue
+        receiver = called.child_by_field_name("object") or called.child_by_field_name("value")
+        if receiver is None:
+            continue
+        name = node_text(receiver, raw).rsplit(".", 1)[-1].strip()
+        if name in spec["io_receivers"] or f"{name}.{bare}" in spec["io_dotted"]:
+            touched.add(f"{name}.{bare}")
+    return touched
+
+
+def called_names_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:
+    """Every function name this node calls, by the bare name at the call site."""
+    names: set[str] = set()
+    for inner in walk(node):
+        if inner.type not in spec["call_types"]:
+            continue
+        called = inner.child_by_field_name(spec["call_fn"])
+        if called is not None:
+            names.add(node_text(called, raw).rsplit(".", 1)[-1].strip())
+    return names
+
+
+def names_handed_on(node: Node, spec: LangSpec, raw: bytes) -> set[str]:
+    """Every bare name handed to a call as an argument.
+
+    Passing a function by name reaches it, the same static fact as holding it in a dispatch
+    table. `skus.map(price)` calls `price` for every element and the call graph saw only
+    `map`, so a function reached only that way was reached by nothing as far as this reader
+    could tell."""
+    handed: set[str] = set()
+    for inner in walk(node):
+        if inner.type not in spec["call_types"]:
+            continue
+        arguments = inner.child_by_field_name(spec["call_args"])
+        if arguments is None:
+            continue
+        handed |= {node_text(a, raw) for a in arguments.named_children
+                   if a.type == "identifier"}
+    return handed
+
+
+def declares_a_boundary(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether this function says it is one of the project's own edges.
+
+    Two spellings, because a decorator is Python's and most languages have none. The Honest
+    Framework's own architecture format puts the same fact in the function's NAME, as a
+    `boundary_in` or `boundary_out` prefix, and a name is something every language has.
+
+    Read from what a decorator NAMES rather than from its text: a parametrize carrying the
+    word as test data is not a declaration, which is the lesson another clause learned from
+    one carrying an exit handler."""
+    name = node_text(node.child_by_field_name("name"), raw) or first_name(node, raw)
+    # A PREFIX, with the separator. Accepting the bare marker as well reported every
+    # project's own `def boundary(fn)` as a declared edge that reaches nothing, which is
+    # the marker itself rather than a function carrying it. Six of nine findings on this
+    # repository were that.
+    if any(name.startswith(f"{marker}_") for marker in _BOUNDARY_MARKERS):
+        return True
+    # The decorators of a function, which are its siblings rather than its children: Python
+    # wraps both in a `decorated_definition`, so reading the function's own children found
+    # none and every decorated declaration read as undeclared.
+    decorated = node.parent
+    around = decorated.children if decorated is not None else ()
+    for child in (*node.children, *around):
+        if child.type not in spec["decorator_types"]:
+            continue
+        called = next((n for n in walk(child) if n.type in spec["call_types"]), None)
+        named = called.child_by_field_name(spec["call_fn"]) if called is not None else None
+        text = node_text(named if named is not None else child, raw).lstrip("@")
+        if set(text.split(".")) & _BOUNDARY_MARKERS:
+            return True
+    return False
