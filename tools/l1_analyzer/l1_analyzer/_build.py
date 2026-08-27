@@ -1,2 +1,0 @@
-COMMIT = "f3718003"
-DIRTY = True
