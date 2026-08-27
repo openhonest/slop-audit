@@ -264,7 +264,7 @@ CLAUSES: tuple[Clause, ...] = (
     _clause(9, "SQL Over Application Caches", _PARTLY, python_rules.unmeasured_caches, nothing_to_read=""),
     _clause(10, "Pure Function Assertions Over Mocks", _TREE, python_rules.mock_heavy_tests, nothing_to_read=""),
     _clause(11, "Trust the Contract in the Interior", _TREE,
-            python_rules.imperative_validation, nothing_to_read=""),
+            rules.imperative_validation, nothing_to_read="", reads=_TREE_READER),
     _clause(12, "Context Managers Over Instance State", _TREE, python_rules.unscoped_resources, nothing_to_read=""),
     _clause(13, "Configuration as Parameters", _TREE, rules.hidden_configuration, nothing_to_read="",
             reads=_TREE_READER),

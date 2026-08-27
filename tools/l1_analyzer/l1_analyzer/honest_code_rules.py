@@ -762,3 +762,111 @@ def _is_keyed_write_target(node: "Node", spec: "LangSpec") -> bool:
 # --------------------------------------------------------------------------
 # 4. I/O at the boundary
 # --------------------------------------------------------------------------
+
+
+def _declared_type_of(parameter, spec: dict, raw: bytes) -> str:
+    """The type a parameter declares, stripped of the punctuation a grammar hangs on it.
+
+    TypeScript's annotation node carries the colon (`: number`), Python's does not. Reading
+    the text as it comes would compare `: number` against `number` and never match."""
+    declared = parameter.child_by_field_name(spec["typed_param_type"])
+    return (node_text(declared, raw) or "").lstrip(":").strip()
+
+
+def _parameter_name(parameter, spec: dict, raw: bytes) -> str:
+    """The name a typed parameter binds. Named by a field in most grammars; Python's
+    typed_parameter hangs it as the first child with no field at all."""
+    field = spec["typed_param_name"]
+    named = parameter.child_by_field_name(field) if field else parameter.child(0)
+    return node_text(named, raw) or ""
+
+
+def _type_tests_in(fn, spec: dict, raw: bytes) -> list[tuple[str, str, int]]:
+    """Every runtime type test inside `fn`, as (value tested, type tested for, line).
+
+    Two shapes, because languages spell it two ways. An operator form is a node with the
+    value in one field and the type in another: Java's `instanceof_expression`, C#'s
+    `is_expression`, Go's `type_assertion_expression`, and TypeScript's binary expression
+    where the operator happens to be `instanceof`. A call form names the value in its first
+    argument and the type in its second, which is Python's `isinstance`."""
+    tests: list[tuple[str, str, int]] = []
+    for node in walk(fn):
+        if node.type in spec["type_test_types"]:
+            wanted = spec["type_test_operators"]
+            if wanted:
+                operator = node.child_by_field_name("operator")
+                if node_text(operator, raw) not in wanted:
+                    continue
+            subject = node.child_by_field_name(spec["type_test_subject"])
+            tested = node.child_by_field_name(spec["type_test_type"])
+            if subject is not None and tested is not None:
+                tests.append((node_text(subject, raw) or "", node_text(tested, raw) or "",
+                              node.start_point[0] + 1))
+        if node.type in spec["call_types"] and spec["type_test_calls"]:
+            if first_name(node, raw) not in spec["type_test_calls"]:
+                continue
+            arguments = [a for a in _call_arguments(node) if a.is_named]
+            if len(arguments) >= 2:
+                tests.append((node_text(arguments[0], raw) or "",
+                              node_text(arguments[1], raw) or "", node.start_point[0] + 1))
+    return tests
+
+
+def _call_arguments(call) -> list:
+    """The argument nodes of a call, whatever the grammar calls the list holding them."""
+    holder = call.child_by_field_name("arguments")
+    return list(holder.children) if holder is not None else []
+
+
+def imperative_validation(source: dict) -> list[Finding] | None:
+    """A runtime type test on a parameter whose declaration already fixes the type.
+
+    Re-checking a value the signature promised is distrust of your own contract. In a correct
+    program the caller has already been excluded by the declaration; in an incorrect one the
+    branch fires where the type checker should have. A check on a value that arrived untyped
+    from outside is where validation belongs, so only the declared ones are counted.
+
+    The declaration fixes the type in two cases this reader can tell apart from a guess: the
+    test asks for exactly the type the parameter declares, or the parameter declares one of
+    the language's own scalars. `Object`, `any` and `interface{}` promise nothing, so a test
+    against one of those is the check the declaration deliberately left to run.
+
+    This measures Trust the Contract in the Interior, not Type Declarations Over Imperative
+    Validation, and it was named after the second until the two were separated upstream. The
+    other is a hand-written check copying a constraint declared elsewhere, a schema column or
+    a form field, and drifting from it. Nothing here measures that one.
+
+    Not decided: whether the function is a boundary receiving external input, where a typed
+    parameter may still deserve a runtime check. Nor a test for a type the parameter cannot
+    hold, such as asking `isinstance(x, str)` of an `x: int`. That branch is unreachable
+    rather than redundant, which is a different defect, and this reader does not count it.
+
+    Not decided for a language with no parameter type or no runtime type test: JavaScript and
+    Ruby declare no parameter types, C and Rust have no runtime downcast in this vocabulary.
+    That is a fact about the language, not a gap here, and an empty list would instead claim
+    the file was read and found clean."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["typed_param_types"]:
+        return None
+    if not (spec["type_test_types"] or spec["type_test_calls"]):
+        return None
+    found: list[Finding] = []
+    for fn in function_nodes(source["root"], spec):
+        declared: dict[str, str] = {}
+        for parameter in walk(fn):
+            if parameter.type in spec["typed_param_types"]:
+                declared[_parameter_name(parameter, spec, raw)] = _declared_type_of(
+                    parameter, spec, raw)
+        for value, tested, line in _type_tests_in(fn, spec, raw):
+            promised = declared.get(value)
+            if promised is None:
+                continue
+            if tested != promised and promised not in spec["scalar_types"]:
+                continue
+            owner = node_text(fn.child_by_field_name("name"), raw) or first_name(fn, raw)
+            found.append(_finding(
+                "L1.21.11", f"{owner}({value})", line,
+                f"re-checks `{value}`, which the signature already types as `{promised}`",
+                "trust the contract in the interior and tighten the boundary or the "
+                "type instead", ""))
+    return found

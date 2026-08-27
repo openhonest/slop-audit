@@ -35,12 +35,6 @@ Feature: Clauses this reader still reads through Python's own parser
     Then a step needing thirty lines of setup is a readout on the code under test rather than on the test
     But a step that calls the function and checks the result is what a pure function makes possible
 
-  Scenario: imperative_validation finds a check the type already made
-    Given a parsed source
-    When imperative_validation reads its guards
-    Then an isinstance check on a parameter the signature already types is distrust of your own contract
-    But a check at a boundary, on a value that arrived untyped from outside, is where validation belongs
-
   Scenario: lifecycle_hooks finds behaviour parked where the reader does not look
     Given a parsed source
     When lifecycle_hooks reads its registrations

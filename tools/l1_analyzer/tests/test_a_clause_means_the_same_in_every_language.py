@@ -1002,3 +1002,123 @@ def test_suppressing_a_control_flow_signal_is_still_not_the_failure_this_names()
     source = ("import contextlib\n\n\ndef save(row):\n"
               "    with contextlib.suppress(KeyboardInterrupt):\n        return store(row)\n")
     assert edges.swallowed_exceptions(read.read_tree(source, "python")) == []
+
+
+# ---------------------------------------------------------------------------
+# 11. Trust the Contract in the Interior
+#
+# Read Python's own parser until 2026-08-27, so on any other language the analyzer said
+# nobody had decided it. The two Python cases that used to live in
+# test_the_honest_code_clauses.py are the first row of each table below.
+#
+# The declaration has to actually fix the type. `Object`, `any`, `object` and `interface{}`
+# promise nothing, so a test against one of those is the check the declaration deliberately
+# left to run, and reporting it would ask an author to delete the validation the signature
+# asked for.
+# ---------------------------------------------------------------------------
+
+_RECHECKS_WHAT_THE_SIGNATURE_TYPED = [
+    ("python", """def f(name: str) -> str:
+    if not isinstance(name, str):
+        raise TypeError('no')
+    return name
+"""),
+    ("typescript", """function f(name: string): string {
+  if (name instanceof String) { throw new TypeError('no') }
+  return name
+}
+"""),
+    ("java", """class A {
+  String f(String name) {
+    if (name instanceof String) { throw new RuntimeException(); }
+    return name;
+  }
+}
+"""),
+    ("csharp", """class A {
+  string F(string name) {
+    if (name is string) { throw new System.Exception(); }
+    return name;
+  }
+}
+"""),
+    ("go", """func f(name string) string {
+	if _, ok := name.(string); ok {
+		panic("no")
+	}
+	return name
+}
+"""),
+]
+
+_TEST_ON_A_TYPE_THAT_PROMISES_NOTHING = [
+    ("python", """def f(payload):
+    if not isinstance(payload, dict):
+        raise TypeError('no')
+    return payload
+"""),
+    ("typescript", """function f(payload: any) {
+  if (payload instanceof Object) { throw new TypeError('no') }
+  return payload
+}
+"""),
+    ("java", """class A {
+  Object f(Object payload) {
+    if (payload instanceof String) { throw new RuntimeException(); }
+    return payload;
+  }
+}
+"""),
+    ("csharp", """class A {
+  object F(object payload) {
+    if (payload is string) { throw new System.Exception(); }
+    return payload;
+  }
+}
+"""),
+    ("go", """func f(payload interface{}) interface{} {
+	if _, ok := payload.(string); ok {
+		panic("no")
+	}
+	return payload
+}
+"""),
+]
+
+
+@pytest.mark.parametrize(("lang", "source"), _RECHECKS_WHAT_THE_SIGNATURE_TYPED)
+def test_a_check_the_signature_already_made_is_found_in_every_language(lang, source):
+    found = rules.imperative_validation(read.read_tree(source, lang))
+    assert found, lang
+    assert "already types" in found[0]["detail"]
+
+
+@pytest.mark.parametrize(("lang", "source"), _TEST_ON_A_TYPE_THAT_PROMISES_NOTHING)
+def test_a_check_on_a_value_the_signature_left_open_is_left_alone(lang, source):
+    """The direction that matters more. A rule that fired here would ask an author to
+    delete the validation their own signature asked for."""
+    assert rules.imperative_validation(read.read_tree(source, lang)) == [], lang
+
+
+@pytest.mark.parametrize("lang", ["javascript", "ruby", "rust", "c"])
+def test_a_language_where_the_question_cannot_arise_says_so_rather_than_nothing(lang):
+    """JavaScript and Ruby declare no parameter types, and C and Rust have no runtime
+    downcast in this vocabulary. None, not an empty list: an empty list would claim the
+    file was read against this clause and found clean."""
+    sources = {
+        "javascript": "function f(y) { return y instanceof Store }\n",
+        "ruby": "def f(y)\n  y.is_a?(String)\nend\n",
+        "rust": "fn f(x: i32) -> i32 { x + 1 }\n",
+        "c": "int f(int x) { return x + 1; }\n",
+    }
+    assert rules.imperative_validation(read.read_tree(sources[lang], lang)) is None, lang
+
+
+def test_a_test_for_a_type_the_parameter_cannot_hold_is_not_counted(lang="python"):
+    """Stated as a bound in the clause and asserted here. `isinstance(x, str)` against an
+    `x: int` is an unreachable branch, which is a different defect from a redundant check,
+    and nothing in this clause measures it."""
+    found = rules.imperative_validation(read.read_tree(
+        "def f(x: SomeProtocol):\n    if isinstance(x, str):\n        return 1\n    return 2\n",
+        lang))
+    assert found == [], found

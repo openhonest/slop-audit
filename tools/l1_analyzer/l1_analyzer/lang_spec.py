@@ -87,6 +87,20 @@ class LangSpec(TypedDict, total=False):
     # they all do carry is the `=` token, so the default is the named child after it, which
     # is the grammar's own answer rather than a per-language guess.
     default_param_types: tuple[str, ...]
+    # Trust the Contract in the Interior. A runtime type test on a parameter the signature
+    # already types is distrust of your own contract, and telling that from legitimate
+    # validation needs two facts per language: how a parameter declares a type, and how the
+    # language spells a runtime type test. Empty either way means the question cannot arise
+    # here, which is a fact about the language rather than a gap in the reader.
+    typed_param_types: tuple[str, ...]
+    typed_param_name: str            # field naming the parameter; empty means the first child
+    typed_param_type: str            # field naming the declared type
+    type_test_types: tuple[str, ...]     # operator forms: instanceof, is, a type assertion
+    type_test_subject: str               # field holding the value under test
+    type_test_type: str                  # field holding the type tested for
+    type_test_operators: frozenset[str]  # operator text that makes the node a type test
+    type_test_calls: frozenset[str]      # call forms, value first argument and type second
+    scalar_types: frozenset[str]         # declarations that fix the type on their own
     default_param_name: str
     # The two ways a language supplies a value for a key that is not in a table. One is a
     # method taking the key and the answer to give when it is absent; the other is an
@@ -330,6 +344,16 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "typed_param_types": ("typed_parameter", "typed_default_parameter"),
+        "typed_param_name": "",
+        "typed_param_type": "type",
+        "type_test_types": (),
+        "type_test_subject": "",
+        "type_test_type": "",
+        "type_test_operators": frozenset(),
+        "type_test_calls": frozenset({"isinstance"}),
+        "scalar_types": frozenset({"int", "str", "float", "bool", "bytes",
+                                   "list", "dict", "set", "tuple"}),
         "class_types": ("class_definition",),
         "func_types": ("function_definition",),
         "assign_types": ("assignment", "augmented_assignment"),
@@ -484,6 +508,17 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        # No parameter carries a type, so the question cannot arise. A JSDoc comment can
+        # carry one and this reader does not read comments.
+        "typed_param_types": (),
+        "typed_param_name": "pattern",
+        "typed_param_type": "type",
+        "type_test_types": ("binary_expression",),
+        "type_test_subject": "left",
+        "type_test_type": "right",
+        "type_test_operators": frozenset({"instanceof"}),
+        "type_test_calls": frozenset(),
+        "scalar_types": frozenset(),
         "class_types": ("class_declaration",),
         "func_types": ("function_declaration", "method_definition", "arrow_function", "function_expression", "generator_function_declaration"),
         "assign_types": ("assignment_expression", "augmented_assignment_expression"),
@@ -583,6 +618,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "typed_param_types": ("formal_parameter",),
+        "typed_param_name": "name",
+        "typed_param_type": "type",
+        "type_test_types": ("instanceof_expression",),
+        "type_test_subject": "left",
+        "type_test_type": "right",
+        "type_test_operators": frozenset(),
+        "type_test_calls": frozenset(),
+        "scalar_types": frozenset({"int", "long", "short", "byte", "char",
+                                   "float", "double", "boolean", "String"}),
         "class_types": ("class_declaration",),
         "func_types": ("method_declaration", "constructor_declaration"),
         "assign_types": ("assignment_expression",),   # `+=` is an assignment_expression with a += operator
@@ -677,6 +722,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "typed_param_types": ("parameter",),
+        "typed_param_name": "name",
+        "typed_param_type": "type",
+        "type_test_types": ("is_expression",),
+        "type_test_subject": "left",
+        "type_test_type": "right",
+        "type_test_operators": frozenset(),
+        "type_test_calls": frozenset(),
+        "scalar_types": frozenset({"int", "long", "short", "byte", "char", "float",
+                                   "double", "decimal", "bool", "string"}),
         "class_types": ("class_declaration",),
         "func_types": ("method_declaration", "constructor_declaration"),
         "assign_types": ("assignment_expression",),
@@ -785,6 +840,17 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        # A parameter carries a type, and this vocabulary has no runtime downcast: the
+        # question cannot arise without one.
+        "typed_param_types": ("parameter",),
+        "typed_param_name": "pattern",
+        "typed_param_type": "type",
+        "type_test_types": (),
+        "type_test_subject": "",
+        "type_test_type": "",
+        "type_test_operators": frozenset(),
+        "type_test_calls": frozenset(),
+        "scalar_types": frozenset(),
         # No classes: state is struct fields used as self.<field> inside a separate
         # impl block, so the impl is the scope and state is enumerated from usage.
         "class_types": ("impl_item",),
@@ -890,6 +956,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        # No parameter carries a type.
+        "typed_param_types": (),
+        "typed_param_name": "",
+        "typed_param_type": "",
+        "type_test_types": (),
+        "type_test_subject": "",
+        "type_test_type": "",
+        "type_test_operators": frozenset(),
+        "type_test_calls": frozenset({"is_a?", "kind_of?", "instance_of?"}),
+        "scalar_types": frozenset(),
         "class_types": ("class", "module"),
         "func_types": ("method", "singleton_method"),
         "assign_types": ("assignment", "operator_assignment"),
@@ -992,6 +1068,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        # A parameter carries a type, and C has no runtime type test at all.
+        "typed_param_types": ("parameter_declaration",),
+        "typed_param_name": "declarator",
+        "typed_param_type": "type",
+        "type_test_types": (),
+        "type_test_subject": "",
+        "type_test_type": "",
+        "type_test_operators": frozenset(),
+        "type_test_calls": frozenset(),
+        "scalar_types": frozenset(),
         # No classes or methods: state is file-scope variables only (module_enum: c).
         "class_types": (),
         "func_types": ("function_definition",),
@@ -1096,6 +1182,16 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "typed_param_types": ("parameter_declaration",),
+        "typed_param_name": "name",
+        "typed_param_type": "type",
+        "type_test_types": ("type_assertion_expression",),
+        "type_test_subject": "operand",
+        "type_test_type": "type",
+        "type_test_operators": frozenset(),
+        "type_test_calls": frozenset(),
+        "scalar_types": frozenset({"int", "int8", "int16", "int32", "int64", "uint",
+                                   "float32", "float64", "bool", "string", "byte", "rune"}),
         # No classes: state is struct fields, methods bound by a named receiver. State
         # is grouped by receiver type (scope_by_receiver) and keyed <Type>.<field>.
         "class_types": (),
@@ -1251,13 +1347,19 @@ _TYPESCRIPT["value_wrapper_types"] = ("unary_expression", "parenthesized_express
 _TYPESCRIPT["default_param_types"] = ("assignment_pattern", "required_parameter",
                                       "optional_parameter")
 _TYPESCRIPT["default_param_name"] = "pattern"
+# JavaScript declares no parameter types, so it leaves this empty and the clause cannot
+# arise there. TypeScript's whole point is that they do, so it is the one override that
+# turns a clause on rather than adjusting one.
+_TYPESCRIPT["typed_param_types"] = ("required_parameter", "optional_parameter")
+_TYPESCRIPT["scalar_types"] = frozenset({"number", "string", "boolean", "bigint", "symbol"})
 
 # The overridden keys, named once so a test can assert that nothing ELSE diverged. Written
 # out per key above rather than merged from a dict of object, so each value is checked
 # against the field it lands in instead of being waved past the checker with an ignore.
 TYPESCRIPT_OVERRIDES = frozenset({
     "binding_sites", "default_param_name", "default_param_types", "field_decl_types",
-    "immutable_modifiers", "passthrough_types", "value_wrapper_types",
+    "immutable_modifiers", "passthrough_types", "scalar_types", "typed_param_types",
+    "value_wrapper_types",
 })
 
 LANG_SPEC["typescript"] = _TYPESCRIPT

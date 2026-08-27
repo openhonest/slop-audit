@@ -156,3 +156,37 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _tests_a_literal reads each pattern for a literal and for destructuring
     Then only the first tests a value
     But a default arm counts as a literal case, because it names no shape and a table has the same thing in its lookup failing
+
+  Scenario: imperative_validation finds a runtime type test on a parameter the signature already types
+    Given a parsed source and its language's node vocabulary
+    When imperative_validation collects each function's typed parameters and every runtime type test inside it
+    Then it reports a test whose value is a parameter and whose type is the one that parameter declares, because re-checking a value the signature promised is distrust of your own contract
+    And a parameter declaring one of the language's own scalars counts as fixed however the test spells the type it wants
+    And a test on a value the signature left open, an Object, an any, an object or an empty interface, is left alone, because that is the check the declaration deliberately left to run
+    And a language with no parameter type or no runtime type test is answered with nothing decided rather than an empty list, since an empty list would claim the file was read against this clause and found clean
+    But a test for a type the parameter cannot hold is not counted, because an unreachable branch is a different defect from a redundant check and nothing here measures it
+
+  Scenario: _declared_type_of gives the type a parameter declares, without the grammar's punctuation
+    Given a parameter node, its language's vocabulary, and the source bytes
+    When _declared_type_of reads the field naming the declared type
+    Then it strips a leading colon and the space after it, because TypeScript hangs the annotation on the type and Python does not
+    But it invents nothing when the field is absent, returning the empty string, which no declaration can equal
+
+  Scenario: _parameter_name gives the name a typed parameter binds
+    Given a parameter node, its language's vocabulary, and the source bytes
+    When _parameter_name reads the field the vocabulary names
+    Then it falls back to the first child where the vocabulary names no field, because Python's typed parameter hangs the name there with no field at all
+    But it names no language, so the fallback is a fact recorded in the table rather than a special case in the reader
+
+  Scenario: _type_tests_in collects every runtime type test inside one function
+    Given a function node, its language's vocabulary, and the source bytes
+    When _type_tests_in walks the function looking for both spellings of a type test
+    Then it reports the value tested, the type tested for, and the line, for an operator form such as instanceof, is, or a type assertion
+    And it reports the same three for a call form, whose first argument is the value and whose second is the type, which is how Python spells it
+    But an operator form is counted only where the operator itself is one the vocabulary names, so an ordinary comparison sharing the same node type is not read as a type test
+
+  Scenario: _call_arguments gives the argument nodes of a call
+    Given a call node
+    When _call_arguments reads the field holding its arguments
+    Then it returns that node's children
+    But it returns nothing when the call has no such field, rather than raising, because a grammar that hangs arguments elsewhere is a gap in the vocabulary and not a crash

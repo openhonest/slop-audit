@@ -47,7 +47,6 @@ _HOOK_DECORATORS = frozenset({"atexit", "on_event", "listens_for", "add_event_ha
 _HOOK_MODULES = frozenset({"atexit", "signal"})
 _STEP_DECORATORS = frozenset({"given", "when", "then", "step"})
 _STEP_LIMIT = 30
-_TYPED_SCALARS = frozenset({"int", "str", "float", "bool", "bytes", "list", "dict", "set", "tuple"})
 _UNPROFILED = ("whether the query was profiled first is not readable from any file, so "
                "only the cache itself was checked")
 
@@ -111,42 +110,6 @@ def _bare_name(call: ast.Call) -> str:
 def _is_test_file(path: str) -> bool:
     name = path.replace("\\", "/").split("/")[-1]
     return name.startswith("test_") or name.endswith("_test.py") or "/tests/" in path
-
-
-def imperative_validation(source: dict) -> list[Finding] | None:
-    """An `isinstance` check on a parameter the signature already types.
-
-    This measures Trust the Contract in the Interior, not Type Declarations Over Imperative
-    Validation, and it was named after the second until the two were separated upstream.
-    They are different failures. This one is a branch nothing can reach: in a correct
-    program the caller has already been excluded by the declaration, and in an incorrect one
-    it fires where the type checker should have. The other is a hand-written check that
-    copies a constraint declared somewhere else, a schema column or a form field, and drifts
-    from it. Nothing here measures that one.
-
-    Re-checking a value the signature promised is distrust of your own contract. A check on
-    a value that arrived untyped from outside is where validation belongs, so only the
-    typed ones are counted.
-
-    Not decided: whether the function is a boundary receiving external input. A typed
-    parameter at a true boundary may still deserve a runtime check."""
-    found: list[Finding] = []
-    for fn in _functions(source):
-        typed = {a.arg for a in fn.args.args + fn.args.kwonlyargs
-                 if a.annotation is not None
-                 and ast.unparse(a.annotation).split("[")[0] in _TYPED_SCALARS}
-        for node in ast.walk(fn):
-            if not (isinstance(node, ast.Call) and _bare_name(node) == "isinstance"):
-                continue
-            if not node.args or not isinstance(node.args[0], ast.Name):
-                continue
-            if node.args[0].id in typed:
-                found.append(_finding(
-                    "L1.21.11", f"{fn.name}({node.args[0].id})", node.lineno,
-                    f"re-checks `{node.args[0].id}`, which the signature already types",
-                    "trust the contract in the interior and tighten the boundary or the "
-                    "type instead", ""))
-    return found
 
 
 def unscoped_resources(source: dict) -> list[Finding] | None:

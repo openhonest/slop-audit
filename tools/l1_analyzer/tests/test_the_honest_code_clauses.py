@@ -197,22 +197,12 @@ def test_the_mock_clause_only_reads_test_files():
 
 
 # --------------------------------------------------------------------------
-# 11. Type declarations over imperative validation
+# 11. Trust the contract in the interior
+#
+# Ported to the shared node vocabulary, so both cases moved to
+# test_a_clause_means_the_same_in_every_language.py where they are asserted for Python and
+# for the four other languages that can now decide the clause.
 # --------------------------------------------------------------------------
-
-def test_a_check_the_signature_already_made_is_found():
-    """Re-checking a value the signature types is distrust of your own contract."""
-    found = python_rules.imperative_validation(_module(
-        "def f(name: str) -> str:\n"
-        "    if not isinstance(name, str):\n        raise TypeError('no')\n    return name\n"))
-    assert found
-
-
-def test_a_check_on_an_untyped_value_is_left_alone():
-    """It arrived from outside with no contract, which is where validation belongs."""
-    assert python_rules.imperative_validation(_module(
-        "def f(payload):\n"
-        "    if not isinstance(payload, dict):\n        raise TypeError('no')\n    return payload\n")) == []
 
 
 # --------------------------------------------------------------------------
