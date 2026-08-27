@@ -37,4 +37,9 @@ research/arms/paper-a-v2/
 
 # Output of scripts/cardinality_distribution.py, which defaults to the working directory.
 cardinality-distribution.json
-l1_analyzer/_build.py
+# The build stamp, written into the package when a wheel is built.
+#
+# The pattern was `l1_analyzer/_build.py`, which git anchors to this file's own directory,
+# so it named a path at the repository root that does not exist and the real file was
+# committed anyway. A leading `**/` matches at any depth, which is what was meant.
+**/l1_analyzer/_build.py
