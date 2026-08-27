@@ -207,19 +207,11 @@ def test_the_mock_clause_only_reads_test_files():
 
 # --------------------------------------------------------------------------
 # 12. Context managers over instance state
+#
+# Ported to the shared node vocabulary, so both cases moved to
+# test_a_clause_means_the_same_in_every_language.py, where they are asserted for Python and
+# for the five other languages that can now decide the clause.
 # --------------------------------------------------------------------------
-
-def test_a_resource_stored_on_self_is_found():
-    found = python_rules.unscoped_resources(_module(
-        "class Client:\n    def __init__(self, dsn):\n        self.connection = connect(dsn)\n"))
-    assert [f["symbol"] for f in found] == ["Client.connection"]
-
-
-def test_a_class_that_is_a_context_manager_has_scoped_it():
-    assert python_rules.unscoped_resources(_module(
-        "class Client:\n"
-        "    def __enter__(self):\n        self.connection = connect(self.dsn)\n        return self\n"
-        "    def __exit__(self, *a):\n        self.connection.close()\n")) == []
 
 
 # --------------------------------------------------------------------------

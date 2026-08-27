@@ -265,7 +265,8 @@ CLAUSES: tuple[Clause, ...] = (
     _clause(10, "Pure Function Assertions Over Mocks", _TREE, python_rules.mock_heavy_tests, nothing_to_read=""),
     _clause(11, "Trust the Contract in the Interior", _TREE,
             rules.imperative_validation, nothing_to_read="", reads=_TREE_READER),
-    _clause(12, "Context Managers Over Instance State", _TREE, python_rules.unscoped_resources, nothing_to_read=""),
+    _clause(12, "Context Managers Over Instance State", _TREE, rules.unscoped_resources,
+            nothing_to_read="", reads=_TREE_READER),
     _clause(13, "Configuration as Parameters", _TREE, rules.hidden_configuration, nothing_to_read="",
             reads=_TREE_READER),
     _clause(14, "No Implicit Defaults", _TREE, rules.implicit_defaults, nothing_to_read="",
@@ -912,8 +913,13 @@ def analyze(repo: Path, lang: str) -> dict:
     # Both, because they answer different questions. The name says what was not checked,
     # which a bare number cannot, and the code is what a reader greps for afterwards.
     named_undecided = ", ".join(f"{by_code[code]['name']} ({code})" for code in never_decided)
-    unreachable = [code for code in never_decided
-                   if by_code[code]["reads"] == _PYTHON_AST and lang != "python"]
+    # Two reasons, kept apart because they send a reader to different places. An unported
+    # clause is work for us. A ported clause whose question the language cannot raise is
+    # nothing to do at all, and running the two together would make our backlog look like
+    # the reader's problem.
+    unported = [code for code in never_decided
+                if by_code[code]["reads"] == _PYTHON_AST and lang != "python"]
+    cannot_arise = [code for code in never_decided if code not in unported]
     if not decided:
         nothing = ("no file here could be measured against any clause, so there is no "
                    "conformity to report. Not decided: " + named_undecided)
@@ -937,10 +943,14 @@ def analyze(repo: Path, lang: str) -> dict:
               f"{'' if unexamined_blocks_seen == 1 else 's'} of another language were not "
               "examined. "
               f"Not decided ({len(never_decided)}): " + named_undecided)
-    if unreachable:
-        detail += (f". {len(unreachable)} of those read Python's own parser rather than the "
+    if unported:
+        detail += (f". {len(unported)} of those read Python's own parser rather than the "
                    f"shared node vocabulary, so on {lang} they could not reach the code at "
                    "all. They are unported, not silent")
+    if cannot_arise:
+        detail += (f". The remaining {len(cannot_arise)} read this language and found no "
+                   f"question to answer: what each asks about cannot arise in {lang}, which "
+                   "is a fact about the language rather than a gap in the reader")
     return {"value": share, "band": band_of(share), "details": detail,
             "findings": [f for group in broken.values() for f in group],
             "undecided": never_decided, "allowed": declared_exceptions,

@@ -59,15 +59,6 @@ Feature: Clauses this reader still reads through Python's own parser
     Then a cache client or a memoising decorator is a second source of truth with an invalidation bug waiting
     But whether anyone profiled the query first is not readable from any file, so the clause reports the cache and says the measurement is what it cannot see
 
-  Scenario: unscoped_resources finds a resource with a manual lifecycle
-    Given a parsed source
-    When unscoped_resources reads what is stored on self
-    Then a connection or a handle assigned to self, in a class with no __enter__, is a leak waiting for an exception
-    But a class that is a context manager has scoped the resource, which is the whole point of the rule
-
-  # The reserved case. This module is a way station: its whole purpose is to hold clauses
-  # until they can read every language, and no reading of any file decides when that is.
-  @undecidable @not-implemented
   Scenario: undecidable when a clause here is ready to read the shared vocabulary
     Given a clause written against one language's parser
     When someone asks whether the shared vocabulary can carry it yet

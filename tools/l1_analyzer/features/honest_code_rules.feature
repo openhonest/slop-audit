@@ -190,3 +190,31 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _call_arguments reads the field holding its arguments
     Then it returns that node's children
     But it returns nothing when the call has no such field, rather than raising, because a grammar that hangs arguments elsewhere is a gap in the vocabulary and not a crash
+
+  Scenario: unscoped_resources finds a resource held on instance state that the class never releases
+    Given a parsed source and its language's node vocabulary
+    When unscoped_resources reads each class, asks whether it declares the language's own release hook, and looks for an acquisition assigned to instance state
+    Then it reports the class that holds a resource and declares no release hook, because the path that returns closes it and the path that raises does not
+    And a class declaring that hook is left alone, since declaring one is doing what the rule asks and reporting it would punish the remedy
+    And an ordinary value on instance state is not reported, because the rule is about a thing with a lifecycle rather than about instance state as such
+    And a site reached twice, where a grammar nests one class node inside another as Ruby's does, is reported once, because the site is the finding
+    But a language with no class to hold the resource is answered with nothing decided rather than an empty list, since C has none and Go's struct has no release hook here, defer scoping at the call site instead
+
+  Scenario: _resource_calls gives every name that counts as acquiring a resource in one language
+    Given a language's node vocabulary
+    When _resource_calls joins the shared list of acquisitions to the language's own spellings
+    Then it returns both, because C# names the same operation Connect where the shared list says connect and Java says getConnection
+    But neither half owns the other, so adding a language's convention does not edit the shared list and vice versa
+
+  Scenario: _instance_member_written gives the name of the instance state an assignment writes
+    Given an assignment node, its language's vocabulary, and the source bytes
+    When _instance_member_written reads the target and asks which of the two shapes it is
+    Then it returns the member name where the target is a member access whose object is one of the language's receiver words
+    And it returns the whole name where the target is instance state on its own, which is how Ruby writes an at-sign variable and reaches for no receiver at all
+    But it returns the empty string for anything else, so an ordinary local assignment is not read as instance state
+
+  Scenario: _scopes_its_own_resource says whether a class declares the language's own release hook
+    Given a class node, its language's vocabulary, and the source bytes
+    When _scopes_its_own_resource reads the name of each method the class declares
+    Then it answers yes on the first one the vocabulary names as a release hook, whether that is Python's enter, Java's close or C#'s Dispose
+    But it reads the names the table holds rather than any it knows, so adding a language means adding a row and not a branch

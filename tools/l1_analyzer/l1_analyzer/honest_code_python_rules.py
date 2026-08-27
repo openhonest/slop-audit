@@ -14,13 +14,8 @@ import ast
 
 from l1_analyzer.honest_code_read import (
     Finding,
-    _classes,
     _finding,
     _functions,
-    _methods,
-)
-from l1_analyzer.honest_code_rules import (
-    RESOURCE_CALLS,
 )
 
 # Calls whose bare name is unambiguous: nothing but I/O is spelled this way.
@@ -110,33 +105,6 @@ def _bare_name(call: ast.Call) -> str:
 def _is_test_file(path: str) -> bool:
     name = path.replace("\\", "/").split("/")[-1]
     return name.startswith("test_") or name.endswith("_test.py") or "/tests/" in path
-
-
-def unscoped_resources(source: dict) -> list[Finding] | None:
-    """A resource assigned to `self` in a class that is not a context manager.
-
-    A connection with a manual lifecycle is a leak waiting for an exception. A class with
-    `__enter__` has scoped it, which is the whole point of the rule."""
-    found: list[Finding] = []
-    for node in _classes(source):
-        if any(m.name == "__enter__" or m.name == "__aenter__" for m in _methods(node)):
-            continue
-        for method in _methods(node):
-            for statement in ast.walk(method):
-                if not isinstance(statement, ast.Assign):
-                    continue
-                if not isinstance(statement.value, ast.Call):
-                    continue
-                if _bare_name(statement.value) not in RESOURCE_CALLS:
-                    continue
-                for target in statement.targets:
-                    if (isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name)
-                            and target.value.id == "self"):
-                        found.append(_finding(
-                            "L1.21.12", f"{node.name}.{target.attr}", statement.lineno,
-                            "a resource with a manual lifecycle, waiting for an exception",
-                            "make the resource a context manager and take it in a `with` block, so it is released on the path that raises as well as the one that returns", ""))
-    return found
 
 
 def heavy_step_definitions(source: dict) -> list[Finding] | None:

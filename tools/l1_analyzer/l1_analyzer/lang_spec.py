@@ -93,6 +93,12 @@ class LangSpec(TypedDict, total=False):
     # language spells a runtime type test. Empty either way means the question cannot arise
     # here, which is a fact about the language rather than a gap in the reader.
     typed_param_types: tuple[str, ...]
+    # Context Managers Over Instance State. A resource held on instance state leaks on the
+    # path that raises, and every language with classes has a way to scope it. Which method
+    # declares that scope, and which node holds instance state, are language facts.
+    release_methods: frozenset[str]      # declaring one says the class scopes its resource
+    instance_state_types: tuple[str, ...]  # nodes that ARE instance state, needing no receiver
+    resource_calls: frozenset[str]       # this language's own spellings, joined to the shared list
     typed_param_name: str            # field naming the parameter; empty means the first child
     typed_param_type: str            # field naming the declared type
     type_test_types: tuple[str, ...]     # operator forms: instanceof, is, a type assertion
@@ -344,6 +350,9 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "release_methods": frozenset({"__enter__", "__aenter__"}),
+        "instance_state_types": (),
+        "resource_calls": frozenset(),
         "typed_param_types": ("typed_parameter", "typed_default_parameter"),
         "typed_param_name": "",
         "typed_param_type": "type",
@@ -508,6 +517,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "release_methods": frozenset({"close", "dispose", "destroy", "end"}),
+        "instance_state_types": (),
+        "resource_calls": frozenset({"createConnection", "createClient", "createPool"}),
         # No parameter carries a type, so the question cannot arise. A JSDoc comment can
         # carry one and this reader does not read comments.
         "typed_param_types": (),
@@ -618,6 +630,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "release_methods": frozenset({"close"}),
+        "instance_state_types": (),
+        "resource_calls": frozenset({"getConnection", "openConnection", "newSession"}),
         "typed_param_types": ("formal_parameter",),
         "typed_param_name": "name",
         "typed_param_type": "type",
@@ -722,6 +737,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "release_methods": frozenset({"Dispose", "DisposeAsync"}),
+        "instance_state_types": (),
+        # PascalCase, so the shared list's lowercase spellings never match here.
+        "resource_calls": frozenset({"Connect", "ConnectAsync", "Open", "OpenAsync",
+                                     "CreateConnection", "GetConnection", "CreateClient"}),
         "typed_param_types": ("parameter",),
         "typed_param_name": "name",
         "typed_param_type": "type",
@@ -840,6 +860,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "release_methods": frozenset({"drop"}),
+        "instance_state_types": (),
+        "resource_calls": frozenset(),
         # A parameter carries a type, and this vocabulary has no runtime downcast: the
         # question cannot arise without one.
         "typed_param_types": ("parameter",),
@@ -956,6 +979,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "release_methods": frozenset({"close", "disconnect", "shutdown"}),
+        # Instance state is its own node here, not a member access on a receiver, so a
+        # reader looking only for `self.x` finds nothing in idiomatic Ruby.
+        "instance_state_types": ("instance_variable",),
+        "resource_calls": frozenset(),
         # No parameter carries a type.
         "typed_param_types": (),
         "typed_param_name": "",
@@ -1068,6 +1096,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        # No class to hold the resource, so the question cannot arise.
+        "release_methods": frozenset(),
+        "instance_state_types": (),
+        "resource_calls": frozenset(),
         # A parameter carries a type, and C has no runtime type test at all.
         "typed_param_types": ("parameter_declaration",),
         "typed_param_name": "declarator",
@@ -1182,6 +1214,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        # A struct has no release hook in this vocabulary, and `defer` scopes at the call
+        # site rather than in the type, so nothing here decides the question.
+        "release_methods": frozenset(),
+        "instance_state_types": (),
+        "resource_calls": frozenset(),
         "typed_param_types": ("parameter_declaration",),
         "typed_param_name": "name",
         "typed_param_type": "type",

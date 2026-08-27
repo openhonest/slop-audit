@@ -1122,3 +1122,140 @@ def test_a_test_for_a_type_the_parameter_cannot_hold_is_not_counted(lang="python
         "def f(x: SomeProtocol):\n    if isinstance(x, str):\n        return 1\n    return 2\n",
         lang))
     assert found == [], found
+
+
+# ---------------------------------------------------------------------------
+# 12. Context Managers Over Instance State
+#
+# Read Python's own parser until now, so on any other language the analyzer said nobody had
+# decided it. A resource held on instance state with no scope around it leaks on the path
+# that raises, and every one of these languages has a way to scope it: Python's `with`,
+# Java's try-with-resources, C#'s `using`, Ruby's block form.
+#
+# What tells a scoped class from an unscoped one is language-specific and belongs in the
+# vocabulary: Python declares __enter__, Java implements close, C# implements Dispose. So is
+# what counts as acquiring a resource, because the naming conventions differ and a single
+# shared list spelled every one of them in Python's.
+# ---------------------------------------------------------------------------
+
+_HOLDS_A_RESOURCE_UNSCOPED = [
+    ("python", """class Store:
+    def __init__(self, path):
+        self.conn = sqlite3.connect(path)
+"""),
+    ("javascript", """class Store {
+  constructor(path) {
+    this.conn = db.connect(path)
+  }
+}
+"""),
+    ("typescript", """class Store {
+  conn: any
+  constructor(path: string) {
+    this.conn = db.connect(path)
+  }
+}
+"""),
+    ("java", """class Store {
+  Connection conn;
+  Store(String url) {
+    this.conn = Database.connect(url);
+  }
+}
+"""),
+    ("csharp", """class Store {
+  object conn;
+  Store(string url) {
+    this.conn = Database.Connect(url);
+  }
+}
+"""),
+    ("ruby", """class Store
+  def initialize(path)
+    @conn = DB.connect(path)
+  end
+end
+"""),
+]
+
+_SCOPES_THE_SAME_RESOURCE = [
+    ("python", """class Store:
+    def __enter__(self):
+        self.conn = sqlite3.connect(self.path)
+        return self
+
+    def __exit__(self, *exc):
+        self.conn.close()
+"""),
+    ("javascript", """class Store {
+  constructor(path) {
+    this.conn = db.connect(path)
+  }
+  close() { this.conn.end() }
+}
+"""),
+    ("typescript", """class Store {
+  conn: any
+  constructor(path: string) {
+    this.conn = db.connect(path)
+  }
+  close(): void { this.conn.end() }
+}
+"""),
+    ("java", """class Store implements AutoCloseable {
+  Connection conn;
+  Store(String url) {
+    this.conn = Database.connect(url);
+  }
+  public void close() { this.conn.close(); }
+}
+"""),
+    ("csharp", """class Store {
+  object conn;
+  Store(string url) {
+    this.conn = Database.Connect(url);
+  }
+  public void Dispose() { }
+}
+"""),
+    ("ruby", """class Store
+  def initialize(path)
+    @conn = DB.connect(path)
+  end
+
+  def close
+    @conn.close
+  end
+end
+"""),
+]
+
+
+@pytest.mark.parametrize(("lang", "source"), _HOLDS_A_RESOURCE_UNSCOPED)
+def test_a_resource_on_instance_state_with_no_scope_is_found(lang, source):
+    found = rules.unscoped_resources(read.read_tree(source, lang))
+    assert found, lang
+    assert "manual lifecycle" in found[0]["detail"]
+
+
+@pytest.mark.parametrize(("lang", "source"), _SCOPES_THE_SAME_RESOURCE)
+def test_a_class_that_scopes_its_own_resource_is_left_alone(lang, source):
+    """The direction that matters more. A class declaring the language's own release hook
+    has done what the rule asks, and reporting it would punish the remedy."""
+    assert rules.unscoped_resources(read.read_tree(source, lang)) == [], lang
+
+
+@pytest.mark.parametrize("lang", ["c", "go"])
+def test_a_language_with_no_class_to_hold_the_resource_says_nothing_was_decided(lang):
+    """C has no class at all and Go's struct has no release hook in this vocabulary, so
+    the question cannot arise. None, not an empty list."""
+    sources = {"c": "int main(void) { return 0; }\n",
+               "go": "type Store struct{ conn int }\n"}
+    assert rules.unscoped_resources(read.read_tree(sources[lang], lang)) is None, lang
+
+
+def test_an_ordinary_value_on_instance_state_is_not_a_resource():
+    """The rule is about a thing with a lifecycle, not about instance state as such."""
+    assert rules.unscoped_resources(read.read_tree(
+        "class Store:\n    def __init__(self, name):\n        self.name = name.strip()\n",
+        "python")) == []

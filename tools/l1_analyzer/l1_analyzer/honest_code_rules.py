@@ -870,3 +870,100 @@ def imperative_validation(source: dict) -> list[Finding] | None:
                 "trust the contract in the interior and tighten the boundary or the "
                 "type instead", ""))
     return found
+
+
+def _resource_calls(spec: dict) -> frozenset[str]:
+    """Every name that counts as acquiring a resource in this language.
+
+    The shared list joined to the language's own spellings. C# names the same operation
+    `Connect` where the shared list says `connect`, and Java says `getConnection`, so a
+    single lowercase list spelled every language's convention in Python's."""
+    return RESOURCE_CALLS | spec["resource_calls"]
+
+
+def _instance_member_written(assignment, spec: dict, raw: bytes) -> str:
+    """The name of the instance state this assignment writes, or the empty string.
+
+    Two shapes. Most languages write a member on a receiver, `self.conn` or `this.conn`, so
+    the target is a member access whose object is one of the language's receiver words. Ruby
+    writes `@conn`, which is instance state on its own and reaches for no receiver at all, so
+    a reader looking only for the first shape finds nothing in idiomatic Ruby."""
+    left = assignment.child_by_field_name(spec["assign_left"])
+    if left is None:
+        return ""
+    if left.type in spec["instance_state_types"]:
+        return node_text(left, raw) or ""
+    if left.type not in spec["member_types"]:
+        return ""
+    obj = left.child_by_field_name(spec["mem_object"]) or left.child(0)
+    if obj is None or node_text(obj, raw) not in spec["this_idents"]:
+        return ""
+    member = left.child_by_field_name(spec["mem_attr"])
+    return node_text(member, raw) if member is not None else ""
+
+
+def _scopes_its_own_resource(class_node, spec: dict, raw: bytes) -> bool:
+    """Whether the class declares the language's own release hook.
+
+    Python declares `__enter__`, Java implements `close`, C# implements `Dispose`, Ruby
+    offers a `close` for the block form to call. Declaring one is doing what the rule asks,
+    so reporting such a class would punish the remedy."""
+    for method in method_nodes(class_node, spec):
+        named = method.child_by_field_name("name")
+        if node_text(named, raw) in spec["release_methods"]:
+            return True
+    return False
+
+
+def unscoped_resources(source: dict) -> list[Finding] | None:
+    """A resource held on instance state by a class that never releases it.
+
+    A connection with a manual lifecycle is a leak waiting for an exception: the path that
+    returns closes it and the path that raises does not. A class declaring the language's own
+    release hook has scoped it, which is the whole point of the rule.
+
+    Read through the language's own node vocabulary, so the rule means the same thing in
+    every language the spec covers rather than being reimplemented per language.
+
+    Not decided: a language with no class to hold the resource. C has none and Go's struct
+    has no release hook in this vocabulary, since `defer` scopes at the call site rather than
+    in the type. That is a fact about the language, and an empty list would instead claim the
+    file was read against this clause and found clean.
+
+    Not decided either: whether a receiver named something other than the language's own word
+    for it is a receiver. Python allows any name for the first parameter, and this reader
+    believes only `self`."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["class_types"] or not spec["release_methods"]:
+        return None
+    wanted = _resource_calls(spec)
+    found: list[Finding] = []
+    seen: set[tuple[str, int]] = set()
+    for class_node in class_nodes(source["root"], spec):
+        if _scopes_its_own_resource(class_node, spec, raw):
+            continue
+        owner = node_text(class_node.child_by_field_name("name"), raw) or first_name(class_node, raw)
+        for node in walk(class_node):
+            if node.type not in spec["assign_types"]:
+                continue
+            member = _instance_member_written(node, spec, raw)
+            if not member:
+                continue
+            value = node.child_by_field_name("right")
+            if value is None or value.type not in spec["call_types"]:
+                continue
+            if (node_text(value, raw) or "").split("(")[0].split(".")[-1] not in wanted:
+                continue
+            line = node.start_point[0] + 1
+            # A grammar that nests one class node inside another, as Ruby's does, walks the
+            # same assignment twice. The site is the finding, so it is reported once.
+            if (member, line) in seen:
+                continue
+            seen.add((member, line))
+            found.append(_finding(
+                "L1.21.12", f"{owner}.{member}", line,
+                "a resource with a manual lifecycle, waiting for an exception",
+                "give the class the language's own release hook and take it in a scoped "
+                "block, so it is released on the path that raises as well as the one that "
+                "returns", ""))
+    return found
