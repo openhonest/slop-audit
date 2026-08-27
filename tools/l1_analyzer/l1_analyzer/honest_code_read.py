@@ -161,6 +161,12 @@ def chain_subjects(node: Node, spec: LangSpec, raw: bytes) -> list[str]:
     subjects: list[str] = []
     for arm in _chain_arms(node, spec):
         test = arm.child_by_field_name(spec["branch_cond"])
+        if test is None:
+            # A ternary fields nothing in some grammars: Python's `conditional_expression`
+            # names none of its three children, so asking for the condition by name got
+            # nothing and every chain of ternaries read as no chain at all.
+            test = next((c for c in arm.named_children
+                         if c.type in spec["comparison_types"]), None)
         while test is not None and test.type == "parenthesized_expression":
             test = next(iter(test.named_children), None)
         name = _equality_subject(test, spec, raw)
@@ -173,16 +179,28 @@ def chain_subjects(node: Node, spec: LangSpec, raw: bytes) -> list[str]:
 def _chain_arms(node: Node, spec: LangSpec) -> list[Node]:
     """Every arm of one if chain, in source order, whichever way the grammar spells it.
 
-    The two shapes are read from structure rather than from a language name. Python hangs
-    its `elif` arms off the head as children; JavaScript nests each `else if` inside the
-    previous one's alternative. A reader keyed to either shape alone sees a one-armed chain
-    in the other language and reports nothing."""
+    THREE shapes, read from structure rather than from a language name. Python hangs its
+    `elif` arms off the head as children; JavaScript nests each `else if` inside the
+    previous one's alternative; and a chain of ternaries in either language nests the next
+    one as its own last child, with no field naming it. A reader keyed to any one of them
+    sees a one-armed chain in the others and reports nothing, which is how a chain of
+    ternaries went unread here.
+
+    Found after a neighbouring project's check for if-statements reported zero against
+    seventy-six standing in the code, having learned one spelling and never the other."""
     arms = [node]
     arms += [c for c in node.children if c.type == "elif_clause"]
     current = node
     while True:
         alternative = current.child_by_field_name("alternative")
         if alternative is None:
+            # The ternary shape: the rest of the chain is the last child and nothing names
+            # it, so there is no field to follow.
+            tail = current.named_children[-1] if current.named_children else None
+            if tail is not None and tail.type in spec["branch_types"]:
+                arms.append(tail)
+                current = tail
+                continue
             return arms
         nested = alternative if alternative.type in spec["branch_types"] else next(
             (c for c in alternative.named_children if c.type in spec["branch_types"]), None)
@@ -487,11 +505,14 @@ def declares_only_signatures(node: Node, spec: LangSpec, raw: bytes) -> bool:
 def io_calls_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:
     """The I/O this node performs, by name.
 
-    Three readings, because a name means different things in different company. An
-    unambiguous name counts on its own. A call on a receiver that only reaches outside
-    counts whatever it is called, since those names are open-ended. And a call named one at
-    a time counts where most of its module is not I/O: `os.getenv` reads process state and
-    `os.path.join` joins strings, and taking the whole of `os` reported both."""
+    Four readings, because a name means different things in different company. An
+    unambiguous name counts on its own. A call on a module that only reaches outside counts
+    whatever it is called, since a database driver's names are open-ended. A call named one
+    at a time counts where most of its module is NOT I/O: `os.getenv` reads process state
+    and `os.path.join` joins strings, and taking the whole of `os` doubled the findings on
+    two real codebases. And an ambiguous name counts only beside a receiver that names a
+    client, because `TABLE.get(key)` is a dict lookup and `requests.get(url)` fetches a
+    page."""
     touched: set[str] = set()
     for inner in walk(node):
         if inner.type not in spec["call_types"]:
@@ -509,7 +530,8 @@ def io_calls_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:
         if receiver is None:
             continue
         name = node_text(receiver, raw).rsplit(".", 1)[-1].strip()
-        if name in spec["io_receivers"] or f"{name}.{bare}" in spec["io_dotted"]:
+        if (name in spec["io_modules"] or f"{name}.{bare}" in spec["io_dotted"]
+                or (bare in spec["io_ambiguous"] and name in spec["io_receivers"])):
             touched.add(f"{name}.{bare}")
     return touched
 

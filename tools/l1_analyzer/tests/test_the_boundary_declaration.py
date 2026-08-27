@@ -9,11 +9,11 @@ meant `make_target_in` deciding from text and `_read_makefile` doing nothing but
 it. The split came first; the decorator records that it happened.
 """
 
-import ast
 import pathlib
 
 from l1_analyzer import boundary, c_trace
-from l1_analyzer import honest_code_python_rules as python_rules
+from l1_analyzer import honest_code_edges as edges
+from l1_analyzer import honest_code_read as read
 
 
 def test_the_declaration_changes_nothing_at_runtime():
@@ -43,9 +43,7 @@ def _findings(module) -> list[dict]:
     """The findings that survive as violations. A declared boundary is emitted and marked
     withheld rather than dropped, so a consumer can count real suppressions."""
     source = pathlib.Path(module.__file__).read_text()
-    found = python_rules.io_below_the_boundary({
-        "path": pathlib.Path(module.__file__).name, "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+    found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
     return [f for f in found if f["withheld_by"] == ""]
 
 
@@ -69,9 +67,7 @@ def test_an_undeclared_reader_is_still_reported():
               "@boundary\ndef declared(path):\n    return path.read_text()\n\n\n"
               "def undeclared(path):\n    return path.read_text()\n\n\n"
               "def run(path):\n    return declared(path), undeclared(path)\n")
-    found = python_rules.io_below_the_boundary({
-        "path": "m.py", "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+    found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["undeclared"]
     assert [f["symbol"] for f in found if f["withheld_by"] == "declaration"] == ["declared"]
 
@@ -118,9 +114,7 @@ def test_every_declared_boundary_actually_obtains_something():
     is a finding about anyone's code, not a fact about this repository. What is left here
     asserts the clause covers this repository and reports nothing, so the invariant stays
     named in the suite without a second implementation of it drifting from the first."""
-    import ast
 
-    from l1_analyzer import honest_code_python_rules as python_rules
 
     repo = pathlib.Path(boundary.__file__).parent.parent.parent.parent
     stamps = []
@@ -130,13 +124,10 @@ def test_every_declared_boundary_actually_obtains_something():
         text = path.read_text(errors="replace")
         if "@boundary" not in text:
             continue
-        try:
-            tree = ast.parse(text)
-        except SyntaxError:
-            continue
-        found = python_rules.io_below_the_boundary({
-            "path": path.name, "language": "python", "text": text,
-            "tree": tree, "readable": True, "unreadable_reason": ""}) or []
+        # No guard around the parse. tree-sitter accepts anything and reports the trouble
+        # as error nodes rather than raising, so the guard here caught nothing and cost a
+        # second parse of every file that has a declaration.
+        found = edges.io_below_the_boundary(read.read_tree(text, "python")) or []
         stamps += [f"{path.name}:{f['symbol']}" for f in found
                    if "states an edge that is not there" in f["detail"]]
     assert stamps == [], f"declared as edges and reach nothing outside the process: {stamps}"
@@ -212,13 +203,9 @@ def test_the_call_is_followed_one_step_and_not_transitively():
 
 
 def _findings_of(source: str) -> list[dict]:
-    import ast
 
-    from l1_analyzer import honest_code_python_rules as python_rules
 
-    return python_rules.io_below_the_boundary({
-        "path": "m.py", "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+    return edges.io_below_the_boundary(read.read_tree(source, "python")) or []
 
 
 # ---------------------------------------------------------------------------

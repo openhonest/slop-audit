@@ -46,12 +46,10 @@ def test_the_deciders_touch_nothing():
 
 def test_the_readers_are_declared_and_the_clause_reads_the_declaration():
     """The three sites the clause reported are gone from its findings."""
-    import ast
 
-    from l1_analyzer import honest_code_python_rules as python_rules
+    from l1_analyzer import honest_code_edges as edges
+    from l1_analyzer import honest_code_read as read
 
     source = pathlib.Path(js_trace.__file__).read_text()
-    found = python_rules.io_below_the_boundary({
-        "path": "js_trace.py", "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+    found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == []

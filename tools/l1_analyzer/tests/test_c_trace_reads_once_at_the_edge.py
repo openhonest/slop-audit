@@ -101,12 +101,10 @@ def test_no_helper_below_the_entry_point_touches_the_filesystem():
     """Rule 4, asserted against the module rather than described in a docstring. Only the
     reader and the entry points may do I/O, and the reader is called by the entry point
     alone."""
-    import ast
 
-    from l1_analyzer import honest_code_python_rules as python_rules
+    from l1_analyzer import honest_code_edges as edges
+    from l1_analyzer import honest_code_read as read
 
     source = pathlib.Path(c_trace.__file__).read_text()
-    found = python_rules.io_below_the_boundary({
-        "path": "c_trace.py", "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""})
+    found = edges.io_below_the_boundary(read.read_tree(source, "python"))
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == [], found

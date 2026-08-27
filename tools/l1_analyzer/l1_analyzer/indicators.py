@@ -39,6 +39,7 @@ from l1_analyzer import (
     ruby_trace,
     rust_trace,
 )
+from l1_analyzer.boundary import boundary
 from l1_analyzer.disclosure import (
     with_skipped as _with_skipped,
 )
@@ -353,7 +354,6 @@ def compute_config_indicators(repo: Path) -> dict[str, L1Result]:
                         "no Dockerfile and no docker-compose.yml at the repository root"),
         },
     }
-from l1_analyzer.boundary import boundary
 from l1_analyzer.lang_cfg import (  # noqa: F401 - re-exported: every reader imports these from here
     LANG_CFG,
     TYPESCRIPT_CFG_OVERRIDES,

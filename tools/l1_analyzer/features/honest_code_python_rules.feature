@@ -11,23 +11,11 @@ Feature: Clauses this reader still reads through Python's own parser
     Then the last segment of the dotted name comes back
     But the receiver is dropped, so a caller that needs to tell two receivers apart has to read them separately
 
-  Scenario: _declares_a_boundary says whether a function is one of the project's own edges
-    Given a function definition and its decorators
-    When _declares_a_boundary reads what each decorator NAMES
-    Then a declared edge is conforming rather than violating, since the rule is that I/O belongs at the boundary
-    But a decorator merely carrying the word as data is not a declaration, which is the lesson clause 16 learned from a parametrize holding an exit handler
-
   Scenario: _first_line finds where a name is first read or written in a function
     Given a function, a name and the context to look for
     When _first_line walks the tree
     Then a write through a subscript counts as a write to the container
     But the line order is what the clause reasons about, and a tree walk is not source order, so only the first of each is taken
-
-  Scenario: _io_calls names the I/O one function performs
-    Given a function definition
-    When _io_calls reads its calls
-    Then an unambiguous name counts on its own and an ambiguous one counts only with a receiver that names a client
-    But reading the bare name reported this tool's own suffix table as I/O, because a dict lookup and an HTTP fetch are both spelled get
 
   Scenario: _is_test_file says whether a path holds tests
     Given a file path
@@ -52,13 +40,6 @@ Feature: Clauses this reader still reads through Python's own parser
     When imperative_validation reads its guards
     Then an isinstance check on a parameter the signature already types is distrust of your own contract
     But a check at a boundary, on a value that arrived untyped from outside, is where validation belongs
-
-  Scenario: io_below_the_boundary finds I/O that has been pushed inward
-    Given a parsed source
-    When io_below_the_boundary reads the call graph and the effects of each function
-    Then a function that performs I/O and is itself called by a sibling has put the I/O below the boundary
-    And a declared boundary is reported as withheld rather than dropped, so the count of real suppressions is a fact rather than a guess made from the presence of a decorator
-    But an entry point that performs I/O is the boundary, which is where the I/O is supposed to be
 
   Scenario: lifecycle_hooks finds behaviour parked where the reader does not look
     Given a parsed source
@@ -99,8 +80,3 @@ Feature: Clauses this reader still reads through Python's own parser
     Then the answer is in the grammars of eight other languages, not in this file
     But nothing here can read those grammars to find out
 
-  Scenario: _named_in_a_table finds every bare name a map literal holds as a value
-    Given a dispatch table whose values are function names
-    When _named_in_a_table reads the map literals in the file
-    Then each function the table holds counts as reached, because the table is how it is called
-    But a table of strings names no function, or a table mentioning a name would reach it

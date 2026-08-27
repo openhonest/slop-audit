@@ -27,6 +27,7 @@ from typing import TypedDict
 
 from tree_sitter import Language, Node, Parser
 
+from l1_analyzer import honest_code_edges as edges
 from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.honest_code_read import read_tree
@@ -245,7 +246,7 @@ CLAUSES: tuple[Clause, ...] = (
             reads=_TREE_READER),
     _clause(3, "Pure Functions Over Methods", _TREE, rules.methods_wearing_a_class, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(4, "I/O at the Boundary", _TREE, rules.io_below_the_boundary,
+    _clause(4, "I/O at the Boundary", _TREE, edges.io_below_the_boundary,
             reads=_TREE_READER,
             nothing_to_read=(
                 "this reader knows no I/O vocabulary for this language, so it had no way to "
@@ -258,7 +259,7 @@ CLAUSES: tuple[Clause, ...] = (
             nothing_to_read="", languages=BROWSER_LANGUAGES, reads=_TEXT_READER),
     _clause(7, "HTML Attributes Over Imperative DOM Manipulation", _TREE, rules.imperative_dom,
             nothing_to_read="", languages=BROWSER_LANGUAGES, reads=_TEXT_READER),
-    _clause(8, "Typed Exceptions at the Boundary", _TREE, rules.swallowed_exceptions, nothing_to_read="",
+    _clause(8, "Typed Exceptions at the Boundary", _TREE, edges.swallowed_exceptions, nothing_to_read="",
             reads=_TREE_READER),
     _clause(9, "SQL Over Application Caches", _PARTLY, python_rules.unmeasured_caches, nothing_to_read=""),
     _clause(10, "Pure Function Assertions Over Mocks", _TREE, python_rules.mock_heavy_tests, nothing_to_read=""),
@@ -283,7 +284,7 @@ CLAUSES: tuple[Clause, ...] = (
     _clause(19, "Atomic Test-and-Set Over Check-Then-Act", _TREE, rules.check_then_act, nothing_to_read="",
             reads=_TREE_READER),
     _clause(20, "Logging Is a Declared Boundary, and an Error Is Returned", _PARTLY,
-            rules.undeclared_logging, reads=_TREE_READER,
+            edges.undeclared_logging, reads=_TREE_READER,
             nothing_to_read=(
                 "nothing here writes a log line through a receiver this reader knows, so "
                 "there was no edge to read. A language with no logging convention named in "

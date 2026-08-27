@@ -52,12 +52,10 @@ def test_the_entry_point_is_declared_the_boundary():
 
 
 def test_no_clause_four_finding_survives_in_the_cli():
-    import ast
 
-    from l1_analyzer import honest_code_python_rules as python_rules
+    from l1_analyzer import honest_code_edges as edges
+    from l1_analyzer import honest_code_read as read
 
     source = pathlib.Path(cli.__file__).read_text()
-    found = python_rules.io_below_the_boundary({
-        "path": "cli.py", "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+    found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == []

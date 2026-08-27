@@ -36,13 +36,11 @@ def test_the_coverage_run_is_declared_rather_than_split():
 
 
 def test_no_clause_four_finding_survives_in_either():
-    import ast
 
-    from l1_analyzer import honest_code_python_rules as python_rules
+    from l1_analyzer import honest_code_edges as edges
+    from l1_analyzer import honest_code_read as read
 
     for module in (scope, rust_trace):
         source = pathlib.Path(module.__file__).read_text()
-        found = python_rules.io_below_the_boundary({
-            "path": pathlib.Path(module.__file__).name, "language": "python", "text": source,
-            "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+        found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
         assert [f["symbol"] for f in found if f["withheld_by"] == ""] == [], module.__name__

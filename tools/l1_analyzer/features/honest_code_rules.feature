@@ -47,12 +47,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then addEventListener, querySelector and innerHTML describe how, in a place the reader has to go and find
     But the clause is not applicable to a file with no DOM to drive
 
-  Scenario: swallowed_exceptions finds an error going somewhere to be forgotten
-    Given a parsed source
-    When swallowed_exceptions reads its handlers
-    Then a handler whose body only passes, or returns a stand-in, reports success for work that failed
-    But a handler that re-raises, or that maps the error to a response at a boundary, is doing the thing the rule asks for
-
   Scenario: hidden_configuration finds behaviour depending on something no caller can see
     Given a parsed source
     When hidden_configuration reads what each function reaches for
@@ -120,30 +114,6 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then each yields the same three things, and the clause itself names neither spelling
     But an ordinary subscript supplies no fallback and yields nothing
 
-  Scenario: _throws_it_away says whether a handler discards the failure
-    Given one empty handler and one returning the message of the error it caught
-    When _throws_it_away reads the body through the language's vocabulary
-    Then only the first discards the failure
-    But a body mentioning the caught error is disclosing it rather than hiding it
-
-  Scenario: _guarded_body_asserts_a_raise says when the handler is the success condition
-    Given a try body ending in a statement that records a failure
-    When _guarded_body_asserts_a_raise reads the body the handler guards
-    Then reaching the recorder is the defect and the handler beneath is correct
-    But whether the recorded failure is the one the author meant is not readable here
-
-  Scenario: _caught_text says what one handler catches
-    Given a handler naming one exception type and one naming none
-    When _caught_text reads the handler's children other than its body
-    Then the first names its type and the second names nothing
-    But a handler catching everything is the one this clause is least able to excuse
-
-  Scenario: _caught_variable names what the handler binds the error to
-    Given a handler binding the error and one binding nothing
-    When _caught_variable takes the last identifier before the body
-    Then the bound name comes back for the first and nothing for the second
-    But all five grammars put it there whether they field it or not
-
   Scenario: functions_of_one_shape finds functions that are one function with other words
     Given two generators differing only in a table name and a keyword
     When functions_of_one_shape erases every name and quoted string and compares what is left
@@ -174,20 +144,15 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then only a write reports true
     But the comparison is by equality, because the same node comes back from an accessor as a distinct object
 
-  Scenario: undeclared_logging finds a function that writes a log line
-    Given one function logging a failure and carrying on, and one logging information
-    When undeclared_logging reads both through the language's logging vocabulary
-    Then the first is reported for losing the failure and the second for opening an edge onto a global nothing declared
-    But whether the return value already names the failure is not readable from the callee alone
 
-  Scenario: _log_levels_in names the logging calls one function makes
-    Given a call on a logger and a call named info on something that is not one
-    When _log_levels_in matches the receiver and the call together
-    Then only the logger's call counts
-    But both halves are ordinary words alone, so matching either by itself would report a field named info
+  Scenario: _switch_tables finds a match or switch selecting behaviour by literal
+    Given a match on three literal cases and a match that destructures a mapping
+    When _switch_tables reads both through the language's switch vocabulary
+    Then the first is a table written as syntax and is reported
+    But the second is doing what no dict lookup can, and reporting it would ask an author to throw away the construct
 
-  Scenario: io_below_the_boundary finds I/O a sibling reaches
-    Given a function that reads a file and another that reaches it
-    When io_below_the_boundary builds the call graph from calls, table entries and names handed on
-    Then the reader is reported, because neither it nor its caller can be tested without a mock
-    But a function nothing reaches IS the edge, and whether it is truly an entry point is not readable here
+  Scenario: _tests_a_literal says whether one case matches a value or pulls a shape apart
+    Given a case naming a string and a case binding the parts of a mapping
+    When _tests_a_literal reads each pattern for a literal and for destructuring
+    Then only the first tests a value
+    But a default arm counts as a literal case, because it names no shape and a table has the same thing in its lookup failing

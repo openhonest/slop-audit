@@ -84,7 +84,7 @@ def _classify(tmp_path, src: str) -> dict:
 
 
 @pytest.mark.parametrize("name,source", [
-    ("walrus", WALRUS), ("match", MATCH),
+    ("walrus", WALRUS),
     ("comprehension", COMPREHENSION), ("starred_unpack", STARRED_UNPACK),
 ])
 def test_a_construct_with_no_dispatch_row_is_unmeasured_rather_than_clean(tmp_path, name, source):
@@ -114,7 +114,11 @@ def test_the_unmeasured_construct_is_our_backlog_and_counts_under_its_own_reason
     """Property three. `by_reason` carries every reason key whether or not it fired, so a
     reader can tell a zero from an omission; the new reason has to be in that set or the
     count would be invisible to anyone reading the JSON."""
-    result = _classify(tmp_path, MATCH)
+    # WALRUS rather than MATCH. The match statement had no rule when this was written and
+    # has one now, so it stopped being an example of the backlog and became an example of
+    # the backlog shrinking. The property is about a construct nobody has taught the reader,
+    # and the walrus is still one.
+    result = _classify(tmp_path, WALRUS)
     by_reason = result["silence"]["by_reason"]
     assert state_partition.UNMODELED_CONSTRUCT in by_reason
     assert by_reason[state_partition.UNMODELED_CONSTRUCT] == 1
@@ -142,3 +146,23 @@ def test_a_construct_that_does_have_a_rule_is_still_decided_by_it(tmp_path):
     finding = result["findings"][0]
     assert finding["drives_decision"] is True
     assert finding["partition"]["classes"] == 2
+
+
+def test_the_match_statement_has_a_rule_now_and_is_no_longer_backlog(tmp_path):
+    """`match` was in this list until the switch vocabulary was filled for Python.
+
+    It is the one row here that produces CLASSES rather than merely reading a construct: a
+    state value used as a match subject selects one arm, and the arms are countable from the
+    tree. Java, C#, Go and Rust have had that rule since it was written; Python and
+    JavaScript were left empty, so the modern spelling went unmeasured in both readers that
+    consume the table.
+
+    Kept as a test rather than a deletion, because a construct leaving the backlog is the
+    thing this file is about and the count moving the other way is worth failing on."""
+    result = _classify(tmp_path, MATCH)
+    assert result["counts"][state_bounds.UNRESOLVED] == 0, "match is measured now"
+    finding = result["findings"][0]
+    # Three: the two literal cases and the fall-through, which is a class of its own.
+    assert finding["partition"]["classes"] == 3, finding["partition"]
+    assert finding["partition"]["counted"] is True
+    assert finding["silence"] == ""

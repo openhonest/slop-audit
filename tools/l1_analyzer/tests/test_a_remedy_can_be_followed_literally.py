@@ -29,14 +29,23 @@ from l1_analyzer.honest_code import CLAUSES
 
 def _remedies() -> list[tuple[str, str]]:
     """Every remedy line in the two rule modules, with the clause it belongs to."""
+    # Every module in the package, not two named by hand. It listed two and the edge
+    # clauses moved to a third, so a clause carrying no remedy at all would have passed. A
+    # check narrower than its subject reports on what nobody changed, which is the third
+    # time that shape has cost something here.
     out: list[tuple[str, str]] = []
-    for name in ("honest_code_rules", "honest_code_python_rules"):
-        path = pathlib.Path(__file__).parent.parent / "l1_analyzer" / f"{name}.py"
+    for path in sorted((pathlib.Path(__file__).parent.parent / "l1_analyzer").glob("*.py")):
         for node in ast.walk(ast.parse(path.read_text())):
-            if (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_finding"
+            if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_finding"
                     and len(node.args) >= 5):
-                out.append((ast.unparse(node.args[0]).strip("'\""),
-                            ast.unparse(node.args[4])))
+                continue
+            code = ast.unparse(node.args[0]).strip("'\"")
+            # L1.21 only. Widening the scan to the package picked up a `_finding` of the
+            # same name in the state reader, whose arguments mean something else entirely,
+            # and the test then judged its wording against a rule it is not under.
+            if not code.startswith("L1.21."):
+                continue
+            out.append((code, ast.unparse(node.args[4])))
     return out
 
 

@@ -17,6 +17,7 @@ dispatch chain, and counting it as one would teach a reader to ignore the number
 import ast
 
 import pytest
+from l1_analyzer import honest_code_edges as edges
 from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_read as read
 from l1_analyzer import honest_code_rules as rules
@@ -72,7 +73,7 @@ def _source(text: str, path: str, language: str) -> dict:
 def test_io_in_a_function_a_sibling_calls_is_found():
     """The I/O has been pushed inward: `price` cannot be tested without a filesystem, and
     `total` cannot be tested without mocking one."""
-    found = python_rules.io_below_the_boundary(_module(
+    found = edges.io_below_the_boundary(_tree(
         "def price(path):\n    return int(path.read_text())\n\n\n"
         "def total(path):\n    return price(path) * 2\n"))
     assert [f["symbol"] for f in found] == ["price"]
@@ -80,7 +81,7 @@ def test_io_in_a_function_a_sibling_calls_is_found():
 
 def test_io_in_an_entry_point_is_the_boundary():
     """Nothing in the module calls it, so it IS the edge, which is where the I/O belongs."""
-    assert python_rules.io_below_the_boundary(_module(
+    assert edges.io_below_the_boundary(_tree(
         "def load(path):\n    return path.read_text()\n")) == []
 
 
@@ -128,20 +129,20 @@ def test_driving_the_dom_by_hand_is_found():
 
 @pytest.mark.parametrize("body", ["pass", "return None", "return []", "return 0"])
 def test_a_handler_that_swallows_is_found(body):
-    found = rules.swallowed_exceptions(_tree(
+    found = edges.swallowed_exceptions(_tree(
         f"def f(x):\n    try:\n        return g(x)\n    except ValueError:\n        {body}\n"))
     assert found, body
 
 
 def test_a_handler_that_reraises_is_left_alone():
-    assert rules.swallowed_exceptions(_tree(
+    assert edges.swallowed_exceptions(_tree(
         "def f(x):\n    try:\n        return g(x)\n    except ValueError:\n        raise\n")) == []
 
 
 def test_a_handler_that_maps_the_error_is_left_alone():
     """The boundary catching and turning the type into a response is the rule, not the
     violation."""
-    assert rules.swallowed_exceptions(_tree(
+    assert edges.swallowed_exceptions(_tree(
         "def route(x):\n    try:\n        return g(x)\n"
         "    except ValueError as error:\n        return respond(400, str(error))\n")) == []
 
@@ -324,7 +325,7 @@ def test_a_dict_lookup_is_not_io():
     """`_SUFFIXES.get(suffix)` was reported as I/O below the boundary, because `get` is
     also how an HTTP client fetches a page. A bare name cannot tell the two apart, so the
     ambiguous ones are matched on the whole dotted call instead."""
-    assert python_rules.io_below_the_boundary(_module(
+    assert edges.io_below_the_boundary(_tree(
         "TABLE = {'a': 1}\n\n\n"
         "def look(key):\n    return TABLE.get(key)\n\n\n"
         "def top(key):\n    return look(key)\n")) == []
@@ -333,7 +334,7 @@ def test_a_dict_lookup_is_not_io():
 @pytest.mark.parametrize("call", ["requests.get(url)", "httpx.post(url)", "session.get(url)",
                                   "subprocess.run(cmd)", "path.read_text()"])
 def test_a_named_client_call_is_still_io(call):
-    found = python_rules.io_below_the_boundary(_module(
+    found = edges.io_below_the_boundary(_tree(
         f"def fetch(url, cmd, path, session, requests, httpx, subprocess):\n    return {call}\n\n\n"
         "def top(*a):\n    return fetch(*a)\n"))
     assert found, call
@@ -346,7 +347,7 @@ def test_a_handler_that_returns_a_reason_is_not_swallowing():
 
     Found by pointing the clause at this repository: it flagged three handlers and one of
     them was doing exactly the right thing."""
-    assert rules.swallowed_exceptions(_tree(
+    assert edges.swallowed_exceptions(_tree(
         "def toolchains():\n    try:\n        return run(['rustup']).stdout\n"
         "    except OSError:\n        return 'could not query rustup toolchains'\n")) == []
 
@@ -355,7 +356,7 @@ def test_a_handler_that_returns_a_reason_is_not_swallowing():
 def test_a_handler_that_returns_a_falsy_stand_in_is_still_swallowing(stand_in):
     """A value indistinguishable from a successful empty result. The caller cannot tell
     "there were none" from "I could not look"."""
-    found = rules.swallowed_exceptions(_tree(
+    found = edges.swallowed_exceptions(_tree(
         f"def f(x):\n    try:\n        return g(x)\n    except ValueError:\n        return {stand_in}\n"))
     assert found, stand_in
 
@@ -398,7 +399,7 @@ def test_a_catch_that_is_the_assertion_is_not_a_swallow():
               "        bad.append('startup_check should have raised')\n"
               "    except HonestCheckError:\n"
               "        pass\n")
-    assert rules.swallowed_exceptions(_tree(source)) == []
+    assert edges.swallowed_exceptions(_tree(source)) == []
 
 
 @pytest.mark.parametrize("recorder", [
@@ -412,7 +413,7 @@ def test_a_catch_that_is_the_assertion_is_not_a_swallow():
 def test_the_shapes_that_count_as_recording_a_failure(recorder):
     source = (f"def check(bad):\n    try:\n        risky()\n        {recorder}\n"
               "    except ValueError:\n        pass\n")
-    assert rules.swallowed_exceptions(_tree(source)) == [], recorder
+    assert edges.swallowed_exceptions(_tree(source)) == [], recorder
 
 
 def test_a_try_whose_last_statement_does_not_record_a_failure_is_still_a_swallow():
@@ -420,14 +421,14 @@ def test_a_try_whose_last_statement_does_not_record_a_failure_is_still_a_swallow
     error is the shape the clause exists for."""
     source = ("def load(path):\n    try:\n        raw = path.read_text()\n"
               "        return parse(raw)\n    except ValueError:\n        pass\n")
-    assert rules.swallowed_exceptions(_tree(source))
+    assert edges.swallowed_exceptions(_tree(source))
 
 
 def test_a_single_statement_try_is_still_a_swallow():
     """There is no statement after the call, so nothing records a failure and nothing makes
     the catch an assertion."""
     source = "def load(p):\n    try:\n        return parse(p)\n    except ValueError:\n        pass\n"
-    assert rules.swallowed_exceptions(_tree(source))
+    assert edges.swallowed_exceptions(_tree(source))
 
 
 @pytest.mark.parametrize("signal", ["SystemExit", "KeyboardInterrupt", "GeneratorExit"])
@@ -439,12 +440,12 @@ def test_a_control_flow_signal_is_not_an_error_this_clause_names(signal):
     What this does NOT decide: a program that swallows an exit it did not intend has a real
     defect, and it is a different one from the silent failure this clause names."""
     source = f"def probe():\n    try:\n        cli_main(['--help'])\n    except {signal}:\n        pass\n"
-    assert rules.swallowed_exceptions(_tree(source)) == []
+    assert edges.swallowed_exceptions(_tree(source)) == []
 
 
 def test_an_ordinary_exception_is_still_caught_by_the_clause():
     source = "def probe():\n    try:\n        cli_main(['--help'])\n    except ValueError:\n        pass\n"
-    assert rules.swallowed_exceptions(_tree(source))
+    assert edges.swallowed_exceptions(_tree(source))
 
 
 def test_the_clause_nothing_decides_is_never_asked():

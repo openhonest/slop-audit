@@ -13,15 +13,13 @@ the write hook had built a detector that counted markers rather than markers tha
 anything, found it wrong three times in four, and removed it. This counts something true.
 """
 
-import ast
 
-from l1_analyzer import honest_code_python_rules as python_rules
+from l1_analyzer import honest_code_edges as edges
+from l1_analyzer import honest_code_read as read
 
 
 def _findings(source: str) -> list[dict]:
-    return python_rules.io_below_the_boundary({
-        "path": "m.py", "language": "python", "text": source,
-        "tree": ast.parse(source), "readable": True, "unreadable_reason": ""}) or []
+    return edges.io_below_the_boundary(read.read_tree(source, "python")) or []
 
 
 DECORATOR = "from l1_analyzer.boundary import boundary\n\n\n"

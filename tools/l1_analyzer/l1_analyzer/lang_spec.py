@@ -45,6 +45,13 @@ class LangSpec(TypedDict, total=False):
     writing_builtins: frozenset[str]
     iterate_types: tuple[str, ...]
     local_binding: dict[str, tuple[str, str | None]]
+    # A match or switch, as {node type: (subject field, arm type)}. Two readers want it: the
+    # state classifier, which has read it since it was written, and clause 1, for which a
+    # match on literal cases IS a dispatch table written as syntax. Python and JavaScript
+    # were empty, so both readers were blind to the modern spelling of the very thing
+    # clause 1 names. Filled once here rather than a second time beside the clause: the
+    # first attempt added three flat keys and broke 314 tests, which is what a second owner
+    # of one fact costs.
     switch_types: dict[str, tuple[str, str]]
     immutable_modifiers: frozenset[str]
     immutable_ctor_rule: bool
@@ -117,18 +124,35 @@ class LangSpec(TypedDict, total=False):
     log_receivers: frozenset[str]
     log_calls: frozenset[str]
     log_failure_calls: frozenset[str]
-    # Reaching outside the process. `io_calls` are names that mean I/O wherever they appear;
-    # `io_receivers` are modules and clients whose every call does; `io_dotted` names one
-    # call at a time where most of a module is not I/O. Empty means this reader knows no I/O
-    # vocabulary for the language, and a clause about edges says so rather than reporting a
-    # file clean.
+    # Reaching outside the process, in four tiers, because a name means different things in
+    # different company.
+    #
+    # `io_calls` mean I/O wherever they appear. `io_modules` are receivers whose every call
+    # does, so the open-ended names of a database driver need no list. `io_dotted` names one
+    # call at a time where most of a module is NOT I/O: taking the whole of `os` reported
+    # `os.getenv`, which reads process state, and `shutil.which`, which every tracer here
+    # calls once. `io_ambiguous` are names that count only beside an `io_receivers` entry,
+    # because `TABLE.get(key)` is a dict lookup and `requests.get(url)` fetches a page.
+    #
+    # These four were duplicated for an hour: the ported clause carried a thinner copy here
+    # while the Python one kept the full set beside itself, which is the two-owners defect
+    # this package keeps finding in other people's code. One owner now.
+    #
+    # Empty means this reader knows no I/O vocabulary for the language, and a clause about
+    # edges says so rather than reporting a file clean.
     io_calls: frozenset[str]
-    io_receivers: frozenset[str]
+    io_modules: frozenset[str]
     io_dotted: frozenset[str]
+    io_ambiguous: frozenset[str]
+    io_receivers: frozenset[str]
     # The statement that records a failure. A try body ending in one is ASSERTING that its
     # call raised, so the handler beneath is the success condition and reaching the recorder
     # is the defect. Keying on the handler alone made both readings look alike.
     assertion_types: tuple[str, ...]
+    # Calls that discard an exception with no handler to read. `contextlib.suppress(E)`
+    # silences everything the block raises and returns as though it succeeded, and a reader
+    # looking for a handler body finds none, so the purest swallow was the one it missed.
+    silencing_calls: frozenset[str]
     # Literals that hold other values. `literal_types` carries the scalars; an empty list or
     # an empty map is just as much a value nobody chose, and is the default that bites.
     container_literal_types: frozenset[str]
@@ -337,7 +361,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         # construct still unread today, which is its own small piece of work.
         "iterate_types": (),
         "local_binding": {"assignment": ("left", "right")},
-        "switch_types": {},
+        "switch_types": {"match_statement": ("subject", "case_clause")},
         "immutable_modifiers": frozenset(),
         # The immutable-CONSTRUCTION rule, which follows a constructor one level to see
         # whether its return can be mutated. Python only, and now declared here rather
@@ -378,17 +402,36 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset({"logger", "logging", "log", "_logger", "LOGGER"}),
         "log_calls": frozenset({"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}),
         "log_failure_calls": frozenset({"warning", "warn", "error", "exception", "critical"}),
-        "io_calls": frozenset({"read_text", "read_bytes", "write_text", "write_bytes", "open", "iterdir",
-                          "glob", "Popen", "check_output", "urlopen", "execute", "fetchall",
-                          "fetchone", "commit", "listdir", "makedirs", "remove", "print", "input"}),
-        "io_receivers": frozenset({"requests", "httpx", "session", "client", "urllib", "aiohttp", "subprocess",
-                              "conn", "connection", "cursor", "db", "stdout", "stderr", "stdin",
-                              "psycopg2", "psycopg", "asyncpg", "sqlite3", "aiosqlite", "pymongo",
-                              "redis", "smtplib", "ftplib", "imaplib", "poplib"}),
-        "io_dotted": frozenset({"os.read", "os.write", "os.walk", "os.remove", "os.system", "os.popen",
-                           "shutil.copy", "shutil.move", "shutil.rmtree", "socket.socket",
-                           "tempfile.mkdtemp", "environ.get", "loader.exec_module"}),
+        "io_calls": frozenset({
+                          "Popen", "check_output", "commit", "execute", "fetchall", "fetchone",
+                          "glob", "input", "iterdir", "listdir", "makedirs", "open", "print",
+                          "read_bytes", "read_text", "remove", "urlopen", "write_bytes",
+                          "write_text"}),
+        "io_modules": frozenset({
+                          "aiosqlite", "asyncpg", "ftplib", "imaplib", "poplib", "psycopg",
+                          "psycopg2", "pymongo", "redis", "smtplib", "sqlite3", "stderr",
+                          "stdin", "stdout"}),
+        "io_dotted": frozenset({
+                          "environ.get", "environ.setdefault", "loader.exec_module",
+                          "mmap.mmap", "os.execvp", "os.fork", "os.mkdir", "os.popen",
+                          "os.read", "os.remove", "os.rename", "os.rmdir", "os.system",
+                          "os.walk", "os.write", "shutil.copy", "shutil.copyfile",
+                          "shutil.move", "shutil.rmtree", "socket.create_connection",
+                          "socket.create_server", "socket.getaddrinfo", "socket.getfqdn",
+                          "socket.gethostbyaddr", "socket.gethostbyname", "socket.socket",
+                          "spec.loader", "tempfile.NamedTemporaryFile",
+                          "tempfile.TemporaryDirectory", "tempfile.mkdtemp",
+                          "util.spec_from_file_location"}),
+        "io_ambiguous": frozenset({
+                          "basicConfig", "critical", "debug", "delete", "error", "exception",
+                          "get", "head", "info", "patch", "post", "put", "request", "run",
+                          "warn", "warning"}),
+        "io_receivers": frozenset({
+                          "aiohttp", "client", "conn", "connection", "cursor", "db", "engine",
+                          "httpx", "log", "logger", "logging", "requests", "session",
+                          "subprocess", "urllib"}),
         "assertion_types": ("assert_statement", "raise_statement"),
+        "silencing_calls": frozenset({"suppress"}),
         "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
@@ -456,7 +499,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "writing_builtins": frozenset(),
         "iterate_types": (),
         "local_binding": {"variable_declarator": ("name", "value")},
-        "switch_types": {},
+        "switch_types": {"switch_statement": ("value", "switch_case")},
         "immutable_modifiers": frozenset({"const"}),
         "immutable_ctor_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
@@ -490,10 +533,14 @@ LANG_SPEC: dict[str, LangSpec] = {
                           "appendFile", "readdir", "readdirSync", "unlink", "mkdir",
                           "createReadStream", "createWriteStream", "query", "exec", "execSync",
                           "spawn", "spawnSync", "request"}),
-        "io_receivers": frozenset({"fs", "fsp", "axios", "http", "https", "net", "process", "child_process",
-                              "db", "pool", "client", "connection", "redis", "mongo"}),
+        "io_modules": frozenset({"fs", "fsp", "axios", "http", "https", "net", "process",
+                                 "child_process", "db", "pool", "client", "connection",
+                                 "redis", "mongo"}),
+        "io_ambiguous": frozenset(),
+        "io_receivers": frozenset(),
         "io_dotted": frozenset({"process.exit", "process.env", "localStorage.getItem", "localStorage.setItem"}),
         "assertion_types": ("throw_statement",),
+        "silencing_calls": frozenset(),
         "container_literal_types": frozenset({"array", "object"}),
         "instance_ref_style": "member",
         "instance_enum": "member",
@@ -582,9 +629,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_calls": frozenset({"debug", "info", "warn", "error", "trace", "fatal"}),
         "log_failure_calls": frozenset({"warn", "error", "fatal"}),
         "io_calls": frozenset(),
+        "io_modules": frozenset(),
         "io_receivers": frozenset(),
+        "io_ambiguous": frozenset(),
         "io_dotted": frozenset(),
         "assertion_types": ("assert_statement", "throw_statement"),
+        "silencing_calls": frozenset(),
         "container_literal_types": frozenset({"array_initializer"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
@@ -685,9 +735,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_calls": frozenset({"LogDebug", "LogInformation", "LogWarning", "LogError", "LogCritical"}),
         "log_failure_calls": frozenset({"LogWarning", "LogError", "LogCritical"}),
         "io_calls": frozenset(),
+        "io_modules": frozenset(),
         "io_receivers": frozenset(),
+        "io_ambiguous": frozenset(),
         "io_dotted": frozenset(),
         "assertion_types": ("throw_statement",),
+        "silencing_calls": frozenset(),
         "container_literal_types": frozenset({"array_creation_expression", "initializer_expression"}),
         "instance_ref_style": "identifier",
         "instance_enum": "identifier",
@@ -750,7 +803,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "writing_builtins": frozenset(),
         "iterate_types": (),
         "local_binding": {"let_declaration": ("pattern", "value")},
-        "switch_types": {},
+        "switch_types": {"match_expression": ("value", "match_arm")},
         "immutable_modifiers": frozenset({"const", "static"}),
         "immutable_ctor_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
@@ -781,9 +834,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_calls": frozenset(),
         "log_failure_calls": frozenset(),
         "io_calls": frozenset(),
+        "io_modules": frozenset(),
         "io_receivers": frozenset(),
+        "io_ambiguous": frozenset(),
         "io_dotted": frozenset(),
         "assertion_types": (),
+        "silencing_calls": frozenset(),
         "container_literal_types": frozenset({"array_expression", "tuple_expression"}),
         "instance_ref_style": "member",
         "instance_enum": "self_usage",
@@ -850,7 +906,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "writing_builtins": frozenset(),
         "iterate_types": (),
         "local_binding": {"assignment": ("left", "right")},
-        "switch_types": {},
+        "switch_types": {"case": ("value", "when")},
         "immutable_modifiers": frozenset(),
         "immutable_ctor_rule": False,
         "mem_object": "receiver", "mem_attr": "method",
@@ -883,9 +939,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_calls": frozenset({"debug", "info", "warn", "error", "fatal"}),
         "log_failure_calls": frozenset({"warn", "error", "fatal"}),
         "io_calls": frozenset(),
+        "io_modules": frozenset(),
         "io_receivers": frozenset(),
+        "io_ambiguous": frozenset(),
         "io_dotted": frozenset(),
         "assertion_types": (),
+        "silencing_calls": frozenset(),
         "container_literal_types": frozenset({"array", "hash"}),
         "instance_ref_style": "member",
         "instance_enum": "ruby_ivar",
@@ -949,7 +1008,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "writing_builtins": frozenset(),
         "iterate_types": (),
         "local_binding": {"init_declarator": ("declarator", "value")},
-        "switch_types": {},
+        "switch_types": {"switch_statement": ("condition", "case_statement")},
         "immutable_modifiers": frozenset({"const"}),
         "immutable_ctor_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
@@ -985,9 +1044,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_calls": frozenset(),
         "log_failure_calls": frozenset(),
         "io_calls": frozenset(),
+        "io_modules": frozenset(),
         "io_receivers": frozenset(),
+        "io_ambiguous": frozenset(),
         "io_dotted": frozenset(),
         "assertion_types": (),
+        "silencing_calls": frozenset(),
         "container_literal_types": frozenset({"initializer_list"}),
         "instance_ref_style": "identifier",
         "instance_enum": "none",
@@ -1100,9 +1162,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_calls": frozenset({"Print", "Printf", "Println", "Error", "Warn", "Info", "Debug"}),
         "log_failure_calls": frozenset({"Error", "Warn", "Fatal"}),
         "io_calls": frozenset(),
+        "io_modules": frozenset(),
         "io_receivers": frozenset(),
+        "io_ambiguous": frozenset(),
         "io_dotted": frozenset(),
         "assertion_types": (),
+        "silencing_calls": frozenset(),
         "container_literal_types": frozenset({"composite_literal"}),
         "instance_ref_style": "member",
         "instance_enum": "none",
