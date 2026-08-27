@@ -25,12 +25,14 @@ Feature: scope — deciding which files are the code under audit and which are s
     And the operator opts in for that run only, after the whole payload is printed rather than summarised
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
-  Scenario: excluded_dirs gives a named scope the directory names it removes from a measurement
+  Scenario: scope_rule gives one named scope the whole of its rule
     Given the name of a scope
-    When excluded_dirs looks that name up in the scope table
+    When scope_rule looks that name up in the scope table
     Then it returns the directory names that scope removes: the two test-directory names for the production scope, those plus the conformance directory for the scope the god-file and state meters use, and none at all for the whole-repository scope
+    And it returns which of documentation, conventional tooling files and loose root scripts that scope sets aside, where the whole-repository scope sets aside none of the three, because the ratio of test lines to production lines and the discipline of the repository's whitespace are questions about every file and skipping the documentation would answer a narrower question under the wider question's name
+    And the caller names the field it wants rather than calling a function per field, which were two names over one lookup and one shape to the conformity check
     And routing every reader through it is what stops an indicator measuring under a scope nobody wrote down
-    But a name that is not in the table raises rather than falling back to a default, so an unrecorded scope cannot be measured quietly
+    But vendored trees and machine output are in no scope's list, because no scope may decline those, and a name that is not in the table raises rather than falling back to a default
 
   Scenario: _test_dir_corroborated checks that a directory named like a test directory really holds tests
     Given a directory
@@ -118,10 +120,11 @@ Feature: scope — deciding which files are the code under audit and which are s
 
   Scenario: _bucket_reason gives the one reason a source file is set aside, or keeps it
     Given a path, the repository, whether the repository has packages, and a scope name
-    When _bucket_reason tests the path in order against the vendored list, the scope's markers, a docs directory, the conventional tooling file names, machine output, and the loose-root-script rule
+    When _bucket_reason tests the path in order against the vendored list, the scope's markers, machine output, and then whichever of the docs directory, the conventional tooling file names and the loose-root-script rule the scope's judgment calls name
     Then it returns the first reason that applies, and nothing when the file stays in the audit
     And a file a tool generated is set aside for every measurement that reads this scope, because a parser table or a build stamp is the output of a generator and no number an audit puts on it describes this repository
     And the loose-root-script reason fires only for a file directly at the root of a repository that has packages and is not itself a package, so a flat script-only repository keeps its root scripts because they are the code
+    And the last three are the scope's to decline, which is what lets one function serve the byte reader and the text reader instead of each holding a copy of the rule
     But it names no project and encodes no specific repository, and every reason it returns is disclosed rather than applied silently
 
   Scenario: _read_source_bytes reads the audited source files as bytes under a named scope
@@ -138,14 +141,10 @@ Feature: scope — deciding which files are the code under audit and which are s
     And those three are the judgment calls a reader most needs to challenge, since over-bucketing a real entry point would otherwise hide behind a silent skip
     But vendored dependencies are counted only and not listed, because naming every vendored file would bury the judgment calls
 
-  # The docstring says this reads files "under the named scope", and it does apply that scope's
-  # directory markers — but it applies only those, not the docs, tooling and loose-root-script
-  # reasons that _read_source_bytes applies through _bucket_reason. Two readers of the same
-  # named scope therefore see different file sets. Recorded, not fixed.
   Scenario: _read_text_files reads files of the given extensions as text under a named scope
     Given a repository, a set of file suffixes, and a scope name
-    When _read_text_files walks the whole tree, keeps the files whose suffix is in the set, and drops the ones in a vendored or scoped-out directory and the ones a tool generated
+    When _read_text_files walks the whole tree, keeps the files whose suffix is in the set, and asks _bucket_reason about each one
     Then it returns the files it read with their text, decoded so an undecodable byte is replaced rather than raising, and a count of the files it could not read
-    And machine output is dropped here as the source reader drops it, through the same function, so the two cannot come to disagree about what a generated file is
-    But it applies only the scope's directory markers, so a documentation file, a conventional tooling file or a loose root script that the source reader would have set aside is read here
+    And it sets aside exactly what the byte reader sets aside under the same scope name, because both ask that one function, where this reader used to apply only the scope's directory markers and the two saw different file sets under one name
+    But an unreadable file is counted and disclosed, never dropped in silence
 

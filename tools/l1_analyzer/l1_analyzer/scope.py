@@ -67,8 +67,15 @@ WHOLE_REPO = "whole-repo"
 class Scope(TypedDict):
     """One named measurement scope: the directory names it removes, and every indicator
     measured under it. `indicators` names panel keys, plus any consumer that publishes a
-    number without being a panel entry (the CLI gate's type-escape ratchet)."""
+    number without being a panel entry (the CLI gate's type-escape ratchet).
+
+    `buckets` names which of the three judgment-call exclusions this scope makes: docs,
+    tooling, root-script. They were unconditional, so a scope could not decline them, and
+    the reader that had to decline them implemented the whole rule a second time instead.
+    Vendored trees and machine output are not listed because no scope may decline those:
+    neither is anybody's code here, whatever the question being asked."""
     excludes: tuple[str, ...]
+    buckets: tuple[str, ...]
     indicators: tuple[str, ...]
 
 
@@ -78,6 +85,7 @@ SCOPES: dict[str, Scope] = {
     # 24 of 57 absolute-path findings on the run that prompted the scope fix.
     PRODUCTION: {
         "excludes": ("tests", "test"),
+        "buckets": ("docs", "tooling", "root-script"),
         # L1.12 measures dead code in production source and divides by production LOC, and
         # it splits its reference sites into production and test so a symbol only the
         # tests call is disclosed rather than called dead. L1.14 counts the whole tree,
@@ -96,6 +104,7 @@ SCOPES: dict[str, Scope] = {
     # hand-piles logic into an append-only conformance table.
     PRODUCTION_WITHOUT_CONFORMANCE: {
         "excludes": ("tests", "test", "conformance"),
+        "buckets": ("docs", "tooling", "root-script"),
         "indicators": ("L1.17", "L1.18b", "thread_surface"),
     },
     # Everything, tests included, because for these three the test tree IS the subject:
@@ -104,18 +113,29 @@ SCOPES: dict[str, Scope] = {
     # which files carry a model-checker harness.
     WHOLE_REPO: {
         "excludes": (),
+        # None of the three, because under this name they are the subject. L1.8 is the
+        # ratio of test lines to production lines and L1.16 asks whether the whitespace is
+        # disciplined anywhere, so a reading that skipped the docs, the tooling files and
+        # the loose scripts would answer a narrower question under the wider question's
+        # name. This is what the second reader was working around by rewriting the rule.
+        "buckets": (),
         "indicators": ("L1.8", "L1.16", "interleaving_robustness"),
     },
 }
 
 
-def excluded_dirs(scope: str) -> tuple[str, ...]:
-    """The directory names `scope` removes from a measurement.
+def scope_rule(name: str) -> Scope:
+    """The whole rule for one named scope: the directory names it removes, the judgment-call
+    exclusions it makes, and the indicators measured under it.
 
     KeyError on a name that is not in SCOPES, which is the point of routing every reader
-    through here: an indicator cannot quietly measure under a scope that nobody wrote
-    down and no test knows to check."""
-    return SCOPES[scope]["excludes"]
+    through here: an indicator cannot quietly measure under a scope that nobody wrote down
+    and no test knows to check.
+
+    One function rather than one accessor per field. Two of those were two names over a
+    single lookup, which this package's own conformity check reads as one shape, and it is
+    right: naming the field at the call site says which part of the rule is being read."""
+    return SCOPES[name]
 
 
 # A directory NAMED like a test directory is believed only if its contents corroborate
@@ -372,12 +392,14 @@ def _bucket_reason(path: Path, repo: Path, has_packages: bool, scope: str) -> st
     parts = set(path.parts)
     if parts & _IGNORE_DIRS:
         return "vendored"
-    reason = _extra_reason(parts, excluded_dirs(scope), path)
+    rule = scope_rule(scope)
+    reason = _extra_reason(parts, rule["excludes"], path)
     if reason is not None:
         return reason
-    if "docs" in parts:
+    calls = rule["buckets"]
+    if "docs" in calls and "docs" in parts:
         return "docs"
-    if path.name in _TOOLING_FILES:
+    if "tooling" in calls and path.name in _TOOLING_FILES:
         return "tooling"
     # Machine output is not the author's code. Measuring its mutable state, its type
     # escapes or its conformity reports on a code generator nobody in this repository
@@ -388,7 +410,8 @@ def _bucket_reason(path: Path, repo: Path, has_packages: bool, scope: str) -> st
     # and the repo does have packages) is a dev/entry-point script, not the library.
     # A flat, script-only repo (no packages anywhere) keeps its root scripts: they
     # are the code.
-    if has_packages and path.parent == repo and not (repo / "__init__.py").exists():
+    if ("root-script" in calls and has_packages and path.parent == repo
+            and not (repo / "__init__.py").exists()):
         return "root-script"
     return None
 
@@ -458,13 +481,11 @@ def _read_text_files(repo: Path, extensions: frozenset[str], scope: str) -> tupl
     whole-repository indicators measure, which is a different question from this one."""
     files: list[tuple[Path, str]] = []
     skipped = 0
-    excluded = excluded_dirs(scope)
+    has_packages = _repo_has_packages(repo)
     for f in _rglob_files(repo, "*"):
         if f.suffix.lower() not in extensions:
             continue
-        if _in_ignored_dir(f, excluded):
-            continue
-        if _is_machine_output(f):
+        if _bucket_reason(f, repo, has_packages, scope) is not None:
             continue
         try:
             files.append((f, f.read_text(errors="ignore")))
