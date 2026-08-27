@@ -7,7 +7,8 @@ the finite-testability meter uses. What gets scoped out is disclosed (bucketed_l
 never dropped silently. Pure assertions on real files, no mocks.
 """
 
-from l1_analyzer.indicators import _god_files, _is_generated
+from l1_analyzer.indicators import _god_files
+from l1_analyzer.scope import _is_generated
 
 _BIG = "x = 1\n" * 1200            # >1000 lines
 _SMALL = "y = 2\n" * 10

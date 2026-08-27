@@ -15,16 +15,16 @@ from l1_analyzer import rust_trace, scope
 
 
 def test_a_head_holding_a_framework_marker_corroborates_a_test_directory():
-    assert scope.holds_a_test_marker(b"import pytest\n\ndef test_go():\n    pass\n")
+    assert scope.head_carries_any("import pytest\n\ndef test_go():\n    pass\n", scope._TEST_FRAMEWORK_MARKERS)
 
 
 def test_a_head_holding_no_marker_does_not():
-    assert not scope.holds_a_test_marker(b"def go(x):\n    return x + 1\n")
+    assert not scope.head_carries_any("def go(x):\n    return x + 1\n", scope._TEST_FRAMEWORK_MARKERS)
 
 
 def test_the_marker_question_touches_nothing():
     source = pathlib.Path(scope.__file__).read_text()
-    body = source.split("def holds_a_test_marker")[1].split("\ndef ")[0]
+    body = source.split("def head_carries_any")[1].split("\ndef ")[0]
     for reach in ("read_bytes", "read_text", "rglob", "is_file", "open("):
         assert reach not in body, reach
 

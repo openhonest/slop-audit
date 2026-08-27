@@ -79,12 +79,36 @@ Feature: scope — deciding which files are the code under audit and which are s
     And it skips anything under a nested checkout, meaning any directory below the root that carries its own version-control marker, because a submodule, a vendored clone or a worktree is a different repository with its own history
     But it follows symbolic links, so a symlinked source file is still read, and a file the process may not open still reaches its reader and is still disclosed as unreadable
 
+  Scenario: boundary_in_file_head reads the opening of a file and decides nothing
+    Given a path and how many bytes of it to read
+    When boundary_in_file_head reads that many bytes and decodes them as text
+    Then it returns that text, which is the only place in this module that a header reaches the disk
+    And a file it cannot open returns the empty string, which every caller reads as a header carrying no marker, so the file falls through to ordinary scope and is audited rather than excluded on a guess
+    And the caller names the window rather than accepting a default, because the two questions this module asks of a header look at different amounts of it and a default would hide which one a reader is getting
+    But it applies no rule and names no marker, because reading the file and judging what it says are two jobs and only the first one needs a disk
+
+  Scenario: head_carries_any asks whether a file header holds any marker from a given table
+    Given the opening text of a file and a table of markers
+    When head_carries_any looks for each marker in that text
+    Then it answers yes as soon as one of them appears
+    And it answers both header questions this module asks, whether the file names a test framework and whether a tool wrote it, which were two functions with one body until the package's own conformity check reported them as a single shape wearing two names
+    And it touches nothing, so every marker either table holds can be tested as a plain string
+    And a file importing a test framework corroborates the directory it sits in, though the file's own name is judged elsewhere, because a renamed directory must not corroborate itself
+    But it holds no table of its own, so the caller says which question is being asked
+
   Scenario: _is_generated decides whether a file's own header marks it as machine-generated
     Given a path
-    When _is_generated reads the first two kilobytes and looks for the machine-readable generated marker, the Go generated banner, or the protocol-buffer banner
-    Then it answers yes when one of them appears in that header
-    And only the header is read, so a hand-written file mentioning the same phrase further down is unaffected
-    But an unreadable file answers no and falls through to ordinary scope, rather than being excluded on a guess
+    When _is_generated offers the header that boundary_in_file_head read to the generated-marker table: the machine-readable generated marker, the Go generated banner, and the protocol-buffer banner
+    Then it answers yes when a toolchain declared itself the author of the file
+    And only the header is offered, so a hand-written file mentioning the same phrase further down is unaffected
+    But the reading and the judging are each done by one function it calls, so neither has a second owner here
+
+  Scenario: _is_machine_output says whether a tool wrote this file rather than a person
+    Given a path
+    When _is_machine_output asks whether the file is a minified bundle or declares itself generated in its header
+    Then it answers yes for either, because both are the output of a build and neither is anyone's authored code
+    And it exists so that the shared scope and the text reader cannot drift into disagreeing about what machine output is
+    But it reads the header through the same function every other caller does, rather than carrying a second copy of the markers
 
   Scenario: _repo_has_packages asks whether the repository is organised into importable packages
     Given a repository
@@ -94,8 +118,9 @@ Feature: scope — deciding which files are the code under audit and which are s
 
   Scenario: _bucket_reason gives the one reason a source file is set aside, or keeps it
     Given a path, the repository, whether the repository has packages, and a scope name
-    When _bucket_reason tests the path in order against the vendored list, the scope's markers, a docs directory, the conventional tooling file names, and the loose-root-script rule
+    When _bucket_reason tests the path in order against the vendored list, the scope's markers, a docs directory, the conventional tooling file names, machine output, and the loose-root-script rule
     Then it returns the first reason that applies, and nothing when the file stays in the audit
+    And a file a tool generated is set aside for every measurement that reads this scope, because a parser table or a build stamp is the output of a generator and no number an audit puts on it describes this repository
     And the loose-root-script reason fires only for a file directly at the root of a repository that has packages and is not itself a package, so a flat script-only repository keeps its root scripts because they are the code
     But it names no project and encodes no specific repository, and every reason it returns is disclosed rather than applied silently
 
@@ -119,12 +144,8 @@ Feature: scope — deciding which files are the code under audit and which are s
   # named scope therefore see different file sets. Recorded, not fixed.
   Scenario: _read_text_files reads files of the given extensions as text under a named scope
     Given a repository, a set of file suffixes, and a scope name
-    When _read_text_files walks the whole tree, keeps the files whose suffix is in the set, and drops the ones in a vendored or scoped-out directory
+    When _read_text_files walks the whole tree, keeps the files whose suffix is in the set, and drops the ones in a vendored or scoped-out directory and the ones a tool generated
     Then it returns the files it read with their text, decoded so an undecodable byte is replaced rather than raising, and a count of the files it could not read
+    And machine output is dropped here as the source reader drops it, through the same function, so the two cannot come to disagree about what a generated file is
     But it applies only the scope's directory markers, so a documentation file, a conventional tooling file or a loose root script that the source reader would have set aside is read here
 
-  Scenario: holds_a_test_marker says whether a file's first bytes name a test framework
-    Given the first 4 KiB of a file inside a directory named like a test directory
-    When holds_a_test_marker looks for the framework markers
-    Then a file importing a test framework corroborates the directory
-    But the file name is judged elsewhere, because a renamed directory must not corroborate itself

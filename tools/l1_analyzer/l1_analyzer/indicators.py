@@ -60,7 +60,6 @@ from l1_analyzer.scope import (  # noqa: F401
     _component_scoped_out,
     _extra_reason,
     _in_ignored_dir,
-    _is_generated,
     _read_source_bytes,
     _read_text_files,
     _repo_has_packages,
@@ -583,21 +582,17 @@ def _code_line_count(src: bytes, ext: str) -> int:
 def _god_file_reason(f: Path, repo: Path, has_packages: bool) -> str | None:
     """Why a candidate file is not a production god-file, or None to count it. The
     shared production scoping (tests, conformance, docs, tooling, vendored, loose
-    scripts) plus generated code, which is L1.17-specific: a machine-generated or
-    minified file carries no merge-conflict surface and nobody hand-piles into it.
+    scripts, generated code).
 
     The scope is the finite-testability meter's, so L1.17 is declared under it in
     scope.SCOPES and a change to that scope names L1.17 among the numbers it moves.
 
-    Generated-exclusion lives here, NOT in the shared _bucket_reason, so it never
-    changes the mutable-state (L1.18) or finite-testability measurements that flow
-    through that function; only the god-file indicator is refined."""
-    reason = _bucket_reason(f, repo, has_packages, PRODUCTION_WITHOUT_CONFORMANCE)
-    if reason is not None:
-        return reason
-    if f.name.endswith((".min.js", ".min.css")) or _is_generated(f):
-        return "generated"
-    return None
+    This function used to read the generated-file marker itself, on the stated
+    grounds that excluding machine output here alone left the other indicators'
+    published numbers undisturbed. It left them wrong instead: every other measure
+    read a parser table or a build stamp as code somebody wrote. _bucket_reason now
+    reads the marker for all of them, and this function asks it rather than the file."""
+    return _bucket_reason(f, repo, has_packages, PRODUCTION_WITHOUT_CONFORMANCE)
 
 
 @boundary
