@@ -17,6 +17,7 @@ runs, not that it is reading the thing it names.
 """
 
 import pytest
+from l1_analyzer import honest_code_contracts as contracts
 from l1_analyzer import honest_code_edges as edges
 from l1_analyzer import honest_code_read as read
 from l1_analyzer import honest_code_rules as rules
@@ -1088,7 +1089,7 @@ _TEST_ON_A_TYPE_THAT_PROMISES_NOTHING = [
 
 @pytest.mark.parametrize(("lang", "source"), _RECHECKS_WHAT_THE_SIGNATURE_TYPED)
 def test_a_check_the_signature_already_made_is_found_in_every_language(lang, source):
-    found = rules.imperative_validation(read.read_tree(source, lang))
+    found = contracts.imperative_validation(read.read_tree(source, lang))
     assert found, lang
     assert "already types" in found[0]["detail"]
 
@@ -1097,7 +1098,7 @@ def test_a_check_the_signature_already_made_is_found_in_every_language(lang, sou
 def test_a_check_on_a_value_the_signature_left_open_is_left_alone(lang, source):
     """The direction that matters more. A rule that fired here would ask an author to
     delete the validation their own signature asked for."""
-    assert rules.imperative_validation(read.read_tree(source, lang)) == [], lang
+    assert contracts.imperative_validation(read.read_tree(source, lang)) == [], lang
 
 
 @pytest.mark.parametrize("lang", ["javascript", "ruby", "rust", "c"])
@@ -1111,14 +1112,14 @@ def test_a_language_where_the_question_cannot_arise_says_so_rather_than_nothing(
         "rust": "fn f(x: i32) -> i32 { x + 1 }\n",
         "c": "int f(int x) { return x + 1; }\n",
     }
-    assert rules.imperative_validation(read.read_tree(sources[lang], lang)) is None, lang
+    assert contracts.imperative_validation(read.read_tree(sources[lang], lang)) is None, lang
 
 
 def test_a_test_for_a_type_the_parameter_cannot_hold_is_not_counted(lang="python"):
     """Stated as a bound in the clause and asserted here. `isinstance(x, str)` against an
     `x: int` is an unreachable branch, which is a different defect from a redundant check,
     and nothing in this clause measures it."""
-    found = rules.imperative_validation(read.read_tree(
+    found = contracts.imperative_validation(read.read_tree(
         "def f(x: SomeProtocol):\n    if isinstance(x, str):\n        return 1\n    return 2\n",
         lang))
     assert found == [], found
@@ -1233,7 +1234,7 @@ end
 
 @pytest.mark.parametrize(("lang", "source"), _HOLDS_A_RESOURCE_UNSCOPED)
 def test_a_resource_on_instance_state_with_no_scope_is_found(lang, source):
-    found = rules.unscoped_resources(read.read_tree(source, lang))
+    found = contracts.unscoped_resources(read.read_tree(source, lang))
     assert found, lang
     assert "manual lifecycle" in found[0]["detail"]
 
@@ -1242,7 +1243,7 @@ def test_a_resource_on_instance_state_with_no_scope_is_found(lang, source):
 def test_a_class_that_scopes_its_own_resource_is_left_alone(lang, source):
     """The direction that matters more. A class declaring the language's own release hook
     has done what the rule asks, and reporting it would punish the remedy."""
-    assert rules.unscoped_resources(read.read_tree(source, lang)) == [], lang
+    assert contracts.unscoped_resources(read.read_tree(source, lang)) == [], lang
 
 
 @pytest.mark.parametrize("lang", ["c", "go"])
@@ -1251,11 +1252,157 @@ def test_a_language_with_no_class_to_hold_the_resource_says_nothing_was_decided(
     the question cannot arise. None, not an empty list."""
     sources = {"c": "int main(void) { return 0; }\n",
                "go": "type Store struct{ conn int }\n"}
-    assert rules.unscoped_resources(read.read_tree(sources[lang], lang)) is None, lang
+    assert contracts.unscoped_resources(read.read_tree(sources[lang], lang)) is None, lang
 
 
 def test_an_ordinary_value_on_instance_state_is_not_a_resource():
     """The rule is about a thing with a lifecycle, not about instance state as such."""
-    assert rules.unscoped_resources(read.read_tree(
+    assert contracts.unscoped_resources(read.read_tree(
         "class Store:\n    def __init__(self, name):\n        self.name = name.strip()\n",
         "python")) == []
+
+
+
+_SUFFIX = {"python": ".py", "javascript": ".js", "typescript": ".ts", "java": ".java",
+           "csharp": ".cs", "ruby": ".rb", "go": ".go", "rust": ".rs", "c": ".c"}
+
+
+def _source_named(source: str, lang: str, name: str) -> dict:
+    """A parsed source carrying a file name, which read_tree does not add and clause 10
+    asks for first. The analyzer adds it the same way."""
+    return {**read.read_tree(source, lang), "path": name + _SUFFIX[lang]}
+
+
+def _test_source(source: str, lang: str) -> dict:
+    return _source_named(source, lang, "test_it")
+
+
+# ---------------------------------------------------------------------------
+# 10. Pure Function Assertions Over Mocks
+#
+# Read Python's own parser until now. The count is a readout on the CODE and not on the
+# test: three mocks in one test means the function under test has three hidden dependencies.
+#
+# Two language facts make this harder than the clauses before it. Which call builds a mock
+# is a library name and differs everywhere. And what a test IS differs structurally: Python,
+# Java and C# name a function, while JavaScript and Ruby pass a body to `it`, so a reader
+# looking only for named functions finds no tests at all in half the languages.
+# ---------------------------------------------------------------------------
+
+_THREE_MOCKS_IN_ONE_TEST = [
+    ("python", """def test_it(monkeypatch):
+    a = Mock()
+    b = MagicMock()
+    c = Mock()
+    assert use(a, b, c)
+"""),
+    ("javascript", """it('works', () => {
+  const a = jest.fn()
+  const b = jest.fn()
+  const c = jest.fn()
+  expect(use(a, b, c)).toBe(1)
+})
+"""),
+    ("typescript", """it('works', () => {
+  const a = jest.fn()
+  const b = jest.fn()
+  const c = jest.fn()
+  expect(use(a, b, c)).toBe(1)
+})
+"""),
+    ("java", """class StoreTest {
+  @Test
+  void testIt() {
+    Store a = Mockito.mock(Store.class);
+    Store b = Mockito.mock(Store.class);
+    Store c = Mockito.mock(Store.class);
+    assertTrue(use(a, b, c));
+  }
+}
+"""),
+    ("csharp", """class StoreTest {
+  public void TestIt() {
+    var a = Substitute.For<IStore>();
+    var b = Substitute.For<IStore>();
+    var c = Substitute.For<IStore>();
+    Assert.True(Use(a, b, c));
+  }
+}
+"""),
+    ("ruby", """it 'works' do
+  a = double('a')
+  b = double('b')
+  c = double('c')
+  expect(use(a, b, c)).to eq(1)
+end
+"""),
+]
+
+_TWO_MOCKS_IS_ORDINARY_ISOLATION = [
+    ("python", """def test_it():
+    a = Mock()
+    b = Mock()
+    assert use(a, b)
+"""),
+    ("javascript", """it('works', () => {
+  const a = jest.fn()
+  const b = jest.fn()
+  expect(use(a, b)).toBe(1)
+})
+"""),
+    ("typescript", """it('works', () => {
+  const a = jest.fn()
+  const b = jest.fn()
+  expect(use(a, b)).toBe(1)
+})
+"""),
+    ("java", """class T {
+  @Test
+  void testIt() {
+    Store a = Mockito.mock(Store.class);
+    Store b = Mockito.mock(Store.class);
+  }
+}
+"""),
+    ("csharp", """class T {
+  public void TestIt() {
+    var a = Substitute.For<IStore>();
+    var b = Substitute.For<IStore>();
+  }
+}
+"""),
+    ("ruby", """it 'works' do
+  a = double('a')
+  b = double('b')
+end
+"""),
+]
+
+
+@pytest.mark.parametrize(("lang", "source"), _THREE_MOCKS_IN_ONE_TEST)
+def test_three_mocks_in_one_test_is_found_in_every_language(lang, source):
+    found = contracts.mock_heavy_tests(_test_source(source, lang))
+    assert found, lang
+    assert "hidden dependencies" in found[0]["detail"]
+
+
+@pytest.mark.parametrize(("lang", "source"), _TWO_MOCKS_IS_ORDINARY_ISOLATION)
+def test_two_mocks_is_left_alone_in_every_language(lang, source):
+    """One or two is ordinary isolation. A rule firing here would report the practice it
+    is asking for."""
+    assert contracts.mock_heavy_tests(_test_source(source, lang)) == [], lang
+
+
+@pytest.mark.parametrize(("lang", "source"), _THREE_MOCKS_IN_ONE_TEST)
+def test_a_file_that_is_not_a_test_is_not_decided(lang, source):
+    """The count means nothing outside a test, so the answer is that nobody asked, not
+    that the file is clean."""
+    assert contracts.mock_heavy_tests(_source_named(source, lang, "app")) is None, lang
+
+
+@pytest.mark.parametrize("lang", ["go", "rust", "c"])
+def test_a_language_with_no_mock_vocabulary_says_nothing_was_decided(lang):
+    sources = {"go": "func TestIt(t *testing.T) { t.Fail() }\n",
+               "rust": "#[test]\nfn it_works() { assert!(true); }\n",
+               "c": "void test_it(void) { }\n"}
+    assert contracts.mock_heavy_tests(_test_source(sources[lang], lang)) is None, lang

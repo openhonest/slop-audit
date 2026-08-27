@@ -174,26 +174,12 @@ def test_a_file_with_no_cache_finds_nothing():
 # --------------------------------------------------------------------------
 # 10. Pure-function assertions over mocks
 # --------------------------------------------------------------------------
-
-def test_a_test_carrying_three_mocks_is_found():
-    found = python_rules.mock_heavy_tests(_source(
-        "def test_order():\n"
-        "    a = Mock()\n    b = MagicMock()\n    c = patch('x')\n"
-        "    assert place(a, b, c)\n", path="test_m.py", language="python"))
-    assert [f["symbol"] for f in found] == ["test_order"]
-
-
-def test_a_test_with_two_mocks_is_ordinary_isolation():
-    assert python_rules.mock_heavy_tests(_source(
-        "def test_order():\n    a = Mock()\n    b = Mock()\n    assert place(a, b)\n",
-        path="test_m.py", language="python")) == []
-
-
-def test_the_mock_clause_only_reads_test_files():
-    """A file that is not a test has no tests to count mocks in, and a production file
-    naming Mock is doing something else."""
-    assert python_rules.mock_heavy_tests(_source(
-        "def build():\n    return Mock(), Mock(), Mock()\n", path="m.py", language="python")) is None
+# 10. Pure function assertions over mocks
+#
+# Ported to the shared node vocabulary, so all three cases moved to
+# test_a_clause_means_the_same_in_every_language.py, where they are asserted for Python and
+# for the five other languages that can now decide the clause.
+# --------------------------------------------------------------------------
 
 
 # --------------------------------------------------------------------------

@@ -34,8 +34,6 @@ from l1_analyzer.honest_code_read import (
 #
 _CACHE_NAMES = frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache"})
 _CACHE_DECORATORS = frozenset({"lru_cache", "cache", "cached", "memoize", "cached_property"})
-_MOCK_NAMES = frozenset({"Mock", "MagicMock", "AsyncMock", "patch", "mock_open", "NonCallableMock"})
-_MOCK_LIMIT = 3
 _HOOK_CALLS = frozenset({"register", "signal", "on_event", "add_event_handler", "atexit"})
 _HOOK_DECORATORS = frozenset({"atexit", "on_event", "listens_for", "add_event_handler",
                               "before_request", "after_request", "receiver"})
@@ -71,30 +69,6 @@ def unmeasured_caches(source: dict) -> list[Finding] | None:
                         "L1.21.9", node.name, node.lineno,
                         f"@{bare} caches the result before anything measured the cost",
                         "profile it and fix the query or the schema first", _UNPROFILED))
-    return found
-
-
-def mock_heavy_tests(source: dict) -> list[Finding] | None:
-    """Three or more mocks in one test.
-
-    The count is a readout on the CODE, not on the test: three mocks means the function
-    under test has three hidden dependencies. One or two is ordinary isolation.
-
-    Not applicable to a file that is not a test."""
-    if not _is_test_file(source["path"]):
-        return None
-    found: list[Finding] = []
-    for fn in _functions(source):
-        if not fn.name.startswith("test"):
-            continue
-        mocks = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
-                 and _bare_name(n) in _MOCK_NAMES]
-        if len(mocks) >= _MOCK_LIMIT:
-            found.append(_finding(
-                "L1.21.10", fn.name, fn.lineno,
-                f"{len(mocks)} mocks, so the function under test has {len(mocks)} hidden "
-                "dependencies",
-                "extract the pure logic and assert f(input) == expected on it directly", ""))
     return found
 
 

@@ -41,12 +41,6 @@ Feature: Clauses this reader still reads through Python's own parser
     Then an exit handler, a signal handler, an ORM callback or a mount effect puts behaviour somewhere nobody reads
     But a call at the place it happens is not a hook, however much work it does
 
-  Scenario: mock_heavy_tests finds a test carrying the function's hidden dependencies
-    Given a parsed test file
-    When mock_heavy_tests counts the mocks in each test
-    Then three or more in one test means the function under test has three hidden dependencies
-    But one or two is ordinary isolation, and the count is a readout on the code rather than on the test
-
   Scenario: strangler_migration records that nothing checked the migration
     Given any parsed source
     When strangler_migration is asked about it

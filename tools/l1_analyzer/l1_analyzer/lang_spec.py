@@ -97,6 +97,13 @@ class LangSpec(TypedDict, total=False):
     # path that raises, and every language with classes has a way to scope it. Which method
     # declares that scope, and which node holds instance state, are language facts.
     release_methods: frozenset[str]      # declaring one says the class scopes its resource
+    # Pure Function Assertions Over Mocks. Which call builds a mock is a library name and
+    # differs everywhere. What a test IS differs structurally too: Python, Java and C# name
+    # a function, while JavaScript and Ruby pass a body to `it`, so a reader looking only
+    # for named functions finds no tests at all in half the languages.
+    mock_calls: frozenset[str]           # empty means this language has no mock vocabulary here
+    test_name_prefixes: tuple[str, ...]  # a named function that is a test
+    test_block_calls: frozenset[str]     # a call that takes the test body as its argument
     instance_state_types: tuple[str, ...]  # nodes that ARE instance state, needing no receiver
     resource_calls: frozenset[str]       # this language's own spellings, joined to the shared list
     typed_param_name: str            # field naming the parameter; empty means the first child
@@ -350,6 +357,10 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "mock_calls": frozenset({"Mock", "MagicMock", "AsyncMock", "patch", "mock_open",
+                                 "NonCallableMock"}),
+        "test_name_prefixes": ("test",),
+        "test_block_calls": frozenset(),
         "release_methods": frozenset({"__enter__", "__aenter__"}),
         "instance_state_types": (),
         "resource_calls": frozenset(),
@@ -517,6 +528,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "mock_calls": frozenset({"fn", "mock", "spyOn", "stub", "fake",
+                                 "createStubInstance"}),
+        "test_name_prefixes": (),
+        "test_block_calls": frozenset({"it", "test", "specify"}),
         "release_methods": frozenset({"close", "dispose", "destroy", "end"}),
         "instance_state_types": (),
         "resource_calls": frozenset({"createConnection", "createClient", "createPool"}),
@@ -630,6 +645,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "mock_calls": frozenset({"mock", "spy"}),
+        "test_name_prefixes": ("test",),
+        "test_block_calls": frozenset(),
         "release_methods": frozenset({"close"}),
         "instance_state_types": (),
         "resource_calls": frozenset({"getConnection", "openConnection", "newSession"}),
@@ -737,6 +755,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "mock_calls": frozenset({"For", "Fake", "Mock"}),
+        "test_name_prefixes": ("Test",),
+        "test_block_calls": frozenset(),
         "release_methods": frozenset({"Dispose", "DisposeAsync"}),
         "instance_state_types": (),
         # PascalCase, so the shared list's lowercase spellings never match here.
@@ -860,6 +881,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        # No mock vocabulary in this table, so the question is not decided here.
+        "mock_calls": frozenset(),
+        "test_name_prefixes": (),
+        "test_block_calls": frozenset(),
         "release_methods": frozenset({"drop"}),
         "instance_state_types": (),
         "resource_calls": frozenset(),
@@ -979,6 +1004,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "mock_calls": frozenset({"double", "instance_double", "class_double", "spy",
+                                 "stub"}),
+        "test_name_prefixes": ("test",),
+        "test_block_calls": frozenset({"it", "specify"}),
         "release_methods": frozenset({"close", "disconnect", "shutdown"}),
         # Instance state is its own node here, not a member access on a receiver, so a
         # reader looking only for `self.x` finds nothing in idiomatic Ruby.
@@ -1096,6 +1125,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "mock_calls": frozenset(),
+        "test_name_prefixes": (),
+        "test_block_calls": frozenset(),
         # No class to hold the resource, so the question cannot arise.
         "release_methods": frozenset(),
         "instance_state_types": (),
@@ -1214,6 +1246,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "mock_calls": frozenset(),
+        "test_name_prefixes": (),
+        "test_block_calls": frozenset(),
         # A struct has no release hook in this vocabulary, and `defer` scopes at the call
         # site rather than in the type, so nothing here decides the question.
         "release_methods": frozenset(),

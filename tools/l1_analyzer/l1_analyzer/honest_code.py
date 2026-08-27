@@ -27,6 +27,7 @@ from typing import TypedDict
 
 from tree_sitter import Language, Node, Parser
 
+from l1_analyzer import honest_code_contracts as contracts
 from l1_analyzer import honest_code_edges as edges
 from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_rules as rules
@@ -262,10 +263,11 @@ CLAUSES: tuple[Clause, ...] = (
     _clause(8, "Typed Exceptions at the Boundary", _TREE, edges.swallowed_exceptions, nothing_to_read="",
             reads=_TREE_READER),
     _clause(9, "SQL Over Application Caches", _PARTLY, python_rules.unmeasured_caches, nothing_to_read=""),
-    _clause(10, "Pure Function Assertions Over Mocks", _TREE, python_rules.mock_heavy_tests, nothing_to_read=""),
+    _clause(10, "Pure Function Assertions Over Mocks", _TREE, contracts.mock_heavy_tests,
+            nothing_to_read="", reads=_TREE_READER),
     _clause(11, "Trust the Contract in the Interior", _TREE,
-            rules.imperative_validation, nothing_to_read="", reads=_TREE_READER),
-    _clause(12, "Context Managers Over Instance State", _TREE, rules.unscoped_resources,
+            contracts.imperative_validation, nothing_to_read="", reads=_TREE_READER),
+    _clause(12, "Context Managers Over Instance State", _TREE, contracts.unscoped_resources,
             nothing_to_read="", reads=_TREE_READER),
     _clause(13, "Configuration as Parameters", _TREE, rules.hidden_configuration, nothing_to_read="",
             reads=_TREE_READER),
