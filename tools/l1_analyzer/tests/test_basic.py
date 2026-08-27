@@ -884,7 +884,9 @@ def test_cli_source_indicators_no_exec_text(tmp_path, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     # The default CLI output is the full Slop Audit report (grade + verdict + audit checks).
-    assert "Slop Audit" in out and "finitely testable" in out
+    # A grade line rather than the phrase: a repository that keeps no state grades without a
+    # percentage, because a share of nothing is not a measurement.
+    assert "Slop Audit" in out and "**Grade:" in out
 
 
 def test_cli_all_indicators_auto_lang(tmp_path, capsys):

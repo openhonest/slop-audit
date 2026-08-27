@@ -116,6 +116,13 @@ SILENCE_FLOOR = 0.52
 # on every report so a reader can see how thin the reading was.
 NO_SOURCE, UNREAD, SILENT, MEASURED = "no-source", "unread", "silent", "measured"
 
+# A repository that keeps no state at all. Its own case, because a reading over nothing is
+# not the same kind of answer as a reading over something, and one word for both is what let
+# the card print "100% of its state is finitely testable" against zero pieces. Run on this
+# package, which keeps none by design, that headline made a claim about an empty set while
+# the three zeroes sat underneath it.
+NO_STATE = "no-state"
+
 # A finite, unordered partition wider than this is D. NO NUMBER IS SET, and that is the
 # measurement result, not an omission.
 #
@@ -211,7 +218,7 @@ def unread_kinds_phrase(census: object) -> str:
 
 
 def _basis(band: str, counts: dict, meter_ran: bool, census: object) -> str:
-    """What evidence the report actually has. Four cases, and three of them forbid a grade.
+    """What evidence the report actually has. Five cases, and three of them forbid a grade.
 
     The order is the argument. A promiscuous finding is a PROOF, and a proof does not need
     coverage of everything else to stand: one state that provably reaches an unbounded
@@ -229,6 +236,12 @@ def _basis(band: str, counts: dict, meter_ran: bool, census: object) -> str:
     # Subscripted. `counts` is either the analyzer's own, which carries all three verdicts,
     # or the named complete fallback its caller builds; neither can be missing a key, and a
     # default here would read a broken count as "none promiscuous".
+    # No state at all, which is not silence and not a gap: the census above has already
+    # confirmed the reader reached every declaration site. The honest sentence is that there
+    # is nothing here that can grow without limit, which is a STRONGER claim than a
+    # percentage rather than a weaker one.
+    if not any(counts.values()):
+        return NO_STATE
     if counts["promiscuous"] > 0:
         return MEASURED
     if silence_fraction(counts) > SILENCE_FLOOR:
@@ -249,7 +262,15 @@ def _status(basis: str, counts: dict, coarse: bool) -> str:
     shows the analyzer nothing, because zero observed state is vacuously clean. Hiding state
     behind an unreadable boundary trips the silence floor; hiding it in a construct the
     enumerator does not know about trips the census. Either way there is no grade, so
-    obscurity buys silence rather than a good letter."""
+    obscurity buys silence rather than a good letter.
+
+    NO STATE is not one of those two, and it grades. The census has already confirmed the
+    reader reached every declaration site and found nothing that outlives a call, which is
+    the strongest finite-testability result there is: not "every piece is bounded" but "there
+    are no pieces". Sending it to `na` told a reader we could not read their code, which is
+    the opposite of what happened."""
+    if basis == NO_STATE:
+        return "can"
     if basis != MEASURED:
         return "na"
     if counts["promiscuous"] > 0:

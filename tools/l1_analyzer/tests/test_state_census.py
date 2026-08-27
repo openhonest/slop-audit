@@ -239,7 +239,12 @@ def test_a_codebase_with_no_mutable_state_by_design_is_graded_not_refused(tmp_pa
     assert result["census"]["admitted"] == 0
     assert result["census"]["declared"] > 0
     g = report.grade_summary(_results(result) | {"L1.18": {"value": 0.0, "band": "Healthy"}}, None)
-    assert g["basis"] == report.MEASURED, "the enumerator looked and was right; that is a reading"
+    # NO_STATE rather than MEASURED. Both are readings and both grade, which is what this
+    # test is for; they were one word until the card printed "100% of its state is finitely
+    # testable" over zero pieces. A share of nothing is not a measurement, so a repository
+    # that keeps none says so instead of scoring it.
+    assert g["basis"] == report.NO_STATE, "the enumerator looked and was right; that is a reading"
+    assert g["grade"] is not None, "a reading over no state still grades"
     assert g["grade"] is not None
 
 

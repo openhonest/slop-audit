@@ -31,6 +31,7 @@ CARD_COPY: dict[str, str] = {
     "headline.cannot": "This code mathematically CANNOT be exhaustively tested.",
     "detail.can": "None of the data this code keeps can grow without limit, so a fixed number of tests can check every case. The Slop Audit worked out the fewest test runs that reach every path: {cover} runs cover them all.",
     "detail.can_nocover": "None of the data this code keeps can grow without limit, so a fixed number of tests can check every case. Run the [CLI](https://github.com/openhonest/slop-audit) to get the exact number of runs that cover every path.",
+    "detail.no_state": "This code keeps no data that outlives a single call, so there is nothing here that could grow without limit and nothing a test would have to enumerate. That is a stronger result than a good score, and it is why no percentage is shown: a share of nothing is not a measurement. We read {declared} {places} where data is declared and none of them holds state between calls.",
     "detail.coarse": "Every piece of data here has a limited set of cases, so a fixed number of tests would cover it. The trouble is how many, and that they have no order. When cases are ordered, such as numbers against a limit, you test each side of the limit and you are done, however wide the range. The cases below are names, and one name is not next to another, so there is no shortcut: covering them means one test each. Cut the number of distinct cases, or give them an order, and the count comes down.",
     "detail.cannot": "{n} {plural} of data here can be almost anything, and the code makes decisions based on it. Because it can be anything, there is always one more case to check, so no fixed number of tests can ever cover them all. Writing more tests will not fix this. The only fix is to limit what that data can be, or stop letting other parts of the code change it.",
     "detail.na": "Point it at a public repository with code in a language the analyzer reads: Python, TypeScript, JavaScript, Java, C#, Rust, Ruby, Go, or C.",
@@ -323,6 +324,10 @@ def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts
                   total=sum(counts.values())) if sum(counts.values()) else _t("detail.na")
     if status == "cannot":
         return _t("detail.cannot", n=promiscuous, plural="piece" if promiscuous == 1 else "pieces")
+    if basis == report.NO_STATE:
+        declared = census.get("declared", 0)
+        return _t("detail.no_state", declared=declared,
+                  places="place" if declared == 1 else "places")
     if status == "can":
         return _t("detail.can", cover=f"{cover:,}") if cover else _t("detail.can_nocover")
     return _t("detail.coarse")
@@ -503,7 +508,12 @@ def _verdict_lines(card: dict, strip: re.Pattern) -> list[str]:
     state, and an ungraded card is one where no state was read. Printing the counts alone
     would put "0 provably unbounded" under a refusal to grade, which reads as good news."""
     lines: list[str] = []
-    if card["grade"] is not None:
+    if card["basis"] == report.NO_STATE:
+        # No percentage. A share of nothing is not a measurement, and the headline said
+        # "100% of its state is finitely testable" over zero pieces while the three zeroes
+        # sat underneath it as the only thing saying otherwise.
+        lines += [f"**Grade: {card['grade']}** — this code keeps no state between calls", ""]
+    elif card["grade"] is not None:
         lines += [f"**Grade: {card['grade']}** — {card['grade_pct']}% of its state is finitely testable", ""]
     lines += [card["headline"], "", strip.sub("", card["detail"])]
     if card["grade"] is None:
