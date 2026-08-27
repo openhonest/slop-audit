@@ -485,6 +485,16 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
         "the canon's second Slop arm, a confirmed true positive, is not evaluated: "
         "no credential is validated against its issuer"
     )
+    # A count standing entirely outside production code can still be cleared, and the canon
+    # says by whom and on what condition (spec/dimensions/07-configuration-secrets.md, Layer
+    # 2 step 1). Layer 1 cannot demonstrate a false positive, so it names the route rather
+    # than taking it: a reader who is told only "Slop" reaches for the one repair this
+    # project refuses, which is excluding a path until the number improves.
+    if total > 0 and counts["in_production"] == 0:
+        details += (
+            "; none of these sits in production code, so Layer 2 may still clear this count, "
+            "but only where every hit is demonstrably a false positive on a test fixture"
+        )
     if skipped:
         details += f"; {skipped} file(s) unreadable or oversized and excluded"
     if scanned == 0:

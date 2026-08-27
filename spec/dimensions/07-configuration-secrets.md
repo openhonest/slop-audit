@@ -70,10 +70,10 @@
 
 **Example absence (Python / Flask).** A Flask application with a `config.py` file at the repository root containing:
 ```
-STRIPE_SECRET_KEY = "sk_live_51ABC..."
-DATABASE_URL = "postgres://app:hunter2@db.prod.internal:5432/myapp"
-JWT_SECRET = "the-quick-brown-fox-jumps-over-the-lazy-dog"
-SENDGRID_API_KEY = "SG.xyz..."
+STRIPE_SECRET_KEY = "<a live Stripe key>"
+DATABASE_URL = "postgres://app:<the production password>@db.prod.internal:5432/myapp"
+JWT_SECRET = "<a forty-three character signing secret>"
+SENDGRID_API_KEY = "<a live SendGrid key>"
 ```
 The file is committed to git and has been since the project's first commit 26 months ago. `git log --all -p config.py` reveals that the Stripe key was rotated once 8 months ago (the new key replaced the old one in a commit), but the old key is still retrievable from history and was never revoked at Stripe. The `.env.example` file in the same repository contains a working OpenAI API key for the team's shared developer account. A Dockerfile in the same repository contains `ENV ADMIN_PASSWORD=changeme` as a default that "would be overridden in production" but isn't, because the Kubernetes deployment YAML omits the override. Five out of nine credentials checked are exposed in the codebase.
 
