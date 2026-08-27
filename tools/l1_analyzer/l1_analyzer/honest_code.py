@@ -904,9 +904,19 @@ def analyze(repo: Path, lang: str) -> dict:
 
     files = production + tests
     never_decided = sorted({c["code"] for c in CLAUSES} - decided)
+    # Named, not numbered, and with the reason where there is one to give. A reader shown
+    # "Not decided (7): L1.21.9, L1.21.10, ..." cannot tell a clause that found nothing from
+    # one that could not be applied to their language at all, and seven of them cannot: they
+    # read Python's own parser, so on any other language they never reach the code.
+    by_code = {c["code"]: c for c in CLAUSES}
+    # Both, because they answer different questions. The name says what was not checked,
+    # which a bare number cannot, and the code is what a reader greps for afterwards.
+    named_undecided = ", ".join(f"{by_code[code]['name']} ({code})" for code in never_decided)
+    unreachable = [code for code in never_decided
+                   if by_code[code]["reads"] == _PYTHON_AST and lang != "python"]
     if not decided:
         nothing = ("no file here could be measured against any clause, so there is no "
-                   "conformity to report. Not decided: " + ", ".join(never_decided))
+                   "conformity to report. Not decided: " + named_undecided)
         return {"value": "n/a", "band": "n/a", "details": nothing,
                 "findings": [], "undecided": never_decided,
                 "allowed": declared_exceptions, "declared": boundary_declarations,
@@ -926,7 +936,11 @@ def analyze(repo: Path, lang: str) -> dict:
               f"{unexamined_blocks_seen} block"
               f"{'' if unexamined_blocks_seen == 1 else 's'} of another language were not "
               "examined. "
-              f"Not decided ({len(never_decided)}): " + ", ".join(never_decided))
+              f"Not decided ({len(never_decided)}): " + named_undecided)
+    if unreachable:
+        detail += (f". {len(unreachable)} of those read Python's own parser rather than the "
+                   f"shared node vocabulary, so on {lang} they could not reach the code at "
+                   "all. They are unported, not silent")
     return {"value": share, "band": band_of(share), "details": detail,
             "findings": [f for group in broken.values() for f in group],
             "undecided": never_decided, "allowed": declared_exceptions,
