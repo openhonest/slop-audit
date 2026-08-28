@@ -973,7 +973,15 @@ def _compute_decision_space(repo: Path, lang: str) -> L1Result:
                 walk(c)
         walk(root)
 
-    detail = f"{decision_points} finite decision points enumerated across {len(files)} files; exercised-coverage fraction requires a test-execution trace (not run by this reference implementation)"
+    # What it counted, and the bound on that count. NOT whether a trace ran: this function
+    # serves the website, which runs nothing, and the CLI, which runs the suite, and it used
+    # to end "(not run by this reference implementation)" for both. On a Java repository the
+    # reader got that sentence beside the harness's own account of running Maven. It is the
+    # larger version of the claim already removed from the footer, that the runtime harness
+    # is Python-only. There are harnesses for eight languages and they work.
+    detail = (f"{decision_points} finite decision points enumerated across {len(files)} "
+              "files; the share a test exercises is a different number and needs a "
+              "test-execution trace")
     return {"value": decision_points, "band": "n/a", "details": _with_skipped(detail, skipped)}
 
 def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:

@@ -65,7 +65,7 @@ GOLDEN = Path(__file__).parent / "golden" / "py_repo.json"
 # It counted every line of the file, blanks and docstrings included, while its numerator
 # marked whole clone line ranges. Both halves generous, and generosity in a divisor lowers a
 # percentage. Both now count lines that carry a code token. The value is 0.0 either way here.
-_GOLDEN_SHA256 = "9a008b3831db332828ffbee92f62234ab70aca35edc675c6ae4e818a4cb0995f"
+_GOLDEN_SHA256 = "5caac1ebeac7cdf0a083740263342d22d5a1e46b72a14480ef29858b37d86a8c"
 
 # A deliberately-sloppy sample: pure function + reads of dict/list/str/int/bool
 # state, plus one bounded projection (len). Written to tmp_path per test. Kept
@@ -286,6 +286,11 @@ def test_a_membership_partition_is_not_ordered(tmp_path):
         assert finding["partition"]["ordered"] is False, op
 
 
+# Re-captured 2026-08-28, one string. The L1.19 static row ended "(not run by this
+# reference implementation)", which spoke for a run this function cannot see: the same
+# code serves the website, which runs nothing, and the CLI, which runs the suite. A Java
+# repository was shown that sentence beside the harness's own account of running Maven.
+# Nothing measured moved; the row now says what it counted and stops.
 def test_the_golden_itself_is_unchanged():
     """A re-capture must be a decision, not a side effect.
 
