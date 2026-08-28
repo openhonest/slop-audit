@@ -59,8 +59,16 @@ CARD_COPY: dict[str, str] = {
     # false for the Python repository whose report named it: there, our own coverage session
     # had collided with theirs. A reader could not tell a language we cannot run from a bug
     # in how we ran theirs, and the sentence they were shown blamed them.
-    "footer.cli_na": "Run under the Slop Audit CLI, which executes the repository's test suite to measure decision-space coverage (L1.19) and test determinism (L1.20). Those rows read n/a here: {reason}. try.slopaudit.org never executes any repo's code; this is the difference between 'we did not run it' and 'we could not run it here yet.'",
+    # One sentence per row. Written for both rows at once, it announced that both read n/a
+    # and then quoted one of the measurements as the reason, on the first run where coverage
+    # worked and determinism did not. That held only while the two always failed together.
+    "footer.cli_open": "Run under the Slop Audit CLI, which executes the repository's test suite.",
+    "footer.row_ran": "{label} ({code}) was measured: {reason}.",
+    "footer.row_missing": "{label} ({code}) was not measured: {reason}.",
+    "footer.cli_close": "try.slopaudit.org never executes any repo's code; this is the difference between 'we did not run it' and 'we could not run it here yet.'",
     "footer.cli_na_silent": "the harness did not say why",
+    "footer.row.L1.19": "decision-space coverage",
+    "footer.row.L1.20": "test determinism",
     "grade.rubric": "The grade is verifiability first, by a rule we publish rather than hide. The verdict sets the tier: <strong>CANNOT &rarr; F</strong> (some state is provably unbounded, so no finite test suite covers it), <strong>COARSE &rarr; D</strong> (some state has a countable but unordered set of cases too wide to cover; a wide ORDERED range costs a handful of boundary tests, a wide unordered one costs one test per case). When every piece of state is finitely testable and coverable, the audit checks below decide <strong>A, B, or C</strong> by weighted health &mdash; god-files and type-escapes weigh most (3 each), then CI (2), then containers, pre-commit, and formatting (1 each). The number is the share of DECIDED state that is finitely testable. No hidden weights.",
     # Migrated from report.py when its renderers were deleted. The claim was published on
     # every report that module produced and on no card, so the surface people actually read
@@ -406,18 +414,27 @@ def _proofs(results: dict) -> list[dict]:
 
 
 def footer_for(card: dict) -> str:
-    """The closing sentence, which says what this run did and did not do.
+    """The closing sentences, one for each row the CLI runs.
 
-    Three cases. The site never runs anyone's code. The CLI ran the suite and got a number.
-    The CLI ran and did not, and THAT case carries the harness's own reason rather than a
-    cause chosen here: it named a Python-only harness for every failure, and told a Python
-    repository exactly that on a run our own coverage session had broken."""
+    The site never runs anyone's code, and says so. Otherwise every runtime row gets its own
+    sentence saying whether it was measured and why, taken from what that row reported.
+
+    Two bugs live behind this, one inside the other. The footer used to name a single cause
+    for every unmeasured run, and told a Python repository the harness was Python-only on a
+    run our own coverage session had broken. Then it kept one sentence for two rows, so on a
+    run where coverage measured and determinism did not it announced that both read n/a and
+    offered the coverage measurement as the reason."""
     if not card["ran_tests"]:
         return _t("footer.fine")
-    if card["tests_measured"]:
-        return _t("footer.cli")
-    reason = card.get("coverage_na_reason") or _t("footer.cli_na_silent")
-    return _t("footer.cli_na").replace("{reason}", reason)
+    sentences = [_t("footer.cli_open")]
+    for row in card["runtime_rows"]:
+        key = "footer.row_ran" if row["measured"] else "footer.row_missing"
+        sentences.append(_t(key)
+                         .replace("{label}", _t(f"footer.row.{row['code']}").capitalize())
+                         .replace("{code}", row["code"])
+                         .replace("{reason}", row["reason"] or _t("footer.cli_na_silent")))
+    sentences.append(_t("footer.cli_close"))
+    return " ".join(sentences)
 
 
 def build_card(slug: str, lang: str, results: dict, ran_tests: bool,
@@ -452,13 +469,20 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool,
     tests_measured = ran_tests and isinstance(l20, dict) and str(l20["band"]) != "n/a"
     # Taken from the harness, never chosen here. The footer used to name one cause for every
     # unmeasured run and got it wrong on the first repository that reported it.
-    l19 = results.get("L1.19")
-    coverage_na_reason = ("" if tests_measured or not isinstance(l19, dict)
-                          else str(l19.get("details") or l19.get("detail") or ""))
+    # One row per runtime check, each carrying what it reported. Taken from the row, never
+    # chosen here: the footer used to speak for both rows with one sentence and one cause.
+    runtime_rows = [
+        {"code": code,
+         "measured": isinstance(row, dict) and str(row.get("band")) != "n/a",
+         "reason": str(row.get("details") or row.get("detail") or "")
+                   if isinstance(row, dict) else ""}
+        for code, row in ((c, results.get(c)) for c in ("L1.19", "L1.20"))
+        if row is not None
+    ]
     return {
         "slug": slug, "lang": lang, "question": _t("question"), "status": status, "grade": grade,
         "grade_pct": pct, "ran_tests": ran_tests, "tests_measured": tests_measured,
-        "coverage_na_reason": coverage_na_reason,
+        "runtime_rows": runtime_rows,
         "headline": "" if status == "na" else _t(f"headline.{status}"),
         "basis": g["basis"], "census": g["census"],
         "census_note": "" if status == "na" else _census_note(g["census"]),
