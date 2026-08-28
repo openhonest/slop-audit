@@ -156,3 +156,23 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _tests_a_literal reads each pattern for a literal and for destructuring
     Then only the first tests a value
     But a default arm counts as a literal case, because it names no shape and a table has the same thing in its lookup failing
+
+  Scenario: lifecycle_hooks finds work parked where the reader does not look
+    Given a parsed source and its language's node vocabulary
+    When lifecycle_hooks looks for both shapes a hook takes, a call that registers a callback and a marker on a declaration
+    Then it reports either one, because the call site says nothing and the sequence lives in the registration instead
+    And a call at the place it happens is left alone, however much work it does
+    And a marker is matched as a node and never as text, since reading the unparsed source found a test whose data was the words of a registration and reported it as one
+    But a language this table gives no hook vocabulary is answered with nothing decided, which is Go, Rust, C, and Ruby, whose Rails callback is a bare call in a class body that needs more than this table holds to tell from an ordinary call
+
+  Scenario: _marker_names gives the names a marker on a declaration is built from
+    Given a marker node and the source bytes
+    When _marker_names strips the punctuation each language wraps it in and splits the rest on dots
+    Then Python's at-sign dotted decorator, Java's at-sign annotation and C#'s bracketed attribute all reduce to names a table can hold
+    But it returns every part rather than only the last, so a name matches whether it was written bare or dotted
+
+  Scenario: _declaration_named gives what the declaration under a marker is called
+    Given a marker node, its language's vocabulary, and the source bytes
+    When _declaration_named walks up to the first function or class holding the marker
+    Then it returns that name, so the finding points at the thing that runs rather than at the marker
+    But it falls back to the marker's own text where no named declaration holds it, rather than reporting an empty name

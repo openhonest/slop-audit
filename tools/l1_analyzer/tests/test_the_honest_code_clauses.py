@@ -236,19 +236,12 @@ def test_a_step_that_calls_and_checks_is_left_alone():
 
 
 # --------------------------------------------------------------------------
-# 16. Declarative equivalents over lifecycle hooks
+# 16. Declarative equivalents over framework lifecycle hooks
+#
+# Ported to the shared node vocabulary, so all six cases moved to
+# test_a_clause_means_the_same_in_every_language.py, where they are asserted for Python and
+# for the four other languages that can now decide the clause.
 # --------------------------------------------------------------------------
-
-@pytest.mark.parametrize("registration", [
-    "atexit.register(cleanup)", "signal.signal(signal.SIGTERM, stop)",
-])
-def test_behaviour_parked_in_a_hook_is_found(registration):
-    found = python_rules.lifecycle_hooks(_module(f"def setup():\n    {registration}\n"))
-    assert found, registration
-
-
-def test_a_call_at_the_place_it_happens_is_not_a_hook():
-    assert python_rules.lifecycle_hooks(_module("def run():\n    cleanup()\n")) == []
 
 
 # --------------------------------------------------------------------------
@@ -287,69 +280,6 @@ def test_the_strangler_clause_never_returns_a_verdict():
 
 # --------------------------------------------------------------------------
 # What the clauses learned from being pointed at themselves
-# --------------------------------------------------------------------------
-
-def test_a_dict_lookup_is_not_io():
-    """`_SUFFIXES.get(suffix)` was reported as I/O below the boundary, because `get` is
-    also how an HTTP client fetches a page. A bare name cannot tell the two apart, so the
-    ambiguous ones are matched on the whole dotted call instead."""
-    assert edges.io_below_the_boundary(_tree(
-        "TABLE = {'a': 1}\n\n\n"
-        "def look(key):\n    return TABLE.get(key)\n\n\n"
-        "def top(key):\n    return look(key)\n")) == []
-
-
-@pytest.mark.parametrize("call", ["requests.get(url)", "httpx.post(url)", "session.get(url)",
-                                  "subprocess.run(cmd)", "path.read_text()"])
-def test_a_named_client_call_is_still_io(call):
-    found = edges.io_below_the_boundary(_tree(
-        f"def fetch(url, cmd, path, session, requests, httpx, subprocess):\n    return {call}\n\n\n"
-        "def top(*a):\n    return fetch(*a)\n"))
-    assert found, call
-
-
-def test_a_handler_that_returns_a_reason_is_not_swallowing():
-    """The opposite of a swallow. `return "could not query rustup toolchains"` names the
-    failure and hands it to a caller that discloses it, which is what the whole of this
-    tool does with an absent measurement.
-
-    Found by pointing the clause at this repository: it flagged three handlers and one of
-    them was doing exactly the right thing."""
-    assert edges.swallowed_exceptions(_tree(
-        "def toolchains():\n    try:\n        return run(['rustup']).stdout\n"
-        "    except OSError:\n        return 'could not query rustup toolchains'\n")) == []
-
-
-@pytest.mark.parametrize("stand_in", ["None", "False", "0", "''", "[]", "{}"])
-def test_a_handler_that_returns_a_falsy_stand_in_is_still_swallowing(stand_in):
-    """A value indistinguishable from a successful empty result. The caller cannot tell
-    "there were none" from "I could not look"."""
-    found = edges.swallowed_exceptions(_tree(
-        f"def f(x):\n    try:\n        return g(x)\n    except ValueError:\n        return {stand_in}\n"))
-    assert found, stand_in
-
-
-def test_a_decorator_that_merely_mentions_a_hook_is_not_a_hook():
-    """Found by the write hook, on this very file. A `parametrize` decorator carrying the
-    string "atexit.register(cleanup)" as test DATA was read as a registration, because the
-    clause matched the unparsed decorator as text and the arguments are part of that text.
-
-    What a decorator does is decided by what it calls, not by what it carries."""
-    source = ("@pytest.mark.parametrize('registration', ['atexit.register(cleanup)'])\n"
-              "def test_it(registration):\n    assert registration\n")
-    assert python_rules.lifecycle_hooks(_source(source, path="test_m.py", language="python")) == []
-
-
-def test_a_decorator_that_is_a_hook_registration_is_still_found():
-    assert python_rules.lifecycle_hooks(_module(
-        "@atexit.register\ndef cleanup():\n    pass\n"))
-
-
-def test_a_framework_event_decorator_is_still_found():
-    assert python_rules.lifecycle_hooks(_module(
-        "@app.on_event('startup')\ndef begin():\n    pass\n"))
-
-
 # --------------------------------------------------------------------------
 # When the catch IS the assertion
 # --------------------------------------------------------------------------

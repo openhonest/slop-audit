@@ -763,3 +763,80 @@ def _is_keyed_write_target(node: "Node", spec: "LangSpec") -> bool:
 # --------------------------------------------------------------------------
 # 4. I/O at the boundary
 # --------------------------------------------------------------------------
+
+
+def _marker_names(marker, raw: bytes) -> list[str]:
+    """The names a marker on a declaration is built from.
+
+    A marker is written four ways: Python's `@atexit.register`, Java's `@PostConstruct`, C#'s
+    `[OnDeserialized]`. Stripping the punctuation and splitting on dots leaves the names a
+    table can hold, so `atexit` matches whether it was written bare or dotted."""
+    text = (node_text(marker, raw) or "").lstrip("@[").rstrip("]").split("(")[0]
+    return [part.strip() for part in text.split(".")]
+
+
+def _declaration_named(marker, spec: dict, raw: bytes) -> str:
+    """What the declaration a marker sits on is called, for the finding to point at.
+
+    Looked for beside the marker as well as above it. Python wraps a decorator and the
+    function it decorates in one parent and makes them SIBLINGS, so walking up alone finds
+    the wrapper and never the function, and every decorated finding was named after the
+    decorator's own text. Java and C# nest the marker inside the declaration, where walking
+    up is the only thing that works."""
+    declared = spec["func_types"] + spec["class_types"]
+    holder = marker.parent
+    while holder is not None:
+        if holder.type in declared:
+            named = holder.child_by_field_name("name")
+            if named is not None:
+                return node_text(named, raw) or ""
+        for sibling in holder.named_children:
+            if sibling.type in declared:
+                named = sibling.child_by_field_name("name")
+                if named is not None:
+                    return node_text(named, raw) or ""
+        holder = holder.parent
+    return node_text(marker, raw) or ""
+
+
+def lifecycle_hooks(source: dict) -> list[Finding] | None:
+    """A registration or a marker that runs work somewhere the reader does not look.
+
+    An exit handler, a signal handler, an ORM callback or a mount effect each put behaviour
+    where the sequence cannot be read: the call site says nothing and the registration is
+    somewhere else. A call at the place it happens is not a hook, however much work it does.
+
+    Read through the language's own node vocabulary, so the rule means the same thing in
+    every language the spec covers rather than being reimplemented per language.
+
+    A marker is matched as a NODE, never as text. Reading the unparsed source found a test
+    whose data was the string "atexit.register(cleanup)" and reported it as a registration.
+
+    Not decided for a language this table gives no hook vocabulary. Go, Rust and C have none
+    here, and Ruby writes a Rails callback as a bare call in a class body, which needs more
+    than this table holds to tell from an ordinary call. An empty list would instead claim
+    the file was read against this clause and found clean."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["hook_marker_types"] and not spec["hook_registrations"]:
+        return None
+    found: list[Finding] = []
+    for node in walk(source["root"]):
+        if node.type in spec["call_types"]:
+            named = node.child_by_field_name(spec["call_fn"])
+            whole = (node_text(named, raw) or "").split("(")[0].strip()
+            if whole in spec["hook_registrations"]:
+                found.append(_finding(
+                    "L1.21.16", whole, node.start_point[0] + 1,
+                    f"{whole} parks behaviour where the reader does not look",
+                    "call the work directly at the point it is needed, so the sequence is "
+                    "visible at the call site rather than in a registration", ""))
+        if node.type in spec["hook_marker_types"]:
+            names = _marker_names(node, raw)
+            if any(name in spec["hook_markers"] for name in names):
+                owner = _declaration_named(node, spec, raw)
+                found.append(_finding(
+                    "L1.21.16", owner, node.start_point[0] + 1,
+                    f"{'.'.join(names)} runs this somewhere nobody reads",
+                    "call the work directly at the point it is needed, so a reader sees it "
+                    "in the flow rather than in a registration that runs later", ""))
+    return found

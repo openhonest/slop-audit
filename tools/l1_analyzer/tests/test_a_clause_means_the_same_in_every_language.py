@@ -1406,3 +1406,116 @@ def test_a_language_with_no_mock_vocabulary_says_nothing_was_decided(lang):
                "rust": "#[test]\nfn it_works() { assert!(true); }\n",
                "c": "void test_it(void) { }\n"}
     assert contracts.mock_heavy_tests(_test_source(sources[lang], lang)) is None, lang
+
+
+# ---------------------------------------------------------------------------
+# 16. Declarative Equivalents Over Framework Lifecycle Hooks
+#
+# Read Python's own parser until now. A hook parks behaviour where the reader does not look:
+# the sequence lives in a registration rather than at the point it happens.
+#
+# Two shapes again. A call that registers a callback, which Python spells `atexit.register`
+# and JavaScript spells `process.on`. And a marker on a declaration, which Python writes as a
+# decorator, Java and C# as an annotation or attribute, and Ruby as a bare call in the class
+# body. The marker is where the languages diverge most, so what counts as one is a fact the
+# vocabulary holds rather than a branch in the reader.
+# ---------------------------------------------------------------------------
+
+_PARKS_BEHAVIOUR_IN_A_HOOK = [
+    ("python", """import atexit
+
+
+def cleanup():
+    close()
+
+
+atexit.register(cleanup)
+"""),
+    ("javascript", """process.on('exit', () => {
+  close()
+})
+"""),
+    ("typescript", """process.on('exit', (): void => {
+  close()
+})
+"""),
+    ("java", """class Store {
+  @PostConstruct
+  void warm() {
+    load();
+  }
+}
+"""),
+    ("csharp", """class Store {
+  [OnDeserialized]
+  void Warm() {
+    Load();
+  }
+}
+"""),
+]
+
+_CALLS_THE_WORK_WHERE_IT_HAPPENS = [
+    ("python", "def run():\n    load()\n    close()\n"),
+    ("javascript", "function run() {\n  load()\n  close()\n}\n"),
+    ("typescript", "function run(): void {\n  load()\n  close()\n}\n"),
+    ("java", "class Store {\n  void run() {\n    load();\n    close();\n  }\n}\n"),
+    ("csharp", "class Store {\n  void Run() {\n    Load();\n    Close();\n  }\n}\n"),
+]
+
+
+@pytest.mark.parametrize(("lang", "source"), _PARKS_BEHAVIOUR_IN_A_HOOK)
+def test_a_lifecycle_hook_is_found_in_every_language(lang, source):
+    found = rules.lifecycle_hooks(read.read_tree(source, lang))
+    assert found, lang
+    assert "reader does not look" in found[0]["detail"] or "nobody reads" in found[0]["detail"]
+
+
+@pytest.mark.parametrize(("lang", "source"), _CALLS_THE_WORK_WHERE_IT_HAPPENS)
+def test_work_called_where_it_happens_is_left_alone(lang, source):
+    """A call at the place it happens is not a hook, however much work it does."""
+    assert rules.lifecycle_hooks(read.read_tree(source, lang)) == [], lang
+
+
+@pytest.mark.parametrize("registration", ["atexit.register(cleanup)",
+                                         "signal.signal(signal.SIGTERM, stop)"])
+def test_each_registration_the_table_names_is_found(registration):
+    """Moved from the Python-only tests when the clause was ported."""
+    assert rules.lifecycle_hooks(read.read_tree(
+        f"def setup():\n    {registration}\n", "python")), registration
+
+
+@pytest.mark.parametrize(("source", "expected"), [
+    ("@atexit.register\ndef cleanup():\n    pass\n", "cleanup"),
+    ("@app.on_event('startup')\ndef begin():\n    pass\n", "begin"),
+])
+def test_a_decorator_that_is_a_hook_names_the_function_it_decorates(source, expected):
+    """The name matters and it was wrong. Python makes a decorator and its function
+    SIBLINGS under one wrapper, so walking up from the marker found the wrapper and never
+    the function, and every decorated finding was named after the decorator's own text."""
+    found = rules.lifecycle_hooks(read.read_tree(source, "python"))
+    assert [f["symbol"] for f in found] == [expected], found
+
+
+def test_a_marker_that_merely_mentions_a_hook_is_not_a_hook():
+    """Found by the write hook, on the test file itself. A parametrize decorator carrying
+    the words "atexit.register(cleanup)" as test DATA was read as a registration, because
+    the clause matched the unparsed decorator as text and the arguments are part of it.
+
+    What a marker does is decided by what it is, not by what it carries."""
+    assert rules.lifecycle_hooks(read.read_tree(
+        "@pytest.mark.parametrize('registration', ['atexit.register(cleanup)'])\n"
+        "def test_it(registration):\n    assert registration\n", "python")) == []
+
+
+def test_a_string_naming_a_registration_is_not_a_registration():
+    """What a marker DOES is decided by what it is, not by text that looks like it. A test
+    whose data is the words "atexit.register(cleanup)" registers nothing."""
+    assert rules.lifecycle_hooks(read.read_tree(
+        'CASES = ["atexit.register(cleanup)"]\n', "python")) == []
+
+
+@pytest.mark.parametrize("lang", ["go", "c"])
+def test_a_language_with_no_hook_vocabulary_says_nothing_was_decided(lang):
+    sources = {"go": "func run() { load() }\n", "c": "void run(void) { load(); }\n"}
+    assert rules.lifecycle_hooks(read.read_tree(sources[lang], lang)) is None, lang

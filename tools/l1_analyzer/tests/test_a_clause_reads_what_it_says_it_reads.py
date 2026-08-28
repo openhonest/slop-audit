@@ -19,6 +19,7 @@ being exact will always produce.
 """
 
 from l1_analyzer.honest_code import (
+    _NOTHING,
     _PYTHON_AST,
     _TEXT_READER,
     _TREE_READER,
@@ -75,7 +76,21 @@ def test_every_clause_that_says_it_reads_the_text_reaches_for_the_text():
     assert wrong == [], f"{wrong} are declared to read the text and never name it"
 
 
-def test_every_clause_declares_one_of_the_three_readers():
-    """A fourth spelling would pass every test above by matching none of them."""
-    readers = {_PYTHON_AST, _TREE_READER, _TEXT_READER}
+def test_every_clause_declares_one_of_the_four_readers():
+    """A fifth spelling would pass every test above by matching none of them.
+
+    The fourth is `nothing`, and it earns its place: a clause that decides nothing reads
+    nothing, and naming a parser there stated a capability the clause never uses. The
+    undecided disclosure read that name as a port we owe, so a JavaScript repository was
+    promised work on a clause that cannot be written."""
+    readers = {_PYTHON_AST, _TREE_READER, _TEXT_READER, _NOTHING}
     assert {c["reads"] for c in CLAUSES} <= readers
+
+
+def test_only_a_clause_that_decides_nothing_may_read_nothing():
+    """The fourth spelling is the one a clause could hide behind: it matches no test above,
+    so a checker declared this way is exempt from every guard in this file. Tying it to what
+    the clause decides is what stops it being the quiet way out."""
+    wrong = [c["code"] for c in CLAUSES
+             if c["reads"] == _NOTHING and c["decides"] != _NOTHING]
+    assert wrong == [], f"{wrong} read nothing and claim to decide something"

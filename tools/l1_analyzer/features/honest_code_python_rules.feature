@@ -35,12 +35,6 @@ Feature: Clauses this reader still reads through Python's own parser
     Then a step needing thirty lines of setup is a readout on the code under test rather than on the test
     But a step that calls the function and checks the result is what a pure function makes possible
 
-  Scenario: lifecycle_hooks finds behaviour parked where the reader does not look
-    Given a parsed source
-    When lifecycle_hooks reads its registrations
-    Then an exit handler, a signal handler, an ORM callback or a mount effect puts behaviour somewhere nobody reads
-    But a call at the place it happens is not a hook, however much work it does
-
   Scenario: strangler_migration records that nothing checked the migration
     Given any parsed source
     When strangler_migration is asked about it

@@ -34,10 +34,6 @@ from l1_analyzer.honest_code_read import (
 #
 _CACHE_NAMES = frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache"})
 _CACHE_DECORATORS = frozenset({"lru_cache", "cache", "cached", "memoize", "cached_property"})
-_HOOK_CALLS = frozenset({"register", "signal", "on_event", "add_event_handler", "atexit"})
-_HOOK_DECORATORS = frozenset({"atexit", "on_event", "listens_for", "add_event_handler",
-                              "before_request", "after_request", "receiver"})
-_HOOK_MODULES = frozenset({"atexit", "signal"})
 _STEP_DECORATORS = frozenset({"given", "when", "then", "step"})
 _STEP_LIMIT = 30
 _UNPROFILED = ("whether the query was profiled first is not readable from any file, so "
@@ -99,39 +95,6 @@ def heavy_step_definitions(source: dict) -> list[Finding] | None:
         "test rather than on the test",
         "make the function under test pure, so the step is call it and check the result", "")
         for fn in steps if (fn.end_lineno or fn.lineno) - fn.lineno > _STEP_LIMIT]
-
-
-def lifecycle_hooks(source: dict) -> list[Finding] | None:
-    """An exit handler, a signal handler, an ORM callback or a mount effect.
-
-    Each puts behaviour somewhere the reader does not look. A call at the place it happens
-    is not a hook, however much work it does."""
-    found: list[Finding] = []
-    for node in ast.walk(source["tree"]):
-        if not isinstance(node, ast.Call):
-            continue
-        whole = ast.unparse(node.func)
-        root = whole.split(".")[0]
-        if root in _HOOK_MODULES and _bare_name(node) in _HOOK_CALLS:
-            found.append(_finding(
-                "L1.21.16", whole, node.lineno,
-                f"{whole} parks behaviour where the reader does not look",
-                "call the work directly at the point it is needed, so the sequence is visible at the call site rather than in a registration", ""))
-    for node in ast.walk(source["tree"]):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for decorator in node.decorator_list:
-            # What a decorator DOES is decided by what it calls, not by what it carries.
-            # Matching the unparsed decorator as text read a parametrize whose test data
-            # was the string "atexit.register(cleanup)" as a registration.
-            called = decorator.func if isinstance(decorator, ast.Call) else decorator
-            whole = ast.unparse(called)
-            if any(name in whole.split(".") for name in _HOOK_DECORATORS):
-                found.append(_finding(
-                    "L1.21.16", node.name, node.lineno,
-                    f"@{whole} runs this somewhere nobody reads",
-                    "call the work directly at the point it is needed, so a reader sees it in the flow rather than in a registration that runs later", ""))
-    return found
 
 
 def strangler_migration(source: dict) -> list[Finding] | None:

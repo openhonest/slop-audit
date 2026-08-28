@@ -102,6 +102,13 @@ class LangSpec(TypedDict, total=False):
     # a function, while JavaScript and Ruby pass a body to `it`, so a reader looking only
     # for named functions finds no tests at all in half the languages.
     mock_calls: frozenset[str]           # empty means this language has no mock vocabulary here
+    # Declarative Equivalents Over Framework Lifecycle Hooks. A hook parks behaviour where
+    # the reader does not look. Two shapes: a call that registers a callback, and a marker
+    # on a declaration. The marker is where the languages diverge most, so which node is one
+    # and which names count are facts the table holds rather than branches in the reader.
+    hook_marker_types: tuple[str, ...]   # decorator, annotation, attribute
+    hook_markers: frozenset[str]         # marker names that park behaviour
+    hook_registrations: frozenset[str]   # dotted calls that register a callback
     test_name_prefixes: tuple[str, ...]  # a named function that is a test
     test_block_calls: frozenset[str]     # a call that takes the test body as its argument
     instance_state_types: tuple[str, ...]  # nodes that ARE instance state, needing no receiver
@@ -357,6 +364,10 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "hook_marker_types": ("decorator",),
+        "hook_markers": frozenset({"atexit", "on_event", "listens_for", "add_event_handler",
+                                   "before_request", "after_request", "receiver"}),
+        "hook_registrations": frozenset({"atexit.register", "signal.signal"}),
         "mock_calls": frozenset({"Mock", "MagicMock", "AsyncMock", "patch", "mock_open",
                                  "NonCallableMock"}),
         "test_name_prefixes": ("test",),
@@ -528,6 +539,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        # No marker on a declaration: the decorator proposal is not in this grammar.
+        "hook_marker_types": (),
+        "hook_markers": frozenset(),
+        "hook_registrations": frozenset({"process.on", "process.once",
+                                         "process.addListener"}),
         "mock_calls": frozenset({"fn", "mock", "spyOn", "stub", "fake",
                                  "createStubInstance"}),
         "test_name_prefixes": (),
@@ -645,6 +661,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "hook_marker_types": ("marker_annotation", "annotation"),
+        "hook_markers": frozenset({"PostConstruct", "PreDestroy", "EventListener",
+                                   "PostLoad", "PrePersist", "PreUpdate", "PostPersist"}),
+        "hook_registrations": frozenset({"Runtime.addShutdownHook"}),
         "mock_calls": frozenset({"mock", "spy"}),
         "test_name_prefixes": ("test",),
         "test_block_calls": frozenset(),
@@ -755,6 +775,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "hook_marker_types": ("attribute",),
+        "hook_markers": frozenset({"OnDeserialized", "OnDeserializing", "OnSerialized",
+                                   "OnSerializing"}),
+        "hook_registrations": frozenset({"AppDomain.ProcessExit"}),
         "mock_calls": frozenset({"For", "Fake", "Mock"}),
         "test_name_prefixes": ("Test",),
         "test_block_calls": frozenset(),
@@ -881,6 +905,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "hook_marker_types": (),
+        "hook_markers": frozenset(),
+        "hook_registrations": frozenset(),
         # No mock vocabulary in this table, so the question is not decided here.
         "mock_calls": frozenset(),
         "test_name_prefixes": (),
@@ -1004,6 +1031,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        # A Rails callback is a bare call in the class body rather than a marker node, so
+        # telling one from an ordinary call needs more than this table holds today.
+        "hook_marker_types": (),
+        "hook_markers": frozenset(),
+        "hook_registrations": frozenset(),
         "mock_calls": frozenset({"double", "instance_double", "class_double", "spy",
                                  "stub"}),
         "test_name_prefixes": ("test",),
@@ -1125,6 +1157,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "hook_marker_types": (),
+        "hook_markers": frozenset(),
+        "hook_registrations": frozenset(),
         "mock_calls": frozenset(),
         "test_name_prefixes": (),
         "test_block_calls": frozenset(),
@@ -1246,6 +1281,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "hook_marker_types": (),
+        "hook_markers": frozenset(),
+        "hook_registrations": frozenset(),
         "mock_calls": frozenset(),
         "test_name_prefixes": (),
         "test_block_calls": frozenset(),

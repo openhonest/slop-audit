@@ -280,8 +280,14 @@ CLAUSES: tuple[Clause, ...] = (
                 "needs the feature files as well as the source. This reader sees one file, "
                 "so it reads the secondary signal only, the length of a step definition, "
                 "and there are none here")),
-    _clause(16, "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE, python_rules.lifecycle_hooks, nothing_to_read=""),
-    _clause(17, "Strangler Pattern for Migration", _NOTHING, python_rules.strangler_migration, nothing_to_read=""),
+    _clause(16, "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE,
+            rules.lifecycle_hooks, nothing_to_read="", reads=_TREE_READER),
+    # Reads nothing, and says so. Declaring a reader here named a capability the clause
+    # never uses, and the undecided disclosure read that as a port we owe: a JavaScript
+    # repository was told this clause "is unported, not silent", promising work that cannot
+    # be done. What it decides and what it reads are one answer for this row.
+    _clause(17, "Strangler Pattern for Migration", _NOTHING, python_rules.strangler_migration,
+            nothing_to_read="", reads=_NOTHING),
     _clause(18, "Dispatch Tables Close Open Input", _TREE, rules.open_dispatch, nothing_to_read="",
             reads=_TREE_READER),
     _clause(19, "Atomic Test-and-Set Over Check-Then-Act", _TREE, rules.check_then_act, nothing_to_read="",
@@ -921,7 +927,9 @@ def analyze(repo: Path, lang: str) -> dict:
     # the reader's problem.
     unported = [code for code in never_decided
                 if by_code[code]["reads"] == _PYTHON_AST and lang != "python"]
-    cannot_arise = [code for code in never_decided if code not in unported]
+    undecidable = [code for code in never_decided if by_code[code]["decides"] == _NOTHING]
+    cannot_arise = [code for code in never_decided
+                    if code not in unported and code not in undecidable]
     if not decided:
         nothing = ("no file here could be measured against any clause, so there is no "
                    "conformity to report. Not decided: " + named_undecided)
@@ -949,6 +957,11 @@ def analyze(repo: Path, lang: str) -> dict:
         detail += (f". {len(unported)} of those read Python's own parser rather than the "
                    f"shared node vocabulary, so on {lang} they could not reach the code at "
                    "all. They are unported, not silent")
+    if undecidable:
+        named = ", ".join(by_code[code]["name"] for code in undecidable)
+        detail += (f". {named} decides nothing in any language and never will: it is a "
+                   "property of how a migration is sequenced over weeks, and no file "
+                   "carries the sequence of the work that produced it")
     if cannot_arise:
         detail += (f". The remaining {len(cannot_arise)} read this language and found no "
                    f"question to answer: what each asks about cannot arise in {lang}, which "
