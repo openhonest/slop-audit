@@ -554,6 +554,53 @@ def names_a_table_holds(root: Node, spec: LangSpec, raw: bytes) -> set[str]:
     return named
 
 
+def keys_bound_to_io(root: Node, spec: LangSpec, raw: bytes) -> set[str]:
+    """Every record key in this file whose value performs I/O.
+
+    A record that carries functions as fields is how some code names its edges: a Database
+    holds connect, close_connection and write_one, and a caller reaches the database by
+    calling a field rather than a method. There is no attribute access to read, so a reader
+    looking for one sees a function that calls nothing.
+
+    Reported by an adopter with three such sites. This is the same reading clause 19 already
+    needed, where a function a dispatch table holds is a function something calls, applied to
+    what the field does rather than to the field's name.
+
+    One file. A record built in another module is not read here, and that bound is real: this
+    reader sees one source and cannot follow an import to the table it came from."""
+    keys: set[str] = set()
+    for node in walk(root):
+        if node.type not in spec["container_literal_types"]:
+            continue
+        for pair in node.named_children:
+            key = pair.child_by_field_name("key")
+            value = pair.child_by_field_name("value")
+            if key is None or value is None:
+                continue
+            if io_calls_in(value, spec, raw):
+                keys.add(node_text(key, raw).strip("\"'"))
+    return keys
+
+
+def subscript_keys_called_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:
+    """Every literal key this node reads out of a record and then calls.
+
+    `loader["disable_fk_checks"](conn)` reaches whatever that field holds, and the key is the
+    only thing naming it. A subscript that is read without being called is left out: reading
+    a row is not doing what the row does."""
+    called: set[str] = set()
+    for inner in walk(node):
+        if inner.type not in spec["call_types"]:
+            continue
+        target = inner.child_by_field_name(spec["call_fn"])
+        if target is None or target.type not in spec["subscript_types"]:
+            continue
+        key = target.child_by_field_name(spec["sub_index"])
+        if key is not None:
+            called.add(node_text(key, raw).strip("\"'"))
+    return called
+
+
 def declares_only_signatures(node: Node, spec: LangSpec, raw: bytes) -> bool:
     """Whether a class is a list of method signatures rather than an implementation.
 

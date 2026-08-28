@@ -219,6 +219,9 @@ class LangSpec(TypedDict, total=False):
     io_dotted: frozenset[str]
     io_ambiguous: frozenset[str]
     io_receivers: frozenset[str]
+    # Calls reaching something non-deterministic. Named only so a boundary declaration on a
+    # function doing one is not reported as false; they are not counted as input or output.
+    non_deterministic_calls: frozenset[str]
     # The statement that records a failure. A try body ending in one is ASSERTING that its
     # call raised, so the handler beneath is the success condition and reaching the recorder
     # is the defect. Keying on the handler alone made both readings look alike.
@@ -513,11 +516,17 @@ LANG_SPEC: dict[str, LangSpec] = {
         "log_receivers": frozenset({"logger", "logging", "log", "_logger", "LOGGER"}),
         "log_calls": frozenset({"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}),
         "log_failure_calls": frozenset({"warning", "warn", "error", "exception", "critical"}),
+        # `mkdir` and its neighbours changed the disk on any receiver, so they are plain
+        # names rather than ambiguous ones: `path.mkdir()` makes a directory whatever the
+        # variable is called, and a method of that name doing something else is rare enough
+        # that counting it is the safer error. Reported by an adopter whose function made a
+        # directory and was told it reached nothing outside the process.
         "io_calls": frozenset({
-                          "Popen", "check_output", "commit", "execute", "fetchall", "fetchone",
-                          "glob", "input", "iterdir", "listdir", "makedirs", "open", "print",
-                          "read_bytes", "read_text", "remove", "urlopen", "write_bytes",
-                          "write_text"}),
+                          "Popen", "chmod", "check_output", "commit", "execute", "fetchall",
+                          "fetchone", "glob", "hardlink_to", "input", "iterdir", "listdir",
+                          "makedirs", "mkdir", "open", "print", "read_bytes", "read_text",
+                          "remove", "rename", "replace_file", "rmdir", "symlink_to", "touch",
+                          "unlink", "urlopen", "write_bytes", "write_text"}),
         "io_modules": frozenset({
                           "aiosqlite", "asyncpg", "ftplib", "imaplib", "poplib", "psycopg",
                           "psycopg2", "pymongo", "redis", "smtplib", "sqlite3", "stderr",
@@ -533,14 +542,39 @@ LANG_SPEC: dict[str, LangSpec] = {
                           "spec.loader", "tempfile.NamedTemporaryFile",
                           "tempfile.TemporaryDirectory", "tempfile.mkdtemp",
                           "util.spec_from_file_location"}),
+        # An adopter read all fifteen of our false positives and seven were this: verbs a
+        # database actually uses that we had never named. We knew `execute` and `commit` and
+        # stopped. `fetch` is asyncpg's only read verb, so every function introspecting a
+        # PostgreSQL database in any codebase reported as an edge that reaches nothing.
+        #
+        # They are ambiguous rather than plain, and pair with a receiver below: `close` on a
+        # string buffer is not I/O, and naming it plainly would report every context manager
+        # in every file.
         "io_ambiguous": frozenset({
-                          "basicConfig", "critical", "debug", "delete", "error", "exception",
-                          "get", "head", "info", "patch", "post", "put", "request", "run",
+                          "basicConfig", "callproc", "critical", "close", "debug", "delete",
+                          "error", "exception", "executemany", "executescript", "fetch",
+                          "fetchmany", "fetchrow", "fetchval", "get", "head", "info",
+                          "patch", "post", "push", "put", "request", "rollback", "run",
                           "warn", "warning"}),
         "io_receivers": frozenset({
                           "aiohttp", "client", "conn", "connection", "cursor", "db", "engine",
-                          "httpx", "log", "logger", "logging", "requests", "session",
-                          "subprocess", "urllib"}),
+                          "httpx", "log", "logger", "logging", "pool", "replica", "requests",
+                          "session", "subprocess", "urllib"}),
+        # Calls that reach something non-deterministic rather than something outside the
+        # process. NOT input or output, and this clause is not becoming a clause about
+        # non-determinism: they are named so that a boundary declaration on a function doing
+        # one of them is not called FALSE.
+        #
+        # Reported by an adopter. Another checker in this family grants a boundary three
+        # privileges, input and output, catching, and reading something non-deterministic,
+        # and it REQUIRES the marker on the third. Ours read a boundary as reaching outside
+        # the process, so a function taking a random identifier could satisfy one tool only
+        # by failing the other, and the author was told to delete a marker another gate
+        # needs.
+        "non_deterministic_calls": frozenset({
+                          "monotonic", "now", "perf_counter", "random", "randrange",
+                          "randint", "sample", "shuffle", "signal", "time", "token_bytes",
+                          "token_hex", "token_urlsafe", "uuid1", "uuid3", "uuid4", "uuid5"}),
         "assertion_types": ("assert_statement", "raise_statement"),
         "silencing_calls": frozenset({"suppress"}),
         "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
@@ -595,6 +629,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "non_deterministic_calls": frozenset(),
         # No declared return type, so nothing here can be declared absent.
         "return_type_field": "",
         "absent_markers": (),
@@ -735,6 +770,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "non_deterministic_calls": frozenset(),
         "return_type_field": "type",
         "absent_markers": ("Optional",),
         "absent_values": ("null",),
@@ -864,6 +900,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "non_deterministic_calls": frozenset(),
         "return_type_field": "type",
         "absent_markers": ("?", "Nullable"),
         "absent_values": ("null",),
@@ -1010,6 +1047,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "non_deterministic_calls": frozenset(),
         "return_type_field": "return_type",
         "absent_markers": ("Option",),
         "absent_values": ("None",),
@@ -1151,6 +1189,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "non_deterministic_calls": frozenset(),
         "return_type_field": "",
         "absent_markers": (),
         "absent_values": ("nil",),
@@ -1293,6 +1332,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "non_deterministic_calls": frozenset(),
         "return_type_field": "type",
         "absent_markers": (),
         "absent_values": ("NULL",),
@@ -1433,6 +1473,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "non_deterministic_calls": frozenset(),
         "return_type_field": "result",
         "absent_markers": (),
         "absent_values": ("nil",),

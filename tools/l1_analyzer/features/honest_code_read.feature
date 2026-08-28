@@ -260,3 +260,17 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     Then it answers yes where an ancestor is preceded by a marker the vocabulary names, which is how Rust keeps its tests in the file they test
     And it reads the marker as a preceding sibling rather than a parent, the same shape a decorator takes, since searching each ancestor's text found the marker in the whole file and excluded the file's own code with its tests
     But a language that keeps its tests elsewhere names no marker, so nothing is excluded for it and a marker invented here would start hiding code
+
+  Scenario: keys_bound_to_io gives every record key in a file whose value performs input or output
+    Given a parsed source, its language's vocabulary, and the source bytes
+    When keys_bound_to_io reads each record literal and asks what each value does
+    Then it returns the keys whose value reaches outside the process
+    And this is how some code names its edges, with a record carrying connect and write as fields, where a reader looking for an attribute access sees a function that calls nothing
+    And it is the reading the dispatch-table clause already needed, applied to what a field does rather than to its name
+    But it reads one file, so a record built in another module is not followed, and that bound is real rather than a choice
+
+  Scenario: subscript_keys_called_in gives every literal key a node reads out of a record and calls
+    Given a node, its language's vocabulary, and the source bytes
+    When subscript_keys_called_in looks for a call whose target is a subscript
+    Then it returns the literal key, which is the only thing naming what was reached
+    But a subscript read without being called is left out, because reading a row is not doing what the row does

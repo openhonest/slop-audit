@@ -27,10 +27,12 @@ from l1_analyzer.honest_code_read import (
     handler_body,
     io_calls_in,
     is_absent_value,
+    keys_bound_to_io,
     names_a_table_holds,
     names_handed_on,
     node_text,
     sends_failure_onward,
+    subscript_keys_called_in,
     walk,
 )
 from l1_analyzer.lang_spec import LangSpec
@@ -77,7 +79,21 @@ def io_below_the_boundary(source: Source) -> list[Finding] | None:
     found: list[Finding] = []
     for name, fn in named.items():
         touched = sorted(io_calls_in(fn, spec, raw))
-        if name in declared and not touched and not (called_names_in(fn, spec, raw) & declared):
+        # A declaration is false only where the function reaches NOTHING a boundary is for.
+        # Another checker in this family requires the marker on a function that reads
+        # something non-deterministic, so calling the marker false there would tell an author
+        # to delete what a second gate needs. Non-determinism is still not counted as I/O:
+        # this half of the clause goes quiet, and the half that reports I/O below a boundary
+        # is untouched.
+        uncertain = bool(called_names_in(fn, spec, raw) & spec["non_deterministic_calls"])
+        # A record can carry a function as a field, which is how some code names its edges:
+        # `loader["disable_fk_checks"](conn)` reaches a database and there is no attribute
+        # access to read. Reported by an adopter with three such sites, and it is their
+        # style rather than an accident.
+        through_a_record = bool(subscript_keys_called_in(fn, spec, raw)
+                                & keys_bound_to_io(source["root"], spec, raw))
+        if (name in declared and not touched and not uncertain and not through_a_record
+                and not (called_names_in(fn, spec, raw) & declared)):
             found.append(_finding(
                 "L1.21.4", name, fn.start_point[0] + 1,
                 "declares itself a boundary and makes no call this reader counts as I/O, "

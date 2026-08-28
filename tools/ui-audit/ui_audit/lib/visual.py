@@ -9,6 +9,9 @@ Requires: playwright (optional dependency)
 
 import asyncio
 from pathlib import Path
+
+from ui_audit.boundary import boundary
+
 # Where the audit puts what it captures, and how it finds a playground on the page. Named
 # here rather than defaulted onto the functions below: a default absorbed the caller's
 # omission, so nothing could tell a caller who wanted the usual place from one who forgot
@@ -17,6 +20,7 @@ DEFAULT_SCREENSHOT_DIR = '.audit/screenshots'
 PLAYGROUND_SELECTOR = '[data-playground]'
 
 
+@boundary
 async def verify_components(
     url: str,
     components: list[dict],
