@@ -118,6 +118,14 @@ class LangSpec(TypedDict, total=False):
     # here does, so its tests carry a production file's name and were handed to every
     # production clause. Matched as text against the node holding the module.
     test_module_markers: tuple[str, ...]
+    # Type Declarations Over Imperative Validation. Where this language declares a bound the
+    # machinery will enforce: a Python annotation, a TypeScript type, a Java annotation, a C#
+    # attribute. A literal in one of these and the same literal in a hand-written comparison
+    # are two copies of one constraint, and copies drift.
+    declared_bound_types: tuple[str, ...]
+    # Which literals can BE a bound. A number or a string can; a boolean or a null cannot,
+    # and including them would read `x is None` beside a nullable declaration as a copy.
+    bound_literal_types: tuple[str, ...]
     # Whether this language's step runner calls a step and throws away what it returns.
     # pytest-bdd does, so a step written `async def` hands back a coroutine nobody runs and
     # the step body never executes. Other runners wait for it, and reporting an async step
@@ -385,6 +393,8 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "bound_literal_types": ("integer", "float", "string"),
+        "declared_bound_types": ("type",),
         "steps_discard_the_result": True,
         "async_markers": ("async",),
         "test_module_markers": (),
@@ -570,6 +580,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "bound_literal_types": ("number", "string"),
+        # No declared bound in this grammar.
+        "declared_bound_types": (),
         "steps_discard_the_result": False,
         "async_markers": ("async",),
         "test_module_markers": (),
@@ -702,6 +715,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "bound_literal_types": ("decimal_integer_literal", "decimal_floating_point_literal", "string_literal"),
+        "declared_bound_types": ("annotation", "marker_annotation"),
         "steps_discard_the_result": False,
         "async_markers": ("async",),
         "test_module_markers": (),
@@ -825,6 +840,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "bound_literal_types": ("integer_literal", "real_literal", "string_literal"),
+        "declared_bound_types": ("attribute",),
         "steps_discard_the_result": False,
         "async_markers": ("async",),
         "test_module_markers": (),
@@ -965,6 +982,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "bound_literal_types": (),
+        "declared_bound_types": (),
         "steps_discard_the_result": False,
         "async_markers": ("async",),
         "test_module_markers": ("cfg(test)",),
@@ -1100,6 +1119,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "bound_literal_types": (),
+        "declared_bound_types": (),
         "steps_discard_the_result": False,
         "async_markers": ("async",),
         "test_module_markers": (),
@@ -1236,6 +1257,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "bound_literal_types": (),
+        "declared_bound_types": (),
         "steps_discard_the_result": False,
         "async_markers": ("async",),
         "test_module_markers": (),
@@ -1370,6 +1393,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "bound_literal_types": (),
+        "declared_bound_types": (),
         "steps_discard_the_result": False,
         "async_markers": ("async",),
         "test_module_markers": (),
@@ -1559,6 +1584,8 @@ _TYPESCRIPT["default_param_name"] = "pattern"
 # arise there. TypeScript's whole point is that they do, so it is the one override that
 # turns a clause on rather than adjusting one.
 _TYPESCRIPT["typed_param_types"] = ("required_parameter", "optional_parameter")
+# TypeScript declares a bound in a type where JavaScript has nowhere to put one.
+_TYPESCRIPT["declared_bound_types"] = ("type_annotation",)
 _TYPESCRIPT["scalar_types"] = frozenset({"number", "string", "boolean", "bigint", "symbol"})
 
 # The overridden keys, named once so a test can assert that nothing ELSE diverged. Written
@@ -1566,7 +1593,8 @@ _TYPESCRIPT["scalar_types"] = frozenset({"number", "string", "boolean", "bigint"
 # against the field it lands in instead of being waved past the checker with an ignore.
 TYPESCRIPT_OVERRIDES = frozenset({
     "binding_sites", "default_param_name", "default_param_types", "field_decl_types",
-    "immutable_modifiers", "passthrough_types", "scalar_types", "typed_param_types",
+    "declared_bound_types", "immutable_modifiers", "passthrough_types", "scalar_types",
+    "typed_param_types",
     "value_wrapper_types",
 })
 

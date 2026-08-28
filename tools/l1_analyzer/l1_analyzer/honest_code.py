@@ -31,6 +31,7 @@ from l1_analyzer import honest_code_contracts as contracts
 from l1_analyzer import honest_code_edges as edges
 from l1_analyzer import honest_code_markers as markers
 from l1_analyzer import honest_code_python_rules as python_rules
+from l1_analyzer import honest_code_references as references
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.honest_code_read import read_tree
 from l1_analyzer.honest_code_rules import BROWSER_LANGUAGES, Finding
@@ -92,7 +93,11 @@ NEVER, NOT_APPLICABLE, UNREADABLE = "never", "not applicable", "unreadable"
 # definitions is read perfectly well, and calling it unreadable claims a gap in the
 # instrument that is not there.
 NOTHING_TO_READ = "nothing to read"
-UNDECIDED_KINDS = (NEVER, NOT_APPLICABLE, UNREADABLE, NOTHING_TO_READ)
+# Decided somewhere else. A clause reading the whole repository is not undecided when a
+# single file cannot settle it: it is answered once, over the tree, and a file-by-file
+# reading would report it as a gap in the instrument when the instrument does answer it.
+NOT_HERE = "decided over the repository"
+UNDECIDED_KINDS = (NEVER, NOT_APPLICABLE, UNREADABLE, NOTHING_TO_READ, NOT_HERE)
 
 
 # What a clause reads. Two axes, not one: `decides` says whether the RULE is decidable at
@@ -109,6 +114,11 @@ UNDECIDED_KINDS = (NEVER, NOT_APPLICABLE, UNREADABLE, NOTHING_TO_READ)
 # The middle one is where clauses arrive as they are ported. When none are left in the
 # first, that constant and this comment go.
 _PYTHON_AST, _TREE_READER, _TEXT_READER = "python-ast", "tree", "text"
+# A clause that reads the REPOSITORY rather than one file. References Resolve Statically is
+# the case and it is not a quirk: a reference and the thing it names are in different files
+# by construction, so a page alone cannot say whether the rule it names exists. The table
+# assumed every clause reads one file, which was true for twenty of them and is now false.
+_REPOSITORY = "repository"
 
 
 class Clause(TypedDict):
@@ -321,6 +331,22 @@ CLAUSES: tuple[Clause, ...] = (
                 "nothing here writes a log line through a receiver this reader knows, so "
                 "there was no edge to read. A language with no logging convention named in "
                 "the vocabulary is undecided rather than clean")),
+    # The two principles that had no clause until 2026-08-28. Twenty clauses over
+    # twenty-two principles meant "a hundred per cent" was a hundred per cent of what we
+    # measured, and we published more than we measured.
+    _clause(21, "References Resolve Statically", _PARTLY, references.unresolved_references,
+            reads=_REPOSITORY,
+            nothing_to_read=(
+                "this file names no template and no class, so there was no emitted "
+                "reference here to resolve. A route is passed over wherever it appears: "
+                "where a project declares its routes is a convention this reader does not "
+                "know, and a guess would report every link in the repository")),
+    _clause(22, "Type Declarations Over Imperative Validation", _PARTLY,
+            contracts.copied_constraints, reads=_TREE_READER,
+            nothing_to_read=(
+                "this file declares no bound for the machinery to enforce, so nothing here "
+                "could be a copy of one. A bound declared in a database column, a form "
+                "field or another service is outside this file and is not read")),
 )
 
 _WHY_NOT = {
@@ -523,6 +549,11 @@ def _skip_reason(clause: Clause, source: dict) -> tuple[str, str]:
         return UNREADABLE, (
             f"this clause is still written against Python's own parser, so it has no way "
             f"to read {source['language']} yet")
+    if clause["reads"] == _REPOSITORY:
+        return NOT_HERE, (
+            "this clause is decided once over the whole repository rather than file by "
+            "file, because a reference and the thing it names are in different files, so "
+            "one file on its own cannot resolve it")
     if clause["reads"] == _TREE_READER and source["language"] not in _VOCABULARY:
         return UNREADABLE, (
             f"the shared node vocabulary does not cover {source['language']}, so this "
@@ -939,6 +970,21 @@ def analyze(repo: Path, lang: str) -> dict:
                 boundary_declarations += clause["declared"]
                 if clause["findings"]:
                     broken.setdefault(clause["code"], []).extend(clause["findings"])
+
+    # The clauses that read the whole tree, answered once. A reference and the thing it
+    # names are in different files, so this is the only place they can be decided at all,
+    # and registering one without running it here would leave it deciding nothing anywhere.
+    for clause in CLAUSES:
+        if clause["reads"] != _REPOSITORY:
+            continue
+        over_the_tree = clause["check"](repo)
+        if over_the_tree is None:
+            continue
+        decided.add(clause["code"])
+        for finding in over_the_tree:
+            finding.setdefault("file", "")
+        if over_the_tree:
+            broken.setdefault(clause["code"], []).extend(over_the_tree)
 
     files = production + tests
     never_decided = sorted({c["code"] for c in CLAUSES} - decided)

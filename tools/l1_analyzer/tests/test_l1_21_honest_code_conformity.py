@@ -459,7 +459,7 @@ def test_the_kinds_of_undecided_are_named_as_a_closed_set():
     displayed as "0 fired (0%)". A third state collapsed into a second reports nothing
     happening about the exact case the instrument exists for."""
     assert honest_code.UNDECIDED_KINDS == ("never", "not applicable", "unreadable",
-                                          "nothing to read")
+                                          "nothing to read", "decided over the repository")
 
 
 def test_a_clause_nothing_can_ever_decide_says_never():

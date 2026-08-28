@@ -92,3 +92,25 @@ Feature: Three clauses about what a signature promises and what a caller may ass
     Then it yields a named function whose name begins with one of the language's test prefixes, which is how Python, Java and C# write a test
     And it yields the call that takes the body as an argument, which is how JavaScript and Ruby write one, where the test has no name of its own
     But the block form yields the call and not the anonymous function inside it, so one body is not counted twice under two names
+
+  Scenario: copied_constraints finds a hand-written check spelling out a bound the file already declares
+    Given a parsed source and its language's node vocabulary
+    When copied_constraints collects the bounds the file declares and looks for the same bound written out in a comparison
+    Then it reports the comparison, because one half is enforced by the machinery and the other by a programmer and nothing keeps them equal
+    And a bound only declared is left alone, since that is what the rule asks for and nobody wrote it twice
+    And a bound only checked is left alone, because there is nothing for it to drift from and this rule is about copies
+    And each copy is its own finding, since each can drift on its own
+    And a bound declared somewhere this reader cannot see, a database column or a form field, is not read, which is the narrowest of the cases the principle covers
+    But a language this table gives nowhere to declare a bound is answered with nothing decided, which is JavaScript, Ruby, Go, Rust and C
+
+  Scenario: declared_bounds gives every bound this file declares for the machinery to enforce
+    Given a parsed source and its language's vocabulary
+    When declared_bounds reads the numbers inside each type annotation, Java annotation or C# attribute
+    Then it returns those bounds, which are the ones the runtime, the type checker, the database or the browser enforces
+    But the programmer only writes them down, which is the whole of the principle: they declare and the machinery enforces
+
+  Scenario: _literals_under gives every literal in a subtree that could be a bound
+    Given a node, its language's vocabulary, and the source bytes
+    When _literals_under collects the literals the vocabulary names as able to carry a constraint
+    Then it returns the numbers and the strings
+    But it returns no boolean and no null, because counting those would read a test against nothing beside a nullable declaration as a copy of it

@@ -303,3 +303,73 @@ def mock_heavy_tests(source: dict) -> list[Finding] | None:
                 "dependencies",
                 "extract the pure logic and assert f(input) == expected on it directly", ""))
     return found
+
+
+def _literals_under(node, spec: dict, raw: bytes) -> set[str]:
+    """Every literal this subtree spells out that could be a bound.
+
+    A number or a string can be one. A boolean or a null cannot, and counting them would
+    read `x is None` beside a nullable declaration as a copy of it."""
+    return {node_text(n, raw) for n in walk(node) if n.type in spec["bound_literal_types"]}
+
+
+def declared_bounds(source: dict) -> set[str]:
+    """Every bound this file declares for the machinery to enforce.
+
+    A number inside a type annotation, a Java annotation or a C# attribute. The machinery
+    holds these: the runtime, the type checker, the database or the browser enforces them,
+    and the programmer only writes them down."""
+    spec, raw = source["spec"], source["raw"]
+    declared: set[str] = set()
+    for node in walk(source["root"]):
+        if node.type in spec["declared_bound_types"]:
+            declared |= _literals_under(node, spec, raw)
+    return declared
+
+
+def copied_constraints(source: dict) -> list[Finding] | None:
+    """A hand-written check spelling out a bound this file already declares.
+
+    The principle is Type Declarations Over Imperative Validation. A hand-written check is a
+    copy of a constraint that exists elsewhere: the column is varchar(255), the field is
+    typed, the form says type="email", and a function then checks all three again in its own
+    words. Copies drift, and the copy that drifts is the one on the path nobody exercised.
+
+    Not the clause next door. Trust the Contract in the Interior is about a branch nothing
+    can reach, because the caller was already excluded by the declaration. This is about two
+    live constraints that can disagree, and the harm is the drift. They were one clause under
+    one name until the canon separated them.
+
+    The duplicated bound is what makes it decidable without reading a database. The same
+    number in a declaration and again in a comparison IS the copy: one half is enforced by
+    the machinery, the other by a programmer, and nothing keeps them equal. A number used for
+    something that is not a constraint, a loop counting to it, is not in a comparison and is
+    not reported.
+
+    Each copy is its own finding, because each can drift on its own.
+
+    Not decided: a bound declared somewhere this reader cannot see. A database column, a form
+    field and a schema in another service are the canon's own examples, and none of them is
+    in this file. Only a bound declared and copied in the same file is found here, which is
+    the narrowest of the cases the principle covers.
+
+    Not decided either for a language this table gives nowhere to declare a bound, which is
+    JavaScript, Ruby, Go, Rust and C."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["declared_bound_types"]:
+        return None
+    declared = declared_bounds(source)
+    if not declared:
+        return []
+    found: list[Finding] = []
+    for node in walk(source["root"]):
+        if node.type not in spec["comparison_types"]:
+            continue
+        for bound in sorted(_literals_under(node, spec, raw) & declared):
+            found.append(_finding(
+                "L1.21.22", node_text(node, raw).strip()[:60], node.start_point[0] + 1,
+                f"the bound {bound} is declared in this file and written out again here, "
+                "so the two can drift and only one of them is enforced by the machinery",
+                "delete the check and let the declaration carry the bound, or generate "
+                "both from the one declaration so they cannot disagree", ""))
+    return found

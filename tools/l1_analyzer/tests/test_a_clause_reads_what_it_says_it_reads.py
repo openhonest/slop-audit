@@ -21,6 +21,7 @@ being exact will always produce.
 from l1_analyzer.honest_code import (
     _NOTHING,
     _PYTHON_AST,
+    _REPOSITORY,
     _TEXT_READER,
     _TREE_READER,
     CLAUSES,
@@ -76,15 +77,29 @@ def test_every_clause_that_says_it_reads_the_text_reaches_for_the_text():
     assert wrong == [], f"{wrong} are declared to read the text and never name it"
 
 
-def test_every_clause_declares_one_of_the_four_readers():
-    """A fifth spelling would pass every test above by matching none of them.
+def test_every_clause_declares_one_of_the_five_readers():
+    """A sixth spelling would pass every test above by matching none of them.
 
     The fourth is `nothing`, and it earns its place: a clause that decides nothing reads
     nothing, and naming a parser there stated a capability the clause never uses. The
     undecided disclosure read that name as a port we owe, so a JavaScript repository was
     promised work on a clause that cannot be written."""
-    readers = {_PYTHON_AST, _TREE_READER, _TEXT_READER, _NOTHING}
+    readers = {_PYTHON_AST, _TREE_READER, _TEXT_READER, _NOTHING, _REPOSITORY}
     assert {c["reads"] for c in CLAUSES} <= readers
+
+
+def test_a_clause_reading_the_repository_says_why_one_file_cannot_decide_it():
+    """The fifth reader, added when References Resolve Statically got a clause. A reference
+    and the thing it names are in different files by construction, so a page on its own
+    cannot say whether the rule it names exists. Tying the reader to that sentence is what
+    stops it becoming the quiet way past every guard in this file."""
+    import inspect
+    for clause in CLAUSES:
+        if clause["reads"] != _REPOSITORY:
+            continue
+        taken = list(inspect.signature(clause["check"]).parameters)
+        assert taken == ["repo"], (clause["code"], taken)
+        assert "different files" in (clause["check"].__doc__ or ""), clause["code"]
 
 
 def test_only_a_clause_that_decides_nothing_may_read_nothing():
