@@ -99,3 +99,12 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     When _stamp_written_at_build reads the commit out of it
     Then that is the build's identity, whether or not a repository is anywhere near it
     But a package with no such file yields nothing at all, so the caller falls through to asking git
+
+  Scenario: build_parser builds the command line from the one table that names every flag
+    Given nothing but the flag table
+    When build_parser walks each row and adds it
+    Then it returns a parser offering every flag the table names and no others
+    And it is its own function so a reader, and a test, can hold the parser without running an audit
+    And the flag table replaced thirty-one separate calls, which our own duplication check named as 127 repeated lines in this file, eighteen runs of one call shape carrying different words
+    And the table is the only place a reader sees every flag at once, which is how two flags shipping with no help text at all were found
+    But the program name is set rather than left to whatever launched the process, because naming it wrong sends a new adopter to a command that does not exist
