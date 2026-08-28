@@ -157,3 +157,12 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
     When card_markdown writes the verdict, the silence, both tables, the thread surface and the proofs
     Then an ungraded card keeps every check that WAS measured and prints only the detail paragraph in place of the state verdict, rather than throwing eight measured results away
     And the footer names which run produced the card: the website that never executes code, the CLI that measured the suite, or the CLI whose runtime harness does not reach this language yet
+
+  Scenario: footer_for gives the closing sentence saying what this run did and did not do
+    Given a built card
+    When footer_for reads whether the tests ran and whether they produced a number
+    Then a run that executed nothing says so, which is the website, where no repository's code is ever run
+    And a run that measured the suite says the numbers below are measured rather than estimated
+    And a run that executed the suite and got no number carries the reason the harness itself gave
+    And a harness that gave no reason is reported as having given none, rather than having one chosen for it
+    But it names no cause of its own, because it used to name a Python-only harness for every unmeasured run and told a Python repository exactly that on a run our own coverage session had broken

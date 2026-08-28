@@ -245,6 +245,38 @@ def _na(reason: str) -> L1Result:
     return {"value": "n/a", "band": "n/a", "details": reason}
 
 
+def _stop_their_coverage(pytest_cov_installed: bool) -> list[str]:
+    """`--no-cov`, but only where pytest-cov is installed to understand it.
+
+    Reported by an adopter on 2026-08-28. A repository with `--cov` in its pytest settings
+    starts a second coverage session inside the one we start; theirs wins, ours records
+    nothing, and we published 0.0. Their real branch coverage was 84.4 per cent. Turning on
+    coverage is the practice we ask for, so we were punishing it.
+
+    Asked rather than assumed, because passing the flag to a pytest without the plugin is an
+    unknown argument and the whole run dies on a usage error. That is what the first version
+    of this fix did, and it turned a wrong number into no number at all.
+
+    Told, not asked. Reaching for the probe here meant a test could only cover both answers
+    by replacing a name inside this package, which is the shape this repository refuses:
+    such a test asserts against its own stand-in and passes when the real thing is broken.
+    The caller does the probe and hands in what it found."""
+    return ["--no-cov"] if pytest_cov_installed else []
+
+
+def _collection_was_empty(output: str) -> str:
+    """Our own sentence for a run that recorded nothing, or the empty string.
+
+    A repository whose suite ran and covered nothing is a real finding. A repository whose
+    own coverage session collided with ours is our bug. Both printed the same words, so a
+    reader could not tell which had happened, and the one they were shown blamed them."""
+    if "No data was collected" not in output:
+        return ""
+    return ("the suite ran and this tool recorded nothing, which usually means the "
+            "repository starts its own coverage session and it collided with ours. "
+            "That is our failure and not a reading of your tests")
+
+
 def _first_line(text: str) -> str:
     for line in (text or "").splitlines():
         if line.strip():
@@ -336,7 +368,9 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
         report_file = Path(directory) / "coverage.json"
         env = {"COVERAGE_FILE": str(data_file)}
         run = _run_untrusted(
-            [exe, "-m", "coverage", "run", "--branch", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
+            [exe, "-m", "coverage", "run", "--branch", "-m", "pytest", "-q",
+             "-p", "no:cacheprovider",
+             *_stop_their_coverage(_module_available("pytest_cov", exe)[0])],
             cwd=repo, env=env, timeout_seconds=timeout_seconds,
         )
         if run.returncode not in (0, 1):
@@ -347,7 +381,11 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
             cwd=str(repo), env={**os.environ, **env}, capture_output=True, text=True, check=False,
         )
         if not report_file.exists():
-            return _na(f"coverage produced no data (suite exit {run.returncode}): {_first_line(run.stderr or run.stdout)}")
+            collided = _collection_was_empty(run.stderr or run.stdout)
+            if collided:
+                return _na(collided)
+            return _na(f"coverage produced no data (suite exit {run.returncode}): "
+                       f"{_first_line(run.stderr or run.stdout)}")
         try:
             report = json.loads(report_file.read_text())
         except (OSError, json.JSONDecodeError):

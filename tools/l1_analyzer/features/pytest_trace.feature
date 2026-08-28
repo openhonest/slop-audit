@@ -119,3 +119,17 @@ Feature: pytest_trace — running a Python repository's own test suite to measur
     And it refuses on the first run that timed out or whose suite never executed, so the remaining runs do not each burn a timeout
     But no runs at all is refused rather than banded, since zero clean out of zero satisfies "every run passed" and would read Healthy
 
+
+  Scenario: _stop_their_coverage tells a suite not to start its own coverage, where it can
+    Given the Python that will run the target repository's suite
+    When _stop_their_coverage asks that environment whether the coverage plugin is installed
+    Then it returns the flag that turns the plugin off, because a repository with coverage in its own pytest settings starts a second session inside ours, theirs wins, ours records nothing, and we published a zero on a repository whose real coverage was high
+    And it returns nothing where the plugin is absent, since passing the flag to a pytest that does not know it is an unknown argument that kills the whole run and turns a wrong number into no number
+    But it asks rather than assuming, which is the difference between those two outcomes and is what the first attempt at this got wrong
+
+  Scenario: _collection_was_empty gives our own sentence for a run that recorded nothing
+    Given the output of a suite we ran
+    When _collection_was_empty looks for the words coverage prints when it gathered no data
+    Then it returns a sentence saying the collision is ours rather than a reading of their tests
+    And ordinary output returns the empty string, because a rule that saw a collision everywhere would excuse every real zero
+    But it says usually rather than certainly, since a suite that genuinely covered nothing prints the same words and this reader cannot tell the two apart

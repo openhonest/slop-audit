@@ -54,7 +54,13 @@ CARD_COPY: dict[str, str] = {
     "scoped.why": "Docs, build and test tooling, and loose entry-point scripts are not the code under test. Everything set aside is listed so you can check it.",
     "footer.fine": "A full Slop Audit scores all 18 enterprise compliance dimensions and produces SOC 2 evidence as a byproduct. This page runs the static Layer 1 indicators only. It never executes the repo's code.",
     "footer.cli": "Run under the Slop Audit CLI: the repository's test suite was executed, so decision-space coverage (L1.19) and test determinism (L1.20) below are measured, not estimated. try.slopaudit.org runs the static Layer 1 indicators only and never executes your code.",
-    "footer.cli_na": "Run under the Slop Audit CLI, which executes the repository's test suite to measure decision-space coverage (L1.19) and test determinism (L1.20). Those rows read n/a here: the runtime harness is Python-only so far, so it did not run this repo's suite. try.slopaudit.org never executes any repo's code; this is the difference between 'we did not run it' and 'we could not run it here yet.'",
+    # The reason is filled in from what the harness said. It used to assert one cause for
+    # every failure, that the harness is Python-only, which is true for Rust and Go and was
+    # false for the Python repository whose report named it: there, our own coverage session
+    # had collided with theirs. A reader could not tell a language we cannot run from a bug
+    # in how we ran theirs, and the sentence they were shown blamed them.
+    "footer.cli_na": "Run under the Slop Audit CLI, which executes the repository's test suite to measure decision-space coverage (L1.19) and test determinism (L1.20). Those rows read n/a here: {reason}. try.slopaudit.org never executes any repo's code; this is the difference between 'we did not run it' and 'we could not run it here yet.'",
+    "footer.cli_na_silent": "the harness did not say why",
     "grade.rubric": "The grade is verifiability first, by a rule we publish rather than hide. The verdict sets the tier: <strong>CANNOT &rarr; F</strong> (some state is provably unbounded, so no finite test suite covers it), <strong>COARSE &rarr; D</strong> (some state has a countable but unordered set of cases too wide to cover; a wide ORDERED range costs a handful of boundary tests, a wide unordered one costs one test per case). When every piece of state is finitely testable and coverable, the audit checks below decide <strong>A, B, or C</strong> by weighted health &mdash; god-files and type-escapes weigh most (3 each), then CI (2), then containers, pre-commit, and formatting (1 each). The number is the share of DECIDED state that is finitely testable. No hidden weights.",
     # Migrated from report.py when its renderers were deleted. The claim was published on
     # every report that module produced and on no card, so the surface people actually read
@@ -399,6 +405,21 @@ def _proofs(results: dict) -> list[dict]:
     return out[:_PROOF_CAP]
 
 
+def footer_for(card: dict) -> str:
+    """The closing sentence, which says what this run did and did not do.
+
+    Three cases. The site never runs anyone's code. The CLI ran the suite and got a number.
+    The CLI ran and did not, and THAT case carries the harness's own reason rather than a
+    cause chosen here: it named a Python-only harness for every failure, and told a Python
+    repository exactly that on a run our own coverage session had broken."""
+    if not card["ran_tests"]:
+        return _t("footer.fine")
+    if card["tests_measured"]:
+        return _t("footer.cli")
+    reason = card.get("coverage_na_reason") or _t("footer.cli_na_silent")
+    return _t("footer.cli_na").replace("{reason}", reason)
+
+
 def build_card(slug: str, lang: str, results: dict, ran_tests: bool,
                analyzer_version: str) -> dict:
     """The full scorecard model, identical to the site's. ran_tests=True (the CLI) adds
@@ -429,9 +450,15 @@ def build_card(slug: str, lang: str, results: dict, ran_tests: bool,
     # which. The site (ran_tests=False) is a third case: it never runs code at all.
     l20 = results.get("L1.20")
     tests_measured = ran_tests and isinstance(l20, dict) and str(l20["band"]) != "n/a"
+    # Taken from the harness, never chosen here. The footer used to name one cause for every
+    # unmeasured run and got it wrong on the first repository that reported it.
+    l19 = results.get("L1.19")
+    coverage_na_reason = ("" if tests_measured or not isinstance(l19, dict)
+                          else str(l19.get("details") or l19.get("detail") or ""))
     return {
         "slug": slug, "lang": lang, "question": _t("question"), "status": status, "grade": grade,
         "grade_pct": pct, "ran_tests": ran_tests, "tests_measured": tests_measured,
+        "coverage_na_reason": coverage_na_reason,
         "headline": "" if status == "na" else _t(f"headline.{status}"),
         "basis": g["basis"], "census": g["census"],
         "census_note": "" if status == "na" else _census_note(g["census"]),
@@ -607,6 +634,5 @@ def card_markdown(card: dict) -> str:
             if p.get("detail"):
                 lines.append(f"\n_{p['detail']}_")
             lines += ["", f"```{p['language']}", p["test_source"], "```"]
-    footer = "footer.fine" if not card["ran_tests"] else ("footer.cli" if card["tests_measured"] else "footer.cli_na")
-    lines += ["", "---", "", strip.sub("", _t(footer))]
+    lines += ["", "---", "", strip.sub("", footer_for(card))]
     return "\n".join(lines)
