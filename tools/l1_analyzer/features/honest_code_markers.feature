@@ -74,3 +74,11 @@ Feature: Three clauses that read what is attached to a declaration
     Then it answers yes, because the runner calls the step, gets a coroutine back and drops it, so the body never executes
     And the language decides it, since every other runner waits for what a step returns and reporting an async step there would ask an author to break working tests
     But it says nothing about length, because a step that never runs is not a step that is too long, and two findings on one site would send a reader to shorten a function that does nothing
+
+  Scenario: _declaration_marked gives the declaration a marker sits on, as a node
+    Given a marker node and its language's vocabulary
+    When _declaration_marked looks beside the marker as well as above it
+    Then it returns the function or class the marker belongs to, so two markers on one declaration lead to the same node
+    And it looks at siblings because Python wraps a decorator and its function together and makes them siblings, where walking up alone finds the wrapper and never the function
+    And it walks upward as well because Java and C# nest the marker inside the declaration, where that is the only thing that works
+    But it returns nothing where no declaration holds the marker, rather than naming something that is not one

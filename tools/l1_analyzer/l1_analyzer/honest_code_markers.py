@@ -37,6 +37,25 @@ def _marker_names(marker, raw: bytes) -> list[str]:
     return [part.strip() for part in text.split(".")]
 
 
+def _declaration_marked(marker, spec: dict):
+    """The declaration a marker sits on, as a node, or nothing.
+
+    Looked for beside the marker as well as above it. Python wraps a decorator and the
+    function it decorates in one parent and makes them SIBLINGS, so walking up alone finds
+    the wrapper and never the function. Java and C# nest the marker inside the declaration,
+    where walking up is the only thing that works."""
+    declared = spec["func_types"] + spec["class_types"]
+    holder = marker.parent
+    while holder is not None:
+        if holder.type in declared:
+            return holder
+        for sibling in holder.named_children:
+            if sibling.type in declared:
+                return sibling
+        holder = holder.parent
+    return None
+
+
 def _declaration_named(marker, spec: dict, raw: bytes) -> str:
     """What the declaration a marker sits on is called, for the finding to point at.
 
@@ -45,20 +64,9 @@ def _declaration_named(marker, spec: dict, raw: bytes) -> str:
     the wrapper and never the function, and every decorated finding was named after the
     decorator's own text. Java and C# nest the marker inside the declaration, where walking
     up is the only thing that works."""
-    declared = spec["func_types"] + spec["class_types"]
-    holder = marker.parent
-    while holder is not None:
-        if holder.type in declared:
-            named = holder.child_by_field_name("name")
-            if named is not None:
-                return node_text(named, raw) or ""
-        for sibling in holder.named_children:
-            if sibling.type in declared:
-                named = sibling.child_by_field_name("name")
-                if named is not None:
-                    return node_text(named, raw) or ""
-        holder = holder.parent
-    return node_text(marker, raw) or ""
+    holder = _declaration_marked(marker, spec)
+    named = holder.child_by_field_name("name") if holder is not None else None
+    return (node_text(named, raw) if named is not None else node_text(marker, raw)) or ""
 
 
 def lifecycle_hooks(source: dict) -> list[Finding] | None:
@@ -82,6 +90,10 @@ def lifecycle_hooks(source: dict) -> list[Finding] | None:
     if not spec["hook_marker_types"] and not spec["hook_registrations"]:
         return None
     found: list[Finding] = []
+    # A declaration can carry two markers: registered for two events, memoised twice, or a
+    # step bound to two scenarios. Reported per marker, it was reported twice. An adopter
+    # found the step case, and the other two had it for the same reason.
+    seen: set[int] = set()
     for node in walk(source["root"]):
         if node.type in spec["call_types"]:
             named = node.child_by_field_name(spec["call_fn"])
@@ -94,7 +106,10 @@ def lifecycle_hooks(source: dict) -> list[Finding] | None:
                     "visible at the call site rather than in a registration", ""))
         if node.type in spec["hook_marker_types"]:
             names = _marker_names(node, raw)
-            if any(name in spec["hook_markers"] for name in names):
+            marked = _declaration_marked(node, spec)
+            key = marked.id if marked is not None else node.id
+            if any(name in spec["hook_markers"] for name in names) and key not in seen:
+                seen.add(key)
                 owner = _declaration_named(node, spec, raw)
                 found.append(_finding(
                     "L1.21.16", owner, node.start_point[0] + 1,
@@ -161,6 +176,9 @@ def unmeasured_caches(source: dict) -> list[Finding] | None:
     if not spec["cache_names"] and not spec["cache_markers"]:
         return None
     found: list[Finding] = []
+    # Declarations only. An import and a marker count different things, so a dependency is
+    # never deduplicated against a decorator.
+    seen: set[int] = set()
     for node in walk(source["root"]):
         if _brings_in_a_dependency(node, spec, raw):
             named = [n for n in _dependency_names(node, spec, raw) if n in spec["cache_names"]]
@@ -172,7 +190,10 @@ def unmeasured_caches(source: dict) -> list[Finding] | None:
         if node.type in spec["hook_marker_types"]:
             names = _marker_names(node, raw)
             marker = next((n for n in names if n in spec["cache_markers"]), "")
-            if marker:
+            marked = _declaration_marked(node, spec)
+            key = marked.id if marked is not None else node.id
+            if marker and key not in seen:
+                seen.add(key)
                 found.append(_finding(
                     "L1.21.9", _declaration_named(node, spec, raw), node.start_point[0] + 1,
                     f"@{marker} caches the result before anything measured the cost",
@@ -195,6 +216,11 @@ def _step_definitions(source: dict) -> list[tuple[str, object]]:
     function inside it."""
     spec, raw = source["spec"], source["raw"]
     steps: list[tuple[str, object]] = []
+    # By the node holding the body, because a step can carry more than one marker: a
+    # pytest-bdd function bound to three scenarios has three decorators. Collecting markers
+    # and mapping each back to its function reported one adopter's step three times and
+    # moved their total by two on a day the code did not change. The site is the finding.
+    seen: set[int] = set()
     for node in walk(source["root"]):
         marked = (node.type in spec["hook_marker_types"] and spec["step_markers"]
                   and any(n in spec["step_markers"] for n in _marker_names(node, raw)))
@@ -203,11 +229,13 @@ def _step_definitions(source: dict) -> list[tuple[str, object]]:
             while holder is not None and holder.type not in spec["func_types"]:
                 holder = next((c for c in holder.named_children
                                if c.type in spec["func_types"]), None) or holder.parent
-            if holder is not None:
+            if holder is not None and holder.id not in seen:
+                seen.add(holder.id)
                 steps.append((_declaration_named(node, spec, raw), holder))
         if node.type in spec["call_types"] and spec["step_calls"]:
             spelling = called_spelling(node, spec, raw)
-            if spelling in spec["step_calls"]:
+            if spelling in spec["step_calls"] and node.id not in seen:
+                seen.add(node.id)
                 steps.append((spelling, node))
     return steps
 
