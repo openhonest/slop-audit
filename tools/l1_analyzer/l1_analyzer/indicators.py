@@ -740,6 +740,25 @@ def _annotation_name(node: Node) -> str:
         name = node.child_by_field_name("name")
     return node.text.decode("utf8", errors="ignore") if node.text else ""
 
+def _is_a_bare_generic(node: Node, cfg: LangCfg, text: str) -> bool:
+    """Whether this node names a container without saying what it holds.
+
+    `dict` means dict[Any, Any], the least precise mapping Python has. It carries no escape
+    token, so a counter reading tokens scored it clean, while scoring the better
+    `dict[str, Any]` as an escape. An adopter found that by writing out six annotations they
+    already meant and watching our number get worse. An author who watches the number learns
+    to write `dict`, which is worse and which we could not see at all.
+
+    Told apart from `dict[str, str]` by where it sits rather than by reading its text: a
+    parameterised generic hangs under a generic type node and a bare one hangs directly in
+    the type. A `dict()` call and an `isinstance(x, dict)` sit somewhere else again and are
+    not annotations at all."""
+    if text not in cfg["bare_generics"] or node.named_children:
+        return False
+    parent = node.parent
+    return parent is not None and parent.type in cfg["type_position_types"]
+
+
 def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
     """Count type-escape hatches in one parsed tree.
 
@@ -811,7 +830,7 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
         nonlocal count
         if not n.children:  # leaf token
             text = n.text.decode("utf8", errors="ignore") if n.text else ""
-            if text in escape_tokens and not in_string(n) and not _in_non_type_position(n, nonpositions):
+            if text in escape_tokens and not in_string(n) and not _in_non_type_position(n, nonpositions) or _is_a_bare_generic(n, cfg, text) and not in_string(n):
                 count += 1
         if "comment" in n.type:
             text = n.text.decode("utf8", errors="ignore") if n.text else ""

@@ -40,6 +40,14 @@ class LangCfg(TypedDict, total=False):
     module_level_assign: tuple[str, ...]
     type_escape_patterns: tuple[str, ...]
     type_escape_nonpositions: tuple[str, ...]
+    # A container named with no contents: `dict`, meaning dict[Any, Any], the least precise
+    # mapping the language has. It carries no escape token, so a counter reading tokens
+    # scored it clean while scoring the better `dict[str, Any]` as an escape. An adopter
+    # found it by making six annotations more precise and watching our number get worse.
+    bare_generics: tuple[str, ...]
+    # Where a declared type sits. A parameterised generic sits somewhere else, which is
+    # what separates `dict` from `dict[str, str]` without reading either one's text.
+    type_position_types: tuple[str, ...]
     type_cast_calls: tuple[str, ...]
     annotation_escape_nodes: tuple[str, ...]
     annotation_escape_names: tuple[str, ...]
@@ -55,6 +63,9 @@ class LangCfg(TypedDict, total=False):
 
 LANG_CFG: dict[str, LangCfg] = {
     "python": {
+        "bare_generics": ("dict", "list", "tuple", "set", "frozenset", "Dict", "List",
+                          "Tuple", "Set", "FrozenSet"),
+        "type_position_types": ("type",),
         "language": Language(tree_sitter_python.language()),
         "extensions": (".py",),
         "function_types": ("function_definition",),
@@ -83,6 +94,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "raw_mut_patterns": (),
     },
     "rust": {
+        "bare_generics": (),
+        "type_position_types": (),
         "language": Language(tree_sitter_rust.language()),
         "extensions": (".rs",),
         "function_types": ("function_item",),
@@ -118,6 +131,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "instance_field_types": (),
     },
     "c": {
+        "bare_generics": (),
+        "type_position_types": (),
         "language": Language(tree_sitter_c.language()),
         "extensions": (".c", ".h"),
         "function_types": ("function_definition",),
@@ -145,6 +160,9 @@ LANG_CFG: dict[str, LangCfg] = {
         "raw_mut_patterns": (),
     },
     "java": {
+        "bare_generics": ("List", "Map", "Set", "Collection", "Optional"),
+        "type_position_types": ("formal_parameter", "local_variable_declaration",
+                                "field_declaration", "method_declaration"),
         "language": Language(tree_sitter_java.language()),
         "extensions": (".java",),
         "function_types": ("method_declaration", "constructor_declaration"),
@@ -174,6 +192,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "raw_mut_patterns": (),
     },
     "csharp": {
+        "bare_generics": (),
+        "type_position_types": (),
         "language": Language(tree_sitter_c_sharp.language()),
         "extensions": (".cs",),
         "function_types": ("method_declaration", "constructor_declaration"),
@@ -199,6 +219,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "raw_mut_patterns": (),
     },
     "javascript": {
+        "bare_generics": (),
+        "type_position_types": (),
         "language": Language(tree_sitter_javascript.language()),
         "extensions": (".js", ".jsx", ".mjs", ".cjs"),
         "function_types": ("function_declaration", "function_expression", "generator_function_declaration", "method_definition", "arrow_function"),
@@ -225,6 +247,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "raw_mut_patterns": (),
     },
     "ruby": {
+        "bare_generics": (),
+        "type_position_types": (),
         "language": Language(tree_sitter_ruby.language()),
         "extensions": (".rb",),
         "function_types": ("method", "singleton_method"),
@@ -254,6 +278,8 @@ LANG_CFG: dict[str, LangCfg] = {
         "raw_mut_patterns": (),
     },
     "go": {
+        "bare_generics": (),
+        "type_position_types": (),
         "language": Language(tree_sitter_go.language()),
         "extensions": (".go",),
         "function_types": ("function_declaration", "method_declaration"),
@@ -302,12 +328,17 @@ _TYPESCRIPT_CFG["extensions"] = (".ts", ".tsx")
 # TypeScript has types to escape from; JavaScript has none, so its patterns are empty.
 _TYPESCRIPT_CFG["type_escape_patterns"] = ("any", "unknown")  # plus // @ts-ignore
 _TYPESCRIPT_CFG["type_escape_nonpositions"] = ("import_statement", "pair")
+# TypeScript declares types where JavaScript has nowhere to put one, so it is the only one
+# of the pair with a container that can be named without its contents.
+_TYPESCRIPT_CFG["bare_generics"] = ("Array", "Record", "Map", "Set", "Promise")
+_TYPESCRIPT_CFG["type_position_types"] = ("type_annotation",)
 
 # The overridden keys, named once so a test can assert that nothing ELSE diverged. Written
 # out per key rather than merged from a dict of object, so each value is checked against
 # the field it lands in instead of being waved past the checker with an ignore.
 TYPESCRIPT_CFG_OVERRIDES = frozenset({
     "language", "extensions", "type_escape_patterns", "type_escape_nonpositions",
+    "bare_generics", "type_position_types",
 })
 
 LANG_CFG["typescript"] = _TYPESCRIPT_CFG

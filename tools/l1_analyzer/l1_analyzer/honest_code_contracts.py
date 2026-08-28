@@ -18,6 +18,7 @@ from pathlib import Path
 
 from l1_analyzer.honest_code_read import (
     Finding,
+    Source,
     _finding,
     called_spelling,
     class_nodes,
@@ -28,9 +29,10 @@ from l1_analyzer.honest_code_read import (
     walk,
 )
 from l1_analyzer.honest_code_rules import RESOURCE_CALLS
+from l1_analyzer.lang_spec import LangSpec
 
 
-def _declared_type_of(parameter, spec: dict, raw: bytes) -> str:
+def _declared_type_of(parameter, spec: LangSpec, raw: bytes) -> str:
     """The type a parameter declares, stripped of the punctuation a grammar hangs on it.
 
     TypeScript's annotation node carries the colon (`: number`), Python's does not. Reading
@@ -39,7 +41,7 @@ def _declared_type_of(parameter, spec: dict, raw: bytes) -> str:
     return (node_text(declared, raw) or "").lstrip(":").strip()
 
 
-def _parameter_name(parameter, spec: dict, raw: bytes) -> str:
+def _parameter_name(parameter, spec: LangSpec, raw: bytes) -> str:
     """The name a typed parameter binds. Named by a field in most grammars; Python's
     typed_parameter hangs it as the first child with no field at all."""
     field = spec["typed_param_name"]
@@ -47,7 +49,7 @@ def _parameter_name(parameter, spec: dict, raw: bytes) -> str:
     return node_text(named, raw) or ""
 
 
-def _type_tests_in(fn, spec: dict, raw: bytes) -> list[tuple[str, str, int]]:
+def _type_tests_in(fn, spec: LangSpec, raw: bytes) -> list[tuple[str, str, int]]:
     """Every runtime type test inside `fn`, as (value tested, type tested for, line).
 
     Two shapes, because languages spell it two ways. An operator form is a node with the
@@ -84,7 +86,7 @@ def _call_arguments(call) -> list:
     return list(holder.children) if holder is not None else []
 
 
-def imperative_validation(source: dict) -> list[Finding] | None:
+def imperative_validation(source: Source) -> list[Finding] | None:
     """A runtime type test on a parameter whose declaration already fixes the type.
 
     Re-checking a value the signature promised is distrust of your own contract. In a correct
@@ -138,7 +140,7 @@ def imperative_validation(source: dict) -> list[Finding] | None:
     return found
 
 
-def _resource_calls(spec: dict) -> frozenset[str]:
+def _resource_calls(spec: LangSpec) -> frozenset[str]:
     """Every name that counts as acquiring a resource in this language.
 
     The shared list joined to the language's own spellings. C# names the same operation
@@ -147,7 +149,7 @@ def _resource_calls(spec: dict) -> frozenset[str]:
     return RESOURCE_CALLS | spec["resource_calls"]
 
 
-def _instance_member_written(assignment, spec: dict, raw: bytes) -> str:
+def _instance_member_written(assignment, spec: LangSpec, raw: bytes) -> str:
     """The name of the instance state this assignment writes, or the empty string.
 
     Two shapes. Most languages write a member on a receiver, `self.conn` or `this.conn`, so
@@ -168,7 +170,7 @@ def _instance_member_written(assignment, spec: dict, raw: bytes) -> str:
     return node_text(member, raw) if member is not None else ""
 
 
-def _scopes_its_own_resource(class_node, spec: dict, raw: bytes) -> bool:
+def _scopes_its_own_resource(class_node, spec: LangSpec, raw: bytes) -> bool:
     """Whether the class declares the language's own release hook.
 
     Python declares `__enter__`, Java implements `close`, C# implements `Dispose`, Ruby
@@ -181,7 +183,7 @@ def _scopes_its_own_resource(class_node, spec: dict, raw: bytes) -> bool:
     return False
 
 
-def unscoped_resources(source: dict) -> list[Finding] | None:
+def unscoped_resources(source: Source) -> list[Finding] | None:
     """A resource held on instance state by a class that never releases it.
 
     A connection with a manual lifecycle is a leak waiting for an exception: the path that
@@ -240,7 +242,7 @@ def unscoped_resources(source: dict) -> list[Finding] | None:
 _MOCK_LIMIT = 3
 
 
-def _test_bodies(source: dict) -> list[tuple[str, object, int]]:
+def _test_bodies(source: Source) -> list[tuple[str, object, int]]:
     """Every test in this file, as (what to call it, the node holding its body, its line).
 
     Two shapes, because a test is not the same kind of thing everywhere. Python, Java and C#
@@ -265,7 +267,7 @@ def _test_bodies(source: dict) -> list[tuple[str, object, int]]:
     return bodies
 
 
-def mock_heavy_tests(source: dict) -> list[Finding] | None:
+def mock_heavy_tests(source: Source) -> list[Finding] | None:
     """Three or more mocks in one test.
 
     The count is a readout on the CODE, not on the test: three mocks means the function under
@@ -305,7 +307,7 @@ def mock_heavy_tests(source: dict) -> list[Finding] | None:
     return found
 
 
-def _literals_under(node, spec: dict, raw: bytes) -> set[str]:
+def _literals_under(node, spec: LangSpec, raw: bytes) -> set[str]:
     """Every literal this subtree spells out that could be a bound.
 
     A number or a string can be one. A boolean or a null cannot, and counting them would
@@ -313,7 +315,7 @@ def _literals_under(node, spec: dict, raw: bytes) -> set[str]:
     return {node_text(n, raw) for n in walk(node) if n.type in spec["bound_literal_types"]}
 
 
-def declared_bounds(source: dict) -> set[str]:
+def declared_bounds(source: Source) -> set[str]:
     """Every bound this file declares for the machinery to enforce.
 
     A number inside a type annotation, a Java annotation or a C# attribute. The machinery
@@ -327,7 +329,7 @@ def declared_bounds(source: dict) -> set[str]:
     return declared
 
 
-def copied_constraints(source: dict) -> list[Finding] | None:
+def copied_constraints(source: Source) -> list[Finding] | None:
     """A hand-written check spelling out a bound this file already declares.
 
     The principle is Type Declarations Over Imperative Validation. A hand-written check is a

@@ -25,6 +25,7 @@ from tree_sitter import Node
 
 from l1_analyzer.honest_code_read import (
     Finding,
+    Source,
     _finding,
     base_names,
     chain_subjects,
@@ -92,7 +93,7 @@ _DOM_CALLS = ("addEventListener", "querySelector", "querySelectorAll", "getEleme
 _CHAIN_ARMS = 3
 
 
-def dispatch_chains(source: dict) -> list[Finding] | None:
+def dispatch_chains(source: Source) -> list[Finding] | None:
     """An if/elif chain testing ONE name against literals to select behaviour.
 
     Read through the language's own node vocabulary, so the rule means the same thing in
@@ -182,7 +183,7 @@ def _tests_a_literal(case: "Node", spec: "LangSpec") -> bool:
 _SHAPE_TOKENS = 8
 
 
-def functions_of_one_shape(source: dict) -> list[Finding]:
+def functions_of_one_shape(source: Source) -> list[Finding]:
     """Functions that are one function with different words in them.
 
     Every name and every quoted string is erased and only the shape is kept, so two
@@ -240,7 +241,7 @@ def functions_of_one_shape(source: dict) -> list[Finding]:
     return found
 
 
-def data_classes(source: dict) -> list[Finding] | None:
+def data_classes(source: Source) -> list[Finding] | None:
     """A class whose constructor assigns its parameters, with no method doing more.
 
     Read through the language's own node vocabulary, so the rule means the same thing in
@@ -292,7 +293,7 @@ def _calls_a_resource(node: Node, spec: LangSpec, raw: bytes) -> bool:
 # 3. Pure functions over methods
 # --------------------------------------------------------------------------
 
-def methods_wearing_a_class(source: dict) -> list[Finding] | None:
+def methods_wearing_a_class(source: Source) -> list[Finding] | None:
     """A method that reaches the receiver only to fetch data it could have received.
 
     Read through the language's own node vocabulary. `self` and `this` are the same shape
@@ -333,7 +334,7 @@ def methods_wearing_a_class(source: dict) -> list[Finding] | None:
 # --------------------------------------------------------------------------
 
 
-def local_exception_roots(source: dict) -> set[str]:
+def local_exception_roots(source: Source) -> set[str]:
     """Classes this file defines that reach an exception root through their own bases.
 
     Followed to the root rather than one level, so a three-deep hierarchy is still
@@ -351,7 +352,7 @@ def local_exception_roots(source: dict) -> set[str]:
         known |= grew
 
 
-def inheritance_for_reuse(source: dict) -> list[Finding] | None:
+def inheritance_for_reuse(source: Source) -> list[Finding] | None:
     """A class whose base is neither a declared shape nor a framework requirement.
 
     An exception hierarchy is followed to its root. The table knew the literal name
@@ -386,7 +387,7 @@ def inheritance_for_reuse(source: dict) -> list[Finding] | None:
 # --------------------------------------------------------------------------
 
 
-def client_side_state(source: dict) -> list[Finding] | None:
+def client_side_state(source: Source) -> list[Finding] | None:
     """A store library or `localStorage` holding a copy of what the server already knows.
 
     Two sources of truth means one of them is lying. Not applicable to a file in a language
@@ -410,7 +411,7 @@ def client_side_state(source: dict) -> list[Finding] | None:
     return found
 
 
-def imperative_dom(source: dict) -> list[Finding] | None:
+def imperative_dom(source: Source) -> list[Finding] | None:
     """`addEventListener`, `querySelector` and `innerHTML`: how, in a place the reader has
     to go and find.
 
@@ -465,7 +466,7 @@ _KNOB_UNDECIDED = ("whether a table nobody writes is a knob disguised as a fact 
                    "readable from a file, so only the ones some function turns were checked")
 
 
-def hidden_configuration(source: dict) -> list[Finding] | None:
+def hidden_configuration(source: Source) -> list[Finding] | None:
     """A module-level value that some function WRITES, read inside another.
 
     Read through the language's own node vocabulary. The write is what makes it
@@ -508,7 +509,7 @@ def hidden_configuration(source: dict) -> list[Finding] | None:
 # 14. No implicit defaults
 # --------------------------------------------------------------------------
 
-def implicit_defaults(source: dict) -> list[Finding] | None:
+def implicit_defaults(source: Source) -> list[Finding] | None:
     """A LITERAL default, which cannot be told from a caller who chose that value.
 
     Read through the language's own node vocabulary. A default that binds a collaborator is
@@ -583,7 +584,7 @@ def _is_literal_node(node: Node, spec: LangSpec) -> bool:
 # 18. Dispatch tables close open input
 # --------------------------------------------------------------------------
 
-def open_dispatch(source: dict) -> list[Finding] | None:
+def open_dispatch(source: Source) -> list[Finding] | None:
     """A read of a table this file declares that supplies a value for an absent key.
 
     Two spellings, read through the language's own vocabulary. Python and Java pass the
@@ -680,7 +681,7 @@ def _fallback_lookup(node: Node, spec: LangSpec, raw: bytes) -> tuple[str, Node,
 # 19. Atomic test-and-set over check-then-act
 # --------------------------------------------------------------------------
 
-def check_then_act(source: dict) -> list[Finding] | None:
+def check_then_act(source: Source) -> list[Finding] | None:
     """A read of a shared value followed by a write to it, inside one function.
 
     Read through the language's own node vocabulary. Between the read and the write another

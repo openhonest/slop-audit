@@ -14,6 +14,7 @@ import ast
 
 from l1_analyzer.honest_code_read import (
     Finding,
+    Source,
 )
 
 # Calls whose bare name is unambiguous: nothing but I/O is spelled this way.
@@ -41,7 +42,7 @@ def _is_test_file(path: str) -> bool:
     return name.startswith("test_") or name.endswith("_test.py") or "/tests/" in path
 
 
-def strangler_migration(source: dict) -> list[Finding] | None:
+def strangler_migration(source: Source) -> list[Finding] | None:
     """Never a verdict, and never called.
 
     A property of how a migration is sequenced over weeks. No file, and no set of files,
@@ -73,7 +74,7 @@ def _first_line(fn: ast.FunctionDef, name: str, context: type, subscript: bool) 
     return None
 
 
-def _module_level(source: dict) -> dict[str, ast.expr]:
+def _module_level(source: Source) -> dict[str, ast.expr]:
     """The names assigned at module level, and what they were assigned."""
     assigned: dict[str, ast.expr] = {}
     for node in source["tree"].body:

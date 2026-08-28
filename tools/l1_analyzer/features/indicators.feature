@@ -230,3 +230,11 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     When _ratio_indicator reads the row for its label, thresholds and wording
     Then the share is banded and the counts read back in that row's own words
     But a denominator of zero is absent rather than zero, and the row says why in the refusal
+
+  Scenario: _is_a_bare_generic says whether a node names a container without saying what it holds
+    Given a node, its language's configuration, and the text of that node
+    When _is_a_bare_generic checks the name against the containers that can be written without contents, and checks where the node sits
+    Then it answers yes for a container named in a type position with nothing under it, because that is the least precise annotation the language has and it carries no escape token to count
+    And an adopter found this by writing out six annotations they already meant and watching our number get worse, so the count had been teaching authors to write the sloppier one
+    And a parameterised container is told apart by where it sits rather than by its text, since it hangs under a generic-type node and a bare one hangs directly in the type
+    But a container built as a value, or named in a runtime type test, is not an annotation and is not counted

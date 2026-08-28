@@ -48,7 +48,28 @@ class Finding(TypedDict):
     undecided: str
 
 
-def read_tree(text: str, language: str) -> dict:
+class Source(TypedDict):
+    """One parsed source, and everything a clause needs to read it.
+
+    Written out because `dict` is what every clause checker took, and `dict` means
+    dict[Any, Any]: the least precise mapping Python has. An adopter found that our own
+    type-escape count scored a bare `dict` clean and the better `dict[str, Any]` as an
+    escape, so the count taught an author to write the worse one. Closing that hole in the
+    counter turned this file's own annotations into what they always were.
+
+    `path` is filled in by the runner rather than by read_tree, because a tree does not know
+    which file it came from. `tree` is Python's own parse and is absent for every other
+    language, which is why the clauses that read it declare so."""
+
+    language: str
+    spec: LangSpec
+    text: str
+    raw: bytes
+    root: Node
+    path: str
+
+
+def read_tree(text: str, language: str) -> Source:
     """One source, parsed by the grammar for its language, with that language's vocabulary.
 
     A clause reads node types from the spec rather than naming them, which is what lets one
@@ -65,7 +86,7 @@ def read_tree(text: str, language: str) -> dict:
             "root": _get_parser(language).parse(raw).root_node}
 
 
-def called_spelling(call, spec: dict, raw: bytes) -> str:
+def called_spelling(call, spec: LangSpec, raw: bytes) -> str:
     """What a call is called, reduced to the one word a vocabulary can hold.
 
     Four grammars spell the same idea four ways: Python writes `Mock()`, JavaScript
@@ -102,12 +123,12 @@ def _finding(clause: str, symbol: str, line: int, detail: str, instead: str,
             "detail": detail, "instead": instead, "undecided": undecided}
 
 
-def _functions(source: dict) -> list[ast.FunctionDef]:
+def _functions(source: Source) -> list[ast.FunctionDef]:
     return [n for n in ast.walk(source["tree"])
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
 
 
-def _classes(source: dict) -> list[ast.ClassDef]:
+def _classes(source: Source) -> list[ast.ClassDef]:
     return [n for n in ast.walk(source["tree"]) if isinstance(n, ast.ClassDef)]
 
 

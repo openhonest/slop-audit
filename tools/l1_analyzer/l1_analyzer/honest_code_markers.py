@@ -17,6 +17,7 @@ meaning the clause ran and found nothing.
 
 from l1_analyzer.honest_code_read import (
     Finding,
+    Source,
     _finding,
     called_spelling,
     node_text,
@@ -25,6 +26,7 @@ from l1_analyzer.honest_code_read import (
 from l1_analyzer.honest_code_rules import (
     RESOURCE_CALLS,  # noqa: F401 - kept for adopters
 )
+from l1_analyzer.lang_spec import LangSpec
 
 
 def _marker_names(marker, raw: bytes) -> list[str]:
@@ -37,7 +39,7 @@ def _marker_names(marker, raw: bytes) -> list[str]:
     return [part.strip() for part in text.split(".")]
 
 
-def _declaration_marked(marker, spec: dict):
+def _declaration_marked(marker, spec: LangSpec):
     """The declaration a marker sits on, as a node, or nothing.
 
     Looked for beside the marker as well as above it. Python wraps a decorator and the
@@ -56,7 +58,7 @@ def _declaration_marked(marker, spec: dict):
     return None
 
 
-def _declaration_named(marker, spec: dict, raw: bytes) -> str:
+def _declaration_named(marker, spec: LangSpec, raw: bytes) -> str:
     """What the declaration a marker sits on is called, for the finding to point at.
 
     Looked for beside the marker as well as above it. Python wraps a decorator and the
@@ -69,7 +71,7 @@ def _declaration_named(marker, spec: dict, raw: bytes) -> str:
     return (node_text(named, raw) if named is not None else node_text(marker, raw)) or ""
 
 
-def lifecycle_hooks(source: dict) -> list[Finding] | None:
+def lifecycle_hooks(source: Source) -> list[Finding] | None:
     """A registration or a marker that runs work somewhere the reader does not look.
 
     An exit handler, a signal handler, an ORM callback or a mount effect each put behaviour
@@ -123,7 +125,7 @@ _UNPROFILED = ("whether the query was profiled first is not readable from any fi
                "only the cache itself was checked")
 
 
-def _dependency_names(node, spec: dict, raw: bytes) -> list[str]:
+def _dependency_names(node, spec: LangSpec, raw: bytes) -> list[str]:
     """The identifiers a dependency declaration mentions.
 
     One text, split on everything that cannot be part of a name, so a library is found
@@ -143,7 +145,7 @@ def _dependency_names(node, spec: dict, raw: bytes) -> list[str]:
     return names
 
 
-def _brings_in_a_dependency(node, spec: dict, raw: bytes) -> bool:
+def _brings_in_a_dependency(node, spec: LangSpec, raw: bytes) -> bool:
     """Whether this node pulls a library into the file.
 
     Two shapes. Most languages declare it, and the vocabulary names the declaration. Ruby
@@ -156,7 +158,7 @@ def _brings_in_a_dependency(node, spec: dict, raw: bytes) -> bool:
     return called_spelling(node, spec, raw) in spec["dependency_calls"]
 
 
-def unmeasured_caches(source: dict) -> list[Finding] | None:
+def unmeasured_caches(source: Source) -> list[Finding] | None:
     """A cache library brought into the file, or a memoising marker on a declaration.
 
     A cache is a second source of truth with an invalidation bug waiting, and the rule asks
@@ -205,7 +207,7 @@ def unmeasured_caches(source: dict) -> list[Finding] | None:
 _STEP_LIMIT = 30
 
 
-def _step_definitions(source: dict) -> list[tuple[str, object]]:
+def _step_definitions(source: Source) -> list[tuple[str, object]]:
     """Every step definition in this file, as (what to call it, the node holding its body).
 
     Two shapes. Python, Java and C# mark a declaration with a decorator, an annotation or an
@@ -240,7 +242,7 @@ def _step_definitions(source: dict) -> list[tuple[str, object]]:
     return steps
 
 
-def heavy_step_definitions(source: dict) -> list[Finding] | None:
+def heavy_step_definitions(source: Source) -> list[Finding] | None:
     """A step definition longer than thirty lines.
 
     Step length is a readout on the ARCHITECTURE, not on the test: a step needing thirty
@@ -284,7 +286,7 @@ def heavy_step_definitions(source: dict) -> list[Finding] | None:
     return found
 
 
-def _binds_scenarios(root, spec: dict, raw: bytes) -> bool:
+def _binds_scenarios(root, spec: LangSpec, raw: bytes) -> bool:
     """Whether this file binds itself to the scenarios its steps serve.
 
     A pytest-bdd step file says `scenarios(...)` or carries `@scenario`. A file that binds
@@ -306,7 +308,7 @@ def _binds_scenarios(root, spec: dict, raw: bytes) -> bool:
     return False
 
 
-def _never_runs(step, spec: dict) -> bool:
+def _never_runs(step, spec: LangSpec) -> bool:
     """Whether this step is handed back to the runner unstarted.
 
     Reported by a peer on 2026-08-27, from a suite where seven scenarios went red at once.

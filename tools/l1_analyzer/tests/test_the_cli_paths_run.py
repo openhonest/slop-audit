@@ -122,16 +122,48 @@ def test_race_refuses_on_a_language_it_does_not_support(small_repo, capsys):
 
 def test_the_gate_passes_on_this_repository(capsys):
     """The pre-commit gate's own entry point. It runs on every commit here, and until now
-    nothing ran it under test."""
-    code, out = _run([str(REPO), "--gate", "--max-type-escapes", "0"], capsys)
+    nothing ran it under test.
+
+    The baseline is read from the config the gate actually runs with, rather than written
+    here. Pinning a number in two places is how one of them goes stale, and this test held
+    zero for a day after the config said otherwise."""
+    code, out = _run([str(_gated_tree()), "--gate", "--max-type-escapes", str(_ratchet())],
+                     capsys)
     assert code == 0
     assert "gate passed" in out.lower()
+
+
+def _gated_tree() -> pathlib.Path:
+    """The directory the pre-commit gate actually runs on, which is the repository root.
+
+    REPO above is the analyzer's own parent and is a narrower tree. The gate tests used it
+    while the config gated the whole repository, so the two counted different code and the
+    test passed on a number the gate never sees."""
+    here = REPO
+    while not (here / ".pre-commit-config.yaml").is_file():
+        assert here.parent != here, "no pre-commit config above the analyzer"
+        here = here.parent
+    return here
+
+
+def _ratchet() -> int:
+    """The type-escape baseline the pre-commit config runs with.
+
+    Read from the config rather than written here. A number pinned in two places is how one
+    of them goes stale, and this test held zero for a day after the config said otherwise."""
+    import re
+
+    config = (_gated_tree() / ".pre-commit-config.yaml").read_text()
+    found = re.search(r"--max-type-escapes (\d+)", config)
+    assert found, "the gate config no longer names a type-escape baseline"
+    return int(found.group(1))
 
 
 def test_the_gate_fails_when_the_ratchet_is_looser_than_reality(capsys):
     """Slack is a defect: a baseline above the real count is a regression nobody is told
     about. The gate refuses in both directions and this is the downward one."""
-    code, out = _run([str(REPO), "--gate", "--max-type-escapes", "9"], capsys)
+    code, out = _run([str(_gated_tree()), "--gate", "--max-type-escapes",
+                      str(_ratchet() + 20)], capsys)
     assert code != 0
     assert "ratchet" in out.lower() or "lower it" in out.lower()
 

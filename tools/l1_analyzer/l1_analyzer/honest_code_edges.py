@@ -18,6 +18,7 @@ from tree_sitter import Node
 
 from l1_analyzer.honest_code_read import (
     Finding,
+    Source,
     _finding,
     called_names_in,
     declares_a_boundary,
@@ -39,7 +40,7 @@ from l1_analyzer.lang_spec import LangSpec
 # below is the success condition rather than a swallow.
 _RECORDS_A_FAILURE = frozenset({"append", "add", "extend", "fail", "error", "insert"})
 
-def io_below_the_boundary(source: dict) -> list[Finding] | None:
+def io_below_the_boundary(source: Source) -> list[Finding] | None:
     """A function that performs I/O and is itself reached by a sibling.
 
     Read through the language's own node vocabulary. A function nothing in the file reaches
@@ -97,7 +98,7 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
         found.append(finding)
     return found
 
-def returns_a_declared_absence(handler, spec: dict, raw: bytes) -> bool:
+def returns_a_declared_absence(handler, spec: LangSpec, raw: bytes) -> bool:
     """Whether this handler returns the absent case its own function declares it may return.
 
     A reader at an edge that cannot read something, returning `None` from a function typed
@@ -130,7 +131,7 @@ def returns_a_declared_absence(handler, spec: dict, raw: bytes) -> bool:
     return bool(given) and given <= set(spec["absent_values"])
 
 
-def swallowed_exceptions(source: dict) -> list[Finding] | None:
+def swallowed_exceptions(source: Source) -> list[Finding] | None:
     """A handler whose body throws the error away.
 
     Read through the language's own node vocabulary. Catch-and-swallow is the purest form
@@ -273,7 +274,7 @@ def _caught_variable(handler: Node, spec: LangSpec, raw: bytes) -> str:
              if n.type == "identifier"]
     return names[-1] if names else ""
 
-def undeclared_logging(source: dict) -> list[Finding] | None:
+def undeclared_logging(source: Source) -> list[Finding] | None:
     """A function that writes a log line, and whether it lost a failure doing it.
 
     A log line written from inside a function is a return value that skipped the type
