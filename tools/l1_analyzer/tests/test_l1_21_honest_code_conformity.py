@@ -458,7 +458,8 @@ def test_the_kinds_of_undecided_are_named_as_a_closed_set():
     verdict that was not `fired` into `declined`, so a hook that had just held three files
     displayed as "0 fired (0%)". A third state collapsed into a second reports nothing
     happening about the exact case the instrument exists for."""
-    assert honest_code.UNDECIDED_KINDS == ("never", "not applicable", "unreadable")
+    assert honest_code.UNDECIDED_KINDS == ("never", "not applicable", "unreadable",
+                                          "nothing to read")
 
 
 def test_a_clause_nothing_can_ever_decide_says_never():
@@ -596,19 +597,22 @@ def test_the_browser_clauses_still_decide_because_they_read_text():
     assert firing >= {"L1.21.6", "L1.21.7"}
 
 
-def test_an_unported_clause_on_javascript_says_unreadable_rather_than_not_applicable():
-    """The distinction matters. These clauses DO apply to JavaScript; this reader cannot
-    read it yet. That is a gap in the instrument, not a question that did not arise, and
-    only one of those two is a failure.
+def test_a_clause_that_could_not_read_javascript_said_so_rather_than_not_applicable():
+    """The distinction mattered while clauses were unported: they DO apply to JavaScript,
+    and the reader could not see it, which is a gap in the instrument rather than a question
+    that did not arise. Only one of those two is a failure.
 
-    The clause is taken from the table rather than named. This test pinned L1.21.2 until
-    that clause was ported, at which point it failed for measuring the schedule instead of
-    the rule, exactly as the number-pinning test above it had."""
+    The port finished on 2026-08-27, so no clause reads Python's parser any more and this
+    case cannot be produced. The rule behind it is what survives: whenever a clause is
+    undecided because the reader could not reach the code, it says so in those words, and
+    the test asserts the rule rather than pinning a schedule. Pinning one is what broke this
+    test twice already, once on a clause number and once on a count."""
     assessed = honest_code.assess(honest_code.read_source_text(DIRTY_JS, "app.js"))
-    unported = [c for c in assessed if not c["decided"] and c["undecided"] == "unreadable"]
-    assert unported, "every clause reads JavaScript now, so this test has nothing to assert"
-    for clause in unported:
-        assert "parser" in clause["reason"], clause["code"]
+    for clause in assessed:
+        if not clause["decided"] and clause["undecided"] == honest_code.UNREADABLE:
+            assert "parser" in clause["reason"] or "vocabulary" in clause["reason"], clause["code"]
+    unported = [c for c in honest_code.CLAUSES if c["reads"] == "python-ast"]
+    assert unported == [], f"{unported} are unported, so this case is reachable again"
 
 
 def test_the_share_for_such_a_file_is_over_the_clauses_that_read_it():

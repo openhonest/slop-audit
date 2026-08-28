@@ -35,10 +35,14 @@ def test_a_clause_that_decides_nothing_does_not_claim_to_read_a_parser():
 
 
 def test_it_is_not_counted_among_the_clauses_we_owe_a_port(tmp_path):
+    """The port finished on 2026-08-27 and no clause reads Python's parser any more, so the
+    sentence about unported clauses is absent rather than wrong. The assertion is the rule
+    behind it: this clause is never one of them, whatever that count becomes."""
     details = honest_code.analyze(_js_repo(tmp_path), "javascript")["details"]
-    unported = details.split("of those read Python's own parser")[0].split(". ")[-1].strip()
-    ported_count = sum(1 for c in honest_code.CLAUSES if c["reads"] == "python-ast")
-    assert unported.split()[0] == str(ported_count), details
+    unported = [c for c in honest_code.CLAUSES if c["reads"] == "python-ast"]
+    assert _clause(17) not in unported
+    if not unported:
+        assert "read Python's own parser" not in details, details
 
 
 def test_the_report_says_why_it_will_never_be_decided(tmp_path):

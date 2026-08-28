@@ -44,12 +44,24 @@ TEST_SCOPED = frozenset({"L1.21.10", "L1.21.15"})
 # by the two clauses that only need text, and is not applicable to the rest.
 _PARSED = frozenset({"python"})
 
+# The door. Every language the shared vocabulary covers has a suffix here, and a test holds
+# the two together: a language the vocabulary knows and the door refuses is a port that the
+# files it was written for can never reach. It listed four until 2026-08-27, so a Java, C#,
+# Go, Rust, Ruby or C file came back as one no reader here parses, before any clause was
+# asked. An unknown suffix is still refused rather than guessed at, because a tree read with
+# the wrong grammar produces findings about a file nobody read.
 _SUFFIXES = {
     ".py": "python", ".js": "javascript", ".jsx": "javascript",
     ".ts": "typescript", ".tsx": "typescript", ".html": "html",
+    ".java": "java", ".cs": "csharp", ".go": "go", ".rs": "rust",
+    ".rb": "ruby", ".c": "c", ".h": "c",
 }
 
-_ALL = frozenset({"python", *BROWSER_LANGUAGES})
+# Which languages a clause applies to unless its row says otherwise. Read from the
+# vocabulary rather than written out, which is what stopped it being a third copy of the
+# same fact: it named Python and the browser three, so a ported clause could have its
+# language covered, its file accepted, and its own row still saying it did not apply.
+_ALL = frozenset(LANG_SPEC)
 
 # The languages the shared node vocabulary covers. A ported clause can be decided for any
 # of them; an unported one is limited to `_PARSED` above.
@@ -71,7 +83,15 @@ _TREE, _PARTLY, _NOTHING = "tree", "partly", "nothing"
 # displayed as "0 fired (0%)". A third state collapsed into a second reports nothing
 # happening about the exact case the instrument exists for.
 NEVER, NOT_APPLICABLE, UNREADABLE = "never", "not applicable", "unreadable"
-UNDECIDED_KINDS = (NEVER, NOT_APPLICABLE, UNREADABLE)
+# The file was read, the rule applies to it, and it holds none of what the clause measures.
+# The runner had only the two labels above and chose between them by asking whether the
+# clause carried a nothing-to-read sentence. That was near enough while One Gherkin Per
+# Function read Python's own parser, because the only files it went quiet on were ones it
+# genuinely could not read. Porting it made the label false: a JavaScript file with no step
+# definitions is read perfectly well, and calling it unreadable claims a gap in the
+# instrument that is not there.
+NOTHING_TO_READ = "nothing to read"
+UNDECIDED_KINDS = (NEVER, NOT_APPLICABLE, UNREADABLE, NOTHING_TO_READ)
 
 
 # What a clause reads. Two axes, not one: `decides` says whether the RULE is decidable at
@@ -275,12 +295,13 @@ CLAUSES: tuple[Clause, ...] = (
     _clause(14, "No Implicit Defaults", _TREE, rules.implicit_defaults, nothing_to_read="",
             reads=_TREE_READER),
     _clause(15, "One Gherkin Per Function", _PARTLY,
-            python_rules.heavy_step_definitions,
+            rules.heavy_step_definitions,
             nothing_to_read=(
                 "the rule is a bijection between functions and scenarios, and a bijection "
                 "needs the feature files as well as the source. This reader sees one file, "
                 "so it reads the secondary signal only, the length of a step definition, "
-                "and there are none here")),
+                "and there are none here"),
+            reads=_TREE_READER),
     _clause(16, "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE,
             rules.lifecycle_hooks, nothing_to_read="", reads=_TREE_READER),
     # Reads nothing, and says so. Declaring a reader here named a capability the clause
@@ -403,6 +424,12 @@ def applies_to(clause: Clause, source: dict) -> bool:
     return source["readable"] and source["language"] in clause["languages"]
 
 
+def clause_named(code: str) -> Clause:
+    """One row of the table, by its code. KeyError rather than a default, so a caller asking
+    about a clause nobody wrote down is refused instead of handed a blank row."""
+    return next(c for c in CLAUSES if c["code"] == code)
+
+
 def assess(source: dict) -> list[Assessed]:
     """Every clause, run over one parsed source.
 
@@ -423,7 +450,7 @@ def assess(source: dict) -> list[Assessed]:
             # rather than NOT APPLICABLE: the rule applies and this reader could not see
             # it, which is a gap in the instrument rather than a question that did not
             # arise. Only one of those two is a failure.
-            kind = UNREADABLE if clause["nothing_to_read"] else NOT_APPLICABLE
+            kind = NOTHING_TO_READ if clause["nothing_to_read"] else NOT_APPLICABLE
             reason = clause["nothing_to_read"] or (
                 f"not applicable to a {source['language']} file, so nothing here was "
                 "checked")

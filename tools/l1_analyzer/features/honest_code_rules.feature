@@ -197,3 +197,18 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then it answers yes for a declaration in every language that has one
     And it answers yes for a call the vocabulary names, which is how Ruby writes require, where a reader looking only for declarations finds no dependencies at all
     But it answers no for an ordinary call, because the call form is matched by name and not by shape
+
+  Scenario: heavy_step_definitions finds a step carrying the setup the code should not need
+    Given a parsed source and its language's node vocabulary
+    When heavy_step_definitions measures the lines each step definition spans
+    Then it reports a step longer than thirty lines, because step length is a readout on the architecture and a step needing that much setup means the code under test has hidden dependencies
+    And a step of one or two lines is left alone, since calling the thing and checking the result is the shape the rule asks for
+    And a file holding no step definitions is answered with nothing decided, because it was not measured against a rule about step definitions and saying it passed would be a claim nobody made
+    But it reads the secondary signal only, the length, and never the rule itself, which is a bijection between functions and scenarios and needs the feature files as well as the source
+
+  Scenario: _step_definitions gives every step in a file, with the node holding its body
+    Given a parsed source and its language's vocabulary
+    When _step_definitions looks for both shapes a step takes
+    Then it yields the declaration a marker sits on, which is how Python, Java and C# write a step
+    And it yields the call that takes the body as an argument, which is how JavaScript and Ruby write one, where the step has no declaration to mark at all
+    But the call form yields the call and not the anonymous function inside it, so the span measured is the step a reader sees

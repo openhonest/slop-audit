@@ -253,3 +253,10 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When called_spelling takes the text naming the function, drops any type arguments, and keeps the tail after the last separator
     Then Python's Mock, JavaScript's jest dot fn, Java's Mockito dot mock and C#'s Substitute dot For of a type all reduce to one word a table can hold
     But it applies no list of its own, so what the word means is the caller's question and not this function's
+
+  Scenario: in_a_test_module says whether a node sits in a module of tests kept in the file it tests
+    Given a node, its language's vocabulary, and the source bytes
+    When in_a_test_module walks up from the node looking for a marked module
+    Then it answers yes where an ancestor is preceded by a marker the vocabulary names, which is how Rust keeps its tests in the file they test
+    And it reads the marker as a preceding sibling rather than a parent, the same shape a decorator takes, since searching each ancestor's text found the marker in the whole file and excluded the file's own code with its tests
+    But a language that keeps its tests elsewhere names no marker, so nothing is excluded for it and a marker invented here would start hiding code

@@ -1589,3 +1589,320 @@ def test_the_half_it_cannot_decide_is_stated_on_every_finding():
                   rules.unmeasured_caches(read.read_tree(
                       "@lru_cache\ndef p(s):\n    return q(s)\n", "python"))):
         assert "profiled" in found[0]["undecided"], found
+
+
+# ---------------------------------------------------------------------------
+# 15. One Gherkin Per Function
+#
+# The last clause reading Python's own parser. A step definition longer than thirty lines is
+# a readout on the ARCHITECTURE and not on the test: a step needing that much setup means the
+# code under test has hidden dependencies.
+#
+# The same two shapes as the clauses before it. Python, Java and C# mark a declaration with a
+# decorator, an annotation or an attribute. JavaScript and Ruby pass the body to `Given`, so
+# the step has no declaration to mark and a reader looking for one finds no steps at all.
+# ---------------------------------------------------------------------------
+
+_A_LONG_STEP = [
+    ("python", """@given("a store")
+def a_store(context):
+    step_0()
+    step_1()
+    step_2()
+    step_3()
+    step_4()
+    step_5()
+    step_6()
+    step_7()
+    step_8()
+    step_9()
+    step_10()
+    step_11()
+    step_12()
+    step_13()
+    step_14()
+    step_15()
+    step_16()
+    step_17()
+    step_18()
+    step_19()
+    step_20()
+    step_21()
+    step_22()
+    step_23()
+    step_24()
+    step_25()
+    step_26()
+    step_27()
+    step_28()
+    step_29()
+    step_30()
+    step_31()
+    step_32()
+    step_33()
+    step_34()
+"""),
+    ("javascript", """Given('a store', function () {
+  step0()
+  step1()
+  step2()
+  step3()
+  step4()
+  step5()
+  step6()
+  step7()
+  step8()
+  step9()
+  step10()
+  step11()
+  step12()
+  step13()
+  step14()
+  step15()
+  step16()
+  step17()
+  step18()
+  step19()
+  step20()
+  step21()
+  step22()
+  step23()
+  step24()
+  step25()
+  step26()
+  step27()
+  step28()
+  step29()
+  step30()
+  step31()
+  step32()
+  step33()
+  step34()
+})
+"""),
+    ("typescript", """Given('a store', function (): void {
+  step0()
+  step1()
+  step2()
+  step3()
+  step4()
+  step5()
+  step6()
+  step7()
+  step8()
+  step9()
+  step10()
+  step11()
+  step12()
+  step13()
+  step14()
+  step15()
+  step16()
+  step17()
+  step18()
+  step19()
+  step20()
+  step21()
+  step22()
+  step23()
+  step24()
+  step25()
+  step26()
+  step27()
+  step28()
+  step29()
+  step30()
+  step31()
+  step32()
+  step33()
+  step34()
+})
+"""),
+    ("java", """class Steps {
+  @Given("a store")
+  public void aStore() {
+    step0();
+    step1();
+    step2();
+    step3();
+    step4();
+    step5();
+    step6();
+    step7();
+    step8();
+    step9();
+    step10();
+    step11();
+    step12();
+    step13();
+    step14();
+    step15();
+    step16();
+    step17();
+    step18();
+    step19();
+    step20();
+    step21();
+    step22();
+    step23();
+    step24();
+    step25();
+    step26();
+    step27();
+    step28();
+    step29();
+    step30();
+    step31();
+    step32();
+    step33();
+    step34();
+  }
+}
+"""),
+    ("csharp", """class Steps {
+  [Given("a store")]
+  public void AStore() {
+    step0();
+    step1();
+    step2();
+    step3();
+    step4();
+    step5();
+    step6();
+    step7();
+    step8();
+    step9();
+    step10();
+    step11();
+    step12();
+    step13();
+    step14();
+    step15();
+    step16();
+    step17();
+    step18();
+    step19();
+    step20();
+    step21();
+    step22();
+    step23();
+    step24();
+    step25();
+    step26();
+    step27();
+    step28();
+    step29();
+    step30();
+    step31();
+    step32();
+    step33();
+    step34();
+  }
+}
+"""),
+    ("ruby", """Given 'a store' do
+  step_0
+  step_1
+  step_2
+  step_3
+  step_4
+  step_5
+  step_6
+  step_7
+  step_8
+  step_9
+  step_10
+  step_11
+  step_12
+  step_13
+  step_14
+  step_15
+  step_16
+  step_17
+  step_18
+  step_19
+  step_20
+  step_21
+  step_22
+  step_23
+  step_24
+  step_25
+  step_26
+  step_27
+  step_28
+  step_29
+  step_30
+  step_31
+  step_32
+  step_33
+  step_34
+end
+"""),
+]
+
+_A_SHORT_STEP = [
+    ("python", """@given("a store")
+def a_store(context):
+    context.store = build()
+"""),
+    ("javascript", """Given('a store', function () {
+  this.store = build()
+})
+"""),
+    ("typescript", """Given('a store', function (): void {
+  this.store = build()
+})
+"""),
+    ("java", """class Steps {
+  @Given("a store")
+  public void aStore() {
+    store = build();
+  }
+}
+"""),
+    ("csharp", """class Steps {
+  [Given("a store")]
+  public void AStore() {
+    store = Build();
+  }
+}
+"""),
+    ("ruby", """Given 'a store' do
+  @store = build
+end
+"""),
+]
+
+
+@pytest.mark.parametrize(("lang", "source"), _A_LONG_STEP)
+def test_a_step_carrying_its_own_setup_is_found_in_every_language(lang, source):
+    found = rules.heavy_step_definitions(read.read_tree(source, lang))
+    assert found, lang
+    assert "readout on the code under test" in found[0]["detail"]
+
+
+@pytest.mark.parametrize(("lang", "source"), _A_SHORT_STEP)
+def test_a_step_that_calls_and_checks_is_left_alone(lang, source):
+    """What the rule asks for. A step of one or two lines is the shape it wants."""
+    assert rules.heavy_step_definitions(read.read_tree(source, lang)) == [], lang
+
+
+@pytest.mark.parametrize(("lang", "source"), [
+    ("python", "def run():\n    return 1\n"),
+    ("javascript", "function run() { return 1 }\n"),
+    ("java", "class A { int run() { return 1; } }\n"),
+    ("ruby", "def run\n  1\nend\n"),
+])
+def test_a_file_holding_no_steps_at_all_is_not_decided(lang, source):
+    """Not an empty list. A file with no step definitions was not measured against a rule
+    about step definitions, and saying it passed would be a claim nobody made."""
+    assert rules.heavy_step_definitions(read.read_tree(source, lang)) is None, lang
+
+
+@pytest.mark.parametrize(("lang", "source"), [
+    ("go", "func run() int { return 1 }\n"),
+    ("rust", "fn run() -> i32 { 1 }\n"),
+    ("c", "int run(void) { return 1; }\n"),
+])
+def test_a_language_with_no_step_vocabulary_says_nothing_was_decided(lang, source):
+    assert rules.heavy_step_definitions(read.read_tree(source, lang)) is None, lang

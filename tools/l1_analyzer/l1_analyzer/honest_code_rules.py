@@ -917,3 +917,63 @@ def unmeasured_caches(source: dict) -> list[Finding] | None:
                     f"@{marker} caches the result before anything measured the cost",
                     "profile it and fix the query or the schema first", _UNPROFILED))
     return found
+
+
+# Where a step stops being a step and starts being the setup the code should not need.
+_STEP_LIMIT = 30
+
+
+def _step_definitions(source: dict) -> list[tuple[str, object]]:
+    """Every step definition in this file, as (what to call it, the node holding its body).
+
+    Two shapes. Python, Java and C# mark a declaration with a decorator, an annotation or an
+    attribute, so the step is the thing marked. JavaScript and Ruby pass the body to `Given`,
+    so the step has no declaration at all and a reader looking for one finds none of them.
+
+    The call form yields the CALL, whose line span is the step, rather than the anonymous
+    function inside it."""
+    spec, raw = source["spec"], source["raw"]
+    steps: list[tuple[str, object]] = []
+    for node in walk(source["root"]):
+        marked = (node.type in spec["hook_marker_types"] and spec["step_markers"]
+                  and any(n in spec["step_markers"] for n in _marker_names(node, raw)))
+        if marked:
+            holder = node.parent
+            while holder is not None and holder.type not in spec["func_types"]:
+                holder = next((c for c in holder.named_children
+                               if c.type in spec["func_types"]), None) or holder.parent
+            if holder is not None:
+                steps.append((_declaration_named(node, spec, raw), holder))
+        if node.type in spec["call_types"] and spec["step_calls"]:
+            spelling = called_spelling(node, spec, raw)
+            if spelling in spec["step_calls"]:
+                steps.append((spelling, node))
+    return steps
+
+
+def heavy_step_definitions(source: dict) -> list[Finding] | None:
+    """A step definition longer than thirty lines.
+
+    Step length is a readout on the ARCHITECTURE, not on the test: a step needing thirty
+    lines of setup means the code under test has hidden dependencies. A step of one or two
+    lines, calling the thing and checking the result, is the shape the rule asks for.
+
+    Read through the language's own node vocabulary, so the rule means the same thing in
+    every language the spec covers rather than being reimplemented per language.
+
+    Not decided for a file holding no step definitions, which was not measured against a rule
+    about step definitions; saying it passed would be a claim nobody made. Not decided either
+    for a language this table gives no step vocabulary, which is Go, Rust and C."""
+    spec = source["spec"]
+    if not spec["step_markers"] and not spec["step_calls"]:
+        return None
+    steps = _step_definitions(source)
+    if not steps:
+        return None
+    return [_finding(
+        "L1.21.15", name, node.start_point[0] + 1,
+        f"{node.end_point[0] - node.start_point[0]} lines of setup, which is a readout on "
+        "the code under test rather than on the test",
+        "make the function under test pure, so the step is call it and check the result", "")
+        for name, node in steps
+        if node.end_point[0] - node.start_point[0] > _STEP_LIMIT]

@@ -192,3 +192,9 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     When _named_under takes its path relative to that repository
     Then the same file gets the same name whether the caller said "." or the absolute path
     But a path outside the repository keeps the spelling it arrived with, because inventing a name for it would be worse than saying what was read
+
+  Scenario: clause_named gives one row of the clause table by its code
+    Given the code of a clause
+    When clause_named looks for the row carrying it
+    Then it returns that row, so a caller reading a clause's own words reads the table rather than a copy of it
+    But a code nobody wrote down raises rather than returning a blank row, since a caller handed an empty clause would report a rule that does not exist as one that holds

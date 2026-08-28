@@ -14,8 +14,6 @@ import ast
 
 from l1_analyzer.honest_code_read import (
     Finding,
-    _finding,
-    _functions,
 )
 
 # Calls whose bare name is unambiguous: nothing but I/O is spelled this way.
@@ -32,8 +30,6 @@ from l1_analyzer.honest_code_read import (
 # Names that mean I/O only with a receiver that names a client. `TABLE.get(key)` is a dict
 # lookup and `requests.get(url)` fetches a page.
 #
-_STEP_DECORATORS = frozenset({"given", "when", "then", "step"})
-_STEP_LIMIT = 30
 
 
 def _bare_name(call: ast.Call) -> str:
@@ -43,26 +39,6 @@ def _bare_name(call: ast.Call) -> str:
 def _is_test_file(path: str) -> bool:
     name = path.replace("\\", "/").split("/")[-1]
     return name.startswith("test_") or name.endswith("_test.py") or "/tests/" in path
-
-
-def heavy_step_definitions(source: dict) -> list[Finding] | None:
-    """A step definition longer than thirty lines.
-
-    Step length is a readout on the ARCHITECTURE, not on the test: a step needing thirty
-    lines of setup means the code under test has hidden dependencies.
-
-    Not applicable to a file holding no step definitions."""
-    steps = [fn for fn in _functions(source)
-             if any(ast.unparse(d).split("(")[0].split(".")[-1] in _STEP_DECORATORS
-                    for d in fn.decorator_list)]
-    if not steps:
-        return None
-    return [_finding(
-        "L1.21.15", fn.name, fn.lineno,
-        f"{fn.end_lineno - fn.lineno} lines of setup, which is a readout on the code under "
-        "test rather than on the test",
-        "make the function under test pure, so the step is call it and check the result", "")
-        for fn in steps if (fn.end_lineno or fn.lineno) - fn.lineno > _STEP_LIMIT]
 
 
 def strangler_migration(source: dict) -> list[Finding] | None:

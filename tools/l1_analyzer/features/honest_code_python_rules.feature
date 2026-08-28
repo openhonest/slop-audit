@@ -29,12 +29,6 @@ Feature: Clauses this reader still reads through Python's own parser
     Then each module-level name comes back with what it was assigned
     But an assignment inside a conditional at module level is read the same way, since a reader of the file sees one name either way
 
-  Scenario: heavy_step_definitions finds a step carrying the architecture's hidden dependencies
-    Given a parsed step-definition file
-    When heavy_step_definitions measures each step's body
-    Then a step needing thirty lines of setup is a readout on the code under test rather than on the test
-    But a step that calls the function and checks the result is what a pure function makes possible
-
   Scenario: strangler_migration records that nothing checked the migration
     Given any parsed source
     When strangler_migration is asked about it

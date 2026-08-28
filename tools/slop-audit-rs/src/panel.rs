@@ -11,9 +11,11 @@ use std::path::Path;
 fn measured(repo: &Path, language: &str) -> Vec<Indicator> {
     let mut panel = Vec::new();
     panel.extend(indicators::git_ratios::analyze(repo)); // L1.1 - L1.8
-    panel.push(indicators::config_presence::l1_09(repo)); // L1.9
+    panel.push(indicators::config_presence::present_at(
+        repo, &indicators::config_presence::PRECOMMIT)); // L1.9
     panel.push(indicators::config_presence::l1_10(repo)); // L1.10
-    panel.push(indicators::config_presence::l1_11(repo)); // L1.11
+    panel.push(indicators::config_presence::present_at(
+        repo, &indicators::config_presence::CONTAINER)); // L1.11
     panel.push(indicators::type_escapes::analyze(repo, language)); // L1.15
     panel.push(indicators::whitespace::analyze(repo)); // L1.16
     panel.push(indicators::god_files::analyze(repo)); // L1.17 (all languages)

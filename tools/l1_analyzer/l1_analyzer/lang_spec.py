@@ -110,6 +110,15 @@ class LangSpec(TypedDict, total=False):
     # SQL Over Application Caches. Every language brings a dependency in differently, and
     # Ruby brings it in with a call rather than a declaration, so the node is a fact here.
     import_types: tuple[str, ...]        # declarations that bring in a dependency
+    # One Gherkin Per Function. A step is marked on a declaration in some languages and IS a
+    # call taking the body in others, so a reader looking for one shape finds no steps at all
+    # in half of them.
+    step_markers: frozenset[str]         # markers on a declaration, read as hook_marker_types
+    # A module of tests living inside the file it tests. Rust does this and nothing else
+    # here does, so its tests carry a production file's name and were handed to every
+    # production clause. Matched as text against the node holding the module.
+    test_module_markers: tuple[str, ...]
+    step_calls: frozenset[str]           # calls that take the step body as an argument
     dependency_calls: frozenset[str]     # calls that do the same job, which is Ruby's require
     cache_names: frozenset[str]          # cache libraries, matched as a word in the import
     cache_markers: frozenset[str]        # memoising markers, read as hook_marker_types are
@@ -370,6 +379,9 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "test_module_markers": (),
+        "step_markers": frozenset({"given", "when", "then", "step"}),
+        "step_calls": frozenset(),
         "import_types": ("import_statement", "import_from_statement"),
         "dependency_calls": frozenset(),
         "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache"}),
@@ -550,6 +562,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "test_module_markers": (),
+        # A step has no declaration to mark: it IS the call.
+        "step_markers": frozenset(),
+        "step_calls": frozenset({"Given", "When", "Then", "And", "But"}),
         "import_types": ("import_statement",),
         "dependency_calls": frozenset({"require"}),
         "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "ioredis", "node-cache", "lru-cache"}),
@@ -676,6 +692,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "test_module_markers": (),
+        "step_markers": frozenset({"Given", "When", "Then", "And", "But"}),
+        "step_calls": frozenset(),
         "import_types": ("import_declaration",),
         "dependency_calls": frozenset(),
         "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "jedis", "lettuce", "ehcache", "caffeine"}),
@@ -794,6 +813,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "test_module_markers": (),
+        "step_markers": frozenset({"Given", "When", "Then", "And", "But"}),
+        "step_calls": frozenset(),
         "import_types": ("using_directive",),
         "dependency_calls": frozenset(),
         # PascalCase, so the shared list's lowercase spellings never match here.
@@ -929,6 +951,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "test_module_markers": ("cfg(test)",),
+        "step_markers": frozenset(),
+        "step_calls": frozenset(),
         "import_types": ("use_declaration",),
         "dependency_calls": frozenset(),
         "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "cached", "moka"}),
@@ -1059,6 +1084,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "test_module_markers": (),
+        "step_markers": frozenset(),
+        "step_calls": frozenset({"Given", "When", "Then", "And", "But"}),
         # A dependency arrives by call here, not by declaration.
         "import_types": (),
         "dependency_calls": frozenset({"require", "require_relative"}),
@@ -1190,6 +1218,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "test_module_markers": (),
+        "step_markers": frozenset(),
+        "step_calls": frozenset(),
         # A header is not a dependency this rule can name, so the question is not decided.
         "import_types": (),
         "dependency_calls": frozenset(),
@@ -1319,6 +1350,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "test_module_markers": (),
+        "step_markers": frozenset(),
+        "step_calls": frozenset(),
         "import_types": ("import_declaration",),
         "dependency_calls": frozenset(),
         "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "go-redis", "bigcache", "groupcache"}),

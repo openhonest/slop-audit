@@ -3,9 +3,14 @@
 //! validated equal on a repo with git history.
 //!
 //! Shape: `analyze(repo)` runs `git log --numstat` once and returns all eight
-//! Indicators in order (L1.1..L1.8). `l1_01`..`l1_08` are thin wrappers that
-//! return a single Indicator each (each re-runs the shared pass); they exist so a
-//! caller can pull one indicator by name, matching the fan-out convention.
+//! Indicators in order (L1.1..L1.8). The panel calls it and takes all eight.
+//!
+//! There were also eight wrappers, `l1_01`..`l1_08`, each returning one Indicator by
+//! index and each re-running the whole git-log pass. Nothing called them; they existed
+//! "so a caller can pull one indicator by name, matching the fan-out convention", and no
+//! caller ever wanted that. This project's own conformity check named them as eight
+//! functions of one shape the first time it was pointed at a Rust file, and it was right:
+//! machinery invented for a problem the shape above does not have.
 
 use crate::{band, source_files, Indicator};
 use std::path::Path;
@@ -352,31 +357,6 @@ pub fn analyze(repo: &Path) -> Vec<Indicator> {
 
     out_ind.push(test_to_prod_ratio(repo));
     out_ind
-}
-
-pub fn l1_01(repo: &Path) -> Indicator {
-    analyze(repo).swap_remove(0)
-}
-pub fn l1_02(repo: &Path) -> Indicator {
-    analyze(repo).swap_remove(1)
-}
-pub fn l1_03(repo: &Path) -> Indicator {
-    analyze(repo).swap_remove(2)
-}
-pub fn l1_04(repo: &Path) -> Indicator {
-    analyze(repo).swap_remove(3)
-}
-pub fn l1_05(repo: &Path) -> Indicator {
-    analyze(repo).swap_remove(4)
-}
-pub fn l1_06(repo: &Path) -> Indicator {
-    analyze(repo).swap_remove(5)
-}
-pub fn l1_07(repo: &Path) -> Indicator {
-    analyze(repo).swap_remove(6)
-}
-pub fn l1_08(repo: &Path) -> Indicator {
-    analyze(repo).swap_remove(7)
 }
 
 #[cfg(test)]

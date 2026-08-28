@@ -341,12 +341,41 @@ def _receiver_of(node: Node, spec: LangSpec, raw: bytes) -> Node | None:
     return node
 
 
+def in_a_test_module(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether this node sits inside a module of tests kept in the file it tests.
+
+    Rust does that and nothing else here does, so its tests carry a production file's name
+    and the scope module, which tells tests from production by path, cannot see them. A
+    language keeping its tests elsewhere names no marker and nothing is excluded for it.
+
+    The marker is a preceding SIBLING of the module it marks, not a parent of it, which is
+    the same shape a decorator takes. Searching the text of each ancestor instead found the
+    marker somewhere in the whole file and excluded the file's own code with its tests."""
+    if not spec["test_module_markers"]:
+        return False
+    holder = node.parent
+    while holder is not None:
+        marking = holder.prev_named_sibling
+        if marking is not None and any(marker in node_text(marking, raw)
+                                       for marker in spec["test_module_markers"]):
+            return True
+        holder = holder.parent
+    return False
+
+
 def function_nodes(root: Node, spec: LangSpec) -> list[Node]:
     """Every function definition in the tree, by this language's own node types.
 
     Methods included: a method is a function that happens to sit in a class body, and every
-    clause reading this wants both."""
-    return [n for n in walk(root) if n.type in spec["func_types"]]
+    clause reading this wants both.
+
+    A function inside a test module kept in the file it tests is NOT included. Every clause
+    reading this is a production clause, and grading a repository's own tests as its code
+    measures the fixtures: the first Rust file this tool read reported three of its own test
+    functions as three functions of one shape, which is what a table of cases looks like."""
+    raw = root.text or b""
+    return [n for n in walk(root)
+            if n.type in spec["func_types"] and not in_a_test_module(n, spec, raw)]
 
 
 def module_level_bindings(root: Node, spec: LangSpec, raw: bytes) -> dict[str, Node]:

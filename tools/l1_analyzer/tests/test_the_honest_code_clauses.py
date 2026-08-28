@@ -206,18 +206,12 @@ def test_a_handler_that_maps_the_error_is_left_alone():
 # --------------------------------------------------------------------------
 # 15. Simple gherkin steps
 # --------------------------------------------------------------------------
-
-def test_a_step_carrying_thirty_lines_of_setup_is_found():
-    body = "\n".join(f"    line_{n} = {n}" for n in range(31))
-    found = python_rules.heavy_step_definitions(_source(
-        f"@given('a user')\ndef step(context):\n{body}\n", path="test_steps.py", language="python"))
-    assert found
-
-
-def test_a_step_that_calls_and_checks_is_left_alone():
-    assert python_rules.heavy_step_definitions(_source(
-        "@when('it runs')\ndef step(context):\n    context.result = band(20)\n",
-        path="test_steps.py", language="python")) == []
+# 15. One gherkin per function
+#
+# Ported to the shared node vocabulary, so both cases moved to
+# test_a_clause_means_the_same_in_every_language.py, where they are asserted for Python and
+# for the five other languages that can now decide the clause.
+# --------------------------------------------------------------------------
 
 
 # --------------------------------------------------------------------------

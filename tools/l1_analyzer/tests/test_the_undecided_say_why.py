@@ -32,9 +32,13 @@ def test_the_undecided_clauses_are_named_not_numbered(tmp_path):
 
 
 def test_the_reason_they_were_not_decided_is_given(tmp_path):
+    """Every undecided clause is accounted for by one of the three sentences, so a reader is
+    never shown a name with nothing said about it. The first sentence, about clauses reading
+    Python's parser, has had nothing to report since the port finished."""
     details = honest_code.analyze(_js_repo(tmp_path), "javascript")["details"]
-    assert "Python" in details
     assert "javascript" in details.lower()
+    reasons = ("read Python's own parser", "decides nothing in any language", "cannot arise")
+    assert any(reason in details for reason in reasons), details
 
 
 def test_a_python_repository_is_told_no_such_thing(tmp_path):
@@ -57,14 +61,20 @@ def test_a_ported_clause_the_language_cannot_raise_is_explained_too(tmp_path):
     assert "cannot arise" in details
 
 
-def test_the_two_reasons_are_not_run_together(tmp_path):
+def test_the_counts_of_the_separate_reasons_add_up_to_the_names_listed(tmp_path):
     """They send a reader to different places. An unported clause is work for us; a clause
-    the language cannot raise is nothing to do at all, and counting them as one number would
-    make our backlog look like their problem."""
-    details = honest_code.analyze(_js_repo(tmp_path), "javascript")["details"]
-    unported = details.split("read Python's own parser")[0].split(". ")[-1].strip()
-    inapplicable = details.split("cannot arise")[0].split(". ")[-1].strip()
-    assert unported.split()[0] != inapplicable.split()[0]
+    the language cannot raise is nothing to do at all; a clause nothing can ever decide is
+    neither. Counting them as one number would make our backlog look like the reader's
+    problem, so the check is that each name is accounted for exactly once."""
+    result = honest_code.analyze(_js_repo(tmp_path), "javascript")
+    by_code = {c["code"]: c for c in honest_code.CLAUSES}
+    unported = [c for c in result["undecided"] if by_code[c]["reads"] == "python-ast"]
+    undecidable = [c for c in result["undecided"] if by_code[c]["decides"] == "nothing"]
+    cannot_arise = [c for c in result["undecided"]
+                    if c not in unported and c not in undecidable]
+    assert len(unported) + len(undecidable) + len(cannot_arise) == len(result["undecided"])
+    if cannot_arise:
+        assert f"The remaining {len(cannot_arise)} read this language" in result["details"]
 
 
 def test_the_score_counts_only_the_clauses_that_decided(tmp_path):
