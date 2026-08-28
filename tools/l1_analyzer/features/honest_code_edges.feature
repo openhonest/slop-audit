@@ -67,3 +67,12 @@ Feature: The three clauses about a program's edges
     When someone asks whether it is this program's edge or merely unused
     Then the answer is in how the module is imported from outside, which is not in the module
     But a module read only from elsewhere has every function looking like an entry point
+
+  Scenario: returns_a_declared_absence says whether a handler returns the absence its function declares
+    Given a handler node, its language's vocabulary, and the source bytes
+    When returns_a_declared_absence reads the enclosing function's declared return type and what the handler returns
+    Then it answers yes where the type admits an absence and the handler returns exactly that, because the absent case is then in the contract and every caller has to handle it
+    And this package carried twelve comments telling the swallow rule to allow such sites, the largest group of exceptions in it by a factor of two, and reading them together showed one shape rather than twelve judgments
+    And a function returning the empty string while typed as a string is not covered, since no caller can tell an absent value from an empty one and that is the shape the rule exists to name
+    And a handler returning some other value where an absence was declared is not covered either, because declaring an absence permits returning that and not a value nobody asked for
+    But a language declaring no return type is refused before anything is read, so this cannot become a way to go quiet by writing less

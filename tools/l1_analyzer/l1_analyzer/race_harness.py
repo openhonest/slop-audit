@@ -124,7 +124,6 @@ def _rust_toolchain_reason() -> str | None:
         return "needs cargo + rustup on PATH"
     try:
         toolchains = subprocess.run(["rustup", "toolchain", "list"], capture_output=True, text=True, timeout=30, check=False).stdout
-    # honest-code-allow: L1.21.8 - the reason IS the return value here, and it names the failure rather than hiding it: the caller refuses to measure and quotes this sentence
     except (subprocess.SubprocessError, OSError):
         return "could not query rustup toolchains"
     return toolchain_reason_in(toolchains)
@@ -145,7 +144,6 @@ def toolchain_reason_in(toolchains: str) -> str | None:
 def _host_target() -> str | None:
     try:
         out = subprocess.run(["rustc", "-vV"], capture_output=True, text=True, timeout=30, check=False).stdout
-    # honest-code-allow: L1.21.8 - the caller turns this None into _na("could not determine the host target triple for the sanitizer"), a refusal that names the same cause for both ways of getting here
     except (subprocess.SubprocessError, OSError):
         return None
     return host_target_in(out)

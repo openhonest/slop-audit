@@ -97,6 +97,39 @@ def io_below_the_boundary(source: dict) -> list[Finding] | None:
         found.append(finding)
     return found
 
+def returns_a_declared_absence(handler, spec: dict, raw: bytes) -> bool:
+    """Whether this handler returns the absent case its own function declares it may return.
+
+    A reader at an edge that cannot read something, returning `None` from a function typed
+    `dict | None`, has not thrown the error away. The absence is in the contract: every
+    caller has to handle it and the type checker says so. That is what the rule on implicit
+    defaults asks for, absence as an explicit case of a bounded type.
+
+    This package carried twelve comments telling the swallow rule to allow such sites, which
+    was the largest group of exceptions in it by a factor of two, and reading them together
+    showed one shape rather than twelve judgments. A rule asking for an exception it should
+    never need is the rule's problem.
+
+    The absence has to be DECLARED, and it has to be the one declared. A function returning
+    the empty string while typed `-> str` has declared nothing, because no caller can tell an
+    absent value from an empty one. A function returning an empty dict where None was
+    declared is handing back a value nobody asked for."""
+    if not spec["absent_markers"] or not spec["return_type_field"]:
+        return False
+    holder = handler.parent
+    while holder is not None and holder.type not in spec["func_types"]:
+        holder = holder.parent
+    if holder is None:
+        return False
+    declared = node_text(holder.child_by_field_name(spec["return_type_field"]), raw)
+    if not any(marker in declared for marker in spec["absent_markers"]):
+        return False
+    returned = [node_text(n, raw).split(maxsplit=1)[1:] for n in walk(handler)
+                if n.type in spec["return_types"]]
+    given = {parts[0].strip() for parts in returned if parts}
+    return bool(given) and given <= set(spec["absent_values"])
+
+
 def swallowed_exceptions(source: dict) -> list[Finding] | None:
     """A handler whose body throws the error away.
 
@@ -126,6 +159,8 @@ def swallowed_exceptions(source: dict) -> list[Finding] | None:
         # it is the defect and the handler is the success condition. Keying on the handler
         # alone made both readings look alike.
         if _guarded_body_asserts_a_raise(node, spec, raw):
+            continue
+        if returns_a_declared_absence(node, spec, raw):
             continue
         caught = _caught_text(node, spec, raw)
         # A signal that carries control flow is not the failure this rule is about. Catching

@@ -136,6 +136,12 @@ class LangSpec(TypedDict, total=False):
     # calls, so an async function under it runs perfectly well. A file that binds no scenario
     # is not a step file whatever its decorators say.
     step_binding_calls: frozenset[str]
+    # How a language declares that a function may return nothing, and what "nothing" is
+    # spelled. A handler returning the absence its own signature declares has not swallowed
+    # the error: the absent case is in the contract and every caller must handle it.
+    return_type_field: str               # the field naming a function's declared return type
+    absent_markers: tuple[str, ...]      # what makes a declared return type admit an absence
+    absent_values: tuple[str, ...]       # what that absence is spelled as in a return
     async_markers: tuple[str, ...]       # the node that makes a declaration asynchronous
     step_calls: frozenset[str]           # calls that take the step body as an argument
     dependency_calls: frozenset[str]     # calls that do the same job, which is Ruby's require
@@ -398,6 +404,9 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "return_type_field": "return_type",
+        "absent_markers": ("None", "Optional"),
+        "absent_values": ("None",),
         "step_binding_calls": frozenset({"scenarios", "scenario"}),
         "bound_literal_types": ("integer", "float", "string"),
         "declared_bound_types": ("type",),
@@ -586,6 +595,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        # No declared return type, so nothing here can be declared absent.
+        "return_type_field": "",
+        "absent_markers": (),
+        "absent_values": ("null", "undefined"),
         "step_binding_calls": frozenset(),
         "bound_literal_types": ("number", "string"),
         # No declared bound in this grammar.
@@ -722,6 +735,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "return_type_field": "type",
+        "absent_markers": ("Optional",),
+        "absent_values": ("null",),
         "step_binding_calls": frozenset(),
         "bound_literal_types": ("decimal_integer_literal", "decimal_floating_point_literal", "string_literal"),
         "declared_bound_types": ("annotation", "marker_annotation"),
@@ -848,6 +864,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "return_type_field": "type",
+        "absent_markers": ("?", "Nullable"),
+        "absent_values": ("null",),
         "step_binding_calls": frozenset(),
         "bound_literal_types": ("integer_literal", "real_literal", "string_literal"),
         "declared_bound_types": ("attribute",),
@@ -991,6 +1010,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "return_type_field": "return_type",
+        "absent_markers": ("Option",),
+        "absent_values": ("None",),
         "step_binding_calls": frozenset(),
         "bound_literal_types": (),
         "declared_bound_types": (),
@@ -1129,6 +1151,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "return_type_field": "",
+        "absent_markers": (),
+        "absent_values": ("nil",),
         "step_binding_calls": frozenset(),
         "bound_literal_types": (),
         "declared_bound_types": (),
@@ -1268,6 +1293,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "return_type_field": "type",
+        "absent_markers": (),
+        "absent_values": ("NULL",),
         "step_binding_calls": frozenset(),
         "bound_literal_types": (),
         "declared_bound_types": (),
@@ -1405,6 +1433,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "return_type_field": "result",
+        "absent_markers": (),
+        "absent_values": ("nil",),
         "step_binding_calls": frozenset(),
         "bound_literal_types": (),
         "declared_bound_types": (),
@@ -1599,6 +1630,9 @@ _TYPESCRIPT["default_param_name"] = "pattern"
 _TYPESCRIPT["typed_param_types"] = ("required_parameter", "optional_parameter")
 # TypeScript declares a bound in a type where JavaScript has nowhere to put one.
 _TYPESCRIPT["declared_bound_types"] = ("type_annotation",)
+# TypeScript declares a return type where JavaScript has nowhere to put one.
+_TYPESCRIPT["return_type_field"] = "return_type"
+_TYPESCRIPT["absent_markers"] = ("null", "undefined")
 _TYPESCRIPT["scalar_types"] = frozenset({"number", "string", "boolean", "bigint", "symbol"})
 
 # The overridden keys, named once so a test can assert that nothing ELSE diverged. Written
@@ -1606,7 +1640,8 @@ _TYPESCRIPT["scalar_types"] = frozenset({"number", "string", "boolean", "bigint"
 # against the field it lands in instead of being waved past the checker with an ignore.
 TYPESCRIPT_OVERRIDES = frozenset({
     "binding_sites", "default_param_name", "default_param_types", "field_decl_types",
-    "declared_bound_types", "immutable_modifiers", "passthrough_types", "scalar_types",
+    "absent_markers", "declared_bound_types", "immutable_modifiers", "passthrough_types",
+    "return_type_field", "scalar_types",
     "typed_param_types",
     "value_wrapper_types",
 })

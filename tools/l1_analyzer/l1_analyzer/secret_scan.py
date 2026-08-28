@@ -376,7 +376,6 @@ def _read_text_bytes(path: Path, max_bytes: int) -> bytes | None:
             if b"\0" in head:
                 return None
             rest = handle.read(max_bytes - len(head) + 1) if len(head) == _BINARY_PROBE_BYTES else b""
-    # honest-code-allow: L1.21.8 - the caller counts these and the result says "N file(s) unreadable or oversized and excluded", so a file this scanner could not read is disclosed rather than counted as carrying no credential
     except OSError:
         return None
     raw = head + rest

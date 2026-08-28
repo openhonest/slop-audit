@@ -57,7 +57,6 @@ def key_from(env_file: Path) -> str | None:
     file paid for it, and an ambient key makes that unanswerable."""
     try:
         lines = env_file.read_text().splitlines()
-    # honest-code-allow: L1.21.8 - the caller has no key either way and refuses the run with NO_KEY, and the file the caller named is already in the message, so the two absences lead to the same repair
     except OSError:
         return None
     for line in lines:

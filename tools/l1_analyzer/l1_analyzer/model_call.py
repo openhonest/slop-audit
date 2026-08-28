@@ -82,7 +82,6 @@ def anthropic_sdk() -> Callable[..., object] | None:
     failure."""
     try:
         from anthropic import Anthropic
-    # honest-code-allow: L1.21.8 - the absence is the point: unavailable_reason turns this None into NO_SDK, which WHY renders as its own sentence, so the caller can tell a missing extra from a missing key
     except ImportError:
         return None
     return Anthropic

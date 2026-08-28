@@ -109,7 +109,6 @@ def _package_json(repo: Path) -> dict | None:
     refusal to measure."""
     try:
         return json.loads((repo / "package.json").read_text())
-    # honest-code-allow: L1.21.8 - the caller turns this None into _na("no readable package.json in the repo"), which covers absent and malformed alike and is a refusal to measure rather than a clean reading
     except (OSError, json.JSONDecodeError):
         return None
 
@@ -158,7 +157,6 @@ def _read_installed(path: Path) -> str | None:
     """One installed package.json's text, or nothing when it cannot be read."""
     try:
         return path.read_text()
-    # honest-code-allow: L1.21.8 - the None is the caller's "could not be read" reason, which it names and hands on, so nothing is reported as success
     except OSError:
         return None
 

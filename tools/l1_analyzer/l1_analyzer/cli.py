@@ -382,7 +382,6 @@ def build_stamp(directory: str) -> str:
                                 capture_output=True, text=True, timeout=10, check=True).stdout.strip()
         changed = subprocess.run(["git", "status", "--porcelain"], cwd=directory,
                                  capture_output=True, text=True, timeout=10, check=True).stdout.strip()
-    # honest-code-allow: L1.21.8 - a build with no repository is the ordinary installed case, and the answer is the stamp the build wrote, which the next line reads
     except (subprocess.SubprocessError, OSError):
         return _stamp_written_at_build(directory) or ""
     if not commit:
