@@ -17,7 +17,20 @@ import re
 from pathlib import Path
 
 from l1_analyzer import report
+from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.report import UNORDERED_CLASS_BOUND, grade_summary
+
+# What a card reads. The panel is every indicator's reading by its code, and a row is one
+# reading. Both were written `dict`, which means dict[Any, Any] and is the least precise
+# mapping the language has: our own escape counter charged twenty-six of them in this file
+# alone once it learned to see a bare one.
+#
+# `object` rather than a union for the looser rows. A card reads results a producer may
+# extend, so the value genuinely varies, and `dict[str, object]` says that while pinning the
+# key. That is what an adopter was doing when they found the counter scoring the sloppier
+# annotation better.
+Panel = dict[str, "L1Result | object"]
+Row = dict[str, object]
 
 _TEMPLATES = Path(__file__).parent / "card_templates"
 _CSS_PATH = Path(__file__).parent / "card_static" / "scorecard.css"
@@ -190,7 +203,7 @@ def _t(key: str, **f: object) -> str:
     return v.format(**{k: str(x) for k, x in f.items()}) if f else v
 
 
-def _value_str(result: dict, unit: str) -> str:
+def _value_str(result: Row, unit: str) -> str:
     # Subscripted. L1Result is total and its only caller passes a panel entry it has
     # already found by key, so a default here would print n/a for a result that measured
     # something and lost the field on the way.
@@ -198,7 +211,7 @@ def _value_str(result: dict, unit: str) -> str:
     return "n/a" if v == "n/a" else f"{v}{unit}"
 
 
-def _metric(spec: dict, result: dict, group: str) -> dict:
+def _metric(spec: Row, result: Row, group: str) -> Row:
     band = str(result["band"])
     k = spec["key"]
     return {"label": _t(f"label.{k}"), "tech": _t(f"tech.{k}"), "value": _value_str(result, spec["unit"]),
@@ -206,11 +219,11 @@ def _metric(spec: dict, result: dict, group: str) -> dict:
             "group": group, "maps_to": spec["maps_to"]}
 
 
-def _metrics(specs: tuple, results: dict, group: str) -> list[dict]:
+def _metrics(specs: tuple, results: Row, group: str) -> list[Row]:
     return [_metric(s, results[s["key"]], group) for s in specs if s["key"] in results]
 
 
-def _culprits(l18b: dict | None, status: str, coarse: list[dict]) -> tuple[list[dict], int]:
+def _culprits(l18b: Row | None, status: str, coarse: list[Row]) -> tuple[list[Row], int]:
     """What limits the grade. CANNOT is limited by proven unbounded state, COARSE by finite
     state with too many unordered cases. The two lists are selected by different rules - one
     reads the verdict, the other reads the cardinality against a bound - so they cannot
@@ -233,7 +246,7 @@ def _culprits(l18b: dict | None, status: str, coarse: list[dict]) -> tuple[list[
     return shown, max(0, len(flagged) - _CULPRIT_CAP)
 
 
-def _scoped_out(l18b: dict | None) -> dict | None:
+def _scoped_out(l18b: Row | None) -> Row | None:
     # The isinstance guard is the absence: L1.18b may not be in the panel at all. Past it
     # the analyzer always writes a bucketed section carrying its counts and paths, even
     # when both are empty, so those two are subscripted.
@@ -249,7 +262,7 @@ def _scoped_out(l18b: dict | None) -> dict | None:
             "paths": paths[:12], "paths_more": max(0, len(paths) - 12)}
 
 
-def _honest_code(results: dict) -> dict | None:
+def _honest_code(results: Row) -> Row | None:
     """The card's view of L1.21, or None when the caller did not ask for it.
 
     The share is over the clauses that were DECIDED, so the card prints how many of the
@@ -268,7 +281,7 @@ def _honest_code(results: dict) -> dict | None:
             "broken_more": max(0, len(broken) - _THREAD_CAP)}
 
 
-def _interleaving_robustness(results: dict) -> dict | None:
+def _interleaving_robustness(results: Row) -> Row | None:
     """The card's view of the interleaving-robustness check, or None when it did not run.
 
     It was computed in cli.py, published into the JSON panel, and mentioned nowhere here,
@@ -294,7 +307,7 @@ def _interleaving_robustness(results: dict) -> dict | None:
             "files_more": max(0, len(unmodeled) - _THREAD_CAP)}
 
 
-def _thread_surface(lang: str, results: dict) -> dict | None:
+def _thread_surface(lang: str, results: Row) -> Row | None:
     ts = results.get("thread_surface")
     if not isinstance(ts, dict):
         return None
@@ -320,7 +333,7 @@ def _thread_surface(lang: str, results: dict) -> dict | None:
             "blurb": blurb, "sites": sites, "sites_more": max(0, len(findings) - _THREAD_CAP)}
 
 
-def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts: dict, census: dict) -> str:
+def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts: Row, census: Row) -> str:
     # Three different things produce `na`, and telling the reader the wrong one wastes their
     # time: "there is no code here I can read" sends them to check the language, "I could not
     # follow most of your state" sends them to the sites, and "I read none of your state"
@@ -347,7 +360,7 @@ def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts
     return _t("detail.coarse")
 
 
-def _census_note(census: dict) -> str:
+def _census_note(census: Row) -> str:
     """What this repository declares that the reader never reached, on a card that GRADED.
 
     The refusal used to fire whenever nothing was admitted, which caught this case by
@@ -375,12 +388,12 @@ def _int(v: object) -> int | None:
 _PROOF_CAP = 20
 
 
-def _proofs(results: dict) -> list[dict]:
+def _proofs(results: Row) -> list[Row]:
     """The adoptable proofs: runnable tests slop-audit generated for a located gap and
     retained only because running them settled it (Umbra's discipline). Two producers feed
     one surface - the concurrency prove loop (results['proofs']) and the coverage-gap prove
     loop (results['coverage_proofs']) - and each proof carries the test source to adopt."""
-    out: list[dict] = []
+    out: list[Row] = []
 
     concurrency = results.get("proofs")
     if isinstance(concurrency, dict):
@@ -413,7 +426,7 @@ def _proofs(results: dict) -> list[dict]:
     return out[:_PROOF_CAP]
 
 
-def footer_for(card: dict) -> str:
+def footer_for(card: Row) -> str:
     """The closing sentences, one for each row the CLI runs.
 
     The site never runs anyone's code, and says so. Otherwise every runtime row gets its own
@@ -437,8 +450,8 @@ def footer_for(card: dict) -> str:
     return " ".join(sentences)
 
 
-def build_card(slug: str, lang: str, results: dict, ran_tests: bool,
-               analyzer_version: str) -> dict:
+def build_card(slug: str, lang: str, results: Row, ran_tests: bool,
+               analyzer_version: str) -> Row:
     """The full scorecard model, identical to the site's. ran_tests=True (the CLI) adds
     the measured runtime metrics (L1.19 coverage, L1.20 determinism); False (the site) omits
     them and the footer says the code was never executed."""
@@ -515,7 +528,7 @@ def _copy_for_html() -> dict[str, str]:
     return {k: _LINK.sub(r'<a href="\2" target="_blank" rel="noopener">\1</a>', v) for k, v in CARD_COPY.items()}
 
 
-def card_html(card: dict) -> str:
+def card_html(card: Row) -> str:
     """Render the card via the site's own template + CSS - a standalone page."""
     from jinja2 import Environment, FileSystemLoader, select_autoescape
     env = Environment(loader=FileSystemLoader(str(_TEMPLATES)), autoescape=select_autoescape(["html"]))
@@ -531,7 +544,7 @@ def card_html(card: dict) -> str:
     )
 
 
-def _silence_sites(l18b: dict | None) -> list[dict]:
+def _silence_sites(l18b: Row | None) -> list[Row]:
     """Every site the analyzer stopped at, with the reason in the reader's words, for the
     HTML card. The model carried `silence` and the template rendered none of it, so the site
     published a grade and named not one place it stopped."""
@@ -542,7 +555,7 @@ def _silence_sites(l18b: dict | None) -> list[dict]:
              "why": _t("silence.reason." + s["reason"])} for s in (sil.get("sites") or [])]
 
 
-def _silence_lines(card: dict) -> list[str]:
+def _silence_lines(card: Row) -> list[str]:
     """Every site the analyzer stopped at. On the `na` card this is the whole content: the
     repository was refused a grade because of silence, so the sites ARE the report."""
     sil = card.get("silence")
@@ -553,7 +566,7 @@ def _silence_lines(card: dict) -> list[str]:
         for s in sil["sites"]]
 
 
-def _verdict_lines(card: dict, strip: re.Pattern) -> list[str]:
+def _verdict_lines(card: Row, strip: re.Pattern) -> list[str]:
     """The state verdict and what limits it. Empty on an ungraded card: the grade sentence,
     the capability claim, the three counts and the path-cover figure are all statements about
     state, and an ungraded card is one where no state was read. Printing the counts alone
@@ -597,7 +610,7 @@ def _verdict_lines(card: dict, strip: re.Pattern) -> list[str]:
     return lines
 
 
-def card_markdown(card: dict) -> str:
+def card_markdown(card: Row) -> str:
     """The same card as Markdown, for the CLI and agent-facing output."""
     strip = re.compile(r"<[^>]+>")
     lines = [f"# Slop Audit — {card['slug']} ({card['lang']})", ""]

@@ -146,7 +146,17 @@ NO_STATE = "no-state"
 # cannot support.
 UNORDERED_CLASS_BOUND: int | None = None
 
-def _meter_ran(l18b: dict) -> bool:
+# What this module reads. A panel is every indicator's reading by its code, a tally is the
+# state census's counts, and a reading is one indicator's row. All three were written
+# `dict`, which means dict[Any, Any], and our own escape counter charged thirteen of them
+# here once it learned to see a bare one.
+Panel = dict[str, object]
+Tally = dict[str, int]
+Reading = dict[str, object]
+
+
+
+def _meter_ran(l18b: Reading) -> bool:
     """Whether the finite-testability meter produced a fraction.
 
     It trusts the declared type. The check it used to make on `l18b` itself re-tested what
@@ -156,7 +166,7 @@ def _meter_ran(l18b: dict) -> bool:
     return isinstance(l18b.get("resolvable_fraction"), (int, float))
 
 
-def silence_fraction(counts: dict) -> float:
+def silence_fraction(counts: Tally) -> float:
     """The share of state whose disposition the analyzer could not decide.
 
     Derived from the same counts the status is derived from, rather than read from a
@@ -217,7 +227,7 @@ def unread_kinds_phrase(census: object) -> str:
     return state_census.kind_phrase(kinds)
 
 
-def _basis(band: str, counts: dict, meter_ran: bool, census: object) -> str:
+def _basis(band: str, counts: Tally, meter_ran: bool, census: object) -> str:
     """What evidence the report actually has. Five cases, and three of them forbid a grade.
 
     The order is the argument. A promiscuous finding is a PROOF, and a proof does not need
@@ -249,7 +259,7 @@ def _basis(band: str, counts: dict, meter_ran: bool, census: object) -> str:
     return MEASURED
 
 
-def _status(basis: str, counts: dict, coarse: bool) -> str:
+def _status(basis: str, counts: Tally, coarse: bool) -> str:
     """The verifiability status, decided on OBSERVED state only.
 
     An undecided state used to produce `might`, and `might` graded D, so one call the
@@ -284,7 +294,7 @@ def _status(basis: str, counts: dict, coarse: bool) -> str:
     return "can"
 
 
-def _hygiene(results: dict) -> float | None:
+def _hygiene(results: Panel) -> float | None:
     num = den = 0.0
     for key, weight in _HYGIENE_WEIGHTS.items():
         points = _BAND_POINTS.get(str((results.get(key) or {}).get("band")))
@@ -332,7 +342,7 @@ def _grade(status: str, pct: int | None, hygiene: float | None) -> str | None:
     return "A" if hygiene >= _A_MIN else "B" if hygiene >= _B_MIN else "C"
 
 
-def coarse_states(l18b: dict, bound: int | None) -> list[dict]:
+def coarse_states(l18b: Reading, bound: int | None) -> list[Reading]:
     """State whose reaching partition is finite, unordered, and wider than the bound.
 
     The bound lives here rather than in the classifier because it is a reporting decision:
@@ -365,10 +375,10 @@ class GradeSummary(TypedDict):
     grade: str | None           # A/B/C (can), D (coarse), F (cannot), None (na)
     silence: float              # share of state the analyzer could not decide
     census: dict[str, object]   # declared vs admitted: the independent denominator
-    coarse: list[dict]          # the states that made the verdict coarse, widest first
+    coarse: list[Reading]          # the states that made the verdict coarse, widest first
 
 
-def grade_summary(results: dict, unordered_class_bound: int | None) -> GradeSummary:
+def grade_summary(results: Panel, unordered_class_bound: int | None) -> GradeSummary:
     """The published grade computation - the SINGLE SOURCE of the A-F grade, used by both
     the CLI report and the web card. Verifiability first: CANNOT is F, COARSE is D, above
     the silence floor no grade at all, and when every piece of state is finitely testable
@@ -383,7 +393,7 @@ def grade_summary(results: dict, unordered_class_bound: int | None) -> GradeSumm
     # value inside one function was the smell that said this step was missing, and each
     # reader below then had to distrust the type its own signature declares.
     panel_l18b = results.get("L1.18b")
-    l18b: dict = panel_l18b if isinstance(panel_l18b, dict) else {}
+    l18b: Reading = panel_l18b if isinstance(panel_l18b, dict) else {}
     counts = l18b.get("counts") or {"neutral": 0, "promiscuous": 0, "unresolved": 0}
     coarse = coarse_states(l18b, unordered_class_bound)
     census = l18b.get("census")

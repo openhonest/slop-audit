@@ -82,6 +82,18 @@ _PROOF_MOD = "l1_coverage_proof"
 LAST_REFUSAL = {"reason": "", "cause": ""}
 
 
+# What this module passes around. A gap is one uncovered decision the sweep found; an answer
+# is what a model handed back for it, or nothing. Both were written `dict`, which means
+# dict[Any, Any] and is the least precise mapping the language has.
+#
+# The key is pinned and the value left open, because a gap carries whatever the locator put
+# in it and an answer carries whatever the model returned. `dict[str, object]` says that
+# honestly; `dict` said nothing at all and scored better for saying it.
+Gap = dict[str, object]
+Answer = dict[str, object]
+
+
+
 def model_available() -> bool:
     """Re-exported from the one reader of the variable's NAME, so a rename cannot
     leave a second copy checking the old one."""
@@ -99,13 +111,13 @@ def host_cfg() -> frozenset[str]:
     return coverage_gates.host_cfg_atoms(probe.stdout or "") if probe.returncode == 0 else frozenset()
 
 
-def _live_gaps(gaps: list[dict], host: frozenset[str]) -> list[dict]:
+def _live_gaps(gaps: list[Gap], host: frozenset[str]) -> list[Gap]:
     """Drop gaps whose branch the host target never compiles: a proof there can only ever
     assert a premise about a platform the run is not on."""
     return [g for g in gaps if not coverage_gates.cfg_excluded(g.get("cfg"), host)]
 
 
-def _call_model(instruction: str, payload: str) -> dict | None:
+def _call_model(instruction: str, payload: str) -> Answer | None:
     """One structured model call. Returns the parsed JSON object, or None on any failure -
     an unusable reply never becomes a false proof."""
     # Through the one boundary. Only the TAIL differed between this and prove.generate:
@@ -132,12 +144,12 @@ def _call_model(instruction: str, payload: str) -> dict | None:
     return data
 
 
-def _signature(gap: dict) -> str:
+def _signature(gap: Gap) -> str:
     params = ", ".join(f"{p['name']}: {p['type']}" for p in gap["parameters"])
     return f"fn {gap['function']}({params}) -> {gap['return_type']}"
 
 
-def _valid(data: dict | None, asserts: Callable[[str], bool]) -> dict | None:
+def _valid(data: Gap | None, asserts: Callable[[str], bool]) -> Answer | None:
     """A usable proposal, or nothing.
 
     `asserts` is the language's reachable-assertion rule, and refusing here rather than
@@ -157,7 +169,7 @@ def _valid(data: dict | None, asserts: Callable[[str], bool]) -> dict | None:
     return {"body": body, "explanation": str(data.get("explanation", ""))}
 
 
-def propose(gap: dict) -> dict | None:
+def propose(gap: Gap) -> Answer | None:
     """First calling test for the located gap: {body, explanation} or None."""
     payload = json.dumps({
         "function_source": gap["function_source"], "signature": _signature(gap),
@@ -166,7 +178,7 @@ def propose(gap: dict) -> dict | None:
     return _valid(_call_model(_PROPOSE_INSTRUCTION, payload), body_asserts)
 
 
-def repair(gap: dict, test_source: str, compiler_error: str) -> dict | None:
+def repair(gap: Gap, test_source: str, compiler_error: str) -> Answer | None:
     """Ask the model to fix a test that did not compile, given rustc's own diagnostic."""
     payload = json.dumps({
         "signature": _signature(gap), "function_source": gap["function_source"],
@@ -325,7 +337,7 @@ class CoverageProof(TypedDict):
     test_source: str
 
 
-def _retained_entry(module_relpath: str, gap: dict, proposal: dict, source: str) -> CoverageProof:
+def _retained_entry(module_relpath: str, gap: Gap, proposal: Gap, source: str) -> CoverageProof:
     return {
         "function": gap["function"], "language": "rust",
         "location": f"{module_relpath}:{gap['line']}",
@@ -333,7 +345,7 @@ def _retained_entry(module_relpath: str, gap: dict, proposal: dict, source: str)
     }
 
 
-def _refine_incidental(repo: Path, module_relpath: str, gap: dict, body: str, timeout_seconds: float) -> str:
+def _refine_incidental(repo: Path, module_relpath: str, gap: Gap, body: str, timeout_seconds: float) -> str:
     """The permutation check on an incidental panic: rebuild the fixture with a valid,
     64-aligned scalar and re-run. If the panic clears, the original scalar - not the
     function - caused it, so this is an invalid fixture. If it persists, it is a real panic
@@ -366,10 +378,10 @@ def _refine_incidental(repo: Path, module_relpath: str, gap: dict, body: str, ti
 # tallies were left unmerged to avoid. Two implementations that differ in what they DO are
 # not a duplication to remove; the shared RULES were, and those are gone.
 
-def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, timeout_seconds: float,
-               propose_fn: Callable[..., dict | None], repair_fn: Callable[..., dict | None],
+def _prove_one(repo: Path, module_relpath: str, gap: Gap, repair_rounds: int, timeout_seconds: float,
+               propose_fn: Callable[..., Answer | None], repair_fn: Callable[..., Answer | None],
                run_fn: Callable[..., tuple[str, str]],
-               refine_fn: Callable[..., str]) -> tuple[str, dict | None, str]:
+               refine_fn: Callable[..., str]) -> tuple[str, Answer | None, str]:
     """Propose -> run -> (repair -> run)* -> gate for one gap. Returns (bucket, proposal,
     test_source): a fail is resolved to one of _FAIL_BUCKETS (only `divergence` is retained);
     a clean run is `pass`; `error` is did-not-compile even after repair; `declined` is no reply, and it is COUNTED: a model call that produced nothing still cost money.
@@ -404,11 +416,11 @@ def _prove_one(repo: Path, module_relpath: str, gap: dict, repair_rounds: int, t
     return bucket, proposal, source
 
 
-def _prove_module(repo: Path, module_relpath: str, gaps: list[dict], repair_rounds: int,
-                  timeout_seconds: float, propose_fn: Callable[..., dict | None],
-                  repair_fn: Callable[..., dict | None], batch_run_fn: Callable[..., tuple[int, str]],
+def _prove_module(repo: Path, module_relpath: str, gaps: list[Gap], repair_rounds: int,
+                  timeout_seconds: float, propose_fn: Callable[..., Answer | None],
+                  repair_fn: Callable[..., Answer | None], batch_run_fn: Callable[..., tuple[int, str]],
                   run_fn: Callable[..., tuple[str, str]],
-                  refine_fn: Callable[..., str]) -> tuple[list[dict], dict]:
+                  refine_fn: Callable[..., str]) -> tuple[list[Gap], dict]:
     """Prove all of one module's gaps. Fast path: batch every proposal into one compile and
     run once, then gate each failing test. If the batch does not compile (one bad test
     poisons it), fall back to per-gap with compiler-feedback repair. Returns (retained,
@@ -489,7 +501,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
     host = host_cfg()
-    retained: list[dict] = []
+    retained: list[Gap] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     modules = 0
     located = 0            # every gap the sweep found, whether or not the ceiling let it try
@@ -533,7 +545,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 
-def sweep_detail(retained: int, modules: int, located: int, outcomes: dict, provenance: str,
+def sweep_detail(retained: int, modules: int, located: int, outcomes: Gap, provenance: str,
                  reason: str, cause: str) -> str:
     """What a finished sweep says, in the three cases it can be in.
 
@@ -570,7 +582,7 @@ def sweep_detail(retained: int, modules: int, located: int, outcomes: dict, prov
             f"(ran under {provenance}). {aside}")
 
 
-def _outcome_detail(outcomes: dict) -> str:
+def _outcome_detail(outcomes: Gap) -> str:
     """The honest breakdown: what each generated test became. Only `divergence` is a proven
     bug; the noise buckets are named so a zero-retained result still says what happened."""
     return (f"Of {sum(outcomes.values())} generated tests run in-crate: {outcomes['divergence']} "
@@ -602,7 +614,7 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: f
     if not gaps:
         return {"retained": [], "attempted": 0, "detail": "no proof-ready uncovered branches located in this module"}
 
-    retained: list[dict] = []
+    retained: list[Gap] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     for gap in gaps:
         bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)

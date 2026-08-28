@@ -61,10 +61,15 @@ repos:
         # the sloppier annotation, ours included, and the zero was a zero on a thing nobody
         # was counting.
         #
-        # Naming the shape every clause checker takes, which was `dict` and is now a
-        # written-out record, closed 45 of them in the analyzer package alone. The
-        # remaining 142 across this repository are real and are ours to work down.
-        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 142 --max-honest-code 0
+        # Naming the shape every clause checker takes closed 45 of them, and naming what
+        # the card, the report and the two prove sweeps pass around closed 59 more: 142 to
+        # 83 in a day. Every one was a bare `dict` on an annotation whose key is always a
+        # string, so writing `dict[str, object]` said what was true and cost nothing.
+        #
+        # Lower it as they are named. A baseline looser than reality is a defect too, and
+        # the gate refuses in that direction as well: it failed on 83 against a ratchet of
+        # 142 and said so.
+        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 83 --max-honest-code 0
         language: system
         pass_filenames: false
         # Any Python in the repository, because the entry audits the whole repository.
