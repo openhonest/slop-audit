@@ -19,6 +19,7 @@ from pathlib import Path
 from l1_analyzer.honest_code_read import (
     Finding,
     _finding,
+    called_spelling,
     class_nodes,
     first_name,
     function_nodes,
@@ -237,18 +238,6 @@ def unscoped_resources(source: dict) -> list[Finding] | None:
 # Three mocks in one test. One or two is ordinary isolation, and the third is where the
 # count stops being about the test and starts being about the code under it.
 _MOCK_LIMIT = 3
-
-
-def called_spelling(call, spec: dict, raw: bytes) -> str:
-    """What a call is called, reduced to the one word a vocabulary can hold.
-
-    Four grammars spell the same idea four ways: Python writes `Mock()`, JavaScript
-    `jest.fn()`, Java `Mockito.mock()` and C# `Substitute.For<IStore>()`. Taking the tail
-    after the last dot and dropping any type arguments leaves `Mock`, `fn`, `mock` and
-    `For`, so one list per language can name them without a branch per grammar."""
-    named = call.child_by_field_name(spec["call_fn"])
-    text = node_text(named, raw) if named is not None else (node_text(call, raw) or "")
-    return text.split("(")[0].split("<")[0].split("::")[-1].split(".")[-1].strip()
 
 
 def _test_bodies(source: dict) -> list[tuple[str, object, int]]:

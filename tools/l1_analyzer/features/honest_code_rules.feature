@@ -176,3 +176,24 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _declaration_named walks up to the first function or class holding the marker
     Then it returns that name, so the finding points at the thing that runs rather than at the marker
     But it falls back to the marker's own text where no named declaration holds it, rather than reporting an empty name
+
+  Scenario: unmeasured_caches finds a cache library or a memoising marker
+    Given a parsed source and its language's node vocabulary
+    When unmeasured_caches reads each dependency the file brings in and each marker on a declaration
+    Then it reports a cache library, because a cache is a second source of truth with an invalidation bug waiting
+    And it reports a memoising marker and names the declaration it caches, rather than naming the marker
+    And every finding carries the half it could not decide, since whether anyone profiled the query first is in no file and a silent finding would claim the whole rule was checked
+    But a language this table gives no cache vocabulary is answered with nothing decided, which is C, whose dependency arrives as a header this rule cannot tell from any other
+
+  Scenario: _dependency_names gives the identifiers a dependency declaration mentions
+    Given a node bringing in a dependency and the source bytes
+    When _dependency_names splits the node's text on everything that cannot be part of a name
+    Then a library is found however the language spells the path around it, whether that is a dotted Java package, a quoted Go URL or a double-colon Rust path
+    But it returns every identifier rather than choosing one, so the caller decides which of them it was looking for
+
+  Scenario: _brings_in_a_dependency says whether a node pulls a library into the file
+    Given a node, its language's vocabulary, and the source bytes
+    When _brings_in_a_dependency checks the node against the declarations the vocabulary names and then against the calls that do the same job
+    Then it answers yes for a declaration in every language that has one
+    And it answers yes for a call the vocabulary names, which is how Ruby writes require, where a reader looking only for declarations finds no dependencies at all
+    But it answers no for an ordinary call, because the call form is matched by name and not by shape

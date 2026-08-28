@@ -32,40 +32,8 @@ from l1_analyzer.honest_code_read import (
 # Names that mean I/O only with a receiver that names a client. `TABLE.get(key)` is a dict
 # lookup and `requests.get(url)` fetches a page.
 #
-_CACHE_NAMES = frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache"})
-_CACHE_DECORATORS = frozenset({"lru_cache", "cache", "cached", "memoize", "cached_property"})
 _STEP_DECORATORS = frozenset({"given", "when", "then", "step"})
 _STEP_LIMIT = 30
-_UNPROFILED = ("whether the query was profiled first is not readable from any file, so "
-               "only the cache itself was checked")
-
-
-def unmeasured_caches(source: dict) -> list[Finding] | None:
-    """A cache client or a memoising decorator.
-
-    Partly decided, and the clause says which half. The cache is readable. Whether anyone
-    profiled the query before adding it is not in any file, and implying otherwise would
-    claim the whole rule was checked."""
-    found: list[Finding] = []
-    for node in ast.walk(source["tree"]):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            module = getattr(node, "module", "") or ""
-            names = [a.name.split(".")[0] for a in node.names] + [module.split(".")[0]]
-            for name in names:
-                if name in _CACHE_NAMES:
-                    found.append(_finding(
-                        "L1.21.9", name, node.lineno,
-                        f"{name} is a second source of truth with an invalidation bug waiting",
-                        "profile the query and add the index first", _UNPROFILED))
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            for decorator in node.decorator_list:
-                bare = ast.unparse(decorator).split("(")[0].split(".")[-1]
-                if bare in _CACHE_DECORATORS:
-                    found.append(_finding(
-                        "L1.21.9", node.name, node.lineno,
-                        f"@{bare} caches the result before anything measured the cost",
-                        "profile it and fix the query or the schema first", _UNPROFILED))
-    return found
 
 
 def _bare_name(call: ast.Call) -> str:

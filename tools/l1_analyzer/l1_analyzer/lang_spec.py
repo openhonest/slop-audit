@@ -107,6 +107,12 @@ class LangSpec(TypedDict, total=False):
     # on a declaration. The marker is where the languages diverge most, so which node is one
     # and which names count are facts the table holds rather than branches in the reader.
     hook_marker_types: tuple[str, ...]   # decorator, annotation, attribute
+    # SQL Over Application Caches. Every language brings a dependency in differently, and
+    # Ruby brings it in with a call rather than a declaration, so the node is a fact here.
+    import_types: tuple[str, ...]        # declarations that bring in a dependency
+    dependency_calls: frozenset[str]     # calls that do the same job, which is Ruby's require
+    cache_names: frozenset[str]          # cache libraries, matched as a word in the import
+    cache_markers: frozenset[str]        # memoising markers, read as hook_marker_types are
     hook_markers: frozenset[str]         # marker names that park behaviour
     hook_registrations: frozenset[str]   # dotted calls that register a callback
     test_name_prefixes: tuple[str, ...]  # a named function that is a test
@@ -364,6 +370,11 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "import_types": ("import_statement", "import_from_statement"),
+        "dependency_calls": frozenset(),
+        "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache"}),
+        "cache_markers": frozenset({"lru_cache", "cache", "cached", "memoize",
+                                    "cached_property"}),
         "hook_marker_types": ("decorator",),
         "hook_markers": frozenset({"atexit", "on_event", "listens_for", "add_event_handler",
                                    "before_request", "after_request", "receiver"}),
@@ -539,6 +550,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "import_types": ("import_statement",),
+        "dependency_calls": frozenset({"require"}),
+        "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "ioredis", "node-cache", "lru-cache"}),
+        "cache_markers": frozenset(),
         # No marker on a declaration: the decorator proposal is not in this grammar.
         "hook_marker_types": (),
         "hook_markers": frozenset(),
@@ -661,6 +676,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "import_types": ("import_declaration",),
+        "dependency_calls": frozenset(),
+        "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "jedis", "lettuce", "ehcache", "caffeine"}),
+        "cache_markers": frozenset({"Cacheable", "CachePut", "Cached"}),
         "hook_marker_types": ("marker_annotation", "annotation"),
         "hook_markers": frozenset({"PostConstruct", "PreDestroy", "EventListener",
                                    "PostLoad", "PrePersist", "PreUpdate", "PostPersist"}),
@@ -775,6 +794,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "import_types": ("using_directive",),
+        "dependency_calls": frozenset(),
+        # PascalCase, so the shared list's lowercase spellings never match here.
+        "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "Redis", "Caching", "MemoryCache"}),
+        "cache_markers": frozenset(),
         "hook_marker_types": ("attribute",),
         "hook_markers": frozenset({"OnDeserialized", "OnDeserializing", "OnSerialized",
                                    "OnSerializing"}),
@@ -905,6 +929,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "import_types": ("use_declaration",),
+        "dependency_calls": frozenset(),
+        "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "cached", "moka"}),
+        "cache_markers": frozenset({"cached"}),
         "hook_marker_types": (),
         "hook_markers": frozenset(),
         "hook_registrations": frozenset(),
@@ -1031,6 +1059,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        # A dependency arrives by call here, not by declaration.
+        "import_types": (),
+        "dependency_calls": frozenset({"require", "require_relative"}),
+        "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "dalli"}),
+        "cache_markers": frozenset(),
         # A Rails callback is a bare call in the class body rather than a marker node, so
         # telling one from an ordinary call needs more than this table holds today.
         "hook_marker_types": (),
@@ -1157,6 +1190,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        # A header is not a dependency this rule can name, so the question is not decided.
+        "import_types": (),
+        "dependency_calls": frozenset(),
+        "cache_names": frozenset(),
+        "cache_markers": frozenset(),
         "hook_marker_types": (),
         "hook_markers": frozenset(),
         "hook_registrations": frozenset(),
@@ -1281,6 +1319,10 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "import_types": ("import_declaration",),
+        "dependency_calls": frozenset(),
+        "cache_names": frozenset({"redis", "memcache", "memcached", "pylibmc", "diskcache", "aiocache", "go-redis", "bigcache", "groupcache"}),
+        "cache_markers": frozenset(),
         "hook_marker_types": (),
         "hook_markers": frozenset(),
         "hook_registrations": frozenset(),

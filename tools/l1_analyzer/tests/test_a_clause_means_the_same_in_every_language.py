@@ -1519,3 +1519,73 @@ def test_a_string_naming_a_registration_is_not_a_registration():
 def test_a_language_with_no_hook_vocabulary_says_nothing_was_decided(lang):
     sources = {"go": "func run() { load() }\n", "c": "void run(void) { load(); }\n"}
     assert rules.lifecycle_hooks(read.read_tree(sources[lang], lang)) is None, lang
+
+
+# ---------------------------------------------------------------------------
+# 9. SQL Over Application Caches
+#
+# Read Python's own parser until now. A cache is a second source of truth with an
+# invalidation bug waiting, and the rule asks you to profile the query and fix the index
+# first. Partly decided, and the clause says which half: the cache is readable, and whether
+# anyone profiled anything first is in no file.
+#
+# Every language brings a dependency in differently, and Ruby brings it in with a call
+# rather than a declaration, so the node type is a fact the vocabulary holds.
+# ---------------------------------------------------------------------------
+
+_PULLS_IN_A_CACHE = [
+    ("python", "import redis\n"),
+    ("javascript", "import Redis from 'ioredis'\n"),
+    ("typescript", "import Redis from 'ioredis'\n"),
+    ("java", "import redis.clients.jedis.Jedis;\n"),
+    ("csharp", "using StackExchange.Redis;\n"),
+    ("ruby", "require 'redis'\n"),
+    ("go", 'import "github.com/go-redis/redis"\n'),
+    ("rust", "use redis::Client;\n"),
+]
+
+_PULLS_IN_SOMETHING_ELSE = [
+    ("python", "import json\n"),
+    ("javascript", "import path from 'path'\n"),
+    ("typescript", "import path from 'path'\n"),
+    ("java", "import java.util.List;\n"),
+    ("csharp", "using System.Text;\n"),
+    ("ruby", "require 'json'\n"),
+    ("go", 'import "encoding/json"\n'),
+    ("rust", "use std::io::Read;\n"),
+]
+
+
+@pytest.mark.parametrize(("lang", "source"), _PULLS_IN_A_CACHE)
+def test_a_cache_dependency_is_found_in_every_language(lang, source):
+    found = rules.unmeasured_caches(read.read_tree(source, lang))
+    assert found, lang
+    assert "second source of truth" in found[0]["detail"]
+    assert found[0]["withheld_by"] == "" and found[0]["undecided"]
+
+
+@pytest.mark.parametrize(("lang", "source"), _PULLS_IN_SOMETHING_ELSE)
+def test_an_ordinary_dependency_is_left_alone(lang, source):
+    assert rules.unmeasured_caches(read.read_tree(source, lang)) == [], lang
+
+
+@pytest.mark.parametrize(("lang", "source", "expected"), [
+    ("python", "@lru_cache\ndef price(sku):\n    return look_up(sku)\n", "price"),
+    ("python", "@functools.cache\ndef price(sku):\n    return look_up(sku)\n", "price"),
+    ("java", "class P {\n  @Cacheable\n  int price(String sku) { return lookUp(sku); }\n}\n",
+     "price"),
+])
+def test_a_memoising_marker_is_found_and_names_what_it_caches(lang, source, expected):
+    found = rules.unmeasured_caches(read.read_tree(source, lang))
+    assert [f["symbol"] for f in found] == [expected], found
+    assert "before anything measured the cost" in found[0]["detail"]
+
+
+def test_the_half_it_cannot_decide_is_stated_on_every_finding():
+    """Partly decided, and saying so is the whole difference between this and a verdict.
+    Whether the query was profiled first is in no file, so a finding that did not say so
+    would claim the whole rule had been checked."""
+    for found in (rules.unmeasured_caches(read.read_tree("import redis\n", "python")),
+                  rules.unmeasured_caches(read.read_tree(
+                      "@lru_cache\ndef p(s):\n    return q(s)\n", "python"))):
+        assert "profiled" in found[0]["undecided"], found

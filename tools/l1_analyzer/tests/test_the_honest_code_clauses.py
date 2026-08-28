@@ -149,26 +149,11 @@ def test_a_handler_that_maps_the_error_is_left_alone():
 
 # --------------------------------------------------------------------------
 # 9. SQL over application caches
+#
+# Ported to the shared node vocabulary, so all three cases moved to
+# test_a_clause_means_the_same_in_every_language.py, where they are asserted for Python and
+# for the seven other languages that can now decide the clause.
 # --------------------------------------------------------------------------
-
-def test_a_memoising_decorator_is_found():
-    found = python_rules.unmeasured_caches(_module(
-        "from functools import lru_cache\n\n\n@lru_cache\ndef price(sku):\n    return query(sku)\n"))
-    assert found
-
-
-def test_the_cache_clause_says_what_it_cannot_see():
-    """Whether anyone profiled the query first is not in any file. The clause reports the
-    cache and names the half it cannot decide, rather than implying the whole rule was
-    checked."""
-    found = python_rules.unmeasured_caches(_module(
-        "import redis\n\n\ndef price(sku):\n    return redis.get(sku)\n"))
-    assert found
-    assert "profil" in found[0]["undecided"].lower()
-
-
-def test_a_file_with_no_cache_finds_nothing():
-    assert python_rules.unmeasured_caches(_module("def price(sku):\n    return query(sku)\n")) == []
 
 
 # --------------------------------------------------------------------------

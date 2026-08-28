@@ -41,12 +41,6 @@ Feature: Clauses this reader still reads through Python's own parser
     Then it reports that the clause was not decided, and why
     But it never returns a pass, because a rule nobody checked is not a rule that passed and this is the one clause no reader will ever decide
 
-  Scenario: unmeasured_caches finds a cache standing in for a query
-    Given a parsed source
-    When unmeasured_caches reads its imports and its decorators
-    Then a cache client or a memoising decorator is a second source of truth with an invalidation bug waiting
-    But whether anyone profiled the query first is not readable from any file, so the clause reports the cache and says the measurement is what it cannot see
-
   Scenario: undecidable when a clause here is ready to read the shared vocabulary
     Given a clause written against one language's parser
     When someone asks whether the shared vocabulary can carry it yet

@@ -86,12 +86,6 @@ Feature: Three clauses about what a signature promises and what a caller may ass
     And what a test file is called is asked of the scope module, the one place in this package that decides it, so a second copy here cannot drift from the first
     But a language this table gives no mock vocabulary, which is Go, Rust and C, is answered with nothing decided, and a test named by an annotation rather than a prefix is not found, since Java's Test and C#'s Fact sit on functions with any name at all
 
-  Scenario: called_spelling gives what a call is called, reduced to one word
-    Given a call node, its language's vocabulary, and the source bytes
-    When called_spelling takes the text naming the function, drops any type arguments, and keeps the tail after the last separator
-    Then Python's Mock, JavaScript's jest dot fn, Java's Mockito dot mock and C#'s Substitute dot For of a type all reduce to one word a table can hold
-    But it applies no list of its own, so what the word means is the caller's question and not this function's
-
   Scenario: _test_bodies gives every test in a file, with the node holding its body
     Given a parsed source and its language's vocabulary
     When _test_bodies looks for both shapes a test takes

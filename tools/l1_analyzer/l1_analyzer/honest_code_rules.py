@@ -27,6 +27,7 @@ from l1_analyzer.honest_code_read import (
     Finding,
     _finding,
     base_names,
+    called_spelling,
     chain_subjects,
     class_nodes,
     declares_only_signatures,
@@ -839,4 +840,80 @@ def lifecycle_hooks(source: dict) -> list[Finding] | None:
                     f"{'.'.join(names)} runs this somewhere nobody reads",
                     "call the work directly at the point it is needed, so a reader sees it "
                     "in the flow rather than in a registration that runs later", ""))
+    return found
+
+
+_UNPROFILED = ("whether the query was profiled first is not readable from any file, so "
+               "only the cache itself was checked")
+
+
+def _dependency_names(node, spec: dict, raw: bytes) -> list[str]:
+    """The identifiers a dependency declaration mentions.
+
+    One text, split on everything that cannot be part of a name, so a library is found
+    however the language spells the path around it: Python writes `import redis`, Java
+    `redis.clients.jedis.Jedis`, Go a quoted URL and Rust a double-colon path."""
+    text = node_text(node, raw) or ""
+    word: list[str] = []
+    names: list[str] = []
+    for char in text:
+        if char.isalnum() or char in "_-":
+            word.append(char)
+        elif word:
+            names.append("".join(word))
+            word = []
+    if word:
+        names.append("".join(word))
+    return names
+
+
+def _brings_in_a_dependency(node, spec: dict, raw: bytes) -> bool:
+    """Whether this node pulls a library into the file.
+
+    Two shapes. Most languages declare it, and the vocabulary names the declaration. Ruby
+    calls `require`, which is an ordinary call node, so a reader looking only for
+    declarations finds no dependencies at all in Ruby."""
+    if node.type in spec["import_types"]:
+        return True
+    if node.type not in spec["call_types"] or not spec["dependency_calls"]:
+        return False
+    return called_spelling(node, spec, raw) in spec["dependency_calls"]
+
+
+def unmeasured_caches(source: dict) -> list[Finding] | None:
+    """A cache library brought into the file, or a memoising marker on a declaration.
+
+    A cache is a second source of truth with an invalidation bug waiting, and the rule asks
+    you to profile the query and fix the index or the schema first.
+
+    Partly decided, and saying so is the whole difference between this and a verdict. The
+    cache is readable. Whether anyone profiled anything before adding it is in no file, so
+    every finding carries that bound rather than implying the whole rule was checked.
+
+    Read through the language's own node vocabulary, so the rule means the same thing in
+    every language the spec covers rather than being reimplemented per language.
+
+    Not decided for a language this table gives no cache vocabulary. C brings a dependency
+    in as a header, which this rule cannot tell from any other header, and an empty list
+    would instead claim the file was read against this clause and found clean."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["cache_names"] and not spec["cache_markers"]:
+        return None
+    found: list[Finding] = []
+    for node in walk(source["root"]):
+        if _brings_in_a_dependency(node, spec, raw):
+            named = [n for n in _dependency_names(node, spec, raw) if n in spec["cache_names"]]
+            if named:
+                found.append(_finding(
+                    "L1.21.9", named[0], node.start_point[0] + 1,
+                    f"{named[0]} is a second source of truth with an invalidation bug waiting",
+                    "profile the query and add the index first", _UNPROFILED))
+        if node.type in spec["hook_marker_types"]:
+            names = _marker_names(node, raw)
+            marker = next((n for n in names if n in spec["cache_markers"]), "")
+            if marker:
+                found.append(_finding(
+                    "L1.21.9", _declaration_named(node, spec, raw), node.start_point[0] + 1,
+                    f"@{marker} caches the result before anything measured the cost",
+                    "profile it and fix the query or the schema first", _UNPROFILED))
     return found

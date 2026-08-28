@@ -247,3 +247,9 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     When declares_a_boundary reads the decorator's name and the function's own
     Then both declare, because a decorator is Python's spelling and most languages have none
     But the bare marker is not a prefix, or every project's own boundary decorator declares itself an edge
+
+  Scenario: called_spelling gives what a call is called, reduced to one word
+    Given a call node, its language's vocabulary, and the source bytes
+    When called_spelling takes the text naming the function, drops any type arguments, and keeps the tail after the last separator
+    Then Python's Mock, JavaScript's jest dot fn, Java's Mockito dot mock and C#'s Substitute dot For of a type all reduce to one word a table can hold
+    But it applies no list of its own, so what the word means is the caller's question and not this function's

@@ -65,6 +65,18 @@ def read_tree(text: str, language: str) -> dict:
             "root": _get_parser(language).parse(raw).root_node}
 
 
+def called_spelling(call, spec: dict, raw: bytes) -> str:
+    """What a call is called, reduced to the one word a vocabulary can hold.
+
+    Four grammars spell the same idea four ways: Python writes `Mock()`, JavaScript
+    `jest.fn()`, Java `Mockito.mock()` and C# `Substitute.For<IStore>()`. Taking the tail
+    after the last dot and dropping any type arguments leaves `Mock`, `fn`, `mock` and
+    `For`, so one list per language can name them without a branch per grammar."""
+    named = call.child_by_field_name(spec["call_fn"])
+    text = node_text(named, raw) if named is not None else (node_text(call, raw) or "")
+    return text.split("(")[0].split("<")[0].split("::")[-1].split(".")[-1].strip()
+
+
 def node_text(node: Node | None, raw: bytes) -> str:
     """The source a node covers. Absent nodes read as nothing, which is what an optional
     field yields when the grammar did not fill it."""
