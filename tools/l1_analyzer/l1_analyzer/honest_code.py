@@ -29,6 +29,7 @@ from tree_sitter import Language, Node, Parser
 
 from l1_analyzer import honest_code_contracts as contracts
 from l1_analyzer import honest_code_edges as edges
+from l1_analyzer import honest_code_markers as markers
 from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.honest_code_read import read_tree
@@ -282,7 +283,7 @@ CLAUSES: tuple[Clause, ...] = (
             nothing_to_read="", languages=BROWSER_LANGUAGES, reads=_TEXT_READER),
     _clause(8, "Typed Exceptions at the Boundary", _TREE, edges.swallowed_exceptions, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(9, "SQL Over Application Caches", _PARTLY, rules.unmeasured_caches,
+    _clause(9, "SQL Over Application Caches", _PARTLY, markers.unmeasured_caches,
             nothing_to_read="", reads=_TREE_READER),
     _clause(10, "Pure Function Assertions Over Mocks", _TREE, contracts.mock_heavy_tests,
             nothing_to_read="", reads=_TREE_READER),
@@ -295,7 +296,7 @@ CLAUSES: tuple[Clause, ...] = (
     _clause(14, "No Implicit Defaults", _TREE, rules.implicit_defaults, nothing_to_read="",
             reads=_TREE_READER),
     _clause(15, "One Gherkin Per Function", _PARTLY,
-            rules.heavy_step_definitions,
+            markers.heavy_step_definitions,
             nothing_to_read=(
                 "the rule is a bijection between functions and scenarios, and a bijection "
                 "needs the feature files as well as the source. This reader sees one file, "
@@ -303,7 +304,7 @@ CLAUSES: tuple[Clause, ...] = (
                 "and there are none here"),
             reads=_TREE_READER),
     _clause(16, "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE,
-            rules.lifecycle_hooks, nothing_to_read="", reads=_TREE_READER),
+            markers.lifecycle_hooks, nothing_to_read="", reads=_TREE_READER),
     # Reads nothing, and says so. Declaring a reader here named a capability the clause
     # never uses, and the undecided disclosure read that as a port we owe: a JavaScript
     # repository was told this clause "is unported, not silent", promising work that cannot

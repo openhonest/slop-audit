@@ -19,6 +19,7 @@ runs, not that it is reading the thing it names.
 import pytest
 from l1_analyzer import honest_code_contracts as contracts
 from l1_analyzer import honest_code_edges as edges
+from l1_analyzer import honest_code_markers as markers
 from l1_analyzer import honest_code_read as read
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.lang_spec import LANG_SPEC
@@ -1466,7 +1467,7 @@ _CALLS_THE_WORK_WHERE_IT_HAPPENS = [
 
 @pytest.mark.parametrize(("lang", "source"), _PARKS_BEHAVIOUR_IN_A_HOOK)
 def test_a_lifecycle_hook_is_found_in_every_language(lang, source):
-    found = rules.lifecycle_hooks(read.read_tree(source, lang))
+    found = markers.lifecycle_hooks(read.read_tree(source, lang))
     assert found, lang
     assert "reader does not look" in found[0]["detail"] or "nobody reads" in found[0]["detail"]
 
@@ -1474,14 +1475,14 @@ def test_a_lifecycle_hook_is_found_in_every_language(lang, source):
 @pytest.mark.parametrize(("lang", "source"), _CALLS_THE_WORK_WHERE_IT_HAPPENS)
 def test_work_called_where_it_happens_is_left_alone(lang, source):
     """A call at the place it happens is not a hook, however much work it does."""
-    assert rules.lifecycle_hooks(read.read_tree(source, lang)) == [], lang
+    assert markers.lifecycle_hooks(read.read_tree(source, lang)) == [], lang
 
 
 @pytest.mark.parametrize("registration", ["atexit.register(cleanup)",
                                          "signal.signal(signal.SIGTERM, stop)"])
 def test_each_registration_the_table_names_is_found(registration):
     """Moved from the Python-only tests when the clause was ported."""
-    assert rules.lifecycle_hooks(read.read_tree(
+    assert markers.lifecycle_hooks(read.read_tree(
         f"def setup():\n    {registration}\n", "python")), registration
 
 
@@ -1493,7 +1494,7 @@ def test_a_decorator_that_is_a_hook_names_the_function_it_decorates(source, expe
     """The name matters and it was wrong. Python makes a decorator and its function
     SIBLINGS under one wrapper, so walking up from the marker found the wrapper and never
     the function, and every decorated finding was named after the decorator's own text."""
-    found = rules.lifecycle_hooks(read.read_tree(source, "python"))
+    found = markers.lifecycle_hooks(read.read_tree(source, "python"))
     assert [f["symbol"] for f in found] == [expected], found
 
 
@@ -1503,7 +1504,7 @@ def test_a_marker_that_merely_mentions_a_hook_is_not_a_hook():
     the clause matched the unparsed decorator as text and the arguments are part of it.
 
     What a marker does is decided by what it is, not by what it carries."""
-    assert rules.lifecycle_hooks(read.read_tree(
+    assert markers.lifecycle_hooks(read.read_tree(
         "@pytest.mark.parametrize('registration', ['atexit.register(cleanup)'])\n"
         "def test_it(registration):\n    assert registration\n", "python")) == []
 
@@ -1511,14 +1512,14 @@ def test_a_marker_that_merely_mentions_a_hook_is_not_a_hook():
 def test_a_string_naming_a_registration_is_not_a_registration():
     """What a marker DOES is decided by what it is, not by text that looks like it. A test
     whose data is the words "atexit.register(cleanup)" registers nothing."""
-    assert rules.lifecycle_hooks(read.read_tree(
+    assert markers.lifecycle_hooks(read.read_tree(
         'CASES = ["atexit.register(cleanup)"]\n', "python")) == []
 
 
 @pytest.mark.parametrize("lang", ["go", "c"])
 def test_a_language_with_no_hook_vocabulary_says_nothing_was_decided(lang):
     sources = {"go": "func run() { load() }\n", "c": "void run(void) { load(); }\n"}
-    assert rules.lifecycle_hooks(read.read_tree(sources[lang], lang)) is None, lang
+    assert markers.lifecycle_hooks(read.read_tree(sources[lang], lang)) is None, lang
 
 
 # ---------------------------------------------------------------------------
@@ -1558,7 +1559,7 @@ _PULLS_IN_SOMETHING_ELSE = [
 
 @pytest.mark.parametrize(("lang", "source"), _PULLS_IN_A_CACHE)
 def test_a_cache_dependency_is_found_in_every_language(lang, source):
-    found = rules.unmeasured_caches(read.read_tree(source, lang))
+    found = markers.unmeasured_caches(read.read_tree(source, lang))
     assert found, lang
     assert "second source of truth" in found[0]["detail"]
     assert found[0]["withheld_by"] == "" and found[0]["undecided"]
@@ -1566,7 +1567,7 @@ def test_a_cache_dependency_is_found_in_every_language(lang, source):
 
 @pytest.mark.parametrize(("lang", "source"), _PULLS_IN_SOMETHING_ELSE)
 def test_an_ordinary_dependency_is_left_alone(lang, source):
-    assert rules.unmeasured_caches(read.read_tree(source, lang)) == [], lang
+    assert markers.unmeasured_caches(read.read_tree(source, lang)) == [], lang
 
 
 @pytest.mark.parametrize(("lang", "source", "expected"), [
@@ -1576,7 +1577,7 @@ def test_an_ordinary_dependency_is_left_alone(lang, source):
      "price"),
 ])
 def test_a_memoising_marker_is_found_and_names_what_it_caches(lang, source, expected):
-    found = rules.unmeasured_caches(read.read_tree(source, lang))
+    found = markers.unmeasured_caches(read.read_tree(source, lang))
     assert [f["symbol"] for f in found] == [expected], found
     assert "before anything measured the cost" in found[0]["detail"]
 
@@ -1585,8 +1586,8 @@ def test_the_half_it_cannot_decide_is_stated_on_every_finding():
     """Partly decided, and saying so is the whole difference between this and a verdict.
     Whether the query was profiled first is in no file, so a finding that did not say so
     would claim the whole rule had been checked."""
-    for found in (rules.unmeasured_caches(read.read_tree("import redis\n", "python")),
-                  rules.unmeasured_caches(read.read_tree(
+    for found in (markers.unmeasured_caches(read.read_tree("import redis\n", "python")),
+                  markers.unmeasured_caches(read.read_tree(
                       "@lru_cache\ndef p(s):\n    return q(s)\n", "python"))):
         assert "profiled" in found[0]["undecided"], found
 
@@ -1876,7 +1877,7 @@ end
 
 @pytest.mark.parametrize(("lang", "source"), _A_LONG_STEP)
 def test_a_step_carrying_its_own_setup_is_found_in_every_language(lang, source):
-    found = rules.heavy_step_definitions(read.read_tree(source, lang))
+    found = markers.heavy_step_definitions(read.read_tree(source, lang))
     assert found, lang
     assert "readout on the code under test" in found[0]["detail"]
 
@@ -1884,7 +1885,7 @@ def test_a_step_carrying_its_own_setup_is_found_in_every_language(lang, source):
 @pytest.mark.parametrize(("lang", "source"), _A_SHORT_STEP)
 def test_a_step_that_calls_and_checks_is_left_alone(lang, source):
     """What the rule asks for. A step of one or two lines is the shape it wants."""
-    assert rules.heavy_step_definitions(read.read_tree(source, lang)) == [], lang
+    assert markers.heavy_step_definitions(read.read_tree(source, lang)) == [], lang
 
 
 @pytest.mark.parametrize(("lang", "source"), [
@@ -1896,7 +1897,7 @@ def test_a_step_that_calls_and_checks_is_left_alone(lang, source):
 def test_a_file_holding_no_steps_at_all_is_not_decided(lang, source):
     """Not an empty list. A file with no step definitions was not measured against a rule
     about step definitions, and saying it passed would be a claim nobody made."""
-    assert rules.heavy_step_definitions(read.read_tree(source, lang)) is None, lang
+    assert markers.heavy_step_definitions(read.read_tree(source, lang)) is None, lang
 
 
 @pytest.mark.parametrize(("lang", "source"), [
@@ -1905,4 +1906,4 @@ def test_a_file_holding_no_steps_at_all_is_not_decided(lang, source):
     ("c", "int run(void) { return 1; }\n"),
 ])
 def test_a_language_with_no_step_vocabulary_says_nothing_was_decided(lang, source):
-    assert rules.heavy_step_definitions(read.read_tree(source, lang)) is None, lang
+    assert markers.heavy_step_definitions(read.read_tree(source, lang)) is None, lang

@@ -19,8 +19,8 @@ said, rather than a verdict of not-applicable that reads as nothing to answer fo
 
 import pytest
 from l1_analyzer import honest_code
+from l1_analyzer import honest_code_markers as markers
 from l1_analyzer import honest_code_read as read
-from l1_analyzer import honest_code_rules as rules
 
 _STEPS = ('from pytest_bdd import given\n\n\n'
           '@given("a thing")\ndef a_thing():\n' + "    x = 1\n" * 40 + "    return x\n")
@@ -33,7 +33,7 @@ def _assess(source: str) -> dict:
 
 def test_a_long_step_is_still_reported():
     """The half it can read, unchanged by the port to the shared node vocabulary."""
-    found = rules.heavy_step_definitions(read.read_tree(_STEPS, "python"))
+    found = markers.heavy_step_definitions(read.read_tree(_STEPS, "python"))
     assert [f["symbol"] for f in found] == ["a_thing"], found
 
 

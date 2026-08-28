@@ -118,6 +118,12 @@ class LangSpec(TypedDict, total=False):
     # here does, so its tests carry a production file's name and were handed to every
     # production clause. Matched as text against the node holding the module.
     test_module_markers: tuple[str, ...]
+    # Whether this language's step runner calls a step and throws away what it returns.
+    # pytest-bdd does, so a step written `async def` hands back a coroutine nobody runs and
+    # the step body never executes. Other runners wait for it, and reporting an async step
+    # there would ask an author to break working tests.
+    steps_discard_the_result: bool
+    async_markers: tuple[str, ...]       # the node that makes a declaration asynchronous
     step_calls: frozenset[str]           # calls that take the step body as an argument
     dependency_calls: frozenset[str]     # calls that do the same job, which is Ruby's require
     cache_names: frozenset[str]          # cache libraries, matched as a word in the import
@@ -379,6 +385,8 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "steps_discard_the_result": True,
+        "async_markers": ("async",),
         "test_module_markers": (),
         "step_markers": frozenset({"given", "when", "then", "step"}),
         "step_calls": frozenset(),
@@ -562,6 +570,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "steps_discard_the_result": False,
+        "async_markers": ("async",),
         "test_module_markers": (),
         # A step has no declaration to mark: it IS the call.
         "step_markers": frozenset(),
@@ -692,6 +702,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "steps_discard_the_result": False,
+        "async_markers": ("async",),
         "test_module_markers": (),
         "step_markers": frozenset({"Given", "When", "Then", "And", "But"}),
         "step_calls": frozenset(),
@@ -813,6 +825,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "steps_discard_the_result": False,
+        "async_markers": ("async",),
         "test_module_markers": (),
         "step_markers": frozenset({"Given", "When", "Then", "And", "But"}),
         "step_calls": frozenset(),
@@ -951,6 +965,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "steps_discard_the_result": False,
+        "async_markers": ("async",),
         "test_module_markers": ("cfg(test)",),
         "step_markers": frozenset(),
         "step_calls": frozenset(),
@@ -1084,6 +1100,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "steps_discard_the_result": False,
+        "async_markers": ("async",),
         "test_module_markers": (),
         "step_markers": frozenset(),
         "step_calls": frozenset({"Given", "When", "Then", "And", "But"}),
@@ -1218,6 +1236,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "steps_discard_the_result": False,
+        "async_markers": ("async",),
         "test_module_markers": (),
         "step_markers": frozenset(),
         "step_calls": frozenset(),
@@ -1350,6 +1370,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "steps_discard_the_result": False,
+        "async_markers": ("async",),
         "test_module_markers": (),
         "step_markers": frozenset(),
         "step_calls": frozenset(),
