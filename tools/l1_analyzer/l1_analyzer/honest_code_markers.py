@@ -259,9 +259,13 @@ def heavy_step_definitions(source: dict) -> list[Finding] | None:
     steps = _step_definitions(source)
     if not steps:
         return None
+    # Only a file bound to its scenarios can hold a step the runner throws away. The length
+    # finding needs no binding: a long step is a long step, and asking for one there would
+    # silence a finding that was always right.
+    bound = _binds_scenarios(source["root"], spec, source["raw"])
     found: list[Finding] = []
     for name, node in steps:
-        if _never_runs(node, spec):
+        if bound and _never_runs(node, spec):
             found.append(_finding(
                 "L1.21.15", name, node.start_point[0] + 1,
                 "this step never runs: the runner calls it and throws away what it returns, "
@@ -278,6 +282,28 @@ def heavy_step_definitions(source: dict) -> list[Finding] | None:
                 "make the function under test pure, so the step is call it and check the "
                 "result", ""))
     return found
+
+
+def _binds_scenarios(root, spec: dict, raw: bytes) -> bool:
+    """Whether this file binds itself to the scenarios its steps serve.
+
+    A pytest-bdd step file says `scenarios(...)` or carries `@scenario`. A file that binds
+    none is not a step file whatever its decorators say, and that matters because `given`
+    belongs to two libraries: a property-based testing library spells its decorator the same
+    way and awaits what it calls, so an async function under THAT one runs perfectly well.
+
+    An adopter reported the false positive and found, writing it up, that their own gate
+    avoided it only by looking in one directory. A directory name is a convention; a binding
+    is the thing itself."""
+    if not spec["step_binding_calls"]:
+        return False
+    for node in walk(root):
+        if node.type in spec["call_types"] and called_spelling(node, spec, raw) in spec["step_binding_calls"]:
+            return True
+        if node.type in spec["hook_marker_types"] and any(
+                name in spec["step_binding_calls"] for name in _marker_names(node, raw)):
+            return True
+    return False
 
 
 def _never_runs(step, spec: dict) -> bool:

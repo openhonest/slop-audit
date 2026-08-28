@@ -131,6 +131,11 @@ class LangSpec(TypedDict, total=False):
     # the step body never executes. Other runners wait for it, and reporting an async step
     # there would ask an author to break working tests.
     steps_discard_the_result: bool
+    # What binds a file to the scenarios its steps serve. `given` belongs to two libraries:
+    # a property-based testing library spells its decorator the same way and awaits what it
+    # calls, so an async function under it runs perfectly well. A file that binds no scenario
+    # is not a step file whatever its decorators say.
+    step_binding_calls: frozenset[str]
     async_markers: tuple[str, ...]       # the node that makes a declaration asynchronous
     step_calls: frozenset[str]           # calls that take the step body as an argument
     dependency_calls: frozenset[str]     # calls that do the same job, which is Ruby's require
@@ -393,6 +398,7 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "step_binding_calls": frozenset({"scenarios", "scenario"}),
         "bound_literal_types": ("integer", "float", "string"),
         "declared_bound_types": ("type",),
         "steps_discard_the_result": True,
@@ -580,6 +586,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "step_binding_calls": frozenset(),
         "bound_literal_types": ("number", "string"),
         # No declared bound in this grammar.
         "declared_bound_types": (),
@@ -715,6 +722,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "step_binding_calls": frozenset(),
         "bound_literal_types": ("decimal_integer_literal", "decimal_floating_point_literal", "string_literal"),
         "declared_bound_types": ("annotation", "marker_annotation"),
         "steps_discard_the_result": False,
@@ -840,6 +848,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "step_binding_calls": frozenset(),
         "bound_literal_types": ("integer_literal", "real_literal", "string_literal"),
         "declared_bound_types": ("attribute",),
         "steps_discard_the_result": False,
@@ -982,6 +991,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "step_binding_calls": frozenset(),
         "bound_literal_types": (),
         "declared_bound_types": (),
         "steps_discard_the_result": False,
@@ -1119,6 +1129,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "step_binding_calls": frozenset(),
         "bound_literal_types": (),
         "declared_bound_types": (),
         "steps_discard_the_result": False,
@@ -1257,6 +1268,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "step_binding_calls": frozenset(),
         "bound_literal_types": (),
         "declared_bound_types": (),
         "steps_discard_the_result": False,
@@ -1393,6 +1405,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "step_binding_calls": frozenset(),
         "bound_literal_types": (),
         "declared_bound_types": (),
         "steps_discard_the_result": False,

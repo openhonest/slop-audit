@@ -44,7 +44,9 @@ def test_two_different_steps_are_two_findings():
 
 def test_a_step_that_never_runs_is_also_reported_once():
     """The other finding this clause makes, on a function carrying two decorators."""
-    found = _found('@when("a")\n@when("b")\nasync def when_it(ctx):\n    await go(ctx)\n')
+    found = _found('from pytest_bdd import scenarios, when\n\n'
+                   'scenarios("f.feature")\n\n\n'
+                   '@when("a")\n@when("b")\nasync def when_it(ctx):\n    await go(ctx)\n')
     assert len(found) == 1, found
     assert "never runs" in found[0]["detail"]
 

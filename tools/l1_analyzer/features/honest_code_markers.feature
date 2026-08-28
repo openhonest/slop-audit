@@ -82,3 +82,11 @@ Feature: Three clauses that read what is attached to a declaration
     And it looks at siblings because Python wraps a decorator and its function together and makes them siblings, where walking up alone finds the wrapper and never the function
     And it walks upward as well because Java and C# nest the marker inside the declaration, where that is the only thing that works
     But it returns nothing where no declaration holds the marker, rather than naming something that is not one
+
+  Scenario: _binds_scenarios says whether a file is bound to the scenarios its steps serve
+    Given a parsed source, its language's vocabulary, and the source bytes
+    When _binds_scenarios looks for the call or the marker that binds a file to a feature
+    Then it answers yes for either spelling, since both bind and a rule knowing one would go quiet on half of them
+    And this is what tells a step file from a file that merely carries a decorator of the same name, because a property-based testing library spells its decorator the same way and awaits what it calls
+    And an adopter reported that false positive and found, writing it up, that their own gate avoided it only by looking in one directory
+    But a directory name is a convention where a binding is the thing itself, which is why this reads the binding

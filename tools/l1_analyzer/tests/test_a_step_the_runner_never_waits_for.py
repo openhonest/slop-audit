@@ -25,7 +25,9 @@ from l1_analyzer import honest_code_markers as markers
 from l1_analyzer import honest_code_read as read
 from l1_analyzer.lang_spec import LANG_SPEC
 
-_ASYNC_STEP = '''from pytest_bdd import when
+_ASYNC_STEP = '''from pytest_bdd import scenarios, when
+
+scenarios("../features/replicate.feature")
 
 
 @when("replicate runs one pass")
@@ -71,11 +73,19 @@ def test_an_async_function_that_is_not_a_step_is_left_alone():
     assert _found("async def fetch(url):\n    return await get(url)\n") == []
 
 
+def test_an_async_step_in_a_file_that_binds_no_scenario_is_left_alone():
+    """The narrowing the false positive forced. Without a binding this is not a step file,
+    and the decorator alone cannot say which library wrote it."""
+    assert _found('@when("a store")\nasync def _when(ctx):\n    await go(ctx)\n') == []
+
+
 def test_a_long_async_step_is_reported_once_for_the_thing_that_matters():
     """Length stops mattering when the body never runs. Two findings on one site would
     send a reader to shorten a step that does nothing."""
     body = "\n".join(f"    step_{i}()" for i in range(35))
-    found = _found('@when("a store")\nasync def _when(ctx):\n' + body + "\n")
+    found = _found('from pytest_bdd import scenarios, when\n\n'
+                   'scenarios("f.feature")\n\n\n'
+                   '@when("a store")\nasync def _when(ctx):\n' + body + "\n")
     assert len(found) == 1, found
     assert "never runs" in found[0]["detail"]
 
@@ -88,3 +98,84 @@ def test_a_language_whose_runner_waits_is_not_reported(lang):
 
 def test_python_is_the_one_that_discards_it():
     assert LANG_SPEC["python"]["steps_discard_the_result"] is True
+
+
+# ---------------------------------------------------------------------------
+# `given` belongs to two libraries
+#
+# Reported by the peer who reported the original shape, against the build carrying it. Their
+# test carried `@given(column=..., template=...)`, which is Hypothesis's decorator, not
+# pytest-bdd's. Hypothesis awaits the function. They proved it by planting a raise as the
+# first line and watching the test fail.
+#
+# Their own gate has no false positive here, and they found out why while writing this up:
+# it only ever looked in the directory holding their step definitions. The rule as they
+# described it is wrong and the rule as they ran it was right by accident.
+#
+# A pytest-bdd step file binds its scenarios, with `scenarios(...)` or `@scenario`. A file
+# that binds none is not a step file whatever its decorators say, and that is nearer to what
+# the clause means than a directory name is: the finding is about a step, and a file with no
+# scenarios has no steps in it.
+#
+# `when` and `then` collide with nothing anyone has seen. It is `given` alone, which is bad
+# luck, because Given is the commonest step to write asynchronously.
+# ---------------------------------------------------------------------------
+
+_HYPOTHESIS = '''from hypothesis import given
+
+from tests.strategies import columns
+
+
+@given(column=columns())
+async def test_the_schema_converges(column):
+    assert column
+'''
+
+_A_REAL_STEP_FILE = '''from pytest_bdd import given, scenarios
+
+scenarios("../features/replicate.feature")
+
+
+@given("a database")
+async def _given_database(ctx):
+    ctx["db"] = await connect()
+'''
+
+_BOUND_ONE_AT_A_TIME = '''from pytest_bdd import given, scenario
+
+
+@scenario("../features/replicate.feature", "it replicates")
+def test_it_replicates():
+    pass
+
+
+@given("a database")
+async def _given_database(ctx):
+    ctx["db"] = await connect()
+'''
+
+
+def test_a_hypothesis_test_is_not_a_step():
+    """The reported false positive. Hypothesis awaits what it calls."""
+    assert _found(_HYPOTHESIS) == []
+
+
+def test_a_file_that_binds_scenarios_is_still_read():
+    found = _found(_A_REAL_STEP_FILE)
+    assert [f["symbol"] for f in found] == ["_given_database"], found
+
+
+def test_a_file_binding_one_scenario_at_a_time_is_read_too():
+    """Both spellings bind a file to its feature, and a rule knowing only one would go
+    quiet on half of them."""
+    found = _found(_BOUND_ONE_AT_A_TIME)
+    assert [f["symbol"] for f in found] == ["_given_database"], found
+
+
+def test_the_length_finding_does_not_need_the_binding():
+    """Only the never-runs arm turns on whether this is a step file. A long step is a long
+    step, and asking for a binding there would silence a finding that was always right."""
+    body = "\n".join(f"    step_{i}()" for i in range(35))
+    found = _found(f'@then("a")\ndef then_it(ctx):\n{body}\n')
+    assert len(found) == 1, found
+    assert "lines of setup" in found[0]["detail"]
