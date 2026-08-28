@@ -97,14 +97,28 @@ def test_a_private_key_header_mentioned_in_prose_is_not_a_secret():
     assert r["value"] == 0
 
 
+# The one copy of each shape this scanner is meant to catch. Every test that needs a
+# credential-shaped string takes it from here rather than writing its own: a second copy is
+# a second finding on this repository's own secret count, and this file plus one other were
+# carrying six between them for three distinct shapes.
+CONNECTION_STRING = 'DB = "postgresql://svc:8Kd2Nq7Rt4Vw9Xz1@db.internal:5432/app"\n'
+CREDENTIAL_NAME = 'API_SECRET = "9Xq4Zt7Lm2Rv8Kd3Nb6Hs1Jw5Yc0Pf"\n'
+VENDOR_KEY = 'TOKEN = "sk_live_9Zx8Wq7Vt6Ru5"\n'
+
+
 def test_flags_a_password_inside_a_database_connection_string():
-    r = _scan({"settings.py": 'DB = "postgresql://svc:8Kd2Nq7Rt4Vw9Xz1@db.internal:5432/app"\n'})
+    r = _scan({"settings.py": CONNECTION_STRING})
     assert _rules(r) == {"connection-string-password"}
 
 
 def test_flags_a_high_entropy_value_assigned_to_a_credential_shaped_name():
-    r = _scan({"conf.py": 'API_SECRET = "9Xq4Zt7Lm2Rv8Kd3Nb6Hs1Jw5Yc0Pf"\n'})
+    r = _scan({"conf.py": CREDENTIAL_NAME})
     assert _rules(r) == {"generic-credential"}
+
+
+def test_flags_a_vendor_key_by_its_prefix():
+    r = _scan({"conf.py": VENDOR_KEY})
+    assert _rules(r), "a live-key prefix is the shape this scanner exists to catch"
 
 
 # --- the cases a naive scanner gets wrong: these must NOT be flagged ----------------

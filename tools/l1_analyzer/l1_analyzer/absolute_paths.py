@@ -59,11 +59,23 @@ _CODE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".cpp", ".hpp", ".js", ".jsx",
 _CAP = 50
 
 
+# A path written with its middle cut out. `/Users/.../tools/x/y.py` names no machine: the
+# elision is where the user name would be, and that is the part a hardcoded path leaks.
+# Nothing can open it either, so it breaks on no checkout.
+#
+# This is NOT an exemption for prose. A comment carrying a REAL home path is still a finding,
+# and the note above says why: it leaks the author's user name into a committed artifact
+# whether or not the program reads the line. Only the elision is excused, and only because
+# somebody removed the machine from it by hand.
+_ELIDED = re.compile(r"/\.{3,}/|\\\.{3,}\\")
+
+
 def _matches(text: str) -> list[tuple[int, str]]:
     """(1-based line, matched path) for every machine-specific absolute path in a file."""
     out: list[tuple[int, str]] = []
     for lineno, line in enumerate(text.splitlines(), start=1):
-        out.extend((lineno, m.group(0)) for m in _ABSOLUTE.finditer(line))
+        out.extend((lineno, m.group(0)) for m in _ABSOLUTE.finditer(line)
+                   if not _ELIDED.search(m.group(0)))
     return out
 
 

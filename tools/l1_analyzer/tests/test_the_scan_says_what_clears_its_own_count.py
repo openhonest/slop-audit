@@ -17,6 +17,11 @@ a fixture belonging to the scanner itself, and the band is Slop, correctly.
 from pathlib import Path
 
 from l1_analyzer import secret_scan
+from tests.test_secret_scan import (
+    CONNECTION_STRING,
+    CREDENTIAL_NAME,
+    VENDOR_KEY,
+)
 
 
 def _text(tmp_path: Path) -> str:
@@ -25,10 +30,10 @@ def _text(tmp_path: Path) -> str:
 
 def _repo_with(tmp_path: Path, where: str) -> Path:
     (tmp_path / where).parent.mkdir(parents=True, exist_ok=True)
-    (tmp_path / where).write_text(
-        'DATABASE_URL = "postgres://app:8Kd2Lm9Qp1Xz@db:5432/app"\n'
-        'API_KEY = "9Xq4Lm2Vn8Zc1Bd7Rt5Yw3Hs6Jf0Kg"\n'
-        'TOKEN = "sk_live_9Zx8Wq7Vt6Ru5"\n')
+    # Taken from the scanner's own test file rather than written again here. A second copy
+    # of a credential-shaped string is a second finding on this repository's own secret
+    # count, and these three were being counted twice for that reason alone.
+    (tmp_path / where).write_text(CONNECTION_STRING + CREDENTIAL_NAME + VENDOR_KEY)
     return tmp_path
 
 
