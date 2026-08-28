@@ -32,7 +32,7 @@ from l1_analyzer.pytest_trace import (
     _first_line,
     _na,
     _run_untrusted,
-    coverage_band,
+    coverage_verdict,
     determinism_tally,
 )
 
@@ -61,37 +61,21 @@ def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, sdk: st
     `branches` is the report's (covered, valid) pair, or None when the run wrote no
     coverage.cobertura.xml at all. Absence is a case here rather than a pair of zeroes because
     the two say different things: no report means the collector is not referenced by the test
-    project, while a report with `branches-valid="0"` means the collector ran and found nothing
-    with a branch in it. Both are n/a, and each names its own remedy.
+    project, while `branches-valid="0"` means the collector ran and found nothing with a
+    branch in it. Both are n/a, and each names its own remedy.
 
-    Extracted because it could not be reached otherwise. The old tests replaced `_dotnet` and
-    `_run_untrusted` with a fake that both answered `dotnet --version` and wrote the report the
-    module read back, so this table was proved against the test's own XML and `dotnet test`
-    could have been invoked with any flags at all.
-    """
-    if returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
-    # coverlet.collector writes a Cobertura file for every project that built and ran, even
-    # when some tests failed. No file means the collector was not wired in (or nothing ran):
-    # n/a with the reason, never a 0.0 that reads as real-but-terrible coverage.
-    if branches is None:
-        return _na("C# branch coverage needs coverlet.collector in the test project "
-                   "(coverage.cobertura.xml not produced)")
-    covered, valid = branches
-    # branches-valid == 0 means nothing had a branch to cover, NOT that coverage is 0. It
-    # usually means the code under test sits in the test assembly, which coverlet excludes by
-    # default. n/a with the remedy, never a 0.0 that reads as real-but-terrible coverage.
-    if valid == 0:
-        return _na("no branches instrumented; the code under test may be in the test assembly "
-                   "(coverlet excludes it) - put it in a separate project the tests reference")
-    pct = covered / valid * 100
-    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": coverage_band(pct),
-        "details": f"{covered}/{valid} branches exercised by tests from `dotnet test --collect "
-                   f"\"XPlat Code Coverage\"` ({suite}; ran under {sdk})",
-    }
+    The decision itself lives in pytest_trace, written once for every language whose tool
+    hands back a covered-and-total pair. What stays here is C#'s arithmetic, coverlet counts
+    covered and VALID where valid is already the total, and C#'s sentences."""
+    covered, total = (None, None) if branches is None else branches
+    return coverage_verdict(
+        covered=covered, total=total, returncode=returncode,
+        no_report="C# branch coverage needs coverlet.collector in the test project "
+                  "(coverage.cobertura.xml not produced)",
+        nothing_to_cover="no branches instrumented; the code under test may be in the test "
+                         "assembly (coverlet excludes it) - put it in a separate project the "
+                         "tests reference",
+        how='from `dotnet test --collect "XPlat Code Coverage"`', toolchain=sdk)
 
 
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:

@@ -133,3 +133,13 @@ Feature: pytest_trace — running a Python repository's own test suite to measur
     Then it returns a sentence saying the collision is ours rather than a reading of their tests
     And ordinary output returns the empty string, because a rule that saw a collision everywhere would excuse every real zero
     But it says usually rather than certainly, since a suite that genuinely covered nothing prints the same words and this reader cannot tell the two apart
+
+  Scenario: coverage_verdict gives the share of decisions the tests reached, or why not
+    Given a covered count, a total, how the run ended, and the sentences for each way it can fail
+    When coverage_verdict asks whether the suite timed out, whether the tool wrote a report, and whether anything had a branch in it
+    Then it returns the share and its band where all three are answered
+    And it was written seven times, once per language runner, and reading those seven together is what showed them to be one function asking the same four questions in the same order
+    And an absent report and a report of nothing are separate answers, since one means the tool is not in the build and the other means it ran and found nothing, and they send a reader to different repairs
+    And a failing suite still reports its coverage and says the suite failed, because the number is true either way and coverage from a red suite is not the same evidence
+    And every sentence is the caller's, because only the caller knows which tool it ran and what a reader should do about it
+    But nothing here is defaulted, so a runner that forgets to name its tool is refused rather than handed a sentence nobody can act on

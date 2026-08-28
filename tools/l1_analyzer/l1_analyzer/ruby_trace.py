@@ -35,7 +35,7 @@ from l1_analyzer.pytest_trace import (
     _first_line,
     _na,
     _run_untrusted,
-    coverage_band,
+    coverage_verdict,
     determinism_band,
     resolve_via_shim,
 )
@@ -142,31 +142,23 @@ def _branch_totals(resultset: dict) -> tuple[int, int]:
 
 
 def _coverage_verdict(covered: int, total: int, returncode: int, version: str) -> L1Result:
-    """L1.19 from a finished run and SimpleCov's branch counts. No I/O, so it can be asserted.
+    """L1.19 from a finished run and what SimpleCov's branch data carried. No I/O, so it can
+    be asserted as a value.
 
-    Extracted because it could not be reached otherwise. `decision_space_coverage` pins the
-    interpreter, runs the suite, reads the resultset and decides the band inside one function,
-    so the band table below was only ever provable through a fake that wrote the very resultset
-    the module then read back.
+    The decision lives in pytest_trace, written once for every language whose tool hands back
+    a covered-and-total pair. What stays here is Ruby's sentence, which names the one line a
+    reader has to add to their spec_helper to get branch data at all.
 
-    The timeout is decided first, and the order carries meaning. A killed run leaves the same
-    zero counts a suite with no branch data leaves, and the remedy the zero case prints tells
-    the reader to enable branch coverage in a helper that may already enable it. A timeout must
-    say it ran out of time, never prescribe a change the suite already made.
-    """
-    if returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
-    if total == 0:
-        return _na("SimpleCov produced no branch data; enable branch coverage in the suite's spec_helper "
-                   f"(SimpleCov.start {{ enable_coverage :branch }}) under {version}")
-    pct = covered / total * 100
-    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": coverage_band(pct),
-        "details": f"{covered}/{total} SimpleCov branches exercised by tests "
-                   f"({suite}; ran under {version})",
-    }
+    Ruby has no separate no-report case: SimpleCov is asked for branch coverage or it is not,
+    and a run with the setting off comes back as a total of zero rather than as a missing
+    file. So the two sentences say the same thing here, and that is a fact about SimpleCov
+    rather than a shortcut."""
+    missing = ("SimpleCov produced no branch data; enable branch coverage in the suite's "
+               "spec_helper (SimpleCov.start { enable_coverage :branch }) under " + version)
+    return coverage_verdict(
+        covered=covered, total=total, returncode=returncode,
+        no_report=missing, nothing_to_cover=missing,
+        how="SimpleCov branches", toolchain=version)
 
 
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:

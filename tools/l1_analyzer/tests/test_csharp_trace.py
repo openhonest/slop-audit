@@ -33,7 +33,7 @@ def test_ran_tests_detects_execution():
 def test_a_completed_run_yields_the_covered_share_and_its_band():
     r = csharp_trace._coverage_verdict((38, 40), 0, "dotnet 8.0.401")
     assert r["value"] == 95.0 and r["band"] == "Healthy"
-    assert "38/40 branches" in r["details"]
+    assert "38/40 decision branches" in r["details"]
     assert "suite passed" in r["details"] and "dotnet 8.0.401" in r["details"]
 
 

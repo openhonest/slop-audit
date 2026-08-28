@@ -277,6 +277,45 @@ def _collection_was_empty(output: str) -> str:
             "That is our failure and not a reading of your tests")
 
 
+def coverage_verdict(*, covered: int | None, total: int | None, returncode: int,
+                     no_report: str, nothing_to_cover: str, how: str,
+                     toolchain: str) -> L1Result:
+    """L1.19 from a finished run: the share of decisions the tests reached, or why not.
+
+    One function for every language. It was written seven times, once per runner, and reading
+    those seven together is what showed them to be the same: each asks the same four questions
+    in the same order. Did the suite time out. Did the coverage tool write a report at all.
+    Did it find anything with a branch in it. What share was covered, and what band is that.
+
+    What differed was the words and one piece of arithmetic. Java's tool reports covered and
+    MISSED, so the total is their sum, while C#'s reports covered and VALID, where valid is
+    already the total. So the caller does its own extraction and hands over a pair that
+    already means the same thing everywhere.
+
+    Absence and zero are separate cases and have to stay separate: `covered=None` means the
+    tool wrote no report, which is a build that does not include it, and `total=0` means it
+    ran and found nothing with a branch in it. They send a reader to different repairs.
+
+    A failing suite still reports its coverage, and says the suite failed. The number is true
+    either way, and coverage from a red suite is not the same evidence as coverage from a
+    green one.
+
+    Every sentence is the caller's, because only the caller knows which tool it ran and what
+    a reader should do about it. Nothing here is defaulted: a runner that forgets to name its
+    tool is refused rather than handed a generic sentence nobody can act on."""
+    if returncode == 124:
+        return _na("test suite timed out before coverage could be measured")
+    if covered is None or total is None:
+        return _na(no_report)
+    if total == 0:
+        return _na(nothing_to_cover)
+    share = covered / total * 100
+    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
+    return {"value": round(share, 1), "band": coverage_band(share),
+            "details": f"{covered}/{total} decision branches exercised by tests "
+                       f"({how}; {suite}; ran under {toolchain})"}
+
+
 def _first_line(text: str) -> str:
     for line in (text or "").splitlines():
         if line.strip():

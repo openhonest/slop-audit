@@ -143,7 +143,7 @@ def test_l20_na_when_no_runner_detected(tmp_path):
 def test_a_finished_run_yields_the_covered_share():
     r = ruby_trace._coverage_verdict(38, 40, 0, "ruby 3.3.0")
     assert r["value"] == 95.0 and r["band"] == "Healthy"
-    assert "38/40 SimpleCov branches exercised by tests" in r["details"]
+    assert "38/40 decision branches exercised by tests" in r["details"]
     assert "suite passed" in r["details"] and "ruby 3.3.0" in r["details"]
 
 

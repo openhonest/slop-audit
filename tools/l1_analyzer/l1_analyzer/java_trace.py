@@ -42,7 +42,7 @@ from l1_analyzer.pytest_trace import (
     _first_line,
     _na,
     _run_untrusted,
-    coverage_band,
+    coverage_verdict,
     determinism_tally,
     resolve_via_shim,
 )
@@ -124,32 +124,17 @@ def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, jdk: st
     things: no report means the plugin is not in the build, while a report of (0, 0) means the
     plugin ran and found nothing to cover. Both are n/a, and each names its own reason.
 
-    Extracted because it could not be reached otherwise. `decision_space_coverage` probes the
-    JDK, runs Maven, locates the report, parses it and decided the band inside one function,
-    so this table was only ever provable through a replaced `_run_untrusted` - a fake that
-    ignored its arguments, and so would have passed had the harness invoked Maven with the
-    wrong goals in the wrong directory.
-    """
-    if returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
-    # JaCoCo writes jacoco.xml only when the plugin is wired into the build and the suite
-    # built and ran. No report means the coverage tool is not configured, not that coverage
-    # is 0: n/a with the reason, never a 0.0 that reads as real-but-terrible coverage (a
-    # silent failure is a lie).
-    if branches is None:
-        return _na("Java branch coverage needs the JaCoCo plugin in the build (jacoco.xml not produced)")
-    covered, missed = branches
-    total = covered + missed
-    if total == 0:
-        return _na("no enumerable decision branches found (JaCoCo reported zero BRANCH counters)")
-    pct = covered / total * 100
-    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": coverage_band(pct),
-        "details": f"{covered}/{total} decision branches exercised by tests "
-                   f"(JaCoCo BRANCH counters; {suite}; ran under {jdk})",
-    }
+    The decision itself lives in pytest_trace, written once for every language whose tool
+    hands back a covered-and-total pair. What stays here is Java's arithmetic, JaCoCo counts
+    covered and MISSED so the total is their sum, and Java's sentences."""
+    covered, total = (None, None) if branches is None else (branches[0], sum(branches))
+    return coverage_verdict(
+        covered=covered, total=total, returncode=returncode,
+        no_report="Java branch coverage needs the JaCoCo plugin in the build "
+                  "(jacoco.xml not produced)",
+        nothing_to_cover="no enumerable decision branches found "
+                         "(JaCoCo reported zero BRANCH counters)",
+        how="JaCoCo BRANCH counters", toolchain=jdk)
 
 
 class JavaTools(TypedDict):
