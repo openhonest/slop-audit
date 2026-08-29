@@ -38,6 +38,13 @@ repos:
         pass_filenames: false
         files: ^tools/l1_analyzer/(l1_analyzer/.*\.py|features/.*\.feature)$
 
+      - id: type-check
+        name: mypy (the annotations are checked rather than believed)
+        entry: uv run --project tools/l1_analyzer python scripts/type_check_ratchet.py
+        language: system
+        pass_filenames: false
+        files: \.py$
+
       - id: slop-audit-self
         name: slop audit (dogfood - god-files + finite-testability + type-escape and Honest Code ratchets)
         # --max-type-escapes is the Any / # type: ignore baseline: a new escape fails

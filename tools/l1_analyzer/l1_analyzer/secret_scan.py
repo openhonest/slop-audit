@@ -205,6 +205,10 @@ class Finding(TypedDict):
     line: int
     excerpt: str
     in_tests: bool
+    # Written at every site and read back to split the count, and it was not declared here.
+    # A type checker had never run over this package, so the record and the code that fills
+    # it had disagreed since the day docs were split out of the test count.
+    in_docs: bool
     occurrences: int
 
 

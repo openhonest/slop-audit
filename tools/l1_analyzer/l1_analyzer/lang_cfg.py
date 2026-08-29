@@ -70,7 +70,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "extensions": (".py",),
         "function_types": ("function_definition",),
         "member_access": "attribute",
-        "this_ident": {"self"},
+        "this_ident": frozenset({"self"}),
         "module_level_assign": ("assignment", "augmented_assignment"),
         "type_escape_patterns": ("Any",),  # typing.Any; plus comments # type: ignore
         "type_escape_nonpositions": ("import_statement", "import_from_statement"),
@@ -104,7 +104,7 @@ LANG_CFG: dict[str, LangCfg] = {
         # is a `field_expression` reading "self.<field>". Treating `self` as the
         # receiver counts that access exactly as Python's does. Free functions have
         # no `self.` access, so this never over-counts them.
-        "this_ident": {"self"},
+        "this_ident": frozenset({"self"}),
         "module_level_assign": ("let_declaration", "static_item", "const_item"),
         # A Rust global is mutable state iff its declaration carries `mut`
         # (`static mut NAME: TYPE`). The name is the declaration's identifier child;
@@ -137,7 +137,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "extensions": (".c", ".h"),
         "function_types": ("function_definition",),
         "member_access": "field_expression",
-        "this_ident": set(),
+        "this_ident": frozenset(),
         "module_level_assign": ("declaration", "init_declarator"),
         "type_escape_patterns": (),
         "type_escape_nonpositions": (),
@@ -167,7 +167,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "extensions": (".java",),
         "function_types": ("method_declaration", "constructor_declaration"),
         "member_access": "field_access",
-        "this_ident": {"this"},
+        "this_ident": frozenset({"this"}),
         "module_level_assign": ("field_declaration", "local_variable_declaration"),
         "type_escape_patterns": ("Object",),  # raw types, etc.
         "type_escape_nonpositions": ("import_declaration",),
@@ -198,7 +198,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "extensions": (".cs",),
         "function_types": ("method_declaration", "constructor_declaration"),
         "member_access": "member_access_expression",
-        "this_ident": {"this"},
+        "this_ident": frozenset({"this"}),
         "module_level_assign": ("field_declaration", "local_declaration_statement"),
         "type_escape_patterns": ("object", "dynamic"),
         "type_escape_nonpositions": ("using_directive",),
@@ -225,7 +225,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "extensions": (".js", ".jsx", ".mjs", ".cjs"),
         "function_types": ("function_declaration", "function_expression", "generator_function_declaration", "method_definition", "arrow_function"),
         "member_access": "member_expression",
-        "this_ident": {"this"},
+        "this_ident": frozenset({"this"}),
         "module_level_assign": ("variable_declaration", "lexical_declaration"),
         "type_escape_patterns": (),  # untyped
         "type_escape_nonpositions": (),
@@ -253,7 +253,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "extensions": (".rb",),
         "function_types": ("method", "singleton_method"),
         "member_access": "call",
-        "this_ident": {"self"},
+        "this_ident": frozenset({"self"}),
         # Ruby signals external mutable state through @instance and $global variables,
         # not a `self.`-prefixed member access.
         "instance_field_types": ("instance_variable", "global_variable"),
@@ -285,7 +285,7 @@ LANG_CFG: dict[str, LangCfg] = {
         "function_types": ("function_declaration", "method_declaration"),
         "member_access": "selector_expression",
         # Go has no fixed receiver keyword; the receiver name is parsed per method.
-        "this_ident": set(),
+        "this_ident": frozenset(),
         "module_level_assign": ("var_declaration",),
         "type_escape_patterns": ("any",),  # Go's `any` alias for interface{}
         "type_escape_nonpositions": ("import_declaration", "import_spec"),

@@ -119,6 +119,9 @@ class Finding(TypedDict):
     file: str
     line: int
     silence: str
+    # The line the silence sits on, written at both sites and never declared. A type checker
+    # had never run over this package, so nothing said the record and the code disagreed.
+    silence_line: int
     construct: str
     partition: Partition
 
