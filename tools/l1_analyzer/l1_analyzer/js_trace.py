@@ -45,6 +45,13 @@ from l1_analyzer.pytest_trace import (
 _NO_TEST_SCRIPT = "no test specified"
 
 
+# The package manifest this module reads, and the branch counts a coverage report carries.
+# Both were written `dict`, the least precise mapping the language has, with a string key.
+Manifest = dict[str, object]
+Branches = dict[str, object]
+
+
+
 def _node() -> str | None:
     return shutil.which("node")
 
@@ -101,7 +108,7 @@ def _node_modules_present(repo: Path) -> bool:
 
 
 @boundary
-def _package_json(repo: Path) -> dict | None:
+def _package_json(repo: Path) -> Manifest | None:
     """The repository's own package.json, parsed, or nothing when it cannot be had.
 
     Declared the boundary rather than split: there is no decision here to lift out. It
@@ -113,7 +120,7 @@ def _package_json(repo: Path) -> dict | None:
         return None
 
 
-def _test_command(pkg: dict) -> str | None:
+def _test_command(pkg: Manifest) -> str | None:
     """The project's own test command from `package.json` scripts.test, or None when there is
     no real one (missing, empty, or the `npm init` placeholder that only prints an error)."""
     script = (pkg.get("scripts") or {}).get("test") or ""
@@ -171,7 +178,7 @@ def _c8_available(repo: Path, timeout_seconds: float) -> bool:
     return probe.returncode == 0
 
 
-def _coverage_verdict(branches: dict, returncode: int, runtime: str) -> L1Result:
+def _coverage_verdict(branches: Branches, returncode: int, runtime: str) -> L1Result:
     """L1.19 from a finished run and c8's branch totals. No I/O, so it can be asserted.
 
     Extracted because it could not be reached otherwise. `decision_space_coverage` probes node,
@@ -287,7 +294,7 @@ _RAN_MARKERS = {
 }
 
 
-def _detect_runner(pkg: dict) -> str | None:
+def _detect_runner(pkg: Manifest) -> str | None:
     """The test runner the project uses, from its deps and its test script. Returns a drivable
     runner key ('vitest'/'jest'), a recognised-but-undrivable runner name, or None."""
     deps = {**(pkg.get("devDependencies") or {}), **(pkg.get("dependencies") or {})}

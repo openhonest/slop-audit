@@ -59,6 +59,13 @@ _COVERAGE_COMMAND = {
 }
 
 
+# The environment a run is given, and the coverage result set it produces. Both were written
+# `dict`, the least precise mapping the language has, with a string key.
+Environment = dict[str, str]
+ResultSet = dict[str, object]
+
+
+
 def _on_path(tool: str) -> str | None:
     """Where a tool is on PATH, or nothing.
 
@@ -101,7 +108,7 @@ def _pin(repo: Path, timeout_seconds: float) -> tuple[str | None, str | None, di
     return ruby_path, bundle, {"PATH": str(bindir) + os.pathsep + os.environ.get("PATH", "")}, f", {note}"
 
 
-def _ruby_version(ruby: str, repo: Path, timeout_seconds: float, env: dict) -> str:
+def _ruby_version(ruby: str, repo: Path, timeout_seconds: float, env: Environment) -> str:
     """The pinned ruby's version, run with cwd=repo (and the pin's PATH) so .ruby-version
     wins, named so every measured result says which interpreter measured it."""
     probe = _run_untrusted([ruby, "--version"], cwd=repo, env=env, timeout_seconds=min(timeout_seconds, 30))
@@ -124,7 +131,7 @@ def _summary_line(runner: str, output: str) -> str:
 # L1.19 decision-space coverage (SimpleCov branch data)
 # ---------------------------------------------------------------------------
 
-def _branch_totals(resultset: dict) -> tuple[int, int]:
+def _branch_totals(resultset: ResultSet) -> tuple[int, int]:
     """(covered, total) SimpleCov branches summed across every command and file in the
     resultset. A branch leaf is covered when its hit count is greater than zero. Files
     stored in the old line-only format (a list, no 'branches') contribute nothing."""

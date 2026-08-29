@@ -42,6 +42,13 @@ from l1_analyzer.pytest_trace import (
 _RESULT = re.compile(r"test result:.*?(\d+) passed;\s*(\d+) failed;\s*(\d+) ignored")
 
 
+# One file's entry in the coverage report, and the uncovered lines a run found, keyed by
+# module path. Both were written `dict`, the least precise mapping the language has.
+Entry = dict[str, object]
+Uncovered = dict[str, frozenset[int]]
+
+
+
 def _cargo() -> str | None:
     return shutil.which("cargo")
 
@@ -104,7 +111,7 @@ def _llvm_cov_report(repo: Path, timeout_seconds: float) -> tuple[dict | None, s
             return None, "coverage report was unreadable"
 
 
-def _uncovered_lines(entry: dict) -> frozenset[int]:
+def _uncovered_lines(entry: Entry) -> frozenset[int]:
     """1-based lines a region entry marked never-executed. A segment is
     [line, col, count, has_count, is_region_entry]; a region entry with a real count of
     zero is a never-executed decision point on that line."""
@@ -112,7 +119,7 @@ def _uncovered_lines(entry: dict) -> frozenset[int]:
                      if len(seg) >= 5 and seg[3] and seg[4] and int(seg[2]) == 0)
 
 
-def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: float) -> dict:
+def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: float) -> Uncovered:
     """Uncovered lines for ONE module file, measured against the module in its crate (so it
     works for a deeply-integrated module). {measured, uncovered_lines, reason}."""
     report, reason = _llvm_cov_report(repo, timeout_seconds)
@@ -128,7 +135,7 @@ def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: flo
     return {"measured": True, "uncovered_lines": _uncovered_lines(entry), "reason": ""}
 
 
-def repo_uncovered_lines(repo: Path, timeout_seconds: float) -> dict:
+def repo_uncovered_lines(repo: Path, timeout_seconds: float) -> Uncovered:
     """Uncovered lines for EVERY file under the repo, from a single coverage build. Returns
     {measured, files: {relpath: frozenset(lines)}, reason}. Only files inside `repo` with at
     least one uncovered line are included, keyed by their path relative to repo."""

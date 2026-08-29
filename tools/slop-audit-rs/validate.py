@@ -19,8 +19,9 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-# One indicator's reading from either tool, keyed by its code. Written `dict`, the least
-# precise mapping the language has, where the key is always a string.
+# One indicator's reading from either tool. The panels were typed `dict[str, dict]`, which
+# pins the outer key and leaves the inner mapping completely open: our own escape counter
+# reads that inner `dict` as the bare generic it is.
 Reading = dict[str, object]
 
 
@@ -40,7 +41,7 @@ BINARY = HERE / "target" / "release" / "slop-audit-rs"
 
 
 @boundary
-def python_panel(repo: Path, lang: str) -> dict[str, dict]:
+def python_panel(repo: Path, lang: str) -> dict[str, Reading]:
     """The reference panel, keyed L1.x. Run from the reference package so `uv run`
     resolves that project's environment, not this directory's."""
     out = subprocess.run(
@@ -51,7 +52,7 @@ def python_panel(repo: Path, lang: str) -> dict[str, dict]:
 
 
 @boundary
-def rust_panel(repo: Path, lang: str) -> dict[str, dict]:
+def rust_panel(repo: Path, lang: str) -> dict[str, Reading]:
     """The portable panel, parsed from --tsv."""
     args = [str(BINARY), str(repo), "--tsv"]
     if lang != "auto":
@@ -59,7 +60,7 @@ def rust_panel(repo: Path, lang: str) -> dict[str, dict]:
     return panel_from_tsv(subprocess.run(args, capture_output=True, text=True, check=True).stdout)
 
 
-def panel_from_tsv(out: str) -> dict[str, dict]:
+def panel_from_tsv(out: str) -> dict[str, Reading]:
     """The portable tool's tab-separated output, as a panel keyed by indicator code.
 
     Lifted out of the run above, which ran the binary and read what it printed in one
@@ -68,7 +69,7 @@ def panel_from_tsv(out: str) -> dict[str, dict]:
     A short row is padded rather than refused: the tool prints a value with no band and no
     details for some indicators, and treating that as malformed would refuse a panel it
     prints on purpose."""
-    panel: dict[str, dict] = {}
+    panel: dict[str, Reading] = {}
     for line in out.splitlines():
         parts = line.split("\t")
         if parts[0] == "lang":

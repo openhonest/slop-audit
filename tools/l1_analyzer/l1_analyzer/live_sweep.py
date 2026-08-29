@@ -42,6 +42,12 @@ SWEEPS = {
 }
 
 
+# One repository's finished report in a sweep. Written `dict`, the least precise mapping the
+# language has, with a string key.
+Report = dict[str, object]
+
+
+
 def _value(line: str) -> str:
     """The value on one KEY=VALUE line, with shell quoting removed.
 
@@ -98,7 +104,7 @@ def language_of(repo: Path) -> str | None:
 
 
 def sweep(repos: list[Path], key: str | None, run_ceiling: int, per_repo: int,
-          sweeps: dict[str, Callable[..., dict]]) -> dict:
+          sweeps: dict[str, Callable[..., dict]]) -> Report:
     """Run the coverage-proof sweep over several repositories under one budget.
 
     Returns every repository that was offered, in order, each with what it attempted and
@@ -120,7 +126,7 @@ def sweep(repos: list[Path], key: str | None, run_ceiling: int, per_repo: int,
                            "detail": f"not swept: no {_KEY}"} for r in repos]}
 
     os.environ[_KEY] = key      # the one place the key enters the process
-    reports: list[dict] = []
+    reports: list[Report] = []
     spent = 0
     for repo in repos:
         language = language_of(repo) if language_of(repo) in sweeps else None
