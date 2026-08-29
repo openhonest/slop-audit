@@ -70,6 +70,12 @@ _CAP = 50
 _ELIDED = re.compile(r"/\.{3,}/|\\\.{3,}\\")
 
 
+# What this scan returns: the count, its band, the sentence, and the sites. Written `dict`,
+# the least precise mapping the language has.
+Scan = dict[str, object]
+
+
+
 def _matches(text: str) -> list[tuple[int, str]]:
     """(1-based line, matched path) for every machine-specific absolute path in a file."""
     out: list[tuple[int, str]] = []
@@ -79,7 +85,7 @@ def _matches(text: str) -> list[tuple[int, str]]:
     return out
 
 
-def scan(repo: Path, lang: str) -> dict:
+def scan(repo: Path, lang: str) -> Scan:
     """Flag hardcoded machine-specific absolute paths across the repo's source. Returns
     {verdict, value, band, details, findings}. `lang` is accepted for a uniform additive
     signature; the check is language-agnostic (a leaked home path is the same smell in any

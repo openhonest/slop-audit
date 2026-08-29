@@ -49,7 +49,7 @@ def pytest_unconfigure(config: object) -> None:
 
 
 @boundary
-def write_opened(seen: set, destination: str) -> bool:
+def write_opened(seen: set[str], destination: str) -> bool:
     """Write what was opened where the caller asked, and say whether it did.
 
     No destination means nobody asked to watch this run. The plugin is registered by name,

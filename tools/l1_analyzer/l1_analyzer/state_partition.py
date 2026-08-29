@@ -82,6 +82,12 @@ UNBOUNDED = "unbounded"    # reaches a decision whose reaching partition is prov
 UNDECIDED = "undecided"    # reaches a context whose reaching-set cannot be decided
 
 
+# One state finding, as the partition reader receives it. Written `dict`, the least precise
+# mapping the language has, with a string key.
+Finding = dict[str, object]
+
+
+
 class Reach(TypedDict):
     """How ONE reference to a state value is consumed, and what it does to the domain.
 
@@ -212,7 +218,7 @@ def is_coarse(partition: Partition, drives_decision: bool, bound: int) -> bool:
 # they carry no tree-sitter knowledge and sit here rather than in the classifier.
 # --------------------------------------------------------------------------
 
-def silence_summary(findings: list[dict], total: int) -> dict[str, object]:
+def silence_summary(findings: list[Finding], total: int) -> dict[str, object]:
     """The silence index: the share of state the analyzer could not decide, and every site.
 
     This is reported BESIDE the grade and never inside it. A state we did not decide is not
@@ -251,7 +257,7 @@ def silence_summary(findings: list[dict], total: int) -> dict[str, object]:
     }
 
 
-def partition_summary(findings: list[dict]) -> dict[str, object]:
+def partition_summary(findings: list[Finding]) -> dict[str, object]:
     """The cardinality distribution over state that decides something, plus the count of
     partitions whose size could not be recovered.
 

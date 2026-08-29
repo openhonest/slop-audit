@@ -420,7 +420,7 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[Gap], repair_round
                   timeout_seconds: float, propose_fn: Callable[..., Answer | None],
                   repair_fn: Callable[..., Answer | None], batch_run_fn: Callable[..., tuple[int, str]],
                   run_fn: Callable[..., tuple[str, str]],
-                  refine_fn: Callable[..., str]) -> tuple[list[Gap], dict]:
+                  refine_fn: Callable[..., str]) -> tuple[list[Gap], Answer]:
     """Prove all of one module's gaps. Fast path: batch every proposal into one compile and
     run once, then gate each failing test. If the batch does not compile (one bad test
     poisons it), fall back to per-gap with compiler-feedback repair. Returns (retained,
@@ -482,7 +482,7 @@ SweepProgress = Callable[[str, int, int], None]
 # honest-code-allow: L1.21.13 - the writer and both readers are one unit. `_call_model` writes LAST_REFUSAL and it is the single model boundary BOTH sweeps import, so there is no second source and no cross-module surprise. Threading the reason back would change the injected propose_fn signature, its repair counterpart and every test fake, to reach one reader at the end of one sweep. The sweeps are sequential, so the value is never stale by more than one call.
 def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
                         timeout_seconds: float, progress: SweepProgress | None,
-                        max_attempts: int) -> dict:
+                        max_attempts: int) -> Answer:
     """Sweep the WHOLE crate: one coverage build, then every module with uncovered branches is
     proven (batched, with per-gap repair fallback). Retained proofs are aggregated across the
     codebase. `progress(relpath, n_gaps, running_retained)` is called before each module."""
@@ -594,7 +594,7 @@ def _outcome_detail(outcomes: Gap) -> str:
 
 
 def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: float,
-                   repair_rounds: int) -> dict:
+                   repair_rounds: int) -> Answer:
     """Locate uncovered decision branches in one Rust module, prove each (propose -> run,
     then compiler-feedback repair up to repair_rounds), and retain the ones that fail.
     Returns the coverage_proofs shape the card consumes. Every not-run path carries a reason."""

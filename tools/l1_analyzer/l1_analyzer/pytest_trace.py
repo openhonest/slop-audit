@@ -339,7 +339,7 @@ _INVALID_RUN = {
 }
 
 
-def _coverage_verdict(returncode: int, totals: dict, provenance: str) -> L1Result:
+def _coverage_verdict(returncode: int, totals: dict[str, object], provenance: str) -> L1Result:
     """L1.19 from a finished run and coverage.py's totals. No I/O, so it can be asserted.
 
     Extracted because it could not be reached otherwise. `decision_space_coverage` runs the

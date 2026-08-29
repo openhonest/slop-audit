@@ -80,7 +80,7 @@ def _type_tests_in(fn, spec: LangSpec, raw: bytes) -> list[tuple[str, str, int]]
     return tests
 
 
-def _call_arguments(call) -> list:
+def _call_arguments(call) -> list[object]:
     """The argument nodes of a call, whatever the grammar calls the list holding them."""
     holder = call.child_by_field_name("arguments")
     return list(holder.children) if holder is not None else []

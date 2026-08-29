@@ -101,6 +101,14 @@ _EXT_LANG: dict[str, tuple[str, str]] = {
     ".go": ("go", "go"),
 }
 
+# One dead or undecidable definition, and the refusal this module returns when it cannot
+# measure. Both were written `dict`, the least precise mapping the language has, and the
+# key here is always a string.
+Site = dict[str, object]
+Refusal = dict[str, object]
+
+
+
 def parser(grammar: str) -> Parser:
     """One parser for a grammar, built on the spot.
 
@@ -355,7 +363,7 @@ def _harvest_source(root: Node, relpath: str, corpus: Corpus) -> None:
     walk(root)
 
 
-def entry_paths_in(data: dict, base: Path, repo: Path) -> set[str]:
+def entry_paths_in(data: Site, base: Path, repo: Path) -> set[str]:
     """The entry points one package manifest declares, relative to the repository.
 
     Five keys name a single path and `bin` names a map of them. A `bin` that is a bare
@@ -736,7 +744,7 @@ _CAP = 100
 _MIN_PARSED_SHARE = 0.8
 
 
-def _na(reason: str) -> dict:
+def _na(reason: str) -> Refusal:
     return {"value": "n/a", "band": "n/a", "details": reason, "findings": [],
             "undecidable": [], "test_only": [], "counts": {}, "production_loc": 0,
             "flagged_lines": 0}
@@ -781,7 +789,7 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
 
     production_loc = analyzed_loc = 0
     definitions: list[tuple[str, Definition]] = []
-    unreachable: list[dict] = []
+    unreachable: list[Site] = []
     unparsed = pasted = 0
     for path, src in sources:
         relpath = str(path.relative_to(repo)) if repo in path.parents else path.name
@@ -828,9 +836,9 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
     islands = _island_files(corpus, production_files) if lang == "python" else frozenset()
     runnable = _runnable_islands(repo, islands, production_files)
     island_live = _island_live_names(definitions, corpus, production_files, islands, runnable)
-    dead: list[dict] = []
-    undecidable: list[dict] = []
-    test_only: list[dict] = []
+    dead: list[Site] = []
+    undecidable: list[Site] = []
+    test_only: list[Site] = []
     excluded = 0
     for relpath, definition in definitions:
         entry = {"file": relpath, "name": definition["name"], "kind": definition["kind"],
