@@ -254,3 +254,17 @@ Feature: thread_surface — the concurrency audit surface, every site where a la
     Then it returns the worst severity present as the verdict, the three counts as the value, the findings sorted worst first, and the count of files read beside the count that parsed
     And a file the parser choked on is still scanned, because a hazard recovered from a broken tree is still a hazard, and the parse count is published as a denominator rather than used as a filter
     But it refuses with unread only when nothing parsed and nothing was found, since a finding is itself proof the scanner read something, and a language with no scanner gets n/a instead
+
+  Scenario: method_receiver gives the method and the receiver of a call on an object
+    Given a call node and its language's vocabulary
+    When method_receiver reads which node is a call, which is a member access, and what the grammar calls the member and the object
+    Then it returns the pair, which is the key the shared-state rules match on
+    And it was written twice, once for Rust and once for JavaScript, differing in exactly those four words
+    But all four have been in the per-language vocabulary since before this module existed, so adding a language is a row rather than a second copy of the pair
+
+  Scenario: receivers_by_method gives the receivers hanging off the object for a set of methods
+    Given a scope, a set of method names, and the language's vocabulary
+    When receivers_by_method walks the scope for calls whose method is in the set
+    Then it returns the receivers that hang off the object itself, because that is what two threads can share
+    And a method call on a local is one thread's own and is left out, which both copies of this enforced by asking whether the receiver began with the language's word for the object
+    But the word comes from the table rather than from the reader, so `self` and `this` are one rule

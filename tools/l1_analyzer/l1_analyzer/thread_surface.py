@@ -65,6 +65,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer.lang_spec import LANG_SPEC, LangSpec
 from tree_sitter import Node
 
 from l1_analyzer.indicators import (
@@ -145,6 +146,48 @@ def _walk(node: Node) -> list[Node]:
     return out
 
 
+def method_receiver(call: Node, spec: LangSpec) -> tuple[str, str] | None:
+    """(method, receiver) for a `receiver.method(...)` call, else None.
+
+    One function for every language. It was written twice, once for Rust and once for
+    JavaScript, and the two differed in four words: which node is a call, which is a member
+    access, what the grammar calls the member, and what it calls the object. All four have
+    been in the per-language vocabulary since before this module existed, and this module
+    hardcoded them, so adding a language meant writing the pair again rather than adding a
+    row.
+
+    The receiver text, `self.count`, is the key the shared-state rules match on."""
+    if call.type not in spec["call_types"]:
+        return None
+    named = call.child_by_field_name(spec["call_fn"])
+    if named is None or named.type not in spec["member_types"]:
+        return None
+    member = named.child_by_field_name(spec["mem_attr"])
+    obj = named.child_by_field_name(spec["mem_object"])
+    if member is None or obj is None:
+        return None
+    return _text(member), _text(obj)
+
+
+def receivers_by_method(scope: Node | None, methods: frozenset[str],
+                        spec: LangSpec) -> set[str]:
+    """Receivers hanging off the object itself, for any call whose method is in `methods`.
+
+    Only state on the object counts, because that is what two threads can share. A method
+    call on a local is one thread's own, and both copies of this enforced that by asking
+    whether the receiver text began with the language's word for the object."""
+    out: set[str] = set()
+    if scope is None:
+        return out
+    roots = tuple(f"{word}." for word in spec["this_idents"])
+    for node in _walk(scope):
+        pair = method_receiver(node, spec)
+        if pair is not None and pair[0] in methods and pair[1].startswith(roots):
+            out.add(pair[1])
+    return out
+
+
+
 def _mk(kind: str, symbol: str, severity: str, rel: str, node: Node) -> Finding:
     # Collapse whitespace: a multi-line field access (self.\n  .field) must read as one
     # symbol, not carry the source's line breaks into the report.
@@ -180,27 +223,8 @@ _CHECK_METHODS = frozenset({"contains_key", "contains", "is_empty", "is_none", "
 _MUTATE_METHODS = frozenset({"insert", "push", "push_back", "remove", "pop", "clear", "extend", "append", "set", "store", "swap"})
 
 
-def _rust_method_receiver(call: Node) -> tuple[str, str] | None:
-    """(method, receiver_text) for a `recv.method(..)` call, else None. The receiver
-    text (e.g. `self.count`) is the shared-state key we match B1/B2 on."""
-    if call.type != "call_expression":
-        return None
-    fn = call.child_by_field_name("function")
-    if fn is None or fn.type != "field_expression":
-        return None
-    return _text(fn.child_by_field_name("field")), _text(fn.child_by_field_name("value"))
 
 
-def _rust_receivers_by_method(scope: Node | None, methods: frozenset[str]) -> set[str]:
-    """self.-rooted receivers of any call whose method is in `methods`, within scope."""
-    out: set[str] = set()
-    if scope is None:
-        return out
-    for n in _walk(scope):
-        mr = _rust_method_receiver(n)
-        if mr is not None and mr[0] in methods and mr[1].startswith("self."):
-            out.add(mr[1])
-    return out
 
 
 def _rust_takes_shared_self(func: Node) -> bool:
@@ -217,7 +241,7 @@ def _rust_takes_shared_self(func: Node) -> bool:
     return any(c.type == "&" for c in sp.children) and not any(c.type == "mutable_specifier" for c in sp.children)
 
 
-def _rust_nonatomic_rmw(func: Node, rel: str) -> list[Finding]:
+def _rust_nonatomic_rmw(func: Node, rel: str, spec: LangSpec) -> list[Finding]:
     """B1: the same self.-rooted atomic is both loaded and stored/swapped in one
     function - a read-modify-write that is not a single atomic op.
 
@@ -228,7 +252,7 @@ def _rust_nonatomic_rmw(func: Node, rel: str) -> list[Finding]:
     stores: set[str] = set()
     atomic_protocol: set[str] = set()
     for n in _walk(func):
-        mr = _rust_method_receiver(n)
+        mr = method_receiver(n, spec)
         if mr is None or not mr[1].startswith("self."):
             continue
         method, recv = mr
@@ -280,22 +304,22 @@ def _result_feeds_branch(call: Node) -> bool:
     return False
 
 
-def _rust_check_then_act(func: Node, rel: str) -> list[Finding]:
+def _rust_check_then_act(func: Node, rel: str, spec: LangSpec) -> list[Finding]:
     """B2: an `if` whose condition checks a self.-rooted collection and whose body
     mutates the same one - a check-then-act (TOCTOU) window."""
     findings: list[Finding] = []
     for n in _walk(func):
         if n.type != "if_expression":
             continue
-        checked = _rust_receivers_by_method(n.child_by_field_name("condition"), _CHECK_METHODS)
-        mutated = _rust_receivers_by_method(n.child_by_field_name("consequence"), _MUTATE_METHODS)
-        mutated |= _rust_receivers_by_method(n.child_by_field_name("alternative"), _MUTATE_METHODS)
+        checked = receivers_by_method(n.child_by_field_name("condition"), _CHECK_METHODS, spec)
+        mutated = receivers_by_method(n.child_by_field_name("consequence"), _MUTATE_METHODS, spec)
+        mutated |= receivers_by_method(n.child_by_field_name("alternative"), _MUTATE_METHODS, spec)
         for recv in sorted(checked & mutated):
             findings.append(_mk("check_then_act", recv, REVIEW, rel, n))
     return findings
 
 
-def _scan_rust(root: Node, rel: str) -> list[Finding]:
+def _scan_rust(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
     for n in _walk(root):
         # unsafe impl Send/Sync for T : the Send/Sync guarantee is hand-asserted.
@@ -317,7 +341,7 @@ def _scan_rust(root: Node, rel: str) -> list[Finding]:
         # review-level missing-acquire (relaxed_guard); every other Relaxed use is the
         # low-precision candidate tier (Relaxed is correct for counters/stats).
         if n.type == "call_expression":
-            mr = _rust_method_receiver(n)
+            mr = method_receiver(n, spec)
             if mr is not None and _call_uses_relaxed(n):
                 if mr[0] == "load" and _result_feeds_branch(n):
                     findings.append(_mk("relaxed_guard", mr[1], REVIEW, rel, n))
@@ -326,8 +350,8 @@ def _scan_rust(root: Node, rel: str) -> list[Finding]:
         # B1 / B2: per-function race shapes, only on &self methods (a shared borrow, so
         # concurrent calls are possible). &mut self / self-by-value are exclusive.
         elif n.type == "function_item" and _rust_takes_shared_self(n):
-            findings.extend(_rust_nonatomic_rmw(n, rel))
-            findings.extend(_rust_check_then_act(n, rel))
+            findings.extend(_rust_nonatomic_rmw(n, rel, spec))
+            findings.extend(_rust_check_then_act(n, rel, spec))
 
     return findings
 
@@ -504,7 +528,7 @@ def _py_has_lock(nodes: list[Node]) -> bool:
     return False
 
 
-def _scan_python(root: Node, rel: str) -> list[Finding]:
+def _scan_python(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
     nodes = _walk(root)
 
@@ -549,27 +573,11 @@ _JS_CHECK = frozenset({"has", "get", "includes", "find", "indexOf", "hasOwnPrope
 _JS_MUTATE = frozenset({"set", "add", "push", "delete", "unshift", "pop", "splice"})
 
 
-def _js_method_receiver(call: Node) -> tuple[str, str] | None:
-    if call.type != "call_expression":
-        return None
-    fn = call.child_by_field_name("function")
-    if fn is None or fn.type != "member_expression":
-        return None
-    return _text(fn.child_by_field_name("property")), _text(fn.child_by_field_name("object"))
 
 
-def _js_receivers_by_method(scope: Node | None, methods: frozenset[str]) -> set[str]:
-    out: set[str] = set()
-    if scope is None:
-        return out
-    for n in _walk(scope):
-        mr = _js_method_receiver(n)
-        if mr is not None and mr[0] in methods and mr[1].startswith("this."):
-            out.add(mr[1])
-    return out
 
 
-def _scan_jsts(root: Node, rel: str) -> list[Finding]:
+def _scan_jsts(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
     for n in _walk(root):
         if n.type != "if_statement":
@@ -577,8 +585,8 @@ def _scan_jsts(root: Node, rel: str) -> list[Finding]:
         cons = n.child_by_field_name("consequence")
         if cons is None or not any(x.type == "await_expression" for x in _walk(cons)):
             continue  # no awaited yield in the body -> not an async TOCTOU
-        checked = _js_receivers_by_method(n.child_by_field_name("condition"), _JS_CHECK)
-        mutated = _js_receivers_by_method(cons, _JS_MUTATE)
+        checked = receivers_by_method(n.child_by_field_name("condition"), _JS_CHECK, spec)
+        mutated = receivers_by_method(cons, _JS_MUTATE, spec)
         for recv in sorted(checked & mutated):
             findings.append(_mk("async_toctou", recv, REVIEW, rel, n))
     return findings
@@ -643,7 +651,7 @@ def _go_has_sync(body: Node) -> bool:
     return False
 
 
-def _scan_go(root: Node, rel: str) -> list[Finding]:
+def _scan_go(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
     for go in _walk(root):
         if go.type != "go_statement":
@@ -694,7 +702,7 @@ def _java_base_type(typ: Node | None) -> str | None:
     return None
 
 
-def _scan_java(root: Node, rel: str) -> list[Finding]:
+def _scan_java(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
     for fd in _walk(root):
         if fd.type != "field_declaration":
@@ -728,7 +736,7 @@ def _ruby_uses_threads(root: Node) -> bool:
     return False
 
 
-def _scan_ruby(root: Node, rel: str) -> list[Finding]:
+def _scan_ruby(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     if not _ruby_uses_threads(root):
         return []
     findings: list[Finding] = []
@@ -740,7 +748,7 @@ def _scan_ruby(root: Node, rel: str) -> list[Finding]:
     return findings
 
 
-_SCANNERS: dict[str, Callable[[Node, str], list[Finding]]] = {
+_SCANNERS: dict[str, Callable[[Node, str, LangSpec], list[Finding]]] = {
     "rust": _scan_rust,
     "python": _scan_python,
     "typescript": _scan_jsts,
@@ -819,6 +827,7 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
     if lang not in _SCANNERS:
         return _na(lang)
     scanner = _SCANNERS[lang]
+    spec = LANG_SPEC[lang]
     cfg = LANG_CFG[lang]
     parser = _get_parser(lang)
     files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
@@ -833,7 +842,7 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
         # tree-sitter recovers usefully from most errors, and a hazard it did recover is a
         # hazard whatever else in the file defeated it.
         parsed += not root.has_error
-        findings.extend(scanner(root, rel))
+        findings.extend(scanner(root, rel, spec))
 
     # A finding is positive evidence the scanner read something, so it outranks the parse
     # count. Same rule as the silence floor, which gates the good grades and lets a proven
