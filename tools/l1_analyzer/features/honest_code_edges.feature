@@ -76,3 +76,39 @@ Feature: The three clauses about a program's edges
     And a function returning the empty string while typed as a string is not covered, since no caller can tell an absent value from an empty one and that is the shape the rule exists to name
     And a handler returning some other value where an absence was declared is not covered either, because declaring an absence permits returning that and not a value nobody asked for
     But a language declaring no return type is refused before anything is read, so this cannot become a way to go quiet by writing less
+
+  Scenario: self_caught_failures finds a test that catches its own failure, or a handler sorting by words
+    Given a parsed source and its language's node vocabulary
+    When self_caught_failures reads each try for a declared failure inside it and each handler for what it catches and how it decides
+    Then it reports a deliberate failure inside a try whose handler catches everything, because that declaration raises like anything else and both land in the same branch
+    And it reports a handler deciding what happened by reading the exception as text, which is the wider rule and holds outside a test entirely
+    And an adopter found this in the only test of a constraint surviving a rebuild, where rewording one message would have passed the test while the constraint was broken, and every other exception read as success too
+    And a narrow handler that cannot catch the failure is left alone, since the two cannot be confused there
+    And a handler sorting by type is left alone, because that is what the rule asks for and reporting it would punish the remedy
+    But whether the text being matched is one the same function wrote is not decided, since in general the string can come from anywhere
+
+  Scenario: _declares_failure says whether a node is a test saying it should not have got this far
+    Given a node, its language's vocabulary, and the source bytes
+    When _declares_failure checks the node against the ways a test declares failure
+    Then it answers yes for a call to the framework's fail, a raised assertion error, or a bare false assertion
+    But it reads the spellings the table holds, so adding a framework means adding a row and not a branch
+
+  Scenario: _catches_everything says whether a handler catches a deliberate failure along with the rest
+    Given a handler node, its language's vocabulary, and the source bytes
+    When _catches_everything reads what the handler names
+    Then it answers yes for a handler naming nothing and for one naming a root exception type
+    But a handler naming a narrower type is answered no, because a test's own failure cannot land there
+
+  Scenario: _sorts_by_text says whether a handler decides what happened by reading the exception as words
+    Given a handler node, its language's vocabulary, and the source bytes
+    When _sorts_by_text looks for the caught name being rendered as text inside the handler
+    Then it answers yes where that rendering sits inside a condition, because rewording a message anywhere then changes which branch runs
+    And a handler putting the exception's text into a response is left alone, since it caught by type and is telling the caller what happened rather than deciding by the words
+    But this holds outside a test as well, and this package hit it in a different room when a contention check retried an error because one word matched and the cause was ours
+
+  Scenario: _bound_name gives the name a handler binds the caught exception to
+    Given a handler node, its language's vocabulary, and the source bytes
+    When _bound_name reads the identifiers the catch declares
+    Then it returns the last of them in source order, which is the local name rather than the type
+    And that is a different question from what type was caught, and the only thing that tells one rendering of the exception from any other call by the same name
+    But taking whichever identifier the walk happened to yield last picked the type and matched nothing

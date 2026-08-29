@@ -21,6 +21,7 @@ from l1_analyzer.honest_code_read import (
     Source,
     _finding,
     called_names_in,
+    called_spelling,
     declares_a_boundary,
     first_name,
     function_nodes,
@@ -165,6 +166,11 @@ def swallowed_exceptions(source: Source) -> list[Finding] | None:
         return None
     found: list[Finding] = []
     found += _silenced_without_a_handler(source["root"], spec, raw)
+    # A handler that catches the test's own failure, or that sorts an exception by its
+    # words, is the same principle as swallowing one: what actually happened stops here and
+    # never reaches anyone who could act on it. Reported by an adopter whose only test of a
+    # constraint could not fail.
+    found += self_caught_failures(source) or []
     for node in walk(source["root"]):
         if node.type not in spec["handler_types"]:
             continue
@@ -366,3 +372,127 @@ def _log_levels_in(fn: Node, spec: LangSpec, raw: bytes) -> set[str]:
         if node_text(receiver, raw).rsplit(".", 1)[-1] in spec["log_receivers"]:
             levels.add(level)
     return levels
+
+
+def _declares_failure(node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether this node is a test saying it should not have got this far.
+
+    Four spellings, and they are the same act: a call to the framework's fail, a raised
+    assertion error, or a bare `assert False`."""
+    text = node_text(node, raw)
+    if node.type in spec["assertion_types"]:
+        return any(name in text for name in spec["deliberate_failures"]) or "False" in text
+    if node.type in spec["call_types"]:
+        return called_spelling(node, spec, raw) in spec["deliberate_failures"]
+    return False
+
+
+def _catches_everything(handler, spec: LangSpec, raw: bytes) -> bool:
+    """Whether this handler catches a deliberate failure along with everything else.
+
+    A handler naming no type catches all of them. A handler naming one of the language's
+    root exception types catches all of them too, which is what puts a test's own failure in
+    the same branch as the failure it was watching for."""
+    caught = _caught_text(handler, spec, raw)
+    if not caught.strip():
+        return True
+    return any(root in caught for root in spec["catch_all_types"])
+
+
+def _sorts_by_text(handler, spec: LangSpec, raw: bytes) -> bool:
+    """Whether this handler decides what happened by reading the exception as words.
+
+    The wider rule, and it holds outside a test. This package hit the same shape in a
+    different room: a contention check retried a KeyError because the word matched, and the
+    cause was ours."""
+    bound = _bound_name(handler, spec, raw)
+    if not bound:
+        return False
+    # Inside a CONDITION. A handler putting the exception's text in a response is doing what
+    # the rule asks: it caught by type and is telling the caller what happened. Firing there
+    # reported a route handler as sorting by words when it was only quoting them.
+    for branch in walk(handler):
+        if branch.type not in spec["branch_types"]:
+            continue
+        condition = branch.child_by_field_name(spec["branch_cond"])
+        if condition is None:
+            continue
+        for node in walk(condition):
+            if node.type not in spec["call_types"]:
+                continue
+            if called_spelling(node, spec, raw) not in spec["exception_text_calls"]:
+                continue
+            if bound in [node_text(c, raw) for c in walk(node) if c.type == "identifier"]:
+                return True
+    return False
+
+
+def _bound_name(handler, spec: LangSpec, raw: bytes) -> str:
+    """The name a handler binds the caught exception to, or the empty string.
+
+    Not the type it caught, which is what `_caught_variable` reports and is a different
+    question. This one is the local name the body reads, and it is the only thing that tells
+    `str(e)` from any other call to `str`."""
+    where = handler.child_by_field_name("value") or handler
+    named = [c for c in walk(where) if c.type == "identifier"]
+    if not named:
+        return ""
+    # The LAST in source order, which is the alias: `except KeyError as e` names the type
+    # first and the local name second. The walk returns nodes in its own order, so taking
+    # the last one it happened to yield picked the type and matched nothing.
+    named.sort(key=lambda c: c.start_byte)
+    return node_text(named[-1], raw)
+
+
+def self_caught_failures(source: Source) -> list[Finding] | None:
+    """A test that catches its own failure, or a handler that sorts an exception by its words.
+
+    Reported by an adopter, from the only test in their suite of a constraint surviving a
+    database rebuild. A deliberate failure raises, so a handler for every exception catches
+    it alongside the failure the test was watching for, and the two could then only be told
+    apart by asking whether the exception's text carried the message the test itself had
+    written. Reword that message and the test passes while the thing it tests is broken.
+
+    It is worse than one wrong branch. Every other exception lands in the same handler and
+    reads as success: a typo in the query, a closed connection, a bug in the package.
+
+    Two findings, and both are exact. A deliberate failure inside a try whose handler can
+    catch it is wrong whatever the handler does next. A handler branching on the exception's
+    text rather than its type is the wider rule and holds outside a test entirely.
+
+    Not decided: whether the text being matched is one the same function wrote, which is what
+    makes that instance circular. In general the string can come from anywhere, so nothing
+    here tries to tell those apart.
+
+    Not decided for a language with no exception. Go returns an error beside the value and
+    Rust returns a Result, and neither is a handler this reads."""
+    spec, raw = source["spec"], source["raw"]
+    if not spec["handler_types"] or not spec["deliberate_failures"]:
+        return None
+    found: list[Finding] = []
+    for node in walk(source["root"]):
+        if node.type not in spec["try_types"]:
+            continue
+        guarded = [c for c in node.named_children if c.type not in spec["handler_types"]]
+        handlers = [c for c in walk(node) if c.type in spec["handler_types"]]
+        declares = any(_declares_failure(inner, spec, raw)
+                       for part in guarded for inner in walk(part))
+        for handler in handlers:
+            if declares and _catches_everything(handler, spec, raw):
+                found.append(_finding(
+                    "L1.21.8", node_text(node, raw).strip().split("\n")[0][:50],
+                    handler.start_point[0] + 1,
+                    "this catches its own failure: the body above declares the test should "
+                    "not have got this far, and that declaration raises like anything else, "
+                    "so both land here and only the words tell them apart",
+                    "assert the failure you expect with the construct that expects it, so "
+                    "the test's own failure is never a case this handler sees", ""))
+            if _sorts_by_text(handler, spec, raw):
+                found.append(_finding(
+                    "L1.21.8", node_text(handler, raw).strip().split("\n")[0][:50],
+                    handler.start_point[0] + 1,
+                    "this decides what happened by reading the exception as text, so "
+                    "rewording a message anywhere changes which branch runs",
+                    "read the failure's type, which is the thing that does not change when "
+                    "somebody edits a sentence", ""))
+    return found

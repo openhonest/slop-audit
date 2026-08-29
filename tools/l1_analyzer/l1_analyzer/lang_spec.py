@@ -222,6 +222,13 @@ class LangSpec(TypedDict, total=False):
     # Calls reaching something non-deterministic. Named only so a boundary declaration on a
     # function doing one is not reported as false; they are not counted as input or output.
     non_deterministic_calls: frozenset[str]
+    # How a test says it should not have got this far, and what a handler catches when it
+    # says every exception. A deliberate failure raises, so a handler for everything catches
+    # it alongside the failure the test was watching for, and the two can then only be told
+    # apart by their words.
+    deliberate_failures: frozenset[str]
+    catch_all_types: frozenset[str]
+    exception_text_calls: frozenset[str]
     # The statement that records a failure. A try body ending in one is ASSERTING that its
     # call raised, so the handler beneath is the success condition and reaching the recorder
     # is the defect. Keying on the handler alone made both readings look alike.
@@ -407,6 +414,9 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
 
 LANG_SPEC: dict[str, LangSpec] = {
     "python": {
+        "deliberate_failures": frozenset({"fail", "AssertionError"}),
+        "catch_all_types": frozenset({"Exception", "BaseException"}),
+        "exception_text_calls": frozenset({"str", "repr", "format"}),
         "return_type_field": "return_type",
         "absent_markers": ("None", "Optional"),
         "absent_values": ("None",),
@@ -629,6 +639,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "javascript": {
+        "deliberate_failures": frozenset({"fail"}),
+        "catch_all_types": frozenset({"Error"}),
+        "exception_text_calls": frozenset({"String"}),
         "non_deterministic_calls": frozenset(),
         # No declared return type, so nothing here can be declared absent.
         "return_type_field": "",
@@ -770,6 +783,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "java": {
+        "deliberate_failures": frozenset({"fail"}),
+        "catch_all_types": frozenset({"Exception", "Throwable", "RuntimeException"}),
+        "exception_text_calls": frozenset({"getMessage", "toString"}),
         "non_deterministic_calls": frozenset(),
         "return_type_field": "type",
         "absent_markers": ("Optional",),
@@ -900,6 +916,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "csharp": {
+        "deliberate_failures": frozenset({"Fail"}),
+        "catch_all_types": frozenset({"Exception", "SystemException"}),
+        "exception_text_calls": frozenset({"ToString"}),
         "non_deterministic_calls": frozenset(),
         "return_type_field": "type",
         "absent_markers": ("?", "Nullable"),
@@ -1047,6 +1066,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "rust": {
+        "deliberate_failures": frozenset(),
+        "catch_all_types": frozenset(),
+        "exception_text_calls": frozenset(),
         "non_deterministic_calls": frozenset(),
         "return_type_field": "return_type",
         "absent_markers": ("Option",),
@@ -1189,6 +1211,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "ruby": {
+        "deliberate_failures": frozenset({"flunk", "fail"}),
+        "catch_all_types": frozenset({"StandardError", "Exception"}),
+        "exception_text_calls": frozenset({"message", "to_s"}),
         "non_deterministic_calls": frozenset(),
         "return_type_field": "",
         "absent_markers": (),
@@ -1332,6 +1357,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "c": {
+        "deliberate_failures": frozenset(),
+        "catch_all_types": frozenset(),
+        "exception_text_calls": frozenset(),
         "non_deterministic_calls": frozenset(),
         "return_type_field": "type",
         "absent_markers": (),
@@ -1473,6 +1501,9 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": False,
     },
     "go": {
+        "deliberate_failures": frozenset(),
+        "catch_all_types": frozenset(),
+        "exception_text_calls": frozenset(),
         "non_deterministic_calls": frozenset(),
         "return_type_field": "result",
         "absent_markers": (),
