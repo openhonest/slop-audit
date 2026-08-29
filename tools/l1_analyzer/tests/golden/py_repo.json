@@ -39,7 +39,7 @@
   },
   "L1.13": {
     "band": "Healthy",
-    "details": "0 of 20 production code lines inside a repeated 50-token window, identifiers and literals normalized, large data tables discounted as L1.17 discounts them, across 1 file(s)",
+    "details": "0 of 20 production code lines inside a repeated 50-token window, identifiers and literals normalized, across 1 file(s). Three things carry no logic and are discounted: a large data table, as L1.17 discounts one; a record declaration, which is a list of field names; and an import statement, which is a list of imported names and whose repetition no author can remove",
     "value": 0.0
   },
   "L1.14": {

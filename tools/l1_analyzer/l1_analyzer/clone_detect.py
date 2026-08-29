@@ -52,6 +52,13 @@ def literal_types(lang: str) -> frozenset[str]:
     return frozenset(LANG_SPEC[lang]["literal_types"])
 
 
+# How each language spells "bring a name in from somewhere else". The statement, never a
+# call: a runtime import does work and is code like any other.
+_IMPORT_STATEMENTS = ("import_statement", "import_from_statement", "import_declaration",
+                      "using_directive", "use_declaration", "preproc_include",
+                      "package_declaration")
+
+
 def _declares_only_fields(node: Node, lang: str) -> bool:
     """Whether this node is a record declaration and nothing else.
 
@@ -126,6 +133,21 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
         # A declaration only. A class carrying methods is code, and skipping that would hide
         # duplication behind a keyword.
         if _declares_only_fields(node, lang):
+            return
+        # An import statement, for the third time the same argument. A data table is not a
+        # pile of logic, a record declaration is a list of field names, and an import block
+        # is a list of imported names. There is no logic in any of them for this check to
+        # be about.
+        #
+        # The import case is the strongest of the three, because the duplication cannot be
+        # removed: a module that uses a name has to import it. A measurement an author
+        # cannot act on teaches them to ignore the measurement, which is worse than not
+        # taking it. Once records were discounted, the two largest contributors left in this
+        # repository were both import blocks.
+        #
+        # The STATEMENT only. `importlib.import_module(name)` is a call that does work, and
+        # treating it as a declaration would hide a real repeated block.
+        if node.type in _IMPORT_STATEMENTS:
             return
         # The literal test comes BEFORE the descent, because a literal is not always a
         # leaf. Python spells a string as a node with string_start, string_content and
@@ -227,10 +249,15 @@ def analyze(repo: Path, lang: str, min_tokens: int = MIN_TOKENS) -> dict:
         return {"value": "n/a", "band": "n/a",
                 "details": f"no {lang} code line carried a token, so duplication was not measured"}
     pct = round(duplicated_count / total_lines * 100, 2)
+    # Every discount named, not one of them. This line said only "large data tables" while
+    # the walk was passing over three things, which is a reading of less code than a reader
+    # was told about.
     detail = (f"{duplicated_count} of {total_lines} production code lines inside a repeated "
               f"{min_tokens}-token window, identifiers and literals normalized, "
-              f"large data tables discounted as L1.17 discounts them, "
-              f"across {len(files)} file(s)")
+              f"across {len(files)} file(s). Three things carry no logic and are discounted: "
+              f"a large data table, as L1.17 discounts one; a record declaration, which is a "
+              f"list of field names; and an import statement, which is a list of imported "
+              f"names and whose repetition no author can remove")
     if skipped:
         detail += f"; {skipped} file(s) unreadable or oversized and excluded"
     return {"value": pct, "band": band(pct, 3, 10, higher_is_better=False), "details": detail}

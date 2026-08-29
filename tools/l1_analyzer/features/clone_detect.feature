@@ -38,6 +38,9 @@ Feature: clone_detect — L1.13 near-duplicate code, measured rather than delega
     Then each identifier becomes one symbol and each literal becomes one symbol, so a block copied and renamed still matches
     And keywords, operators and punctuation keep their text, so the structure is what is compared
     But comments are dropped rather than normalized, and a large data table is skipped whole, the way L1.17 already discounts one
+    And it passes over a large data table, a record declaration and an import statement, because none of the three holds logic and each is a list of names that erasing leaves identical to every other
+    And the import case is the strongest, since the duplication cannot be removed: a module that uses a name has to import it, and a measurement an author cannot act on teaches them to ignore the measurement
+    But it reads the statement and never a call, because a runtime import does work and treating it as a declaration would hide a real repeated block
 
   Scenario: _window_hash gives a run of symbols its identity
     Given a window of consecutive symbols
