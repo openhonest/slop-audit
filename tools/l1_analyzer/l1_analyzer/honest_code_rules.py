@@ -415,15 +415,64 @@ def imperative_dom(source: Source) -> list[Finding] | None:
     """`addEventListener`, `querySelector` and `innerHTML`: how, in a place the reader has
     to go and find.
 
+    In SCRIPT, and only there. This searched the whole file's text for the word, so a page
+    written entirely in attributes was reported for carrying `hx-swap="innerHTML"`, which is
+    the framework's own attribute holding one of its six values. It says where the response
+    goes, on the element it applies to, which is the shape this clause asks for. The finding
+    said the behaviour was somewhere the reader has to go and find, and there was nowhere to
+    go. An adopter reported it three times, once per copy of the file.
+
+    Reporting the remedy is the worst thing a rule can do, so the question is where the name
+    sits rather than whether it appears. A script file is script throughout. In markup, only
+    what a script element holds is script, and an attribute value is markup.
+
     Not applicable to a file with no DOM to drive."""
     if source["language"] not in BROWSER_LANGUAGES:
         return None
     text = source["text"]
     return [_finding(
-        "L1.21.7", call, _line_of(text, call),
+        "L1.21.7", call, line,
         f"{call} describes how, somewhere the reader has to go and find",
-        "replace the listener with an attribute that declares the intent, such as hx-post, hx-target or hx-trigger, so the behaviour reads off the element", "")
-        for call in _DOM_CALLS if call in text]
+        "replace the listener with an attribute that declares the intent, such as hx-post, "
+        "hx-target or hx-trigger, so the behaviour reads off the element", "")
+        for call, line in _dom_calls_in_script(text, source["language"])]
+
+
+def _dom_calls_in_script(text: str, language: str) -> list[tuple[str, int]]:
+    """Every DOM call this file makes in script, with the line it sits on.
+
+    A markup file is read with the markup grammar so that a script element can be told from
+    an attribute. Markup that will not parse is read as script throughout, which reports more
+    rather than less: a file this reader could not take apart is not a file it can clear."""
+    if language != _MARKUP_LANGUAGE:
+        return [(call, _line_of(text, call)) for call in _DOM_CALLS if call in text]
+    found: list[tuple[str, int]] = []
+    for start, end in _script_spans(text):
+        body = text[start:end]
+        for call in _DOM_CALLS:
+            if call in body:
+                found.append((call, text[:start].count("\n") + body[:body.index(call)].count("\n") + 1))
+    return found
+
+
+def _script_spans(text: str) -> list[tuple[int, int]]:
+    """Where the script is in a page, as byte spans into its text.
+
+    Read from the markup grammar rather than matched, because an attribute whose value
+    happens to name a script tag is not a script tag."""
+    from tree_sitter import Parser
+
+    from l1_analyzer.honest_code import _MARKUP, GRAMMARS
+
+    raw = text.encode()
+    root = Parser(GRAMMARS[_MARKUP]).parse(raw).root_node
+    if root.has_error and not any(n.type == "script_element" for n in walk(root)):
+        return [(0, len(text))]
+    return [(n.start_byte, n.end_byte) for n in walk(root) if n.type == "raw_text"
+            and n.parent is not None and n.parent.type == "script_element"]
+
+
+_MARKUP_LANGUAGE = "html"
 
 
 def _line_of(text: str, needle: str) -> int:

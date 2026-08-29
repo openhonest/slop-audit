@@ -156,3 +156,17 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _tests_a_literal reads each pattern for a literal and for destructuring
     Then only the first tests a value
     But a default arm counts as a literal case, because it names no shape and a table has the same thing in its lookup failing
+
+  Scenario: _dom_calls_in_script gives every DOM call a file makes in script, with its line
+    Given the text of a file and its language
+    When _dom_calls_in_script asks where each name sits rather than whether it appears
+    Then a script file is read as script throughout, since there is no markup for a name to sit in
+    And a markup file is read with the markup grammar, so a script element can be told from an attribute
+    And an adopter reported a page written entirely in attributes three times, because the framework's own attribute holds one of its six values and one of those values shares a name with a script property
+    But markup that will not parse is read as script throughout, which reports more rather than less, since a file this reader could not take apart is not a file it can clear
+
+  Scenario: _script_spans gives where the script is in a page
+    Given the text of a page
+    When _script_spans reads the markup grammar for what a script element holds
+    Then it returns those spans and nothing else, so an attribute value is never read as script
+    But it reads the grammar rather than matching the text, because an attribute whose value happens to name a script tag is not a script tag
