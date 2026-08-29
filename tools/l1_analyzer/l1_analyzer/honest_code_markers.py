@@ -207,6 +207,37 @@ def unmeasured_caches(source: Source) -> list[Finding] | None:
 _STEP_LIMIT = 30
 
 
+def statements_in(node, spec: LangSpec) -> int:
+    """How much a step actually does, counted in statements rather than in lines.
+
+    It counted the lines the function spans, so a docstring and a comment counted as setup.
+    An adopter measured their eight sites and six were already under the threshold in code
+    alone: one was eighteen statements carrying a sixteen-line docstring, and that docstring
+    recorded a defect their suite had paid for. So the number told them to delete the
+    explanation, and the family of rules this belongs to exists to ask for that explanation.
+
+    A step is long because of its setup or because somebody wrote down why it exists, and
+    those want opposite responses from a reader.
+
+    Statements also stop the number depending on how a call is wrapped. A call spread over
+    four lines is one statement, and a count that moved when somebody reformatted was
+    measuring the formatter."""
+    counted = 0
+    for holder in walk(node):
+        if "block" not in holder.type and holder.type not in spec["gate_body_types"]:
+            continue
+        for statement in holder.named_children:
+            if "comment" in statement.type:
+                continue
+            # A bare string standing alone is a description, not work. That is how Python
+            # writes a docstring, and it is the half of this the adopter reported.
+            only = statement.named_children[0] if len(statement.named_children) == 1 else None
+            if only is not None and "string" in only.type:
+                continue
+            counted += 1
+    return counted
+
+
 def _step_definitions(source: Source) -> list[tuple[str, object]]:
     """Every step definition in this file, as (what to call it, the node holding its body).
 
@@ -276,11 +307,12 @@ def heavy_step_definitions(source: Source) -> list[Finding] | None:
                 "step. Until then, re-read every scenario that asserts an absence, because "
                 "those pass on a step that did nothing", ""))
             continue
-        if node.end_point[0] - node.start_point[0] > _STEP_LIMIT:
+        setup = statements_in(node, spec)
+        if setup > _STEP_LIMIT:
             found.append(_finding(
                 "L1.21.15", name, node.start_point[0] + 1,
-                f"{node.end_point[0] - node.start_point[0]} lines of setup, which is a "
-                "readout on the code under test rather than on the test",
+                f"{setup} statements of setup, which is a readout on the code under test "
+                "rather than on the test",
                 "make the function under test pure, so the step is call it and check the "
                 "result", ""))
     return found

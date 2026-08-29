@@ -178,4 +178,4 @@ def test_the_length_finding_does_not_need_the_binding():
     body = "\n".join(f"    step_{i}()" for i in range(35))
     found = _found(f'@then("a")\ndef then_it(ctx):\n{body}\n')
     assert len(found) == 1, found
-    assert "lines of setup" in found[0]["detail"]
+    assert "statements of setup" in found[0]["detail"]

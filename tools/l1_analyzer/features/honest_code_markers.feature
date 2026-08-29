@@ -90,3 +90,11 @@ Feature: Three clauses that read what is attached to a declaration
     And this is what tells a step file from a file that merely carries a decorator of the same name, because a property-based testing library spells its decorator the same way and awaits what it calls
     And an adopter reported that false positive and found, writing it up, that their own gate avoided it only by looking in one directory
     But a directory name is a convention where a binding is the thing itself, which is why this reads the binding
+
+  Scenario: statements_in gives how much a step actually does, in statements rather than lines
+    Given a step definition node and its language's vocabulary
+    When statements_in counts what each block holds, passing over comments and a bare string standing alone
+    Then it returns the work the step does, which is what setup means
+    And a docstring does not count, because an adopter measured eight of their sites and six were already under the threshold in code alone, one of them eighteen statements carrying a sixteen-line docstring that recorded a defect their suite had paid for
+    And the number told them to delete that explanation, which is the opposite of what this family of rules asks for
+    But a call spread over four lines counts once, so a number that used to move when somebody reformatted was measuring the formatter
