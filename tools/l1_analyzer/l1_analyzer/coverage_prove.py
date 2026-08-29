@@ -89,8 +89,47 @@ LAST_REFUSAL = {"reason": "", "cause": ""}
 # The key is pinned and the value left open, because a gap carries whatever the locator put
 # in it and an answer carries whatever the model returned. `dict[str, object]` says that
 # honestly; `dict` said nothing at all and scored better for saying it.
-Gap = dict[str, object]
-Answer = dict[str, object]
+class Gap(TypedDict, total=False):
+    """One uncovered decision the sweep found, as the locator hands it over.
+
+    Written out because the fields are read as strings and numbers at a dozen sites, and a
+    mapping of anything to anything cannot say so: every one of those reads was an assumption
+    nothing checked, which a type checker said the moment one ran over this package.
+
+    `total=False` because a locator fills in what its language can see. The Rust sweep knows
+    a function's parameters and return type; the Python one adds whether it is a method.
+    A gap missing a field is a gap the locator could not describe, and a reader asking for it
+    gets nothing rather than a fabricated blank."""
+
+    kind: str
+    function: str
+    line: int
+    detail: str
+    silent: bool
+    body: str
+    function_source: str
+    parameters: str
+    return_type: str
+    is_method: bool
+    # A gap that has been through a refinement carries the sentence explaining it.
+    explanation: str
+
+
+class Answer(TypedDict, total=False):
+    """What a model returned for one gap, or as much of it as arrived.
+
+    Not total, because the model may answer partly or not at all, and a missing field is the
+    honest record of that. Reading one as a string is what every caller did, and nothing
+    checked it until now."""
+
+    function: str
+    explanation: str
+    test_source: str
+    module: str
+    # A refinement answers with a narrowed body, and the caller reads it back. Added by
+    # reading what the code does rather than by guessing which record a key belongs to,
+    # which is how the first split of these two put `body` on the wrong one.
+    body: str
 
 
 
@@ -149,7 +188,7 @@ def _signature(gap: Gap) -> str:
     return f"fn {gap['function']}({params}) -> {gap['return_type']}"
 
 
-def _valid(data: Gap | None, asserts: Callable[[str], bool]) -> Answer | None:
+def _valid(data: Answer | None, asserts: Callable[[str], bool]) -> Answer | None:
     """A usable proposal, or nothing.
 
     `asserts` is the language's reachable-assertion rule, and refusing here rather than

@@ -132,7 +132,12 @@ class Clause(TypedDict):
     decides: str
     reads: str
     languages: frozenset[str]
-    check: Callable[[dict], list[Finding] | None]
+    # The sentence for a clause that found nothing it could read in a file, which is not
+    # the same as the question failing to arise. Required of every row and read at two
+    # sites, and never declared here: a type checker had not run over this package until
+    # 2026-08-29, so nothing said the record and the table disagreed.
+    nothing_to_read: str
+    check: Callable[[Source], list[Finding] | None]
 
 
 class Allowed(TypedDict):
@@ -208,6 +213,24 @@ def _grammars() -> dict[str, Language]:
 
 
 GRAMMARS = _grammars()
+
+
+class Block(TypedDict):
+    """One block of another language, as it is found, before anything reads it.
+
+    The same fields as the record below plus the block's own source, which travels only as
+    far as the reader and never into the published record: carrying every embedded block's
+    text into a report about the file would put the file back into the report.
+
+    Its own record rather than the published one, because the published one does not hold
+    text and said so, while the code built it holding text and popped it out again. Nothing
+    said the two disagreed until a type checker ran over this package.
+    """
+
+    language: str
+    line: int
+    lines: int
+    text: str
 
 
 class Unexamined(TypedDict):
@@ -644,7 +667,7 @@ def unexamined_blocks(source: Source) -> list[Unexamined]:
     return examined
 
 
-def _findings_in(block: Unexamined, text: str) -> list[Finding]:
+def _findings_in(block: Block, text: str) -> list[Finding]:
     """What every clause that reads the shared vocabulary says about one embedded block.
 
     Only those clauses: the ones written against Python's own parser would be handed a tree
@@ -666,7 +689,7 @@ def _findings_in(block: Unexamined, text: str) -> list[Finding]:
     return [{**f, "line": f["line"] + block["line"] - 1} for f in found]
 
 
-def _blocks_in(text: str, own: str, line: int) -> list[Unexamined]:
+def _blocks_in(text: str, own: str, line: int) -> list[Block]:
     """Every block of another language inside this text, one entry per element.
 
     One entry per BLOCK was wrong and it was wrong quietly. Page content usually carries a
