@@ -31,19 +31,6 @@ Feature: thread_surface — the concurrency audit surface, every site where a la
     Then it records the line as the node's start row counted from one, not from zero
     And it collapses every run of whitespace in the symbol to one space, so a field access split across lines reads as a single symbol in the report
 
-  Scenario: _rust_method_receiver splits a Rust method call into the method and what it was called on
-    Given any node
-    When _rust_method_receiver checks that the node is a call whose function is a field access
-    Then it returns the method name and the receiver text, which is the shared-state key the per-function rules match on
-    But anything that is not a call on a field access returns nothing, which is how a plain function call is passed over
-
-  Scenario: _rust_receivers_by_method collects the self-rooted receivers a named set of methods is called on
-    Given a scope to search and the set of method names that count
-    When _rust_receivers_by_method walks the scope and keeps every matching call
-    Then it returns the receiver text of each one whose receiver begins with self.
-    And an empty scope returns nothing, so a missing if-branch costs the caller no special case
-    But a receiver that is a plain local is dropped, because only instance state can be shared between threads
-
   Scenario: _rust_takes_shared_self decides whether a Rust method can be called by two threads at once
     Given a function node
     When _rust_takes_shared_self looks for a self parameter taken by reference
@@ -155,18 +142,6 @@ Feature: thread_surface — the concurrency audit surface, every site where a la
     Then a mutable default argument is always a review-severity finding, concurrency imports or not, because it is shared across calls and decidable on sight
     And a module-level mutable container in a threaded file is exposed when no lock exists in the file and only review when one does
     But a file with no concurrency at all returns after the default-argument pass and is never charged with shared state
-
-  Scenario: _js_method_receiver splits a JavaScript method call into the property and the object
-    Given any node
-    When _js_method_receiver checks that the node is a call whose function is a member expression
-    Then it returns the property name and the object text
-    But anything else returns nothing
-
-  Scenario: _js_receivers_by_method collects the this-rooted receivers a named set of methods is called on
-    Given a scope to search and the set of method names that count
-    When _js_receivers_by_method walks the scope and keeps every matching call
-    Then it returns the object text of each one that begins with this.
-    But a receiver that is a plain local is dropped, because only instance state outlives the awaited gap
 
   Scenario: _scan_jsts finds an async check-then-act across an await
     Given the root of a parsed JavaScript or TypeScript file and its path

@@ -65,7 +65,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
-from l1_analyzer.lang_spec import LANG_SPEC, LangSpec
 from tree_sitter import Node
 
 from l1_analyzer.indicators import (
@@ -74,6 +73,7 @@ from l1_analyzer.indicators import (
     _read_source_bytes,
     bucketed_paths,
 )
+from l1_analyzer.lang_spec import LANG_SPEC, LangSpec
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE, BucketedPaths
 from l1_analyzer.ts_nodes import text as _text
 
