@@ -33,9 +33,10 @@ from l1_analyzer import honest_code_markers as markers
 from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_references as references
 from l1_analyzer import honest_code_rules as rules
-from l1_analyzer.honest_code_read import read_tree
+from l1_analyzer.honest_code_read import Source, read_tree
 from l1_analyzer.honest_code_rules import BROWSER_LANGUAGES, Finding
 from l1_analyzer.lang_spec import LANG_SPEC
+from l1_analyzer.pytest_trace import L1Result
 
 # Clauses that are ABOUT tests: how many mocks one carries, how much setup a step needs.
 # Measured over the test files rather than the production ones, because measuring only
@@ -370,7 +371,7 @@ _ALLOW = re.compile(r"honest-code-allow:\s*(L1\.21\.\d+)\s*[-\u2014:]+\s*(\S.*?)
 _ALLOW_REACH = 4
 
 
-def read_source_text(text: str, path: str) -> dict:
+def read_source_text(text: str, path: str) -> Source:
     """One file's text, parsed into what every clause needs.
 
     A file that does not parse comes back unreadable rather than empty. A file nobody could
@@ -410,7 +411,7 @@ def read_source_text(text: str, path: str) -> dict:
 
 
 # honest-code-allow: L1.21.1 - read_source and assess_file are two edges of this module, one obtaining text and one obtaining a file, and each is a name a caller reaches for. Collapsing them puts a mode argument in front of two things nobody calls together
-def read_source(path: Path) -> dict:
+def read_source(path: Path) -> Source:
     """The one function here that touches the filesystem, so every clause below it stays a
     pure function of a tree."""
     path = Path(path)
@@ -443,7 +444,7 @@ def allowed_reason(finding: Finding, declared: dict[int, dict[str, str]]) -> str
     return ""
 
 
-def applies_to(clause: Clause, source: dict) -> bool:
+def applies_to(clause: Clause, source: Source) -> bool:
     """Whether this clause can be decided for this file at all.
 
     Not applicable is a third answer beside pass and fail. A clause nobody ran is not a
@@ -457,7 +458,7 @@ def clause_named(code: str) -> Clause:
     return next(c for c in CLAUSES if c["code"] == code)
 
 
-def assess(source: dict) -> list[Assessed]:
+def assess(source: Source) -> list[Assessed]:
     """Every clause, run over one parsed source.
 
     A clause that could not be decided never carries findings: not applicable and not
@@ -529,7 +530,7 @@ def _withheld(finding: Finding, reason: str) -> Allowed:
             "line": finding["line"], "detail": finding["detail"], "reason": reason}
 
 
-def _skip_reason(clause: Clause, source: dict) -> tuple[str, str]:
+def _skip_reason(clause: Clause, source: Source) -> tuple[str, str]:
     """Which KIND of undecided this clause is, and the sentence for a reader.
 
     The kind is what a consumer buckets on. The sentence is what a person reads, and it
@@ -609,7 +610,7 @@ def assess_file(path: Path) -> Assessment:
     return assess_file_text(path.read_text(errors="replace"), str(path))
 
 
-def unexamined_blocks(source: dict) -> list[Unexamined]:
+def unexamined_blocks(source: Source) -> list[Unexamined]:
     """Substantial string constants that parse cleanly as another language this tool knows.
 
     A Python file holding a JavaScript widget scored 100 per cent with fourteen clauses
@@ -932,7 +933,7 @@ def _named_under(repo: Path, path: Path) -> str:
         return str(path)
 
 
-def analyze(repo: Path, lang: str) -> dict:
+def analyze(repo: Path, lang: str) -> L1Result:
     """L1.21 over a whole repository.
 
     A clause is broken for the repository if ANY file breaks it, because one dishonest site

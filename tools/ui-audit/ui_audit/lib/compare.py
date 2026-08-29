@@ -6,6 +6,12 @@ No I/O, no side effects. Accepts extracted metadata, returns audit results.
 
 
 
+# One component's reading, and the difference between two of them. Both were written `dict`,
+# the least precise mapping the language has, with the key always a string.
+Reading = dict[str, object]
+
+
+
 def normalize_attr_to_opt(attr_name: str) -> str:
     """
     Convert a ux-* attribute name (kebab) to the opts property name (camelCase).
@@ -22,9 +28,9 @@ def normalize_attr_to_opt(attr_name: str) -> str:
     return parts[0] + ''.join(p.capitalize() for p in parts[1:])
 def compare_component(
     component_name: str,
-    playground_data: dict,
-    enhance_data: dict | None,
-) -> dict:
+    playground_data: Reading,
+    enhance_data: Reading | None,
+) -> Reading:
     """
     Compare what a playground component emits vs what enhance reads.
 
@@ -84,9 +90,9 @@ def compare_component(
 
 
 def audit_all(
-    playground_components: dict,
-    enhance_functions: dict,
-) -> list[dict]:
+    playground_components: Reading,
+    enhance_functions: Reading,
+) -> list[Reading]:
     """
     Run comparison for all components.
 

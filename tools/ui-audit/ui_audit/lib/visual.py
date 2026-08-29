@@ -20,13 +20,25 @@ DEFAULT_SCREENSHOT_DIR = '.audit/screenshots'
 PLAYGROUND_SELECTOR = '[data-playground]'
 
 
+# What this module passes around. A finding is one component the first phase flagged, and a
+# check is what the browser saw when it looked. Both were written `dict`, which means
+# dict[Any, Any] and is the least precise mapping the language has.
+#
+# The key is pinned and the value left open, because each carries whatever produced it: a
+# finding holds whatever the first phase recorded, and a check holds whatever the page gave
+# back. `dict[str, object]` says that; `dict` said nothing.
+Finding = dict[str, object]
+Check = dict[str, object]
+
+
+
 @boundary
 async def verify_components(
     url: str,
-    components: list[dict],
+    components: list[Finding],
     screenshot_dir: str,
     playground_selector: str,
-) -> list[dict]:
+) -> list[Finding]:
     """
     Visually verify flagged components using Playwright.
 
@@ -69,10 +81,10 @@ async def verify_components(
 async def _verify_single_component(
     page,
     name: str,
-    audit_result: dict,
+    audit_result: Finding,
     screenshot_dir: Path,
     playground_selector: str,
-) -> dict:
+) -> Check:
     """Verify a single component's controls visually."""
     result = {
         'component': name,
@@ -123,7 +135,7 @@ async def _verify_single_component(
 
 async def _test_dead_control(
     page, section, name: str, opt_name: str, attr: str, screenshot_dir: Path,
-) -> dict | None:
+) -> Check | None:
     """Change a dead control and screenshot to confirm it has no visual effect."""
     # Find the control by label text matching the option name
     # Convert camelCase to human label: 'hoverBg' -> 'Hover Bg' (approximate)
@@ -183,8 +195,8 @@ async def _test_dead_control(
 
 
 async def _test_hover_control(
-    page, section, name: str, matched: dict, screenshot_dir: Path,
-) -> dict | None:
+    page, section, name: str, matched: Finding, screenshot_dir: Path,
+) -> Check | None:
     """Test a hover-related control with real mouse hover."""
     try:
         preview = section.locator('.ux-playground__preview')
@@ -222,10 +234,10 @@ async def _test_hover_control(
 
 def run_visual_audit(
     url: str,
-    audit_results: list[dict],
+    audit_results: list[Finding],
     screenshot_dir: str,
     only_failures: bool,
-) -> list[dict]:
+) -> list[Finding]:
     """
     Synchronous entry point for visual verification.
 

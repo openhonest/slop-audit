@@ -19,6 +19,12 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+# One indicator's reading from either tool, keyed by its code. Written `dict`, the least
+# precise mapping the language has, where the key is always a string.
+Reading = dict[str, object]
+
+
+
 def boundary(fn):
     """Mark a function as one of this script's edges, and change nothing about it.
 

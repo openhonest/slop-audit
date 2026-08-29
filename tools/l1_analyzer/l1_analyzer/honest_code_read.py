@@ -48,7 +48,7 @@ class Finding(TypedDict):
     undecided: str
 
 
-class Source(TypedDict):
+class Source(TypedDict, total=False):
     """One parsed source, and everything a clause needs to read it.
 
     Written out because `dict` is what every clause checker took, and `dict` means
@@ -67,6 +67,13 @@ class Source(TypedDict):
     raw: bytes
     root: Node
     path: str
+    # Filled in by the runner in honest_code, which reads a file rather than a string. A
+    # clause reading only the tree never sees these, and `total=False` is what lets both
+    # callers hand over the same shape without one of them inventing keys it has no answer
+    # for.
+    tree: object
+    readable: bool
+    unreadable_reason: str
 
 
 def read_tree(text: str, language: str) -> Source:

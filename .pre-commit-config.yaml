@@ -61,15 +61,15 @@ repos:
         # the sloppier annotation, ours included, and the zero was a zero on a thing nobody
         # was counting.
         #
-        # Naming the shape every clause checker takes closed 45 of them, and naming what
-        # the card, the report and the two prove sweeps pass around closed 59 more: 142 to
-        # 83 in a day. Every one was a bare `dict` on an annotation whose key is always a
-        # string, so writing `dict[str, object]` said what was true and cost nothing.
+        # Naming shapes closed 100 of them in a day: 157 the moment the counter could see
+        # a bare generic, then 142, 83, and 57. Every one was a bare `dict` on an annotation
+        # whose key is always a string, so writing `dict[str, object]` said what was true
+        # and cost nothing. Some of them already had a name and were not using it.
         #
         # Lower it as they are named. A baseline looser than reality is a defect too, and
         # the gate refuses in that direction as well: it failed on 83 against a ratchet of
         # 142 and said so.
-        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 83 --max-honest-code 0
+        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 57 --max-honest-code 0
         language: system
         pass_filenames: false
         # Any Python in the repository, because the entry audits the whole repository.
