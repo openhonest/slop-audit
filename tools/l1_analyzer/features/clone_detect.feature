@@ -56,3 +56,12 @@ Feature: clone_detect — L1.13 near-duplicate code, measured rather than delega
     When analyze tokenizes every production file and measures the repeats
     Then it returns that share, banded against the canon's three and ten percent
     But a tree with no production source refuses, because a share of no lines is absent and not zero, and reporting zero would band Healthy for a repository nobody read
+
+  Scenario: _declares_only_fields says whether a node is a record declaration and nothing else
+    Given a node and its language
+    When _declares_only_fields reads the class body for anything that is not a named field or the class's own description
+    Then it answers yes for a record, which is a list of names carrying types
+    And that is why a record is discounted: this check erases identifiers so two functions doing one thing with different names read alike, and a record IS its field names, so erasing them leaves the shape every record ever written has
+    And four types in this package are called Finding and hold different facts, which the check reported as duplicated code because after normalising nothing was left to tell them apart
+    And a name with no type does not count, so a class of constants is still read as code
+    But one method makes it code and this answers no, because a rule that skipped any class would let anyone hide duplication behind a keyword

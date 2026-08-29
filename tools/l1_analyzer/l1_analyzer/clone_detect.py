@@ -52,6 +52,42 @@ def literal_types(lang: str) -> frozenset[str]:
     return frozenset(LANG_SPEC[lang]["literal_types"])
 
 
+def _declares_only_fields(node: Node, lang: str) -> bool:
+    """Whether this node is a record declaration and nothing else.
+
+    A class whose body holds only annotated names and its own description. One method makes
+    it code, and this returns False, because a rule that skipped any class would let anyone
+    hide duplication behind a keyword."""
+    from l1_analyzer.lang_spec import LANG_SPEC
+
+    spec = LANG_SPEC.get(lang)
+    if spec is None or node.type not in spec["class_types"]:
+        return False
+    body = node.child_by_field_name("body")
+    if body is None or not body.named_children:
+        return False
+    fields = 0
+    for statement in body.named_children:
+        if statement.type == "comment":
+            continue
+        inner = statement.named_children[0] if (
+            statement.type in spec["sink_types"] and statement.named_children) else statement
+        if "string" in inner.type:
+            continue
+        if inner.type in _FIELD_DECLARATIONS and inner.child_by_field_name("type") is not None:
+            fields += 1
+            continue
+        return False
+    return fields > 0
+
+
+# How a language spells a name carrying a type. A record holds these and its own description
+# and nothing else; the type is what separates a field from an ordinary assignment, so a
+# class of constants is still read as code.
+_FIELD_DECLARATIONS = ("assignment", "typed_parameter", "annotated_assignment",
+                       "field_declaration", "property_declaration", "variable_declaration")
+
+
 def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
     """Every leaf of the tree as (symbol, line), with identifiers and literals normalized.
 
@@ -76,6 +112,20 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
             return
         if (node.type in tables
                 and node.end_point[0] - node.start_point[0] + 1 >= _MIN_TABLE_LINES):
+            return
+        # A record declaration, for the same reason as a data table. This check erases
+        # identifiers so that two functions doing one thing with different names read alike,
+        # and that is exactly what makes it wrong here: a record IS its field names, and
+        # erasing them leaves the shape every record ever written has.
+        #
+        # Four types in this package are called Finding and hold different facts. Merging
+        # them would be a defect rather than a fix, and the check reported them as
+        # duplicated code because after normalising there was nothing left to tell them
+        # apart. 93 of this repository's 1207 duplicated lines were inside one.
+        #
+        # A declaration only. A class carrying methods is code, and skipping that would hide
+        # duplication behind a keyword.
+        if _declares_only_fields(node, lang):
             return
         # The literal test comes BEFORE the descent, because a literal is not always a
         # leaf. Python spells a string as a node with string_start, string_content and
