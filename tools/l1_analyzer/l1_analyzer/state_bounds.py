@@ -148,6 +148,11 @@ def _callee_name(call: Node | None, sp: LangSpec) -> str:
 # and ORDERED, which inverted the verdict: `key in store` graded the repository F and
 # `key not in store` graded it A. One word, semantics unchanged, and no disclosure.
 def _is_comparison(node: Node | None, sp: LangSpec) -> bool:
+    """Whether this node compares two things. An absent node compares nothing.
+
+    It declared that it takes one and asked it for its type on the next line."""
+    if node is None:
+        return False
     if node.type == "comparison_operator":       # Python: always a comparison
         return True
     return _text(_field(node, "operator")) in _COMPARISON_OPS
@@ -450,7 +455,13 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
 
 
 def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], cells: int | None, depth: int) -> Reach:
-    """Categorise how a value derived from the state (node) reaches a decision."""
+    """Categorise how a value derived from the state (node) reaches a decision.
+
+    An absent node reaches no decision, and that is the same answer as a node with nothing
+    above it: the value goes out of the function. This declared that it takes an absent node
+    and asked it for its parent on the next line."""
+    if node is None:
+        return state_partition.output()
     parent = node.parent
     if parent is None:
         return state_partition.output()

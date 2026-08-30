@@ -122,7 +122,13 @@ MEMBERSHIP_TOKENS = frozenset({"in", "not in"})
 
 
 def membership_operands(node: Node | None, sp: LangSpec) -> tuple[Node, Node] | None:
-    """(left, right) for an `in` / `not in` membership test, else None."""
+    """(left, right) for an `in` / `not in` membership test, else None.
+
+    An absent node is an absent answer. This declared that it takes one and reached into it
+    on the next line, so handing it the absence it advertised raised, and on the run that
+    did it an adopter would get a stack trace instead of an audit."""
+    if node is None:
+        return None
     style = sp["membership"]
     if style == "comparison_in" and node.type == "comparison_operator":
         if not any(c.type in MEMBERSHIP_TOKENS for c in node.children):
