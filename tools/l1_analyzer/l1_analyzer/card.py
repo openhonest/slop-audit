@@ -15,10 +15,36 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TypedDict, cast
 
 from l1_analyzer import report
 from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.report import UNORDERED_CLASS_BOUND, grade_summary
+
+
+class MetricSpec(TypedDict):
+    """One row of the tables that say which indicators a card shows.
+
+    Three keys, and every one is read: the indicator's code, the unit printed after its
+    value, and the compliance dimensions it maps to. The tables were typed as a bare tuple
+    and each row as a mapping of anything to anything, so all three reads were assumptions
+    nothing checked."""
+
+    key: str
+    unit: str
+    maps_to: list[Dimension]
+
+
+class Dimension(TypedDict):
+    """One compliance dimension an indicator maps to, and the frameworks behind it.
+
+    Written out because a guess got it wrong. Declaring the list as one of strings looked
+    right and the checker rejected every row: what it actually holds is a record with a
+    dimension and its frameworks, printed as two fields on the card."""
+
+    dimension: str
+    frameworks: str
+
 
 # What a card reads. The panel is every indicator's reading by its code, and a row is one
 # reading. Both were written `dict`, which means dict[Any, Any] and is the least precise
@@ -173,9 +199,9 @@ ABSENT_INDICATOR = {"value": "n/a", "band": "n/a",
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
 # The core (verifiability) metrics and the audit checks, with their framework mappings.
-_CORE_STATIC = ({"key": "L1.19", "unit": "", "maps_to": []},)
-_CORE_RAN = ({"key": "L1.19", "unit": "", "maps_to": []}, {"key": "L1.20", "unit": "", "maps_to": []})
-_AUDIT = (
+_CORE_STATIC: tuple[MetricSpec, ...] = ({"key": "L1.19", "unit": "", "maps_to": []},)
+_CORE_RAN: tuple[MetricSpec, ...] = ({"key": "L1.19", "unit": "", "maps_to": []}, {"key": "L1.20", "unit": "", "maps_to": []})
+_AUDIT: tuple[MetricSpec, ...] = (
     # The canon's own mapping: L1.12 triangulates tech debt with L1.5/L1.6/L1.7
     # (../../../spec/dimensions/17-tech-debt-management.md), and L1.14 is the first check of the
     # configuration-and-secrets dimension (../../../spec/dimensions/07-configuration-secrets.md).
@@ -203,7 +229,7 @@ def _t(key: str, **f: object) -> str:
     return v.format(**{k: str(x) for k, x in f.items()}) if f else v
 
 
-def _value_str(result: Row, unit: str) -> str:
+def _value_str(result: L1Result, unit: str) -> str:
     # Subscripted. L1Result is total and its only caller passes a panel entry it has
     # already found by key, so a default here would print n/a for a result that measured
     # something and lost the field on the way.
@@ -211,7 +237,7 @@ def _value_str(result: Row, unit: str) -> str:
     return "n/a" if v == "n/a" else f"{v}{unit}"
 
 
-def _metric(spec: Row, result: Row, group: str) -> Row:
+def _metric(spec: MetricSpec, result: L1Result, group: str) -> Row:
     band = str(result["band"])
     k = spec["key"]
     return {"label": _t(f"label.{k}"), "tech": _t(f"tech.{k}"), "value": _value_str(result, spec["unit"]),
@@ -219,8 +245,17 @@ def _metric(spec: Row, result: Row, group: str) -> Row:
             "group": group, "maps_to": spec["maps_to"]}
 
 
-def _metrics(specs: tuple, results: Row, group: str) -> list[Row]:
-    return [_metric(s, results[s["key"]], group) for s in specs if s["key"] in results]
+def _metrics(specs: tuple[MetricSpec, ...], results: Panel, group: str) -> list[Row]:
+    # Narrowed once, here, where a reading comes out of the panel. A panel carries an
+    # indicator's reading under its code and a few named extras beside them, so the value
+    # is genuinely open and every read of it downstream was an assumption. One check at the
+    # gate is what makes the rest of this file's annotations mean something.
+    out: list[Row] = []
+    for spec in specs:
+        reading = results.get(spec["key"])
+        if isinstance(reading, dict):
+            out.append(_metric(spec, cast("L1Result", reading), group))
+    return out
 
 
 def _culprits(l18b: Row | None, status: str, coarse: list[Row]) -> tuple[list[Row], int]:

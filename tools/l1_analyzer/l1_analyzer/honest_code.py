@@ -272,7 +272,7 @@ class Assessment(TypedDict):
     unreadable_reason: str
 
 
-def _clause(rule: int, name: str, decides: str, check: Callable[[dict], list[Finding] | None],
+def _clause(rule: int, name: str, decides: str, check: Callable[[Source], list[Finding] | None],
             nothing_to_read: str, languages: frozenset[str] = _ALL,
             reads: str = _PYTHON_AST) -> Clause:
     """One row of the table.

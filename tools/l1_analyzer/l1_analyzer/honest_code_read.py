@@ -71,7 +71,11 @@ class Source(TypedDict, total=False):
     # clause reading only the tree never sees these, and `total=False` is what lets both
     # callers hand over the same shape without one of them inventing keys it has no answer
     # for.
-    tree: object
+    # Python's own parse, present only for Python and read only by the clauses written
+    # against it. Typed as the module it comes from, because a reader that takes it does ask
+    # for its body: declaring it as anything at all meant every such read was an assumption
+    # nothing checked.
+    tree: ast.Module
     readable: bool
     unreadable_reason: str
 
