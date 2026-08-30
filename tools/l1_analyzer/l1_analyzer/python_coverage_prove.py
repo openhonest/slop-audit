@@ -261,7 +261,7 @@ def _prove_one(repo: Path, interpreter: str, gap: CoverageGap, import_path: str,
     repository refuses everywhere else."""
     proposal = propose_fn(gap, import_path)
     if proposal is None:
-        return "declined", None, ""
+        return "declined", "", ""
     source = render_test(proposal["body"])
     rc, output = run_fn(repo, interpreter, source, timeout_seconds)
     bucket = _classify(output, rc)
@@ -275,7 +275,7 @@ def _prove_one(repo: Path, interpreter: str, gap: CoverageGap, import_path: str,
         source = render_test(fixed["body"])
         rc, output = run_fn(repo, interpreter, source, timeout_seconds)
         bucket = _classify(output, rc)
-    return bucket, proposal, source
+    return bucket, proposal["explanation"], source
 
 
 def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[CoverageGap],
@@ -289,14 +289,15 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Coverag
     import_path = _import_path(repo, repo / relpath)
     retained: list[CoverageProof] = []
     for gap in gaps:
-        bucket, proposal, source = _prove_one(repo, interpreter, gap, import_path, repair_rounds,
-                                              timeout_seconds, propose_fn, repair_fn, run_fn)
+        bucket, explanation, source = _prove_one(repo, interpreter, gap, import_path,
+                                                 repair_rounds, timeout_seconds, propose_fn,
+                                                 repair_fn, run_fn)
         outcomes[bucket] += 1
         if bucket == "divergence":
             entry: CoverageProof = {
                 "function": gap["function"], "language": "python",
                 "location": f"{relpath}:{gap['line']}",
-                "explanation": proposal["explanation"], "test_source": source.strip(),
+                "explanation": explanation, "test_source": source.strip(),
             }
             retained.append(entry)
     return retained, outcomes

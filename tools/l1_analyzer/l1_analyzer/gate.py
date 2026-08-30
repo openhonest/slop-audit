@@ -84,8 +84,9 @@ def _slack(actual: int, baseline: int, label: str, counted: Path) -> list[str]:
     """
     if actual >= baseline:
         return []
-    return [(f"{label}: the ratchet is set at {baseline} and {counted} has {actual}. "
-             f"Lower the baseline to {actual} wherever the gate that runs on {counted} "
+    named = counted.resolve()
+    return [(f"{label}: the ratchet is set at {baseline} and {named} has {actual}. "
+             f"Lower the baseline to {actual} wherever the gate that runs on {named} "
              f"reads it. A baseline above the real count is {baseline - actual} "
              "regression(s) nobody will be told about.")]
 

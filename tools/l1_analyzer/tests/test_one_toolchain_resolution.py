@@ -32,15 +32,15 @@ def test_javascript_looks_for_node_in_one_place():
 
 def test_java_refuses_a_repo_with_no_maven_project(tmp_path):
     """No pom.xml is not a Java repo, so the resolver refuses and hands back no tools."""
-    refusal, tools = java_trace._toolchain(tmp_path, timeout_seconds=5)
-    assert refusal is not None
-    assert refusal["band"] == "n/a"
-    assert tools is None
+    answer = java_trace._toolchain(tmp_path, timeout_seconds=5)
+    assert answer["ok"] is False
+    assert answer["refusal"]["band"] == "n/a"
+    assert "tools" not in answer
 
 
 def test_javascript_refuses_a_repo_with_no_package_json(tmp_path):
     """A directory with no package.json cannot have a runner, whatever is on PATH."""
-    refusal, pkg = js_trace._toolchain(tmp_path)
-    assert refusal is not None
-    assert refusal["band"] == "n/a"
-    assert pkg is None
+    answer = js_trace._toolchain(tmp_path)
+    assert answer["ok"] is False
+    assert answer["refusal"]["band"] == "n/a"
+    assert "manifest" not in answer

@@ -113,16 +113,16 @@ def test_a_gradle_project_is_refused_by_name(tmp_path):
     # The deleted suite stubbed _maven for this case. The stub was dead: the Gradle refusal
     # is returned before _maven is ever called, which is why it needs no stub here either.
     (tmp_path / "build.gradle").write_text("plugins { id 'java' }\n")
-    assert java_trace._unsupported_reason(tmp_path) == "Gradle Java projects not yet supported by this harness"
+    assert java_trace._unsupported_reason(tmp_path, "mvn") == "Gradle Java projects not yet supported by this harness"
 
 
 def test_a_kotlin_dsl_gradle_project_is_refused_by_the_same_name(tmp_path):
     (tmp_path / "build.gradle.kts").write_text("plugins { java }\n")
-    assert java_trace._unsupported_reason(tmp_path) == "Gradle Java projects not yet supported by this harness"
+    assert java_trace._unsupported_reason(tmp_path, "mvn") == "Gradle Java projects not yet supported by this harness"
 
 
 def test_a_project_with_no_build_file_at_all_is_told_what_it_needs(tmp_path):
-    assert java_trace._unsupported_reason(tmp_path) == "needs a Maven build (no pom.xml found)"
+    assert java_trace._unsupported_reason(tmp_path, "mvn") == "needs a Maven build (no pom.xml found)"
 
 
 # --- the L1.20 verdict, extracted so the per-seed outcomes can be asserted -----------------

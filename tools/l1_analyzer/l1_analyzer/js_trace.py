@@ -30,7 +30,7 @@ import shlex
 import shutil
 import tempfile
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
@@ -199,7 +199,7 @@ def _c8_available(repo: Path, timeout_seconds: float) -> bool:
     return probe.returncode == 0
 
 
-def _coverage_verdict(branches: Branches, returncode: int, runtime: str) -> L1Result:
+def _coverage_verdict(branches: Branches | None, returncode: int, runtime: str) -> L1Result:
     """L1.19 from a finished run and c8's branch totals. No I/O, so it can be asserted.
 
     Extracted because it could not be reached otherwise. `decision_space_coverage` probes node,
@@ -208,7 +208,10 @@ def _coverage_verdict(branches: Branches, returncode: int, runtime: str) -> L1Re
     that wrote the very summary file the module then read back.
 
     The timeout is decided first, before any total is touched: a killed run wrote no summary,
-    so the caller has nothing to hand over but an empty object.
+    so the caller has nothing to hand over. That absence is None, matching the Java and C#
+    verdicts, which is what it was in every language here but this one. It was an empty
+    mapping, which the declaration said carried three numbers, so the one call that meant
+    "nothing was read" was written as a report that had lost its fields.
 
     `branches` is read by subscript. c8 writes `total`, `covered`, `skipped` and `pct` into
     every json-summary report it produces, and a summary missing them is a schema change rather
@@ -217,6 +220,8 @@ def _coverage_verdict(branches: Branches, returncode: int, runtime: str) -> L1Re
     """
     if returncode == 124:
         return _na("test suite timed out before coverage could be measured")
+    if branches is None:
+        return _na("the coverage run wrote no summary to read")
     if int(branches["total"]) == 0:
         return _na("no enumerable decision branches found in the measured tree")
     pct = float(branches["pct"])
@@ -228,10 +233,28 @@ def _coverage_verdict(branches: Branches, returncode: int, runtime: str) -> L1Re
     }
 
 
-def _toolchain(repo: Path) -> tuple[L1Result | None, dict | None]:
-    """Either a refusal or a usable toolchain, never a half-resolved one. Exactly one of the
-    two is None, so a caller that forgets the check gets a TypeError rather than a run
-    against a toolchain that was never found.
+class Refused(TypedDict):
+    """No toolchain, and the result the indicator returns instead."""
+    ok: Literal[False]
+    refusal: L1Result
+
+
+class Resolved(TypedDict):
+    """A readable package.json, and nothing to refuse."""
+    ok: Literal[True]
+    manifest: Manifest
+
+
+def _toolchain(repo: Path) -> Refused | Resolved:
+    """Either a refusal or a usable toolchain, never a half-resolved one.
+
+    It returned the pair `(refusal, tools)` with this docstring promising exactly one of
+    them was None. The type permitted (None, None) and (a refusal, a manifest) equally, and
+    nothing enforced the promise. Both indicators then read the manifest on the line after
+    the refusal check, so the promise was the only thing between them and a stack trace.
+
+    Tagged instead, matching the Java resolver. `ok` says which case it is, the other half
+    is absent rather than None, and reading it is a KeyError at the line that read it.
 
     Both L1.19 and L1.20 carried these eight lines. Two copies is two sets of preconditions
     that can drift: one indicator could learn a new one and the other keep running without
@@ -241,24 +264,24 @@ def _toolchain(repo: Path) -> tuple[L1Result | None, dict | None]:
     # _wrap, which spells a bare `node` so nvm can select the repo's version. A field
     # holding the path would be a value nobody reads.
     if _node() is None:
-        return _na("needs Node.js (node) in PATH"), None
+        return {"ok": False, "refusal": _na("needs Node.js (node) in PATH")}
     if not _node_modules_present(repo):
-        return _na("dependencies not installed (node_modules missing); run the project's "
-                   "install first"), None
+        return {"ok": False, "refusal": _na("dependencies not installed (node_modules "
+                                            "missing); run the project's install first")}
     pkg = _package_json(repo)
     if pkg is None:
-        return _na("no readable package.json in the repo"), None
-    return None, pkg
+        return {"ok": False, "refusal": _na("no readable package.json in the repo")}
+    return {"ok": True, "manifest": pkg}
 
 
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.19 for JS/TS: branch coverage from c8 (V8). Bands match the spec: >90% Healthy,
     60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a uniform harness
     signature and ignored: `node` on PATH is the runtime."""
-    refusal, tools = _toolchain(repo)
-    if refusal is not None:
-        return refusal
-    pkg = tools
+    answer = _toolchain(repo)
+    if answer["ok"] is False:
+        return answer["refusal"]
+    pkg = answer["manifest"]
     test_cmd = _test_command(pkg)
     if test_cmd is None:
         return _na("no test command in package.json (scripts.test)")
@@ -276,7 +299,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         )
         runtime = _runtime_name(repo, timeout_seconds)
         if run.returncode == 124:
-            return _coverage_verdict({}, run.returncode, runtime)
+            return _coverage_verdict(None, run.returncode, runtime)
         # c8 writes the summary for every file that ran, even when some tests fail. No summary
         # means the suite did not build or ran no tests: n/a with the reason, never a 0.0 that
         # reads as real-but-terrible coverage (a silent failure is a lie).
@@ -390,15 +413,18 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     A run that does not execute (missing runner, build error, no tests) is not a determinism
     result, so return n/a with the reason rather than a misleading 0/5. When the suite runs
     but some tests fail, the failing seeds' reasons are surfaced in details."""
-    refusal, tools = _toolchain(repo)
-    if refusal is not None:
-        return refusal
-    pkg = tools
+    answer = _toolchain(repo)
+    if answer["ok"] is False:
+        return answer["refusal"]
+    pkg = answer["manifest"]
     runner = _detect_runner(pkg)
-    builder = _RUNNERS.get(runner or "")
-    if builder is None:
+    # Refused before the lookup rather than through it. `_RUNNERS.get(runner or "")` turned
+    # "no runner detected" into a lookup of the empty string, so every line below carried a
+    # name that could be nothing and the refusal above was the only thing saying otherwise.
+    if runner is None or runner not in _RUNNERS:
         return _na("determinism needs an order-randomizing runner (vitest --sequence.shuffle or "
                    f"jest --seed); detected {runner or 'no recognized test runner'}")
+    builder = _RUNNERS[runner]
     if runner == "jest":
         major, unknown = _installed_major(repo, "jest")
         # Refused rather than attempted. `jest --seed` needs jest 30, and driving it at a

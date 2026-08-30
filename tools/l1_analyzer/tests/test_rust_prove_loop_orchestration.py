@@ -34,7 +34,7 @@ def test_a_proposal_nobody_returns_is_declined():
         repair_fn=lambda *a: None,
         run_fn=lambda *a: ("pass", ""),
         refine_fn=lambda *a: "divergence")
-    assert (bucket, proposal, source) == ("declined", None, "")
+    assert (bucket, proposal, source) == ("declined", "", "")
 
 
 def test_a_compile_error_is_repaired_and_then_gated():

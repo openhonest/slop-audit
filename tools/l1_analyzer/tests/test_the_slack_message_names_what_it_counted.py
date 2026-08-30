@@ -19,6 +19,15 @@ def test_the_message_names_the_tree_the_count_came_from():
     assert "tools/analyzer" in said[0]
 
 
+def test_the_tree_is_named_by_its_full_path():
+    """A relative path names no tree. Run from the repository root the message read "the
+    ratchet is set at 27 and . has 26", and a dot is the thing the reader was trying to
+    work out."""
+    said = _slack(20, 27, "type escapes (L1.15)", Path("."))
+    assert "and . has" not in said[0]
+    assert str(Path.cwd()) in said[0]
+
+
 def test_the_message_does_not_name_a_config_file_it_did_not_read():
     """Naming .pre-commit-config.yaml turns a count over one subtree into an instruction
     about a file that gates another. The number goes in the message; where it belongs is

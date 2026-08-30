@@ -237,7 +237,7 @@ def test_the_coverage_bands_are_decided_at_the_exact_edges(pct, band):
 def test_a_timed_out_run_is_named_rather_than_scored():
     # Decided before any total is read: a killed run wrote no summary, so there is nothing to
     # hand over but an empty object, and the verdict must reach its answer without it.
-    r = js_trace._coverage_verdict({}, 124, "node")
+    r = js_trace._coverage_verdict(None, 124, "node")
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "timed out" in r["details"]
 

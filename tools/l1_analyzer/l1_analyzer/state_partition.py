@@ -82,9 +82,33 @@ UNBOUNDED = "unbounded"    # reaches a decision whose reaching partition is prov
 UNDECIDED = "undecided"    # reaches a context whose reaching-set cannot be decided
 
 
-# One state finding, as the partition reader receives it. Written `dict`, the least precise
-# mapping the language has, with a string key.
-Finding = dict[str, object]
+class Partition(TypedDict):
+    """The reaching partition of one piece of state, rolled up from its references."""
+    classes: int      # 0 when counted is False, because there is no number to report
+    ordered: bool
+    counted: bool
+
+
+class Finding(TypedDict):
+    """One state finding, as the partition reader receives it.
+
+    It was `dict[str, object]`, the least precise mapping the language has. Nine fields,
+    written by two builders in state_bounds and read by four modules, and every read was an
+    assumption: nothing could say whether `partition` held a partition or `line` a number.
+    Twenty-one of those reads were indexing an `object` as far as the type checker could
+    tell, which is the same sentence in its own words.
+
+    `silence_line` is the reference the construct was read off rather than where the state
+    was bound, so a reader is sent to the shape the finding names."""
+    state: str
+    verdict: str
+    drives_decision: bool
+    file: str
+    line: int
+    silence: str
+    construct: str
+    silence_line: int
+    partition: Partition
 
 
 
@@ -100,13 +124,6 @@ class Reach(TypedDict):
     key: str          # identity of the discriminator, for de-duplication
     silence: str      # why undecided; empty on every decided reach
     construct: str    # the syntax shape no row covered; empty on every reach a row decided
-
-
-class Partition(TypedDict):
-    """The reaching partition of one piece of state, rolled up from its references."""
-    classes: int      # 0 when counted is False, because there is no number to report
-    ordered: bool
-    counted: bool
 
 
 def _reach(kind: str, ordered: bool) -> Reach:

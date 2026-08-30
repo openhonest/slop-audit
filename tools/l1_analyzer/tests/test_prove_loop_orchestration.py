@@ -50,17 +50,17 @@ def test_a_proposal_nobody_returns_is_declined_and_counted():
         propose_fn=lambda gap, path: None,
         repair_fn=lambda *a: None,
         run_fn=lambda *a: (0, ""))
-    assert (bucket, proposal, source) == ("declined", None, "")
+    assert (bucket, proposal, source) == ("declined", "", "")
 
 
 def test_a_divergence_is_retained_on_the_first_run():
-    bucket, proposal, source = pcp._prove_one(
+    bucket, explanation, source = pcp._prove_one(
         pathlib.Path("."), "python3", _GAP, "m", 3, 1.0,
         propose_fn=lambda gap, path: _proposal(),
         repair_fn=lambda *a: None,
         run_fn=lambda *a: (1, _FAILED_ASSERT))
     assert bucket == "divergence"
-    assert proposal["explanation"] == "why"
+    assert explanation == "why"
     assert "assert False" in source
 
 

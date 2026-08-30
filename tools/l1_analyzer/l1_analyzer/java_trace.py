@@ -33,7 +33,7 @@ import shutil
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from l1_analyzer import incomplete
 from l1_analyzer.boundary import boundary
@@ -51,6 +51,9 @@ from l1_analyzer.pytest_trace import (
 _SUREFIRE = re.compile(r"(Tests run: \d+[^\n]*)")
 
 
+_NO_MAVEN = "needs Maven (mvn) on PATH or a ./mvnw wrapper in the repo"
+
+
 def _maven(repo: Path) -> str | None:
     """The Maven command for this project: its own wrapper `./mvnw` (which pins the Maven
     version) when present, else a system `mvn`. None when neither is available. This is what
@@ -62,21 +65,27 @@ def _maven(repo: Path) -> str | None:
     return shutil.which("mvn")
 
 
-def _unsupported_reason(repo: Path) -> str | None:
+def _unsupported_reason(repo: Path, maven: str | None) -> str | None:
     """The specific, actionable reason this project cannot be measured by the Maven harness,
     or None when it can. A Gradle project is named as not-yet-supported rather than silently
-    failing, and a project with no pom.xml at all is told what it needs."""
+    failing, and a project with no pom.xml at all is told what it needs.
+
+    The command it judges is passed in rather than looked up here. This function decides
+    that the repo HAS one, `_toolchain` then called `_maven` a second time to use it, and a
+    comment carried the promise that the two calls agreed. Two reads of the filesystem are
+    two answers, and the promise is false for any repo that changes between them. One read
+    now, at the caller, judged here."""
     if not (repo / "pom.xml").exists():
         if (repo / "build.gradle").exists() or (repo / "build.gradle.kts").exists():
             return "Gradle Java projects not yet supported by this harness"
         return "needs a Maven build (no pom.xml found)"
-    if _maven(repo) is None:
-        return "needs Maven (mvn) on PATH or a ./mvnw wrapper in the repo"
+    if maven is None:
+        return _NO_MAVEN
     return None
 
 
 @boundary
-def _pin_jdk(repo: Path, timeout_seconds: float) -> tuple[dict, str]:
+def _pin_jdk(repo: Path, timeout_seconds: float) -> tuple[dict[str, str], str]:
     """(env, provenance): pin the JDK via a version manager (jenv/asdf/mise which java) when
     one resolves it for this repo, setting JAVA_HOME so Maven uses it rather than letting a
     homebrew java ahead of the shim on PATH silently win. Empty env and no provenance suffix
@@ -145,32 +154,57 @@ class JavaTools(TypedDict):
     jdk: str
 
 
-def _toolchain(repo: Path, timeout_seconds: float) -> tuple[L1Result | None, JavaTools | None]:
-    """Either a refusal or a usable toolchain, never a half-resolved one. Exactly one of the
-    two is None, so a caller that forgets the check gets a TypeError rather than a run
-    against a toolchain that was never found.
+class Refused(TypedDict):
+    """No toolchain, and the result the indicator returns instead."""
+    ok: Literal[False]
+    refusal: L1Result
+
+
+class Resolved(TypedDict):
+    """A toolchain, and nothing to refuse."""
+    ok: Literal[True]
+    tools: JavaTools
+
+
+def _toolchain(repo: Path, timeout_seconds: float) -> Refused | Resolved:
+    """Either a refusal or a usable toolchain, never a half-resolved one.
+
+    It returned the pair `(refusal, tools)` with this docstring promising exactly one of
+    them was None. The type permitted (None, None) and (a refusal, a toolchain) equally, and
+    nothing enforced the promise. Both indicators then indexed `tools` on the line after the
+    refusal check, so the promise was the only thing between them and a stack trace.
+
+    Tagged instead. `ok` says which case it is, the other half is absent rather than None,
+    and reading it is a KeyError at the line that read it.
 
     Both L1.19 and L1.20 carried these six lines. Two copies is two sets of preconditions
     that can drift: one indicator could learn a new one and the other keep running without
     it, and the panel would then report n/a for coverage and a number for determinism on a
     repo where neither could be measured."""
-    reason = _unsupported_reason(repo)
-    if reason is not None:
-        return _na(reason), None
-    # _unsupported_reason has already refused a repo with no Maven, so this cannot be None.
-    # Re-checking here would be a guard against a contract the line above already holds.
     maven = _maven(repo)
+    reason = _unsupported_reason(repo, maven)
+    if reason is not None:
+        return {"ok": False, "refusal": _na(reason)}
+    if maven is None:
+        # Not reachable by argument: with a pom.xml the line above refuses a missing Maven,
+        # and without one it refuses the pom. Written as a branch rather than an assertion
+        # because the argument holds over today's `_unsupported_reason` and this file is the
+        # only place that knows it, so a rule added there would silently make it false.
+        return {"ok": False, "refusal": _na(_NO_MAVEN)}
     env, prov = _pin_jdk(repo, timeout_seconds)
-    return None, {"maven": maven, "env": env, "jdk": _jdk(repo, timeout_seconds, env) + prov}
+    return {"ok": True,
+            "tools": {"maven": maven, "env": env,
+                      "jdk": _jdk(repo, timeout_seconds, env) + prov}}
 
 
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
     """L1.19 for Java: branch coverage from JaCoCo (`mvn test jacoco:report`). Bands match the
     spec: >90% Healthy, 60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a
     uniform harness signature and ignored: the project's build selects the runtime."""
-    refusal, tools = _toolchain(repo, timeout_seconds)
-    if refusal is not None:
-        return refusal
+    answer = _toolchain(repo, timeout_seconds)
+    if answer["ok"] is False:
+        return answer["refusal"]
+    tools = answer["tools"]
     maven, env, jdk = tools["maven"], tools["env"], tools["jdk"]
     run = _run_untrusted([maven, "-q", "test", "jacoco:report"], cwd=repo, env=env, timeout_seconds=timeout_seconds)
     report = repo / "target" / "site" / "jacoco" / "jacoco.xml"
@@ -217,9 +251,10 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     Healthy, <4/5 Slop. A run that does not build or runs no tests is not a determinism result,
     so return n/a with the reason rather than a misleading 0/5. When the suite runs but some
     tests fail, the failing seeds' Surefire counts are surfaced in `details`."""
-    refusal, tools = _toolchain(repo, timeout_seconds)
-    if refusal is not None:
-        return refusal
+    answer = _toolchain(repo, timeout_seconds)
+    if answer["ok"] is False:
+        return answer["refusal"]
+    tools = answer["tools"]
     maven, env, jdk = tools["maven"], tools["env"], tools["jdk"]
 
     def outcomes() -> Iterable[tuple[int, str]]:
