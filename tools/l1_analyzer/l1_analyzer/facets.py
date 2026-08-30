@@ -387,9 +387,16 @@ def _branch_facets(fn: ast.FunctionDef, uncovered: frozenset[int]) -> list[Facet
     for node in ast.walk(fn):
         if not isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)):
             continue
-        # Every one of these nodes has a non-empty body in any tree the parser accepts, so
-        # a guard here would be a check against a shape that cannot arrive.
-        entry = node.body[0].lineno
+        # Four of the five hold a body. A `match` holds cases, and its first statement is
+        # the first statement of its first case, so asking it for a body raised on any
+        # function containing one. The comment here used to say a guard would check a shape
+        # that cannot arrive; it was right about four constructs and wrong about the fifth,
+        # which is why it read as settled. Any repository with a `match` in an audited
+        # function lost the whole reading.
+        first = node.cases[0].body if isinstance(node, ast.Match) else node.body
+        if not first:
+            continue
+        entry = first[0].lineno
         out.append({
             "kind": "unexercised_branch", "function": fn.name, "line": node.lineno,
             "detail": f"{type(node).__name__.lower()} at line {node.lineno}",

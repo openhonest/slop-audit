@@ -70,3 +70,34 @@ def test_the_table_found_two_flags_with_no_help_at_all():
 def test_the_positional_argument_is_in_the_table_too():
     """It is a row like any other, so nothing sits outside the one place a reader looks."""
     assert any(not row["flags"][0].startswith("-") for row in cli.FLAGS)
+
+
+def test_no_help_string_ends_a_line_flush_against_the_next():
+    """A help string written across several lines is several literals, and Python joins them
+    with nothing at all. Ninety-one seams shipped that way: --help read "the nineteenHonest
+    Code principles" and "a write hook, soit prints", which is the first thing an adopter
+    reads.
+
+    Checked at the seam rather than in the rendered text. Reading the text means finding a
+    lowercase run against a capital, and "ThreadSanitizer" is that shape while being the
+    correct name of a real tool, so the check would need a list of every product name anyone
+    ever mentions and would go quiet as that list fell behind. The seam is mechanical: two
+    literals side by side, and a space written in neither.
+
+    The source looks right, which is why nothing caught this. The line break stands exactly
+    where a reader's eye puts the space."""
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "l1_analyzer" / "cli.py"
+    source = path.read_text().splitlines()
+    flush = []
+    for n, line in enumerate(source[:-1], start=1):
+        stripped, following = line.rstrip(), source[n].lstrip()
+        if not stripped.endswith('"') or not following.startswith('"'):
+            continue
+        if stripped.endswith(' "') or following.startswith('" '):
+            continue
+        if stripped.endswith(('",', '"""')):
+            continue
+        flush.append(f"cli.py:{n}: {stripped[-28:]} + {following[:28]}")
+    assert flush == [], flush

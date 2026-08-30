@@ -158,4 +158,10 @@ def literal_initialiser(declaration: Node, sp: LangSpec) -> bool:
             if value is not None:
                 values.append(value)
         break
-    return bool(values) and all(_unwrap_unary(v, sp).type in sp["literal_types"] for v in values)
+    # Peeled, then checked. A unary wrapper with nothing under it peels to nothing, and
+    # asking that for its type raised: `s[-]` is not valid Python, but a tree-sitter parse of
+    # broken source produces exactly that shape, and this reader runs on whatever it is
+    # given. An unwrapped nothing is not a literal, which is the answer that was intended.
+    unwrapped = [_unwrap_unary(v, sp) for v in values]
+    return bool(values) and all(
+        peeled is not None and peeled.type in sp["literal_types"] for peeled in unwrapped)

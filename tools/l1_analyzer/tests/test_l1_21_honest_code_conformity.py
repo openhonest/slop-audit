@@ -22,7 +22,7 @@ import textwrap
 import time
 
 import pytest
-from l1_analyzer import honest_code
+from l1_analyzer import honest_code, honest_code_report
 
 CLEAN = textwrap.dedent('''
     """A module with nothing for any clause to find."""
@@ -216,18 +216,18 @@ def test_an_absent_share_is_not_the_worst_band():
 # --------------------------------------------------------------------------
 
 def test_the_report_names_every_clause_with_its_number():
-    printed = honest_code.report(honest_code.assess_file_text(DIRTY, "m.py"))
+    printed = honest_code_report.report(honest_code.assess_file_text(DIRTY, "m.py"))
     assert "L1.21.1" in printed and "L1.21.19" in printed
 
 
 def test_the_report_lists_the_undecided_clauses_apart_from_the_score():
-    printed = honest_code.report(honest_code.assess_file_text(CLEAN, "m.py"))
+    printed = honest_code_report.report(honest_code.assess_file_text(CLEAN, "m.py"))
     assert "L1.21.17" in printed
     assert "not decided" in printed.lower()
 
 
 def test_the_report_says_which_half_of_a_partly_decided_clause_it_read():
-    printed = honest_code.report(honest_code.assess_file_text(
+    printed = honest_code_report.report(honest_code.assess_file_text(
         "from functools import lru_cache\n\n\n@lru_cache\ndef p(s):\n    return q(s)\n", "m.py"))
     assert "L1.21.9" in printed
     assert "profil" in printed.lower()
@@ -241,7 +241,7 @@ def test_the_hook_report_locates_each_finding_in_one_readable_line():
     """A hook that fires on every write has to be read in a glance. The locator line is
     what carries that, and the instruction below it is allowed to be as long as acting on
     it requires: welding the two into one line makes neither readable."""
-    lines = honest_code.hook_report(honest_code.assess_file_text(DIRTY, "m.py")).split("\n")
+    lines = honest_code_report.hook_report(honest_code.assess_file_text(DIRTY, "m.py")).split("\n")
     locators = [line for line in lines if not line.startswith("    ")]
     assert locators
     assert all(len(line) < 120 for line in locators), locators
@@ -249,27 +249,27 @@ def test_the_hook_report_locates_each_finding_in_one_readable_line():
 
 
 def test_every_located_finding_carries_the_instruction_under_it():
-    lines = honest_code.hook_report(honest_code.assess_file_text(DIRTY, "m.py")).split("\n")
+    lines = honest_code_report.hook_report(honest_code.assess_file_text(DIRTY, "m.py")).split("\n")
     assert len(lines) % 2 == 0
     assert all(line.startswith("    instead: ") for line in lines[1::2]), lines
 
 
 def test_the_hook_report_names_the_file_the_line_and_the_clause():
-    printed = honest_code.hook_report(honest_code.assess_file_text(DIRTY, "m.py"))
+    printed = honest_code_report.hook_report(honest_code.assess_file_text(DIRTY, "m.py"))
     assert "m.py:" in printed
     assert "L1.21." in printed
 
 
 def test_the_hook_report_says_what_to_do_instead():
     """A finding an agent cannot act on is noise arriving on every keystroke."""
-    printed = honest_code.hook_report(honest_code.assess_file_text(DIRTY, "m.py"))
+    printed = honest_code_report.hook_report(honest_code.assess_file_text(DIRTY, "m.py"))
     assert "instead" in printed.lower() or "->" in printed
 
 
 def test_a_clean_file_says_nothing_at_all():
     """Silence is the correct output on a clean write. A hook that congratulates the agent
     on every file teaches it to skip the output."""
-    assert honest_code.hook_report(honest_code.assess_file_text(CLEAN, "m.py")) == ""
+    assert honest_code_report.hook_report(honest_code.assess_file_text(CLEAN, "m.py")) == ""
 
 
 def test_the_assessment_of_one_file_is_fast_enough_for_a_hook():
@@ -417,7 +417,7 @@ def test_an_allowance_for_a_different_clause_does_not_apply():
 
 
 def test_the_report_names_the_declared_exceptions_and_their_reasons():
-    printed = honest_code.report(honest_code.assess_file_text(ALLOWED, "m.py"))
+    printed = honest_code_report.report(honest_code.assess_file_text(ALLOWED, "m.py"))
     assert "declared" in printed.lower()
     assert "will not parse" in printed
 

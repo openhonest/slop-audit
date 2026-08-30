@@ -24,7 +24,7 @@ fixture.
 from unittest import mock
 
 import pytest
-from l1_analyzer import honest_code
+from l1_analyzer import honest_code, honest_code_report
 
 WIDGET = '''"""A Python module that serves a JavaScript widget."""
 
@@ -105,7 +105,7 @@ def test_it_does_not_change_the_conformity_share():
 def test_the_report_says_the_file_was_not_fully_examined():
     """The whole point. A hundred per cent beside a notice that fourteen lines were never
     looked at is a reading a person can act on; a hundred per cent alone is not."""
-    printed = honest_code.report(honest_code.assess_file_text(WIDGET, "m.py"))
+    printed = honest_code_report.report(honest_code.assess_file_text(WIDGET, "m.py"))
     assert "javascript" in printed.lower()
     # The disclosure, not its wording. This pinned the phrase "no clause examined" until the
     # blocks began carrying what the clauses found in them, at which point the sentence
@@ -116,13 +116,13 @@ def test_the_report_says_the_file_was_not_fully_examined():
 def test_the_hook_says_it_too():
     """The hook prints only what an agent must change, and this is not a violation. It is
     still the one thing that stops a clean hook result reading as a clean file."""
-    printed = honest_code.hook_report(honest_code.assess_file_text(WIDGET, "m.py"))
+    printed = honest_code_report.hook_report(honest_code.assess_file_text(WIDGET, "m.py"))
     assert "javascript" in printed.lower()
 
 
 def test_a_clean_file_with_nothing_embedded_still_says_nothing_at_all():
     source = "def band(n: int, table: dict) -> str:\n    return 'high' if n > table['x'] else 'low'\n"
-    assert honest_code.hook_report(honest_code.assess_file_text(source, "m.py")) == ""
+    assert honest_code_report.hook_report(honest_code.assess_file_text(source, "m.py")) == ""
 
 
 def test_the_repository_measure_counts_the_unexamined_blocks(tmp_path):
@@ -373,8 +373,8 @@ def test_a_misnamed_block_reports_nothing_because_it_is_not_that_language():
 def test_the_report_shows_a_block_that_found_something_and_not_one_that_did_not():
     """A driver holding dozens of queries must not produce dozens of lines that say only
     that a name was guessed."""
-    noisy = honest_code.report(honest_code.assess_file_text(SQL_IN_A_DRIVER, "m.py"))
-    useful = honest_code.report(honest_code.assess_file_text(WIDGET_IN_A_PAGE, "m.py"))
+    noisy = honest_code_report.report(honest_code.assess_file_text(SQL_IN_A_DRIVER, "m.py"))
+    useful = honest_code_report.report(honest_code.assess_file_text(WIDGET_IN_A_PAGE, "m.py"))
     assert "swallow" in useful.lower() or "reports success" in useful
     assert "ruby" not in noisy
 
@@ -425,8 +425,8 @@ def test_both_renderings_carry_every_finding_from_an_embedded_block():
     assessment = honest_code.assess_file_text(WIDGET_IN_A_PAGE, "m.py")
     embedded = [f for b in assessment["unexamined"] for f in b["findings"]]
     assert embedded, "the fixture has to produce findings or this asserts nothing"
-    text = honest_code.report(assessment)
-    hook = honest_code.hook_report(assessment)
+    text = honest_code_report.report(assessment)
+    hook = honest_code_report.hook_report(assessment)
     for finding in embedded:
         for rendering, name in ((text, "report"), (hook, "hook_report")):
             assert finding["clause"] in rendering, (name, finding["clause"])
@@ -438,6 +438,6 @@ def test_neither_rendering_names_a_language_nothing_corroborated():
     assessment = honest_code.assess_file_text(SQL_IN_A_DRIVER, "m.py")
     silent = [b for b in assessment["unexamined"] if not b["findings"]]
     assert silent, "the fixture has to produce a silent block or this asserts nothing"
-    for rendering in (honest_code.report(assessment), honest_code.hook_report(assessment)):
+    for rendering in (honest_code_report.report(assessment), honest_code_report.hook_report(assessment)):
         for block in silent:
             assert block["language"] not in rendering, block["language"]

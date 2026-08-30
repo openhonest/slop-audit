@@ -18,7 +18,7 @@ database layer than for leaving it undeclared.
 
 import ast
 
-from l1_analyzer import honest_code
+from l1_analyzer import honest_code, honest_code_report
 
 
 def _module(text: str) -> dict:
@@ -110,6 +110,6 @@ def test_the_count_is_stated_at_zero(tmp_path):
 
 
 def test_the_report_lists_them_apart_from_the_violations():
-    printed = honest_code.report(honest_code.assess_file_text(WITHHELD, "m.py"))
+    printed = honest_code_report.report(honest_code.assess_file_text(WITHHELD, "m.py"))
     assert "boundary declaration" in printed.lower()
     assert "load" in printed

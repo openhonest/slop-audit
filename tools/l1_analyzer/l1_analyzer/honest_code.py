@@ -1,7 +1,10 @@
 """L1.21: mechanical conformity with the Honest Code principles.
 
-Nineteen principles, nineteen subclauses, L1.21.1 through L1.21.19. The numbering is the
-Honest Framework's, so a clause number means one thing across every Open Honest artifact.
+Twenty-two principles, twenty-two subclauses, L1.21.1 through L1.21.22. The numbering is
+the Honest Framework's, so a clause number means one thing across every Open Honest
+artifact. Two principles have no clause and never will; honest_code_report names them in
+every report, because a share over the clauses that exist cannot see a principle nobody
+wrote a clause for.
 
 What makes the number worth reading is that it says which clauses it decided. Fifteen are
 decidable from a Python syntax tree. Two are questions about a browser and are not
@@ -15,7 +18,7 @@ and it is the whole reason to trust a conformity share: the score is over the cl
 actually decided, so it cannot be raised by looking away.
 
 The second thing this has to be is FAST. It sits behind a hook that fires on every write,
-so it parses one file and runs nineteen pure functions over the tree. Nothing here starts a
+so it parses one file and runs the clauses as pure functions over the tree. Nothing here starts a
 process, reads a second file, or asks the network.
 """
 
@@ -833,107 +836,6 @@ def _grammar_root(text: str, language: str) -> "Node":
         return read_tree(text, language)["root"]
 
     return Parser(GRAMMARS[language]).parse(text.encode()).root_node
-
-
-def report(assessment: Assessment) -> str:
-    """The per-clause result a person reads.
-
-    The clauses nobody could decide are listed apart from the score, each with its reason,
-    so a reader can see what the number covers rather than assume it covered everything."""
-    lines = [f"# L1.21 — Honest Code conformity — {Path(assessment['path']).name}", ""]
-    share = assessment["conformity"]
-    shown = f"{share}%" if share is not None else "not measured"
-    lines += [(f"Conformity: {shown} ({assessment['band']}), over "
-               f"{assessment['decided_clauses']} of 19 clauses that were decided"), ""]
-    if assessment["unreadable_reason"]:
-        lines += [f"> {assessment['unreadable_reason']}", ""]
-    for block in assessment["unexamined"]:
-        # The language is named only where the findings corroborate it. A block that fires
-        # nothing may well not be the language a grammar accepted it as: twelve lines of SQL
-        # are accepted whole by the ruby grammar, there is no SQL grammar, and a database
-        # driver holds dozens of them. Printing that guess dozens of times teaches a reader
-        # to skip the field, which costs the embedded-widget case it exists for.
-        if not block["findings"]:
-            lines += [(f"> line {block['line']}: {block['lines']} lines are not this file's "
-                       "language. Every clause that could read them found nothing, and they "
-                       "are outside the share above either way."), ""]
-            continue
-        lines += [(f"> line {block['line']}: {block['lines']} lines of {block['language']} "
-                   f"that the share above does not cover. {len(block['findings'])} finding(s) "
-                   "in them:"), ""]
-        for finding in block["findings"]:
-            lines.append(f"- `{finding['clause']}:{finding['line']}` — {finding['detail']}")
-        lines.append("")
-
-    broken = [c for c in assessment["clauses"] if c["decided"] and c["findings"]]
-    held = [c for c in assessment["clauses"] if c["decided"] and not c["findings"]]
-    undecided = [c for c in assessment["clauses"] if not c["decided"]]
-    declared = [a for c in assessment["clauses"] for a in c["allowed"]]
-    by_declaration = [a for c in assessment["clauses"] for a in c["declared"]]
-
-    for clause in broken:
-        lines.append(f"## {clause['code']} — {clause['name']} ({len(clause['findings'])})")
-        lines.append("")
-        for finding in clause["findings"]:
-            lines.append(f"- `{finding['symbol']}:{finding['line']}` — {finding['detail']}")
-            lines.append(f"      instead: {finding['instead']}")
-            if finding["undecided"]:
-                lines.append(f"      not decided: {finding['undecided']}")
-        lines.append("")
-    if held:
-        lines += ["## clauses that hold", "", ", ".join(c["code"] for c in held), ""]
-    if declared:
-        lines += [f"## declared exceptions ({len(declared)})", "",
-                  ("> Sites the author stated a reason for. They are not violations and "
-                   "they are not invisible: a reader audits the reason here."), ""]
-        for entry in declared:
-            lines.append(f"- `{entry['clause']}:{entry['line']}` — {entry['reason']}")
-        lines.append("")
-    if by_declaration:
-        lines += [f"## boundary declarations ({len(by_declaration)})", "",
-                  ("> Sites a boundary decorator withheld. The declaration overrode this "
-                   "reader's call-graph inference, which is the case worth seeing; a "
-                   "declaration that agreed with it withheld nothing and is not listed."), ""]
-        for entry in by_declaration:
-            lines.append(f"- `{entry['symbol']}:{entry['line']}` — {entry['detail']}")
-        lines.append("")
-    if undecided:
-        lines += [f"## clauses not decided ({len(undecided)})", "",
-                  ("> These are outside the share, numerator and denominator both. A clause "
-                   "nobody checked is not a clause that passed."), ""]
-        for clause in undecided:
-            lines.append(f"- {clause['code']} — {clause['name']}: {clause['reason']}")
-        lines.append("")
-    return "\n".join(lines)
-
-
-def hook_report(assessment: Assessment) -> str:
-    """The one thing an agent needs mid-edit: where, which clause, and what to do instead.
-
-    Two lines per finding rather than one. The locator has to be readable at a glance, and
-    the instruction has to be complete enough to act on; welding them into a single
-    two-hundred-character line makes neither.
-
-    Silence on a clean write is the correct output. A hook that congratulates the agent on
-    every file teaches it to skip the output, and then the one that matters is skipped
-    too."""
-    name = assessment["path"]
-    lines: list[str] = []
-    for block in assessment["unexamined"]:
-        # A block that fires nothing is not worth an agent's attention mid-edit. It was read
-        # by every clause that could read it and they found nothing, and the language it was
-        # named as may well be wrong: a database driver's SQL is accepted whole by the ruby
-        # grammar and there is no SQL grammar. Printing that guess on every query is what
-        # teaches an agent to skip the output.
-        for finding in block["findings"]:
-            lines.append(f"{name}:{finding['line']} {finding['clause']} "
-                         f"in embedded {block['language']}: {finding['detail']}")
-            lines.append(f"    instead: {finding['instead']}")
-    for clause in assessment["clauses"]:
-        for finding in clause["findings"]:
-            lines.append(f"{name}:{finding['line']} {clause['code']} {finding['detail']}")
-            lines.append(f"    instead: {finding['instead']}")
-    return "\n".join(lines)
 
 
 def _named_under(repo: Path, path: Path) -> str:

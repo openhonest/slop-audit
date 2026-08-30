@@ -86,17 +86,27 @@ def test_every_clause_names_a_principle_that_exists():
 
 @pytest.mark.skipif(not _CANON.is_file(), reason="the principles repository is not checked out here")
 def test_the_principles_no_clause_measures_are_named_here():
-    """One principle has no clause. Naming it in a test rather than leaving the gap silent,
-    so the next person to read this knows what the instrument does not cover.
+    """Two principles have no clause. Naming them in a test rather than leaving the gap
+    silent, so the next person to read this knows what the instrument does not cover.
 
-    It was three on 2026-08-28 and is one. References Resolve Statically and Type
+    It was three on 2026-08-28 and is two. References Resolve Statically and Type
     Declarations Over Imperative Validation both got clauses that day, which is why the
     conformity share stopped being a share of twenty rules over twenty-two principles.
 
-    Constrain AI with Data Shape Contracts is the one left, and it is left deliberately. The
-    canon marks it as mitigating a failure rather than eliminating one, so a clause here
-    would report a repository for declining a mitigation, which is a different thing from
-    breaking a rule.
+    Both are left deliberately, and the canon says why for each.
+
+    Constrain AI with Data Shape Contracts is marked as mitigating a failure rather than
+    eliminating one, so a clause here would report a repository for declining a mitigation,
+    which is a different thing from breaking a rule.
+
+    Watch the Test Fail First was added to the canon on 2026-08-30 and this test caught it
+    the same day, which is what reading the document rather than a copy of it is for. It
+    cannot be checked at all, and the canon says so in its own words: the evidence is
+    destroyed by the act of passing. A test that failed and now passes is byte-identical to
+    a test that never failed, so nothing reading the final state can tell the two apart. It
+    is the ordering rule that makes One Gherkin Per Function worth having: clause 15 proves
+    a scenario exists for every function, and the red run proves the scenario would notice
+    the function breaking. Neither is enough alone.
 
     The list moves because the document moves, which is why this reads the document.
 
@@ -107,4 +117,5 @@ def test_the_principles_no_clause_measures_are_named_here():
     measured = {c["name"] for c in CLAUSES}
     unmeasured = {h for h in _headings()
                   if h not in measured and not h.startswith("Typed Dicts")}
-    assert unmeasured == {"Constrain AI with Data Shape Contracts"}, unmeasured
+    assert unmeasured == {"Constrain AI with Data Shape Contracts",
+                          "Watch the Test Fail First"}, unmeasured

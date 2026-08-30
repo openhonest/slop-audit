@@ -3,7 +3,7 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
-  Nineteen principles, nineteen subclauses, L1.21.1 through L1.21.19. The numbering is
+  Twenty-two principles, twenty-two subclauses, L1.21.1 through L1.21.22. The numbering is
   the Honest Framework's, so a clause number means one thing across every Open Honest
   artifact.
 
@@ -60,18 +60,6 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     When analyze walks the production files
     Then the panel entry carries the share, the band and which clauses were undecidable
     But it is optional in the full audit, because nineteen clauses over a large tree is a cost a caller chooses rather than one imposed on every run
-
-  Scenario: report writes the per-clause result a person reads
-    Given an assessment
-    When report renders it
-    Then each clause is named with its number, its verdict and its findings
-    But the clauses nobody could decide are listed apart from the score, with the reason for each
-
-  Scenario: hook_report writes the one thing an agent needs mid-edit
-    Given an assessment of the file just written
-    When hook_report renders it
-    Then each finding is one line naming the file, the line, the clause and what to do instead
-    But nothing else is printed, because a hook that fires on every write has to be read in a glance rather than studied
 
   Scenario: _clause assembles one subclause of the measure
     Given the rule number, its name, what decides it and who checks it

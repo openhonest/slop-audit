@@ -63,13 +63,19 @@ def _count_type_escapes(repo: Path, lang: str) -> int:
     return sum(indicators._count_type_escapes_in_tree(parser.parse(src).root_node, cfg) for _path, src in files)
 
 
-def _slack(actual: int, baseline: int, label: str) -> list[str]:
+def _slack(actual: int, baseline: int, label: str, counted: Path) -> list[str]:
     """A baseline looser than reality is slack, and slack is a defect.
 
     A ratchet set at 4 against 0 actual findings passes silently and leaves room for four
     free regressions. Nobody notices, because the gate only ever looks upward. So the
     ratchet has to be tight in both directions: fixing the findings obliges you to lower
     the number, in the same reviewable edit that raising it would take.
+
+    The tree it counted is named because the run and the config can be about different
+    trees. This message counted one subdirectory, said "the repo has 20", and pointed at a
+    config that gates the repository root, where the count was 27. Following it loosened the
+    gate by seven. Naming the tree and declining to name a file it never read leaves the
+    reader with the number and the decision, which is the half this can be right about.
 
     Borrowed from declaro-persistum, whose KNOWN_ORPHANS list carries a companion test,
     `test_the_allowlist_does_not_outlive_what_it_excuses`, that fails when an entry no
@@ -78,9 +84,10 @@ def _slack(actual: int, baseline: int, label: str) -> list[str]:
     """
     if actual >= baseline:
         return []
-    return [(f"{label}: the ratchet is set at {baseline} and the repo has {actual}. "
-             f"Lower it to {actual} in .pre-commit-config.yaml. A baseline above the real "
-             f"count is {baseline - actual} regression(s) nobody will be told about.")]
+    return [(f"{label}: the ratchet is set at {baseline} and {counted} has {actual}. "
+             f"Lower the baseline to {actual} wherever the gate that runs on {counted} "
+             f"reads it. A baseline above the real count is {baseline - actual} "
+             "regression(s) nobody will be told about.")]
 
 
 def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
@@ -137,7 +144,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
                 "reader can audit. If the baseline must rise, raise it in "
                 ".pre-commit-config.yaml as a deliberate, reviewable change."
             )
-        problems.extend(_slack(found, max_honest_code, "Honest Code findings (L1.21)"))
+        problems.extend(_slack(found, max_honest_code, "Honest Code findings (L1.21)", repo))
 
     escapes: int | None = None
     if max_type_escapes is not None:
@@ -149,7 +156,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
                 "# type: ignore. If a new escape is truly unavoidable, raise the baseline in "
                 ".pre-commit-config.yaml as a deliberate, reviewable change."
             )
-        problems.extend(_slack(escapes, max_type_escapes, "type escapes (L1.15)"))
+        problems.extend(_slack(escapes, max_type_escapes, "type escapes (L1.15)", repo))
 
     # Thread-safety surface ratchet (opt-in via --max-thread-exposed): the count of
     # hand-overrides of the compiler's thread-safety guarantee (unsafe impl Send/Sync,
@@ -201,7 +208,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
                 "as a deliberate, reviewable change."
             )
         if exposed is not None:
-            problems.extend(_slack(exposed, max_thread_exposed, "thread-safety surface"))
+            problems.extend(_slack(exposed, max_thread_exposed, "thread-safety surface", repo))
 
     if problems:
         print("Slop audit gate FAILED - the audit flags this repo's own code:")

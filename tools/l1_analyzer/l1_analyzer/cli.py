@@ -23,6 +23,7 @@ from l1_analyzer import (
 )
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.gate import _audited_language, _run_gate
+from l1_analyzer.honest_code import CLAUSES
 from l1_analyzer.incomplete import IncompleteCode
 from l1_analyzer.thread_surface import Finding as ThreadFinding
 
@@ -242,7 +243,7 @@ def _report_honest_code(paths: list[Path], output_format: str) -> int:
     The hook shape is the default because it is the one that runs thousands of times. It
     writes to stderr, where a hook runner puts what a blocked tool call said, and it writes
     nothing when there is nothing to change."""
-    from l1_analyzer import honest_code
+    from l1_analyzer import honest_code, honest_code_report
 
     assessments = [honest_code.assess_file(path) for path in paths]
     # A broken clause exits non-zero in every shape, not only the hook's. L1.21 is opt-in
@@ -256,7 +257,7 @@ def _report_honest_code(paths: list[Path], output_format: str) -> int:
         return 1 if broken else 0
     if output_format == "text":
         for assessment in assessments:
-            print(honest_code.report(assessment))
+            print(honest_code_report.report(assessment))
         return 1 if broken else 0
 
     lines: list[str] = []
@@ -264,7 +265,7 @@ def _report_honest_code(paths: list[Path], output_format: str) -> int:
         if assessment["unreadable_reason"]:
             lines.append(f"{path}: {assessment['unreadable_reason']}")
             continue
-        printed = honest_code.hook_report(assessment)
+        printed = honest_code_report.hook_report(assessment)
         if printed:
             lines.append(printed)
     if not lines:
@@ -462,7 +463,7 @@ FLAGS: tuple[Flag, ...] = (
     {"flags": ["--lang"],
      "default": "auto",
      "choices": ['auto', *sorted(indicators.LANG_CFG)],
-     "help": "Primary language for source-based indicators (L1.12+). 'auto' detects"
+     "help": "Primary language for source-based indicators (L1.12+). 'auto' detects "
              "from files.",
      },
     {"flags": ["--format"],
@@ -474,28 +475,28 @@ FLAGS: tuple[Flag, ...] = (
      },
     {"flags": ["--no-exec"],
      "action": "store_true",
-     "help": "Do not execute the target repo's test suite (skips the runtime half of"
+     "help": "Do not execute the target repo's test suite (skips the runtime half of "
              "L1.19 and all of L1.20).",
      },
     {"flags": ["--timeout"],
      "type": float,
      "default": 300.0,
-     "help": "Seconds allowed for each test-suite execution in L1.19/L1.20 (default"
+     "help": "Seconds allowed for each test-suite execution in L1.19/L1.20 (default "
              "300).",
      },
     {"flags": ["--python"],
      "default": None,
      "metavar": "PATH",
-     "help": "Interpreter that runs the target suite for L1.19/L1.20. Defaults to"
-             "the analyzer's own interpreter; point it at the target repo's venv"
-             "python when the target needs a different Python (e.g. a 3.11 target"
-             "audited from a 3.12+ analyzer). The target package must be importable"
+     "help": "Interpreter that runs the target suite for L1.19/L1.20. Defaults to "
+             "the analyzer's own interpreter; point it at the target repo's venv "
+             "python when the target needs a different Python (e.g. a 3.11 target "
+             "audited from a 3.12+ analyzer). The target package must be importable "
              "there, or coverage/determinism report n/a with the reason.",
      },
     {"flags": ["--no-state-bounds"],
      "action": "store_true",
-     "help": "Turn off the additive L1.18b state-bounds classifier. Pre-registered"
-             "runs use this so the output is exactly the frozen L1.18 set; on by"
+     "help": "Turn off the additive L1.18b state-bounds classifier. Pre-registered "
+             "runs use this so the output is exactly the frozen L1.18 set; on by "
              "default for everyone else.",
      },
     {"flags": ["--verbose"],
@@ -506,176 +507,176 @@ FLAGS: tuple[Flag, ...] = (
      },
     {"flags": ["--gate"],
      "action": "store_true",
-     "help": "Dogfood mode for a pre-commit hook: run the source indicators against"
-             "the repo and exit non-zero if the audit flags the repo's own code (a"
-             "production god-file, or promiscuous state that breaks exhaustive"
+     "help": "Dogfood mode for a pre-commit hook: run the source indicators against "
+             "the repo and exit non-zero if the audit flags the repo's own code (a "
+             "production god-file, or promiscuous state that breaks exhaustive "
              "testability). Ignores git/config indicators.",
      },
     {"flags": ["--max-type-escapes"],
      "type": int,
      "default": None,
-     "help": "Ratchet the L1.15 type-escape count (Any / # type: ignore): with"
-             "--gate, fail if the count exceeds this baseline. Set it to the current"
-             "count so a NEW escape fails the commit; lower it as escapes are typed"
+     "help": "Ratchet the L1.15 type-escape count (Any / # type: ignore): with "
+             "--gate, fail if the count exceeds this baseline. Set it to the current "
+             "count so a NEW escape fails the commit; lower it as escapes are typed "
              "away. No effect without --gate.",
      },
     {"flags": ["--max-honest-code"],
      "type": int,
      "default": None,
-     "help": "Ratchet the Honest Code conformity check: with --gate, fail if L1.21's"
-             "clause findings exceed this baseline. Opt-in, because L1.21 states an"
-             "opinion and grades nobody who has not chosen it. Set it to the current"
+     "help": "Ratchet the Honest Code conformity check: with --gate, fail if L1.21's "
+             "clause findings exceed this baseline. Opt-in, because L1.21 states an "
+             "opinion and grades nobody who has not chosen it. Set it to the current "
              "count so a NEW violation fails the commit. No effect without --gate.",
      },
     {"flags": ["--max-thread-exposed"],
      "type": int,
      "default": None,
-     "help": "Ratchet the thread-safety surface: with --gate, fail if the count of"
-             "hand-overrides of the compiler's thread-safety guarantee (unsafe impl"
-             "Send/Sync, static mut) exceeds this baseline. A fact about audit"
-             "surface, not a race verdict. Set it to the current count so a NEW"
+     "help": "Ratchet the thread-safety surface: with --gate, fail if the count of "
+             "hand-overrides of the compiler's thread-safety guarantee (unsafe impl "
+             "Send/Sync, static mut) exceeds this baseline. A fact about audit "
+             "surface, not a race verdict. Set it to the current count so a NEW "
              "override fails the commit. No effect without --gate.",
      },
     {"flags": ["--race"],
      "action": "store_true",
-     "help": "Runtime thread-safety: build and run the repo's test suite under"
-             "ThreadSanitizer (Rust) and report data races that actually fire. The"
-             "dynamic counterpart to the static surface meter. Runs untrusted code"
-             "and needs a nightly toolchain, so this is CLI/CI only and opt-in. A"
-             "race observed is proven; no race observed is bounded by the suite,"
+     "help": "Runtime thread-safety: build and run the repo's test suite under "
+             "ThreadSanitizer (Rust) and report data races that actually fire. The "
+             "dynamic counterpart to the static surface meter. Runs untrusted code "
+             "and needs a nightly toolchain, so this is CLI/CI only and opt-in. A "
+             "race observed is proven; no race observed is bounded by the suite, "
              "never a proof of safety.",
      },
     {"flags": ["--prove"],
      "action": "store_true",
-     "help": "Prove located hazards: for each review-tier concurrency finding, ask a"
-             "model to write a Rust test that reproduces the race, run it under the"
-             "stress runner, and keep it only if it genuinely fires. Locate is"
-             "deterministic; the model only fills a located gap; the execution gate"
-             "decides. Needs ANTHROPIC_API_KEY, cargo, and the anthropic package"
-             "(pip install anthropic). Opt-in and CLI-only - it generates and runs"
+     "help": "Prove located hazards: for each review-tier concurrency finding, ask a "
+             "model to write a Rust test that reproduces the race, run it under the "
+             "stress runner, and keep it only if it genuinely fires. Locate is "
+             "deterministic; the model only fills a located gap; the execution gate "
+             "decides. Needs ANTHROPIC_API_KEY, cargo, and the anthropic package "
+             "(pip install anthropic). Opt-in and CLI-only - it generates and runs "
              "code.",
      },
     {"flags": ["--prove-max"],
      "type": int,
      "default": 3,
-     "help": "With --prove, the maximum number of located hazards to attempt"
-             "(default 3). With --prove-coverage-repo it is the per-MODULE cap: how"
+     "help": "With --prove, the maximum number of located hazards to attempt "
+             "(default 3). With --prove-coverage-repo it is the per-MODULE cap: how "
              "many gaps one module may offer.",
      },
     {"flags": ["--prove-max-total"],
      "type": int,
      "default": 5,
-     "help": "With --prove-coverage-repo, the total gaps the whole run may hand to a"
-             "model (default 5). The per-module cap and this one bound different"
-             "things: five per module over forty modules is two hundred attempts,"
-             "and this is what stops that. A sweep that stops here says so in its"
+     "help": "With --prove-coverage-repo, the total gaps the whole run may hand to a "
+             "model (default 5). The per-module cap and this one bound different "
+             "things: five per module over forty modules is two hundred attempts, "
+             "and this is what stops that. A sweep that stops here says so in its "
              "own report.",
      },
     {"flags": ["--coverage-repair-rounds"],
      "type": int,
      "default": 3,
-     "help": "With --prove-coverage, the max compiler-feedback repair rounds per"
-             "gap: when a generated test does not compile, rustc's error is fed back"
-             "to the model to rebuild the arrange step (construct the real argument"
-             "values), up to this many times. Generic (the compiler is the oracle;"
-             "no per-type knowledge), but each round is another in-crate compile -"
+     "help": "With --prove-coverage, the max compiler-feedback repair rounds per "
+             "gap: when a generated test does not compile, rustc's error is fed back "
+             "to the model to rebuild the arrange step (construct the real argument "
+             "values), up to this many times. Generic (the compiler is the oracle; "
+             "no per-type knowledge), but each round is another in-crate compile - "
              "set 0 to skip repair and take only the first attempt.",
      },
     {"flags": ["--prove-coverage-repo"],
      "action": "store_true",
-     "help": "Prove coverage gaps across the ENTIRE Rust crate: one coverage build,"
-             "then every module with uncovered branches is swept (batched into one"
-             "compile per module, with per-gap repair fallback). Retained proofs"
-             "from all modules land in the report's Adoptable proofs section. Long-"
-             "running (one build per module); native slop-audit; needs"
-             "ANTHROPIC_API_KEY, cargo, cargo-llvm-cov. --prove-max caps gaps per"
+     "help": "Prove coverage gaps across the ENTIRE Rust crate: one coverage build, "
+             "then every module with uncovered branches is swept (batched into one "
+             "compile per module, with per-gap repair fallback). Retained proofs "
+             "from all modules land in the report's Adoptable proofs section. Long- "
+             "running (one build per module); native slop-audit; needs "
+             "ANTHROPIC_API_KEY, cargo, cargo-llvm-cov. --prove-max caps gaps per "
              "module.",
      },
     {"flags": ["--version"],
      "action": "store_true",
-     "help": "Print which build this is and exit. Every panel and every card carries"
-             "the same string, so a measurement can be traced to the instrument that"
+     "help": "Print which build this is and exit. Every panel and every card carries "
+             "the same string, so a measurement can be traced to the instrument that "
              "made it.",
      },
     {"flags": ["--honest-code"],
      "nargs": "+",
      "default": None,
      "metavar": "FILE",
-     "help": "L1.21 for one or more files: mechanical conformity with the nineteen"
-             "Honest Code principles, one subclause each. Built for a write hook, so"
-             "it prints only what to change, prints it to stderr where a hook runner"
-             "feeds it back, says nothing at all when the file is clean, and exits 1"
-             "when it is not. --format text gives the full per-clause report a"
-             "person reads. Several files are measured in one process, which is the"
-             "whole saving: the analysis costs about nothing and the bill is"
-             "interpreter startup, paid once here instead of once per file. One file"
+     "help": f"L1.21 for one or more files: mechanical conformity with the "
+             f"{len(CLAUSES)} Honest Code principles, one subclause each. Built for a write hook, so "
+             "it prints only what to change, prints it to stderr where a hook runner "
+             "feeds it back, says nothing at all when the file is clean, and exits 1 "
+             "when it is not. --format text gives the full per-clause report a "
+             "person reads. Several files are measured in one process, which is the "
+             "whole saving: the analysis costs about nothing and the bill is "
+             "interpreter startup, paid once here instead of once per file. One file "
              "returns exactly what it always returned.",
      },
     {"flags": ["--honest-code-clauses"],
      "action": "store_true",
-     "help": "Add L1.21 to the full audit. Off by default: nineteen clauses over a"
-             "large tree is a cost a caller chooses rather than one imposed on every"
+     "help": f"Add L1.21 to the full audit. Off by default: {len(CLAUSES)} clauses over a "
+             "large tree is a cost a caller chooses rather than one imposed on every "
              "run.",
      },
     {"flags": ["--call-map"],
      "nargs": "+",
      "default": None,
      "metavar": "PATH",
-     "help": "Emit the four-column call-stack map for ONE module and its test"
-             "file(s), as a `.hd` file. Roles are function prefixes: boundary_in"
-             "reads a source, orchestrator composes, a bare fn is pure, boundary_out"
-             "writes a target. A write in the pure lane is marked, and the charge"
-             "rests on the watched run rather than on a guess, so a function nobody"
+     "help": "Emit the four-column call-stack map for ONE module and its test "
+             "file(s), as a `.hd` file. Roles are function prefixes: boundary_in "
+             "reads a source, orchestrator composes, a bare fn is pure, boundary_out "
+             "writes a target. A write in the pure lane is marked, and the charge "
+             "rests on the watched run rather than on a guess, so a function nobody "
              "watched is not accused.",
      },
     {"flags": ["--layer"],
      "default": "",
      "choices": ['', 'foundation', 'data', 'domain', 'ui', 'tooling'],
-     "help": "The layer to declare in the emitted .hd. Left out by default: a layer"
+     "help": "The layer to declare in the emitted .hd. Left out by default: a layer "
              "is an architectural intent and no reading of the source decides it.",
      },
     {"flags": ["--proof-cap"],
      "type": int,
      "default": 0,
      "metavar": "N",
-     "help": "With --facets: ask for up to N isolated proof requests. Each carries"
-             "one signature and one gap and no source, so what leaves this machine"
-             "is a function's shape rather than a repository. Nothing is asked for"
+     "help": "With --facets: ask for up to N isolated proof requests. Each carries "
+             "one signature and one gap and no source, so what leaves this machine "
+             "is a function's shape rather than a repository. Nothing is asked for "
              "by default, because a request is what gets sent to a model.",
      },
     {"flags": ["--prove-facet"],
      "nargs": 6,
      "default": None,
      "metavar": "ARG",
-     "help": "Run one proposal through the execution gate: MODULE TESTS INDEX INPUT"
-             "PROPERTY WHY. INDEX comes from --proof-cap. The proposal is rendered"
-             "as one test and run alone; only a test that FAILS, or that makes the"
-             "audited function raise, is retained. A passing test proves the"
-             "opposite of the claim and is discarded. Nothing is written into your"
+     "help": "Run one proposal through the execution gate: MODULE TESTS INDEX INPUT "
+             "PROPERTY WHY. INDEX comes from --proof-cap. The proposal is rendered "
+             "as one test and run alone; only a test that FAILS, or that makes the "
+             "audited function raise, is retained. A passing test proves the "
+             "opposite of the claim and is discarded. Nothing is written into your "
              "test file.",
      },
     {"flags": ["--facets"],
      "nargs": "+",
      "default": None,
      "metavar": "PATH",
-     "help": "Audit ONE module against the test file(s) holding evidence about it:"
-             "every closeable facet and the Silence index over them. Coverage"
-             "records what ran; silence records evidence the suite lacks, so a"
-             "branch that executed and was never asserted on is covered and silent"
-             "at once. Reports unexercised branches, candidate input regions,"
-             "unasserted return contracts and exception paths, and lists undeclared"
-             "domains separately because those are closed by declaring a type rather"
+     "help": "Audit ONE module against the test file(s) holding evidence about it: "
+             "every closeable facet and the Silence index over them. Coverage "
+             "records what ran; silence records evidence the suite lacks, so a "
+             "branch that executed and was never asserted on is covered and silent "
+             "at once. Reports unexercised branches, candidate input regions, "
+             "unasserted return contracts and exception paths, and lists undeclared "
+             "domains separately because those are closed by declaring a type rather "
              "than by adding a test.",
      },
     {"flags": ["--prove-coverage"],
      "default": None,
      "metavar": "MODULE",
-     "help": "Prove coverage gaps for one Rust MODULE (a path relative to the repo,"
-             "e.g. src/foo.rs): locate the module's uncovered decision branches, ask"
-             "a model for a calling test per gap, run each in-crate under `cargo"
-             "test`, and keep it only if it genuinely fails - a runnable test that"
-             "closes the gap. Retained tests appear in the report's Adoptable proofs"
-             "section. Native slop-audit; needs ANTHROPIC_API_KEY, cargo, and cargo-"
+     "help": "Prove coverage gaps for one Rust MODULE (a path relative to the repo, "
+             "e.g. src/foo.rs): locate the module's uncovered decision branches, ask "
+             "a model for a calling test per gap, run each in-crate under `cargo "
+             "test`, and keep it only if it genuinely fails - a runnable test that "
+             "closes the gap. Retained tests appear in the report's Adoptable proofs "
+             "section. Native slop-audit; needs ANTHROPIC_API_KEY, cargo, and cargo- "
              "llvm-cov. Opt-in and CLI-only (it runs code).",
      },
     {"flags": ["--report"],
@@ -683,8 +684,8 @@ FLAGS: tuple[Flag, ...] = (
      "const": ".",
      "default": None,
      "metavar": "DIR",
-     "help": "Write the full Slop Audit report (the grade, verdict, audit checks,"
-             "and concurrency layer - the way try.slopaudit.org renders it) as"
+     "help": "Write the full Slop Audit report (the grade, verdict, audit checks, "
+             "and concurrency layer - the way try.slopaudit.org renders it) as "
              "<slug>.md and <slug>.html into DIR (default the current directory).",
      },
 )

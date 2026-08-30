@@ -865,9 +865,12 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
             else:
                 dead.append({**entry, "category": "unreferenced"})
 
+    # Read as numbers because that is what they are. The entries carry line numbers under a
+    # declaration that said nothing about their type, so adding one to the end line was an
+    # assumption at a line that runs on every audit.
     flagged = {(f["file"], line)
                for f in dead + unreachable
-               for line in range(f["line"], f["end_line"] + 1)}
+               for line in range(int(f["line"]), int(f["end_line"]) + 1)}
     if not production_loc:
         # 0.0 here bands Healthy, so a tree with no lines to measure published "no dead
         # code" over a measurement that never happened. Same shape as the L1.4 and L1.5
