@@ -42,6 +42,7 @@ from l1_analyzer.coverage_prove import (
     model_available,
     sweep_detail,
 )
+from l1_analyzer.python_facets import CoverageGap
 
 _PROPOSE_INSTRUCTION = (
     "You are given ONE Python function and one of its decision branches that no test ever reached. "
@@ -84,30 +85,10 @@ _SOURCE_ROOTS = frozenset({"src", "lib"})
 # The same two shapes the Rust sweep names, for the same reason: a gap is one uncovered
 # decision, an answer is what a model returned for it. The key is pinned and the value left
 # open, because each carries whatever produced it.
-class Gap(TypedDict, total=False):
-    """One uncovered decision the sweep found, as the locator hands it over.
-
-    Written out because the fields are read as strings and numbers at a dozen sites, and a
-    mapping of anything to anything cannot say so: every one of those reads was an assumption
-    nothing checked, which a type checker said the moment one ran over this package.
-
-    `total=False` because a locator fills in what its language can see. The Rust sweep knows
-    a function's parameters and return type; the Python one adds whether it is a method.
-    A gap missing a field is a gap the locator could not describe, and a reader asking for it
-    gets nothing rather than a fabricated blank."""
-
-    kind: str
-    function: str
-    line: int
-    detail: str
-    silent: bool
-    body: str
-    function_source: str
-    parameters: str
-    return_type: str
-    is_method: bool
-    # A gap that has been through a refinement carries the sentence explaining it.
-    explanation: str
+# A gap already had a name. `python_facets.CoverageGap` has described one since before this
+# module was written, and a bulk rename yesterday invented a second name for the same thing:
+# the rename matched a pattern rather than a meaning, and nothing could see two names for one
+# shape until a type checker ran. This module reads the one that exists.
 
 
 class Answer(TypedDict, total=False):
@@ -153,13 +134,13 @@ def _import_path(repo: Path, file_path: Path) -> str:
     return ".".join(reversed(parts))
 
 
-def _signature(gap: Gap) -> str:
+def _signature(gap: CoverageGap) -> str:
     params = ", ".join(p["name"] + (f": {p['annotation']}" if p["annotation"] else "") for p in gap["parameters"])
     return f"def {gap['function']}({params})"
 
 
 
-def propose(gap: Gap, import_path: str) -> Answer | None:
+def propose(gap: CoverageGap, import_path: str) -> Answer | None:
     """First calling test for the located gap: {body, explanation} or None."""
     payload = json.dumps({
         "module": import_path, "function_source": gap["function_source"], "signature": _signature(gap),
@@ -169,7 +150,7 @@ def propose(gap: Gap, import_path: str) -> Answer | None:
     return _valid(_call_model(_PROPOSE_INSTRUCTION, payload), body_asserts)
 
 
-def repair(gap: Gap, import_path: str, test_source: str, error: str) -> Answer | None:
+def repair(gap: CoverageGap, import_path: str, test_source: str, error: str) -> Answer | None:
     payload = json.dumps({
         "module": import_path, "signature": _signature(gap), "function_source": gap["function_source"],
         "test_that_errored": test_source, "error": error[-4000:],
@@ -260,7 +241,7 @@ def _run(repo: Path, interpreter: str, test_source: str, timeout_seconds: float)
 EMPTY_OUTCOMES = {"divergence": 0, "incidental": 0, "pass": 0, "error": 0, "declined": 0}
 
 
-def _prove_one(repo: Path, interpreter: str, gap: Gap, import_path: str,
+def _prove_one(repo: Path, interpreter: str, gap: CoverageGap, import_path: str,
                repair_rounds: int, timeout_seconds: float,
                propose_fn: Callable[..., Answer | None],
                repair_fn: Callable[..., Answer | None],
@@ -297,16 +278,16 @@ def _prove_one(repo: Path, interpreter: str, gap: Gap, import_path: str,
     return bucket, proposal, source
 
 
-def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Gap],
+def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[CoverageGap],
                   repair_rounds: int, timeout_seconds: float,
                   propose_fn: Callable[..., Answer | None],
                   repair_fn: Callable[..., Answer | None],
-                  run_fn: Callable[..., tuple[int, str]]) -> tuple[list[Gap], dict]:
+                  run_fn: Callable[..., tuple[int, str]]) -> tuple[list[CoverageGap], dict]:
     """Every gap in one module. Threads the three collaborators through rather than
     reaching for the module's globals, for the reason `_prove_one` gives."""
     outcomes = dict(EMPTY_OUTCOMES)
     import_path = _import_path(repo, repo / relpath)
-    retained: list[Gap] = []
+    retained: list[CoverageGap] = []
     for gap in gaps:
         bucket, proposal, source = _prove_one(repo, interpreter, gap, import_path, repair_rounds,
                                               timeout_seconds, propose_fn, repair_fn, run_fn)
@@ -346,7 +327,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
-    retained: list[Gap] = []
+    retained: list[CoverageGap] = []
     outcomes = dict(EMPTY_OUTCOMES)
     modules = 0
     located = 0            # every gap the sweep found, whether or not the ceiling let it try
@@ -420,7 +401,7 @@ def _uncovered_lines(repo: Path, interpreter: str, timeout_seconds: float) -> di
     return {"measured": True, "files": missing_by_file(report, repo), "reason": ""}
 
 
-def missing_by_file(report: Gap, repo: Path) -> dict[str, frozenset[int]]:
+def missing_by_file(report: CoverageGap, repo: Path) -> dict[str, frozenset[int]]:
     """The uncovered lines a coverage report holds, for this repository's files only.
 
     A suite that imports an installed package reports coverage for it too, and those lines

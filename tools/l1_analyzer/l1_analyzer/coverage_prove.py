@@ -38,6 +38,7 @@ from typing import TypedDict
 from l1_analyzer import budget, coverage_gates, rust_facets, rust_trace
 from l1_analyzer import model_call as llm
 from l1_analyzer.boundary import boundary
+from l1_analyzer.rust_facets import CoverageGap
 
 # The retention buckets, in report order. Only `divergence` is a proven bug and retained;
 # the rest name why a failing test is the tool's own noise, surfaced and never hidden.
@@ -89,30 +90,42 @@ LAST_REFUSAL = {"reason": "", "cause": ""}
 # The key is pinned and the value left open, because a gap carries whatever the locator put
 # in it and an answer carries whatever the model returned. `dict[str, object]` says that
 # honestly; `dict` said nothing at all and scored better for saying it.
-class Gap(TypedDict, total=False):
-    """One uncovered decision the sweep found, as the locator hands it over.
+# A gap already had a name. `rust_facets.CoverageGap` has described one since before this
+# module was written, and a bulk rename yesterday invented a second name for the same thing:
+# the rename matched a pattern rather than a meaning, and nothing could see two names for one
+# shape until a type checker ran. This module reads the one that exists.
 
-    Written out because the fields are read as strings and numbers at a dozen sites, and a
-    mapping of anything to anything cannot say so: every one of those reads was an assumption
-    nothing checked, which a type checker said the moment one ran over this package.
 
-    `total=False` because a locator fills in what its language can see. The Rust sweep knows
-    a function's parameters and return type; the Python one adds whether it is a method.
-    A gap missing a field is a gap the locator could not describe, and a reader asking for it
-    gets nothing rather than a fabricated blank."""
+class Sweep(TypedDict, total=False):
+    """What a whole-repository sweep hands back: the proofs it kept, what it tried, and why
+    it stopped where it did.
 
-    kind: str
-    function: str
-    line: int
+    Its own record. A bulk rename put the name of a model's answer on this, on the tally
+    below, and on a gap, because the rename matched a spelling rather than a meaning. Nothing
+    could see that a summary and an answer were being called one thing until a type checker
+    ran, and by then three shapes wore two names.
+
+    `total=False` because a sweep that refuses early carries no tally and no module count:
+    there is nothing to count. The refusal always carries its own sentence."""
+
+    retained: list[CoverageProof]
+    attempted: int
+    outcomes: Outcomes
+    modules: int
     detail: str
-    silent: bool
-    body: str
-    function_source: str
-    parameters: str
-    return_type: str
-    is_method: bool
-    # A gap that has been through a refinement carries the sentence explaining it.
-    explanation: str
+
+
+class Outcomes(TypedDict, total=False):
+    """What each generated test became, one count per bucket.
+
+    Only a divergence is a proven bug; the rest are named so a run retaining nothing still
+    says what happened."""
+
+    divergence: int
+    wrong_channel: int
+    invalid_fixture: int
+    incidental_panic: int
+    error: int
 
 
 class Answer(TypedDict, total=False):
@@ -150,7 +163,7 @@ def host_cfg() -> frozenset[str]:
     return coverage_gates.host_cfg_atoms(probe.stdout or "") if probe.returncode == 0 else frozenset()
 
 
-def _live_gaps(gaps: list[Gap], host: frozenset[str]) -> list[Gap]:
+def _live_gaps(gaps: list[CoverageGap], host: frozenset[str]) -> list[CoverageGap]:
     """Drop gaps whose branch the host target never compiles: a proof there can only ever
     assert a premise about a platform the run is not on."""
     return [g for g in gaps if not coverage_gates.cfg_excluded(g.get("cfg"), host)]
@@ -183,7 +196,7 @@ def _call_model(instruction: str, payload: str) -> Answer | None:
     return data
 
 
-def _signature(gap: Gap) -> str:
+def _signature(gap: CoverageGap) -> str:
     params = ", ".join(f"{p['name']}: {p['type']}" for p in gap["parameters"])
     return f"fn {gap['function']}({params}) -> {gap['return_type']}"
 
@@ -208,7 +221,7 @@ def _valid(data: Answer | None, asserts: Callable[[str], bool]) -> Answer | None
     return {"body": body, "explanation": str(data.get("explanation", ""))}
 
 
-def propose(gap: Gap) -> Answer | None:
+def propose(gap: CoverageGap) -> Answer | None:
     """First calling test for the located gap: {body, explanation} or None."""
     payload = json.dumps({
         "function_source": gap["function_source"], "signature": _signature(gap),
@@ -217,7 +230,7 @@ def propose(gap: Gap) -> Answer | None:
     return _valid(_call_model(_PROPOSE_INSTRUCTION, payload), body_asserts)
 
 
-def repair(gap: Gap, test_source: str, compiler_error: str) -> Answer | None:
+def repair(gap: CoverageGap, test_source: str, compiler_error: str) -> Answer | None:
     """Ask the model to fix a test that did not compile, given rustc's own diagnostic."""
     payload = json.dumps({
         "signature": _signature(gap), "function_source": gap["function_source"],
@@ -376,7 +389,7 @@ class CoverageProof(TypedDict):
     test_source: str
 
 
-def _retained_entry(module_relpath: str, gap: Gap, proposal: Gap, source: str) -> CoverageProof:
+def _retained_entry(module_relpath: str, gap: CoverageGap, proposal: Answer, source: str) -> CoverageProof:
     return {
         "function": gap["function"], "language": "rust",
         "location": f"{module_relpath}:{gap['line']}",
@@ -384,7 +397,7 @@ def _retained_entry(module_relpath: str, gap: Gap, proposal: Gap, source: str) -
     }
 
 
-def _refine_incidental(repo: Path, module_relpath: str, gap: Gap, body: str, timeout_seconds: float) -> str:
+def _refine_incidental(repo: Path, module_relpath: str, gap: CoverageGap, body: str, timeout_seconds: float) -> str:
     """The permutation check on an incidental panic: rebuild the fixture with a valid,
     64-aligned scalar and re-run. If the panic clears, the original scalar - not the
     function - caused it, so this is an invalid fixture. If it persists, it is a real panic
@@ -417,7 +430,7 @@ def _refine_incidental(repo: Path, module_relpath: str, gap: Gap, body: str, tim
 # tallies were left unmerged to avoid. Two implementations that differ in what they DO are
 # not a duplication to remove; the shared RULES were, and those are gone.
 
-def _prove_one(repo: Path, module_relpath: str, gap: Gap, repair_rounds: int, timeout_seconds: float,
+def _prove_one(repo: Path, module_relpath: str, gap: CoverageGap, repair_rounds: int, timeout_seconds: float,
                propose_fn: Callable[..., Answer | None], repair_fn: Callable[..., Answer | None],
                run_fn: Callable[..., tuple[str, str]],
                refine_fn: Callable[..., str]) -> tuple[str, Answer | None, str]:
@@ -455,11 +468,11 @@ def _prove_one(repo: Path, module_relpath: str, gap: Gap, repair_rounds: int, ti
     return bucket, proposal, source
 
 
-def _prove_module(repo: Path, module_relpath: str, gaps: list[Gap], repair_rounds: int,
+def _prove_module(repo: Path, module_relpath: str, gaps: list[CoverageGap], repair_rounds: int,
                   timeout_seconds: float, propose_fn: Callable[..., Answer | None],
                   repair_fn: Callable[..., Answer | None], batch_run_fn: Callable[..., tuple[int, str]],
                   run_fn: Callable[..., tuple[str, str]],
-                  refine_fn: Callable[..., str]) -> tuple[list[Gap], Answer]:
+                  refine_fn: Callable[..., str]) -> tuple[list[CoverageProof], Outcomes]:
     """Prove all of one module's gaps. Fast path: batch every proposal into one compile and
     run once, then gate each failing test. If the batch does not compile (one bad test
     poisons it), fall back to per-gap with compiler-feedback repair. Returns (retained,
@@ -521,7 +534,7 @@ SweepProgress = Callable[[str, int, int], None]
 # honest-code-allow: L1.21.13 - the writer and both readers are one unit. `_call_model` writes LAST_REFUSAL and it is the single model boundary BOTH sweeps import, so there is no second source and no cross-module surprise. Threading the reason back would change the injected propose_fn signature, its repair counterpart and every test fake, to reach one reader at the end of one sweep. The sweeps are sequential, so the value is never stale by more than one call.
 def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
                         timeout_seconds: float, progress: SweepProgress | None,
-                        max_attempts: int) -> Answer:
+                        max_attempts: int) -> Sweep:
     """Sweep the WHOLE crate: one coverage build, then every module with uncovered branches is
     proven (batched, with per-gap repair fallback). Retained proofs are aggregated across the
     codebase. `progress(relpath, n_gaps, running_retained)` is called before each module."""
@@ -540,7 +553,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
     host = host_cfg()
-    retained: list[Gap] = []
+    retained: list[CoverageGap] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     modules = 0
     located = 0            # every gap the sweep found, whether or not the ceiling let it try
@@ -584,7 +597,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 
-def sweep_detail(retained: int, modules: int, located: int, outcomes: Gap, provenance: str,
+def sweep_detail(retained: int, modules: int, located: int, outcomes: CoverageGap, provenance: str,
                  reason: str, cause: str) -> str:
     """What a finished sweep says, in the three cases it can be in.
 
@@ -621,7 +634,7 @@ def sweep_detail(retained: int, modules: int, located: int, outcomes: Gap, prove
             f"(ran under {provenance}). {aside}")
 
 
-def _outcome_detail(outcomes: Gap) -> str:
+def _outcome_detail(outcomes: Outcomes) -> str:
     """The honest breakdown: what each generated test became. Only `divergence` is a proven
     bug; the noise buckets are named so a zero-retained result still says what happened."""
     return (f"Of {sum(outcomes.values())} generated tests run in-crate: {outcomes['divergence']} "
@@ -653,7 +666,7 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: f
     if not gaps:
         return {"retained": [], "attempted": 0, "detail": "no proof-ready uncovered branches located in this module"}
 
-    retained: list[Gap] = []
+    retained: list[CoverageGap] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     for gap in gaps:
         bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)
