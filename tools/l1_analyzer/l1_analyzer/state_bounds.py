@@ -76,6 +76,11 @@ from l1_analyzer.state_partition import (
     Partition,
     Reach,
 )
+from l1_analyzer.state_reading import (  # noqa: F401 - re-exported: callers read these from here
+    Bucketed,
+    FileRead,
+    StateReading,
+)
 from l1_analyzer.state_refs import bound_to as _bound_to
 from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import bare_condition as _bare_condition
@@ -815,21 +820,6 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
             # reader to the shape it names rather than to where the state was bound.
             "silence_line": silence_line,
             "partition": partition}
-
-
-class FileRead(TypedDict):
-    """What the classifier made of one file, and what it walked to get there.
-
-    `visited` and `judged` are the two halves the old coverage number could not separate.
-    `visited` is every declaration the enumerators reached, admitted or declined; `judged` is
-    the subset that yielded a state key which then reached a verdict. A declaration in neither
-    is one nothing looked at, and only that is a gap in the reading.
-
-    They are sets of census-vocabulary sites, not counts, because the comparison happens
-    against the census's own per-file site set and a count cannot be intersected."""
-    findings: list[Finding]
-    visited: set[Site]
-    judged: set[Site]
 
 
 def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ctors: set[str]) -> FileRead:

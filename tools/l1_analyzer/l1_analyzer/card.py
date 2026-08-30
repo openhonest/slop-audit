@@ -20,6 +20,9 @@ from typing import TypedDict, cast
 from l1_analyzer import report
 from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.report import UNORDERED_CLASS_BOUND, grade_summary
+from l1_analyzer.state_bounds import Finding as StateFinding
+from l1_analyzer.state_bounds import StateReading
+from l1_analyzer.thread_surface import Finding as ThreadFinding
 
 
 class MetricSpec(TypedDict):
@@ -258,7 +261,8 @@ def _metrics(specs: tuple[MetricSpec, ...], results: Panel, group: str) -> list[
     return out
 
 
-def _culprits(l18b: Row | None, status: str, coarse: list[Row]) -> tuple[list[Row], int]:
+def _culprits(l18b: StateReading | None, status: str,
+              coarse: list[StateFinding]) -> tuple[list[Row], int]:
     """What limits the grade. CANNOT is limited by proven unbounded state, COARSE by finite
     state with too many unordered cases. The two lists are selected by different rules - one
     reads the verdict, the other reads the cardinality against a bound - so they cannot
@@ -281,7 +285,7 @@ def _culprits(l18b: Row | None, status: str, coarse: list[Row]) -> tuple[list[Ro
     return shown, max(0, len(flagged) - _CULPRIT_CAP)
 
 
-def _scoped_out(l18b: Row | None) -> Row | None:
+def _scoped_out(l18b: StateReading | None) -> Row | None:
     # The isinstance guard is the absence: L1.18b may not be in the panel at all. Past it
     # the analyzer always writes a bucketed section carrying its counts and paths, even
     # when both are empty, so those two are subscripted.
@@ -333,7 +337,11 @@ def _interleaving_robustness(results: Row) -> Row | None:
     # there would report not-measured for a result that was measured and malformed.
     if not isinstance(ir, dict) or str(ir["verdict"]) == "n/a":
         return None
-    unmodeled = ir.get("unmodeled") if isinstance(ir.get("unmodeled"), list) else []
+    # Fetched once and then checked. Written as a check on one fetch and a use of another,
+    # nothing could tie the two together: the value was read twice and only the first read
+    # was ever tested.
+    listed = ir.get("unmodeled")
+    unmodeled: list[object] = listed if isinstance(listed, list) else []
     blurb = (_t("interleaving.blurb.clean") if not unmodeled
              else _t("interleaving.blurb", unmodeled=len(unmodeled),
                      surface=ir.get("surface_files", len(unmodeled))))
@@ -357,7 +365,9 @@ def _thread_surface(lang: str, results: Row) -> Row | None:
         blurb = _t(f"thread.blurb.{verdict}", exposed=counts.get("exposed", 0),
                    review=counts.get("review", 0), candidate=counts.get("candidate", 0),
                    read=ts["files_read"], parsed=ts["files_parsed"])
-    findings = ts.get("findings") if isinstance(ts.get("findings"), list) else []
+    # Fetched once and then checked, for the same reason as the reading above.
+    reported = ts.get("findings")
+    findings: list[ThreadFinding] = reported if isinstance(reported, list) else []
     # thread_surface.Finding is total too, so a site's fields are subscripted. Only the
     # kind's DISPLAY name defaults, and to the kind itself: a kind with no copy yet is shown
     # as the analyzer named it rather than as an empty cell.
