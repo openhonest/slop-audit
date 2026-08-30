@@ -216,3 +216,10 @@ Feature: mutable_state — L1.18, the share of functions that reference unbounde
     When module_mutable_names parses every production file and applies the module scan to each
     Then it returns the union of those names, a binding being a bound literal exactly when it is absent from the set
     But it discards the count of unreadable files rather than disclosing it, and an unconfigured language returns an empty set that reads exactly like a repository with no mutable bindings
+
+  Scenario: text_of gives the source a node covers, and nothing when there is none
+    Given a node, or nothing
+    When text_of reads the node's text
+    Then it returns that source decoded, replacing any byte it cannot read rather than raising
+    And an absent node, or a node the parser produced with no text, returns the empty string
+    But four sites read the text directly before this existed, and each of them raised on such a node, which no caller could have told from a node holding an empty string anyway

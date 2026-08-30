@@ -24,6 +24,7 @@ from l1_analyzer import (
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.gate import _audited_language, _run_gate
 from l1_analyzer.incomplete import IncompleteCode
+from l1_analyzer.thread_surface import Finding as ThreadFinding
 
 # Which indicators each stage computes. One table, read by the branches below.
 #
@@ -86,8 +87,12 @@ class Refused(Exception):
 #
 
 
-def _hazard_context(repo: Path, finding: dict[str, object]) -> str:
-    """The code around a located hazard, handed to the generator as the only context."""
+def _hazard_context(repo: Path, finding: ThreadFinding) -> str:
+    """The code around a located hazard, handed to the generator as the only context.
+
+    Takes the record the thread-safety reader produces rather than a mapping of anything to
+    anything. Every field below is read as a path or a line number, and each of those reads
+    was an assumption while the parameter said nothing about what it holds."""
     located = (f"Located hazard: {finding['kind']} on `{finding['symbol']}` at "
                f"{finding['file']}:{finding['line']}.")
     text = text_or_empty(repo / finding["file"])
@@ -419,7 +424,9 @@ class Flag(TypedDict, total=False):
     type: object
     choices: list[str]
     default: object
-    nargs: str
+    # argparse takes either a count or one of its words, so this holds both. It was
+    # declared as a word alone and one flag passes a count, which nothing could see.
+    nargs: str | int
     const: str
     metavar: str
     help: str

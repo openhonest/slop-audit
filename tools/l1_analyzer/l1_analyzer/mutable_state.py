@@ -95,9 +95,21 @@ def _py_is_type_expression(n: Node) -> bool:
     return False
 
 
+def text_of(node: Node | None) -> str:
+    """The source a node covers, and the empty string when there is none.
+
+    Four sites read `node.text.decode(...)` directly. A tree-sitter node's text is optional,
+    so each of those four raises on a node the parser produced without one, and none of them
+    could have been told apart from a node holding an empty string anyway. This answers the
+    same for both, which is what every caller already assumed."""
+    if node is None or node.text is None:
+        return ""
+    return node.text.decode("utf8", errors="ignore")
+
+
 def _py_is_type_alias(node: Node, rhs: Node | None) -> bool:
     annot = node.child_by_field_name("type")
-    if annot is not None and annot.text.decode("utf8", errors="ignore").split("[", 1)[0].strip() == "TypeAlias":
+    if annot is not None and text_of(annot).split("[", 1)[0].strip() == "TypeAlias":
         return True
     return rhs is not None and _py_is_type_expression(rhs)
 
@@ -111,7 +123,7 @@ def _py_is_empty_container(rhs: Node | None) -> bool:
     if rhs.type == "call":
         fn = rhs.child_by_field_name("function")
         args = rhs.child_by_field_name("arguments")
-        if fn is not None and fn.type == "identifier" and fn.text.decode("utf8", errors="ignore") in _PY_CONTAINER_CTORS:
+        if fn is not None and fn.type == "identifier" and text_of(fn) in _PY_CONTAINER_CTORS:
             return args is None or not args.named_children
     return False
 
@@ -127,7 +139,7 @@ def _module_mutables_python(candidates: list[Node], this_idents: set[str]) -> se
         left = node.child_by_field_name("left")
         if left is None or left.type != "identifier":  # skip subscripts, tuples, attributes
             continue
-        name = left.text.decode("utf8", errors="ignore")
+        name = text_of(left)
         # Dunders (__all__, __version__, ...) are module metadata, not state.
         if name in this_idents or (name.startswith("__") and name.endswith("__")):
             continue
@@ -151,7 +163,7 @@ def _module_mutables_by_specifier(candidates: list[Node]) -> set[str]:
     for node in candidates:
         if not any(c.type == "mutable_specifier" for c in node.children):
             continue
-        name = next((c.text.decode("utf8", errors="ignore") for c in node.children if c.type == "identifier"), None)
+        name = next((text_of(c) for c in node.children if c.type == "identifier"), None)
         if name:
             mutables.add(name)
     return mutables

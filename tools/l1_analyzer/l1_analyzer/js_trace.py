@@ -30,6 +30,7 @@ import shlex
 import shutil
 import tempfile
 from pathlib import Path
+from typing import TypedDict
 
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
@@ -47,8 +48,28 @@ _NO_TEST_SCRIPT = "no test specified"
 
 # The package manifest this module reads, and the branch counts a coverage report carries.
 # Both were written `dict`, the least precise mapping the language has, with a string key.
-Manifest = dict[str, object]
-Branches = dict[str, object]
+class Manifest(TypedDict, total=False):
+    """The project manifest this module reads, holding only the fields it asks for.
+
+    `total=False` because a real manifest carries dozens of fields and this reads three: the
+    scripts table, and the two dependency tables it checks a version in. Declaring the whole
+    file would be a claim about somebody else's project."""
+
+    scripts: dict[str, str]
+    dependencies: dict[str, str]
+    devDependencies: dict[str, str]
+
+
+class Branches(TypedDict):
+    """The branch counts a coverage report carries: how many there are and what share was
+    covered.
+
+    Both are numbers and both were read through a mapping of anything to anything, so
+    turning them into a number was an assumption at every site."""
+
+    total: int
+    covered: int
+    pct: float
 
 
 

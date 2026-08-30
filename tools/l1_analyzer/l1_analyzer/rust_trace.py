@@ -27,6 +27,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
+from typing import TypedDict
 
 from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
@@ -42,10 +43,43 @@ from l1_analyzer.pytest_trace import (
 _RESULT = re.compile(r"test result:.*?(\d+) passed;\s*(\d+) failed;\s*(\d+) ignored")
 
 
-# One file's entry in the coverage report, and the uncovered lines a run found, keyed by
-# module path. Both were written `dict`, the least precise mapping the language has.
-Entry = dict[str, object]
-Uncovered = dict[str, frozenset[int]]
+class Entry(TypedDict, total=False):
+    """One file's entry in the coverage report the toolchain writes.
+
+    `segments` is the only field this module reads, and each segment is a list of five
+    numbers: line, column, count, whether the count is real, and whether it opens a region.
+    Written out because a mapping of anything to anything has no fields to be wrong about."""
+
+    filename: str
+    segments: list[list[int]]
+
+
+class Uncovered(TypedDict):
+    """What a coverage run found, or why it found nothing.
+
+    Three fields and every one is read. It was declared as a mapping of names to sets of
+    line numbers, which is what only ONE of the three holds: `measured` is a yes or no and
+    `reason` is a sentence, so two of the three fields disagreed with the declaration above
+    them at every site that built one.
+
+    `files` is absent on the single-module reading and `uncovered_lines` on the whole-repo
+    one, because each answers a different question and inventing the other would be a blank
+    nobody measured."""
+
+    measured: bool
+    reason: str
+
+
+class ModuleUncovered(Uncovered, total=False):
+    """One module's uncovered lines."""
+
+    uncovered_lines: frozenset[int]
+
+
+class RepoUncovered(Uncovered, total=False):
+    """Every file's uncovered lines, by path from the repository root."""
+
+    files: dict[str, frozenset[int]]
 
 
 
@@ -119,7 +153,7 @@ def _uncovered_lines(entry: Entry) -> frozenset[int]:
                      if len(seg) >= 5 and seg[3] and seg[4] and int(seg[2]) == 0)
 
 
-def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: float) -> Uncovered:
+def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: float) -> ModuleUncovered:
     """Uncovered lines for ONE module file, measured against the module in its crate (so it
     works for a deeply-integrated module). {measured, uncovered_lines, reason}."""
     report, reason = _llvm_cov_report(repo, timeout_seconds)
@@ -135,7 +169,7 @@ def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: flo
     return {"measured": True, "uncovered_lines": _uncovered_lines(entry), "reason": ""}
 
 
-def repo_uncovered_lines(repo: Path, timeout_seconds: float) -> Uncovered:
+def repo_uncovered_lines(repo: Path, timeout_seconds: float) -> RepoUncovered:
     """Uncovered lines for EVERY file under the repo, from a single coverage build. Returns
     {measured, files: {relpath: frozenset(lines)}, reason}. Only files inside `repo` with at
     least one uncovered line are included, keyed by their path relative to repo."""
