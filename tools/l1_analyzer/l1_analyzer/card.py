@@ -25,6 +25,18 @@ from l1_analyzer.state_bounds import StateReading
 from l1_analyzer.thread_surface import Finding as ThreadFinding
 
 
+class RuntimeRow(TypedDict):
+    """One runtime check the CLI runs, and what it reported about itself.
+
+    Three fields and the footer reads every one. It lived on the card as an untyped entry,
+    so the loop that writes one sentence per row was reading three fields nothing had
+    described."""
+
+    code: str
+    measured: bool
+    reason: str
+
+
 class MetricSpec(TypedDict):
     """One row of the tables that say which indicators a card shows.
 
@@ -257,7 +269,7 @@ def _metrics(specs: tuple[MetricSpec, ...], results: Panel, group: str) -> list[
     for spec in specs:
         reading = results.get(spec["key"])
         if isinstance(reading, dict):
-            out.append(_metric(spec, cast("L1Result", reading), group))
+            out.append(_metric(spec, cast(L1Result, reading), group))
     return out
 
 
@@ -378,7 +390,8 @@ def _thread_surface(lang: str, results: Row) -> Row | None:
             "blurb": blurb, "sites": sites, "sites_more": max(0, len(findings) - _THREAD_CAP)}
 
 
-def _detail(status: str, basis: str, promiscuous: int, cover: int | None, counts: Row, census: Row) -> str:
+def _detail(status: str, basis: str, promiscuous: int, cover: int | None,
+            counts: dict[str, int], census: Row) -> str:
     # Three different things produce `na`, and telling the reader the wrong one wastes their
     # time: "there is no code here I can read" sends them to check the language, "I could not
     # follow most of your state" sends them to the sites, and "I read none of your state"
@@ -485,7 +498,8 @@ def footer_for(card: Row) -> str:
     if not card["ran_tests"]:
         return _t("footer.fine")
     sentences = [_t("footer.cli_open")]
-    for row in card["runtime_rows"]:
+    rows = card["runtime_rows"]
+    for row in cast(list[RuntimeRow], rows if isinstance(rows, list) else []):
         key = "footer.row_ran" if row["measured"] else "footer.row_missing"
         sentences.append(_t(key)
                          .replace("{label}", _t(f"footer.row.{row['code']}").capitalize())
@@ -495,7 +509,7 @@ def footer_for(card: Row) -> str:
     return " ".join(sentences)
 
 
-def build_card(slug: str, lang: str, results: Row, ran_tests: bool,
+def build_card(slug: str, lang: str, results: Panel, ran_tests: bool,
                analyzer_version: str) -> Row:
     """The full scorecard model, identical to the site's. ran_tests=True (the CLI) adds
     the measured runtime metrics (L1.19 coverage, L1.20 determinism); False (the site) omits
@@ -505,13 +519,17 @@ def build_card(slug: str, lang: str, results: Row, ran_tests: bool,
     # None, not an empty dict. The empty dict was a SECOND spelling of absent, and it was
     # the one that got past every `isinstance(l18b, dict)` guard downstream: the readers
     # then subscripted a result that was never there. Absence has one spelling here.
-    l18b = results.get("L1.18b")
-    l18b = l18b if isinstance(l18b, dict) else None
+    # Narrowed once, here, where the state reading comes out of the panel. The check said
+    # only "a mapping", which is what the panel already promised, so it narrowed nothing:
+    # every read of a field downstream stayed an assumption.
+    found = results.get("L1.18b")
+    l18b = cast(StateReading, found) if isinstance(found, dict) else None
     counts = l18b["counts"] if l18b else _ZERO
     # The site and CLI are the boundary, so the configured bound is resolved here.
     g = grade_summary(results, UNORDERED_CLASS_BOUND)
     status, pct, grade = g["status"], g["testable_pct"], g["grade"]
-    pc = results.get("path_cover", {})
+    path_cover = results.get("path_cover")
+    pc: Row = path_cover if isinstance(path_cover, dict) else {}
     # The path-cover figure is coverage of the ENUMERATED state, so on an ungraded card it
     # would be a precise number standing next to a refusal to give one. It was the worst part
     # of the defect: "1,080 runs cover them all" is a coverage claim over an empty set.

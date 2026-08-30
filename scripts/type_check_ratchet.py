@@ -33,7 +33,7 @@ from pathlib import Path
 # The same thing happened to the type-escape count the day it learned to see a bare generic:
 # 0 became 157 without a line of behaviour changing. A number that rises when a measurement
 # gets sharper is the measurement working.
-CEILING = 166
+CEILING = 161
 
 _COUNT = re.compile(r"Found (\d+) error")
 
