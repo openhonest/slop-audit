@@ -257,7 +257,7 @@ def data_classes(source: Source) -> list[Finding] | None:
     spec, raw = source["spec"], source["raw"]
     if not spec["constructor_names"] and not spec["constructor_types"]:
         return None
-    shapes = DECLARED_SHAPES | local_exception_roots(source)
+    shapes = DECLARED_SHAPES | local_declared_shapes(source)
     found: list[Finding] = []
     for node in class_nodes(source["root"], spec):
         if set(base_names(node, spec, raw)) & shapes:
@@ -334,12 +334,18 @@ def methods_wearing_a_class(source: Source) -> list[Finding] | None:
 # --------------------------------------------------------------------------
 
 
-def local_exception_roots(source: Source) -> set[str]:
-    """Classes this file defines that reach an exception root through their own bases.
+def local_declared_shapes(source: Source) -> set[str]:
+    """Classes this file defines that reach a declared shape through their own bases.
 
-    Followed to the root rather than one level, so a three-deep hierarchy is still
-    exceptions all the way down. Sixteen second-level exceptions in one adopter's file
-    fired as violations before this existed."""
+    Followed to the root rather than one level, so a three-deep hierarchy is still declared
+    shapes all the way down. Sixteen second-level exceptions in one adopter's file fired as
+    violations before this existed.
+
+    It was called `local_exception_roots` and clears every declared shape, not just
+    exceptions: a TypedDict extending a TypedDict and a Protocol extending a Protocol reach
+    the same table and always did. The name described the case that prompted it rather than
+    the rule it implements, so a reader deciding whether a record shape was covered had to
+    read the body to find out that it was."""
     spec, raw = source["spec"], source["raw"]
     bases = {node_text(node.child_by_field_name("name"), raw) or first_name(node, raw):
              base_names(node, spec, raw)
@@ -366,7 +372,7 @@ def inheritance_for_reuse(source: Source) -> list[Finding] | None:
     past its own imports. Both stay reported, which sends a reader to look rather than
     hiding it."""
     spec, raw = source["spec"], source["raw"]
-    shapes = DECLARED_SHAPES | local_exception_roots(source)
+    shapes = DECLARED_SHAPES | local_declared_shapes(source)
     found: list[Finding] = []
     for node in walk(source["root"]):
         if node.type not in spec["class_types"]:

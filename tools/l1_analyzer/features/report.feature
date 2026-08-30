@@ -60,6 +60,13 @@ Feature: report — the published grade, the verifiability verdict, and the evid
     And a repository with any promiscuous state cannot be verified, a repository with coarse state can be verified only coarsely, and everything else can be verified
     But undecided state no longer affects this verdict, because one call the analyzer could not read used to cap a whole repository, which reported a limit of ours as a defect in theirs; it is published as the silence index instead
 
+  Scenario: _band_of reads one indicator's band when the key is only known at run time
+    Given a panel holding twenty indicator rows, a state reading and a proof sweep
+    When _band_of is asked for a row by a key a loop decided
+    Then it hands back that row's band as text, because the band is what the caller wants
+    And a row carrying no band answers nothing at all, the same as a row nobody produced
+    But it checks rather than asserts: the panel cannot know which row a variable key names, so nothing here claims the value it found is a band
+
   Scenario: _hygiene averages the audit checks by how much each one weighs
     Given the full set of indicator results
     When _hygiene scores each weighted check by its band, at full marks for Healthy, half for Not Healthy and none for Slop

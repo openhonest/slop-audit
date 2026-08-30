@@ -78,9 +78,9 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     Then the clause records that the structure is permitted
     But nothing here reads intent, so whether the permission was earned stays a question for a reader
 
-  Scenario: local_exception_roots names the classes this file derives from an exception
+  Scenario: local_declared_shapes names the classes this file derives from a declared shape
     Given a file defining an exception and three classes descending from it in turn
-    When local_exception_roots follows each chain of bases to its root
+    When local_declared_shapes follows each chain of bases to its root
     Then all four names come back, so a second-level exception is exceptions all the way down
     But a base defined in another module cannot be followed and is not counted a root
 

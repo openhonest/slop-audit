@@ -858,12 +858,38 @@ def _named_under(repo: Path, path: Path) -> str:
         return str(path)
 
 
-def analyze(repo: Path, lang: str) -> L1Result:
+# The clause clears exactly this shape when the base is declared in the same file, and
+# declines when it is not, which is the limit its own docstring states. Reading a base
+# across files needs the whole tree, and this clause runs on one file behind a write hook.
+# honest-code-allow: L1.21.5 - L1Result is a TypedDict; this adds six fields to a record and inherits no behaviour, because there is none to inherit
+class ConformityRow(L1Result):
+    """L1.21's row on the panel: an indicator result, and the six readings that say what the
+    share left out.
+
+    It was declared `L1Result`, which is a value, a band and a sentence, while nine fields
+    went out on every run. The card reads `findings` off it, and as far as anything could
+    tell it was reading a field the row had said it does not have.
+
+    Each of the six answers a question the number cannot. `undecided` is the clauses nobody
+    could check, which are outside the share in both directions. `allowed` and `declared`
+    are the findings a declaration withheld and why. `unreadable_files` and `unexamined` are
+    what the reader could not open and what it could not name. Publishing the share without
+    them is publishing a percentage of an unstated denominator."""
+
+    findings: list[Finding]
+    undecided: list[str]
+    allowed: list[Allowed]
+    declared: list[Allowed]
+    unreadable_files: int
+    unexamined: int
+
+
+def analyze(repo: Path, lang: str) -> ConformityRow:
     """L1.21 over a whole repository.
 
     A clause is broken for the repository if ANY file breaks it, because one dishonest site
-    is what a reader needs to find. Optional in the full audit: nineteen clauses over a
-    large tree is a cost a caller chooses rather than one imposed on every run."""
+    is what a reader needs to find. Optional in the full audit: every clause over a large
+    tree is a cost a caller chooses rather than one imposed on every run."""
     from l1_analyzer import scope
 
     repo = Path(repo)

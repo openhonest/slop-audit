@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TypedDict, cast
 
 from l1_analyzer import report
+from l1_analyzer.panel import Panel
 from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.report import UNORDERED_CLASS_BOUND, grade_summary
 from l1_analyzer.state_bounds import Finding as StateFinding
@@ -61,16 +62,12 @@ class Dimension(TypedDict):
     frameworks: str
 
 
-# What a card reads. The panel is every indicator's reading by its code, and a row is one
-# reading. Both were written `dict`, which means dict[Any, Any] and is the least precise
-# mapping the language has: our own escape counter charged twenty-six of them in this file
-# alone once it learned to see a bare one.
+# One reading, written `dict`, which means dict[Any, Any] and is the least precise mapping
+# the language has: our own escape counter charged twenty-six of those in this file alone
+# once it learned to see a bare one.
 #
-# `object` rather than a union for the looser rows. A card reads results a producer may
-# extend, so the value genuinely varies, and `dict[str, object]` says that while pinning the
-# key. That is what an adopter was doing when they found the counter scoring the sloppier
-# annotation better.
-Panel = dict[str, "L1Result | object"]
+# The panel comes from l1_analyzer.panel. It was declared here AND in the report, and here
+# it read `dict[str, "L1Result | object"]`, which is `dict[str, object]` written at length.
 Row = dict[str, object]
 
 _TEMPLATES = Path(__file__).parent / "card_templates"
@@ -313,12 +310,12 @@ def _scoped_out(l18b: StateReading | None) -> Row | None:
             "paths": paths[:12], "paths_more": max(0, len(paths) - 12)}
 
 
-def _honest_code(results: Row) -> Row | None:
+def _honest_code(results: Panel) -> Row | None:
     """The card's view of L1.21, or None when the caller did not ask for it.
 
     The share is over the clauses that were DECIDED, so the card prints how many of the
-    nineteen those were. Without that a reader would take 100% to mean nineteen clauses
-    held, when it can mean sixteen held and three were never looked at."""
+    clauses those were. Without that a reader would take 100% to mean every clause held,
+    when it can mean sixteen held and three were never looked at."""
     entry = results.get("honest_code")
     if not isinstance(entry, dict) or entry["band"] == "n/a":
         return None
@@ -332,7 +329,7 @@ def _honest_code(results: Row) -> Row | None:
             "broken_more": max(0, len(broken) - _THREAD_CAP)}
 
 
-def _interleaving_robustness(results: Row) -> Row | None:
+def _interleaving_robustness(results: Panel) -> Row | None:
     """The card's view of the interleaving-robustness check, or None when it did not run.
 
     It was computed in cli.py, published into the JSON panel, and mentioned nowhere here,
@@ -362,7 +359,7 @@ def _interleaving_robustness(results: Row) -> Row | None:
             "files_more": max(0, len(unmodeled) - _THREAD_CAP)}
 
 
-def _thread_surface(lang: str, results: Row) -> Row | None:
+def _thread_surface(lang: str, results: Panel) -> Row | None:
     ts = results.get("thread_surface")
     if not isinstance(ts, dict):
         return None
@@ -446,7 +443,7 @@ def _int(v: object) -> int | None:
 _PROOF_CAP = 20
 
 
-def _proofs(results: Row) -> list[Row]:
+def _proofs(results: Panel) -> list[Row]:
     """The adoptable proofs: runnable tests slop-audit generated for a located gap and
     retained only because running them settled it (Umbra's discipline). Two producers feed
     one surface - the concurrency prove loop (results['proofs']) and the coverage-gap prove
@@ -607,7 +604,7 @@ def card_html(card: Row) -> str:
     )
 
 
-def _silence_sites(l18b: Row | None) -> list[Row]:
+def _silence_sites(l18b: StateReading | None) -> list[Row]:
     """Every site the analyzer stopped at, with the reason in the reader's words, for the
     HTML card. The model carried `silence` and the template rendered none of it, so the site
     published a grade and named not one place it stopped."""

@@ -107,10 +107,20 @@ def text_of(node: Node | None) -> str:
     return node.text.decode("utf8", errors="ignore")
 
 
-def _py_is_type_alias(node: Node, rhs: Node | None) -> bool:
+def _py_is_type_alias(node: Node, rhs: Node | None, type_ctors: frozenset[str]) -> bool:
+    """Whether this binding declares a type rather than holding a value.
+
+    The call form is here because `_py_is_type_expression` declines anything with a call in
+    it, and `TypedDict("Panel", {...})` is a call that returns a type. The class form of the
+    same declaration was never counted, so one declaration read two ways depending on which
+    syntax spelled it, and only one of the two can spell a key with a dot in it."""
     annot = node.child_by_field_name("type")
     if annot is not None and text_of(annot).split("[", 1)[0].strip() == "TypeAlias":
         return True
+    if rhs is not None and rhs.type == "call":
+        fn = rhs.child_by_field_name("function")
+        if fn is not None and text_of(fn) in type_ctors:
+            return True
     return rhs is not None and _py_is_type_expression(rhs)
 
 
@@ -128,7 +138,8 @@ def _py_is_empty_container(rhs: Node | None) -> bool:
     return False
 
 
-def _module_mutables_python(candidates: list[Node], this_idents: set[str]) -> set[str]:
+def _module_mutables_python(candidates: list[Node], this_idents: set[str],
+                            type_ctors: frozenset[str]) -> set[str]:
     """Field-based module-global detection for Python. The binding name is read
     from the assignment's `left` field, so string literals and annotation tails
     are never scanned as source. Type aliases are skipped. An uppercase name is a
@@ -144,7 +155,7 @@ def _module_mutables_python(candidates: list[Node], this_idents: set[str]) -> se
         if name in this_idents or (name.startswith("__") and name.endswith("__")):
             continue
         rhs = node.child_by_field_name("right")
-        if _py_is_type_alias(node, rhs):
+        if _py_is_type_alias(node, rhs, type_ctors):
             continue
         if name.isupper():
             if _py_is_empty_container(rhs):
@@ -255,7 +266,8 @@ def _module_mutables_text(root: Node, cfg: LangCfg) -> set[str]:
 
 
 def _module_mutables_python_scan(root: Node, cfg: LangCfg) -> set[str]:
-    return _module_mutables_python(shallow_candidates(root, cfg["module_level_assign"]), cfg["this_ident"])
+    return _module_mutables_python(shallow_candidates(root, cfg["module_level_assign"]),
+                                  cfg["this_ident"], cfg["type_constructors"])
 
 
 def _module_mutables_specifier_scan(root: Node, cfg: LangCfg) -> set[str]:

@@ -21,6 +21,9 @@ from __future__ import annotations
 from typing import TypedDict
 
 from l1_analyzer import incomplete, state_census, state_partition
+from l1_analyzer.panel import Panel
+from l1_analyzer.state_partition import Finding
+from l1_analyzer.state_reading import StateReading
 
 _HYGIENE_WEIGHTS = {"L1.17": 3, "L1.15": 3, "L1.10": 2, "L1.11": 1, "L1.9": 1, "L1.16": 1}
 _BAND_POINTS = {"Healthy": 1.0, "Not Healthy": 0.5, "Slop": 0.0}
@@ -146,17 +149,33 @@ NO_STATE = "no-state"
 # cannot support.
 UNORDERED_CLASS_BOUND: int | None = None
 
-# What this module reads. A panel is every indicator's reading by its code, a tally is the
-# state census's counts, and a reading is one indicator's row. All three were written
-# `dict`, which means dict[Any, Any], and our own escape counter charged thirteen of them
-# here once it learned to see a bare one.
-Panel = dict[str, object]
+# What this module reads. A tally is the state census's counts and a reading is one
+# indicator's row. Both were written `dict`, which means dict[Any, Any], and our own escape
+# counter charged thirteen of them here once it learned to see a bare one.
+#
+# The panel comes from l1_analyzer.panel. It was declared here AND in the card, as two
+# different mappings of anything to anything, so the shape every reader reads had two owners
+# and neither said what it held.
 Tally = dict[str, int]
-Reading = dict[str, object]
+
+# `Reading` stood here and named two different shapes: the whole L1.18b reading of a
+# repository, and ONE state finding inside it. Both are declared elsewhere, by the code that
+# builds them, so this module names them rather than inventing a third word for two things.
+
+# The state reading for a run that produced none: an absent row and an empty one answer the
+# same here, and writing the empty one down keeps every reader below off `isinstance`. Each
+# of those checks distrusted the type its own signature declared, which is what a panel of
+# `object` obliged them to do.
+_NO_STATE_READING: StateReading = {
+    "value": "n/a", "band": "n/a", "counts": {}, "coverage": {},
+    "resolvable_fraction": 0.0, "silence": {}, "partition": {}, "census": {},
+    "findings": [], "bucketed": {"counts": {}, "paths": []},
+    "details": "no state reading was produced",
+}
 
 
 
-def _meter_ran(l18b: Reading) -> bool:
+def _meter_ran(l18b: StateReading) -> bool:
     """Whether the finite-testability meter produced a fraction.
 
     It trusts the declared type. The check it used to make on `l18b` itself re-tested what
@@ -294,10 +313,24 @@ def _status(basis: str, counts: Tally, coarse: bool) -> str:
     return "can"
 
 
+def _band_of(results: Panel, key: str) -> str | None:
+    """One indicator's band, by a key decided at runtime.
+
+    A panel answers a variable key with `object`, and it is right to: it holds a state
+    reading and a proof sweep alongside twenty indicator rows, and cannot know which one a
+    loop is about. The band is what the caller wants, so the band is what comes back, and a
+    row without one answers None the way an absent row already did.
+
+    Checked, not asserted. Nothing here claims the value is a band; it reports what is
+    there, and the caller's own table of bands decides whether it means anything."""
+    row = dict(results).get(key)
+    return str(row["band"]) if isinstance(row, dict) and "band" in row else None
+
+
 def _hygiene(results: Panel) -> float | None:
     num = den = 0.0
     for key, weight in _HYGIENE_WEIGHTS.items():
-        points = _BAND_POINTS.get(str((results.get(key) or {}).get("band")))
+        points = _BAND_POINTS.get(_band_of(results, key) or "")
         if points is None:
             continue
         num += weight * points
@@ -342,7 +375,7 @@ def _grade(status: str, pct: int | None, hygiene: float | None) -> str | None:
     return "A" if hygiene >= _A_MIN else "B" if hygiene >= _B_MIN else "C"
 
 
-def coarse_states(l18b: Reading, bound: int | None) -> list[Reading]:
+def coarse_states(l18b: StateReading, bound: int | None) -> list[Finding]:
     """State whose reaching partition is finite, unordered, and wider than the bound.
 
     The bound lives here rather than in the classifier because it is a reporting decision:
@@ -375,7 +408,7 @@ class GradeSummary(TypedDict):
     grade: str | None           # A/B/C (can), D (coarse), F (cannot), None (na)
     silence: float              # share of state the analyzer could not decide
     census: dict[str, object]   # declared vs admitted: the independent denominator
-    coarse: list[Reading]          # the states that made the verdict coarse, widest first
+    coarse: list[Finding]          # the states that made the verdict coarse, widest first
 
 
 def grade_summary(results: Panel, unordered_class_bound: int | None) -> GradeSummary:
@@ -393,7 +426,7 @@ def grade_summary(results: Panel, unordered_class_bound: int | None) -> GradeSum
     # value inside one function was the smell that said this step was missing, and each
     # reader below then had to distrust the type its own signature declares.
     panel_l18b = results.get("L1.18b")
-    l18b: Reading = panel_l18b if isinstance(panel_l18b, dict) else {}
+    l18b: StateReading = panel_l18b if isinstance(panel_l18b, dict) else _NO_STATE_READING
     counts = l18b.get("counts") or {"neutral": 0, "promiscuous": 0, "unresolved": 0}
     coarse = coarse_states(l18b, unordered_class_bound)
     census = l18b.get("census")
@@ -424,12 +457,17 @@ def grade_summary(results: Panel, unordered_class_bound: int | None) -> GradeSum
     # analyzer's own package reads 532 and 0. Both are correct outcomes, so that pair proves
     # nothing. L1.18 is the one genuinely independent reading, because it walks for functions
     # touching unbounded external state rather than for declarations that might be state.
-    l18_found = isinstance(l18.get("value"), (int, float)) and l18["value"] > 0
+    # Read once and checked once. `l18["value"]` is a number or the string "n/a", and
+    # comparing the string with zero raises, so the isinstance was the only thing between
+    # this line and a TypeError while sitting where nothing could confirm it covered the
+    # read below it.
+    found = l18.get("value")
+    l18_found = isinstance(found, (int, float)) and found > 0
     if status != "na" and decided == 0 and l18_found:
         raise incomplete.refuse(
             "finitely-testable share",
             f"the classifier decided nothing about this repository's state, while L1.18 read "
-            f"{l18['value']} ({l18.get('details', 'no detail')}). Two measures of the same code "
+            f"{found} ({l18.get('details', 'no detail')}). Two measures of the same code "
             f"disagree, so a rule is missing rather than the code being clean")
     pct = None if status == "na" else testable_share(counts["neutral"], decided)
     hygiene = _hygiene(results)
