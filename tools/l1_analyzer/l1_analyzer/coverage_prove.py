@@ -115,17 +115,13 @@ class Sweep(TypedDict, total=False):
     detail: str
 
 
-class Outcomes(TypedDict, total=False):
-    """What each generated test became, one count per bucket.
-
-    Only a divergence is a proven bug; the rest are named so a run retaining nothing still
-    says what happened."""
-
-    divergence: int
-    wrong_channel: int
-    invalid_fixture: int
-    incidental_panic: int
-    error: int
+# What each generated test became, one count per bucket, keyed by the names in `_OUTCOMES`.
+#
+# NOT a written-out record. I wrote one and it was a hand copy of that tuple, missing four
+# of its buckets on the day I wrote it, which is the drift a second copy always produces.
+# The tuple is where the buckets are declared and the tally is built from it by name, so a
+# mapping of those names to counts is what this actually is.
+Outcomes = dict[str, int]
 
 
 class Answer(TypedDict, total=False):
@@ -553,7 +549,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
     host = host_cfg()
-    retained: list[CoverageGap] = []
+    retained: list[CoverageProof] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     modules = 0
     located = 0            # every gap the sweep found, whether or not the ceiling let it try
@@ -597,7 +593,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 
-def sweep_detail(retained: int, modules: int, located: int, outcomes: CoverageGap, provenance: str,
+def sweep_detail(retained: int, modules: int, located: int, outcomes: Outcomes, provenance: str,
                  reason: str, cause: str) -> str:
     """What a finished sweep says, in the three cases it can be in.
 
@@ -666,7 +662,7 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: f
     if not gaps:
         return {"retained": [], "attempted": 0, "detail": "no proof-ready uncovered branches located in this module"}
 
-    retained: list[CoverageGap] = []
+    retained: list[CoverageProof] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     for gap in gaps:
         bucket, proposal, source = _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds)

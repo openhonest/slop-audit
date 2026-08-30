@@ -287,7 +287,7 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Coverag
     reaching for the module's globals, for the reason `_prove_one` gives."""
     outcomes = dict(EMPTY_OUTCOMES)
     import_path = _import_path(repo, repo / relpath)
-    retained: list[CoverageGap] = []
+    retained: list[CoverageProof] = []
     for gap in gaps:
         bucket, proposal, source = _prove_one(repo, interpreter, gap, import_path, repair_rounds,
                                               timeout_seconds, propose_fn, repair_fn, run_fn)
@@ -327,7 +327,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
-    retained: list[CoverageGap] = []
+    retained: list[CoverageProof] = []
     outcomes = dict(EMPTY_OUTCOMES)
     modules = 0
     located = 0            # every gap the sweep found, whether or not the ceiling let it try
