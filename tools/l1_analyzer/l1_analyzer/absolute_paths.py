@@ -20,9 +20,11 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TypedDict
 
 from l1_analyzer import incomplete
 from l1_analyzer.disclosure import listed_note
+from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.scope import PRODUCTION
 
 # Roots that identify one machine: a home or user directory, a temp or scratch location, a
@@ -70,9 +72,22 @@ _CAP = 50
 _ELIDED = re.compile(r"/\.{3,}/|\\\.{3,}\\")
 
 
-# What this scan returns: the count, its band, the sentence, and the sites. Written `dict`,
-# the least precise mapping the language has.
-Scan = dict[str, object]
+class Site(TypedDict):
+    """One hardcoded machine-specific path, and where it is written."""
+    file: str
+    line: int
+    path: str
+
+
+class Scan(L1Result):
+    """What this scan returns: an indicator result, and the sites behind the count.
+
+    It was `dict[str, object]`, the least precise mapping the language has, and the panel
+    then carried it as an ordinary indicator row while it holds two fields more. `verdict`
+    is the word a card prints; `findings` is what a reader follows to fix them."""
+
+    verdict: str
+    findings: list[Site]
 
 
 

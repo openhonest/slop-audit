@@ -78,6 +78,16 @@ class Source(TypedDict, total=False):
     tree: ast.Module
     readable: bool
     unreadable_reason: str
+    # Every name the WHOLE repository declares as a record, a protocol or an exception root,
+    # filled in only by the repository-wide run. A base written in the next file along is
+    # the same declaration as one written here, and the clause that reads bases could see
+    # the first and not the second: a rule about which file a name happens to sit in rather
+    # than about inheritance. This repository hit it twice in one afternoon.
+    #
+    # Absent on the per-file run behind the write hook, which has no tree to search and
+    # reports what it cannot follow. That is the honest answer there: a reader looks, rather
+    # than the reader guessing about a file it never opened.
+    repository_shapes: frozenset[str]
 
 
 def read_tree(text: str, language: str) -> Source:

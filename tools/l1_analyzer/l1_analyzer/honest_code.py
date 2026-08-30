@@ -616,9 +616,55 @@ def band_of(share: float | None) -> str:
     return "Slop"
 
 
-def assess_file_text(text: str, path: str) -> Assessment:
-    """One file's text, measured. This is the pure entry point the hook path uses."""
+def repository_shapes(files: list[tuple[Path, str]]) -> frozenset[str]:
+    """Every name this repository declares as a record, a protocol or an exception root.
+
+    A base written in the next file along is the same declaration as one written here, and
+    the clause that reads bases could follow the second and not the first: a rule about
+    which file a name happens to sit in rather than about inheritance. Two record shapes in
+    this package hit it in one afternoon, each needing the same written excuse, which is the
+    sign that the shape permits it rather than that two authors were unlucky.
+
+    Repeated until nothing new is admitted, so a chain split across three files is followed
+    the same as a chain inside one. Only the whole-repository run can call this; the per-file
+    run behind a write hook has no tree to search and reports what it cannot follow."""
+    from l1_analyzer.honest_code_read import base_names, first_name, node_text, walk
+    from l1_analyzer.honest_code_rules import DECLARED_SHAPES
+
+    bases: dict[str, list[str]] = {}
+    for path, text in files:
+        # The real path, because the language comes from the suffix. An empty one made every
+        # file unreadable and this gathered nothing at all, silently.
+        source = read_source_text(text, str(path))
+        # Guarded on the fields this reads, not on `readable`. A file whose suffix names no
+        # grammar comes back readable and carries no vocabulary, so the flag was true and
+        # the next line raised.
+        if "spec" not in source or "root" not in source:
+            continue
+        spec, raw = source["spec"], source["raw"]
+        for node in walk(source["root"]):
+            if node.type not in spec["class_types"]:
+                continue
+            name = node_text(node.child_by_field_name("name"), raw) or first_name(node, raw)
+            if name:
+                bases[name] = base_names(node, spec, raw)
+    known = {name for name, parents in bases.items() if set(parents) & DECLARED_SHAPES}
+    while True:
+        grew = {name for name, parents in bases.items() if set(parents) & known} - known
+        if not grew:
+            return frozenset(known)
+        known |= grew
+
+
+def assess_file_text(text: str, path: str,
+                     shapes: frozenset[str] = frozenset()) -> Assessment:
+    """One file's text, measured. This is the pure entry point the hook path uses.
+
+    `shapes` is what the WHOLE repository declares as a record, a protocol or an exception
+    root, and only the repository-wide run has it. Empty here rather than absent, because
+    the hook path has genuinely searched no tree and its emptiness is the true answer."""
     source = read_source_text(text, path)
+    source["repository_shapes"] = shapes
     assessed = assess(source)
     share = conformity(assessed)
     return {
@@ -858,10 +904,6 @@ def _named_under(repo: Path, path: Path) -> str:
         return str(path)
 
 
-# The clause clears exactly this shape when the base is declared in the same file, and
-# declines when it is not, which is the limit its own docstring states. Reading a base
-# across files needs the whole tree, and this clause runs on one file behind a write hook.
-# honest-code-allow: L1.21.5 - L1Result is a TypedDict; this adds six fields to a record and inherits no behaviour, because there is none to inherit
 class ConformityRow(L1Result):
     """L1.21's row on the panel: an indicator result, and the six readings that say what the
     share left out.
@@ -907,9 +949,12 @@ def analyze(repo: Path, lang: str) -> ConformityRow:
     boundary_declarations: list[Allowed] = []
     unreadable = 0
     unexamined_blocks_seen = 0
+    # Gathered once, over every file, before any clause runs. A base in another file is the
+    # same declaration as a base in this one.
+    shapes = repository_shapes(production + tests)
     for read, wanted in ((production, False), (tests, True)):
         for path, text in read:
-            assessed = assess_file_text(text, _named_under(repo, path))
+            assessed = assess_file_text(text, _named_under(repo, path), shapes)
             if wanted is False and assessed["unreadable_reason"]:
                 unreadable += 1
             if wanted is False:

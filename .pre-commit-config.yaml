@@ -76,7 +76,7 @@ repos:
         # Lower it as they are named. A baseline looser than reality is a defect too, and
         # the gate refuses in that direction as well: it failed on 83 against a ratchet of
         # 142 and said so.
-        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 25 --max-honest-code 0
+        entry: uv run --project tools/l1_analyzer slop-audit-l1 . --gate --max-type-escapes 24 --max-honest-code 0
         language: system
         pass_filenames: false
         # Any Python in the repository, because the entry audits the whole repository.

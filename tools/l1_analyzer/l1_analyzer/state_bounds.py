@@ -897,7 +897,7 @@ def _na(lang: str) -> dict[str, object]:
     }
 
 
-def classify(repo: Path, lang: str) -> dict[str, object]:
+def classify(repo: Path, lang: str) -> StateReading:
     """L1.18b: the finite-testability verdict distribution.
 
     Additive as a PANEL ENTRY: nothing reads this function's return value except the

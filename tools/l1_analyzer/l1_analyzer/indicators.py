@@ -25,7 +25,7 @@ import subprocess
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from tree_sitter import Node, Parser
 
@@ -45,6 +45,12 @@ from l1_analyzer.disclosure import (
 )
 from l1_analyzer.incomplete import IncompleteCode, ratio
 from l1_analyzer.lang_spec import DECISION_NODE_TYPES
+
+if TYPE_CHECKING:
+    # Only ever an annotation here, and `from __future__ import annotations` keeps it a
+    # string at run time. A plain import would close a cycle: the panel names the shapes
+    # the provers return, and a prover reads this module's parser.
+    from l1_analyzer.panel import Panel
 from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.scope import (  # noqa: F401
     _IGNORE_DIRS,
@@ -455,7 +461,7 @@ def compute_source_indicators(
     timeout_seconds: float,
     classify_state_bounds: bool,
     python_executable: str | None,
-) -> dict[str, L1Result]:
+) -> Panel:
     """L1.12-L1.20. `lang` may be "auto" (resolved here) or a concrete key.
     `exec_tests` gates the two runtime indicators (L1.19 coverage, L1.20);
     `timeout_seconds` bounds each test-suite execution.
@@ -473,7 +479,10 @@ def compute_source_indicators(
     if lang == "auto":
         lang = detect_primary_language(repo)
 
-    results: dict[str, L1Result] = {"lang": lang}
+    # The panel, as its own declaration. It said `dict[str, L1Result]` while the language,
+    # the path cover, the thread surface, the state reading and two indicators carrying
+    # findings all went into it, so six of its rows disagreed with the line above them.
+    results: Panel = {"lang": lang}
     results["L1.16"] = _measure(_trailing_whitespace, repo)
     results["L1.17"] = _measure(_god_files, repo)
     results["L1.18"] = _measure(analyze_mutable_state, repo, lang)
@@ -487,7 +496,9 @@ def compute_source_indicators(
     # L1.18b: value/band/details plus the finding lists that make the number readable.
     results["L1.12"] = dead_code.analyze(repo, lang)
     results["L1.14"] = secret_scan.analyze(repo, lang)
-    results.update(_compute_external_indicators(repo, lang))
+    # One row, written by name. `update` from another panel would let this builder be
+    # handed any row the panel knows and pass it through without saying which.
+    results["L1.13"] = _compute_external_indicators(repo, lang)["L1.13"]
     results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds, python_executable)
     if classify_state_bounds:
         from l1_analyzer import state_bounds
@@ -569,6 +580,11 @@ def _code_line_count(src: bytes, ext: str) -> int:
     # The empty string used to stand in for both "this extension has no grammar" and a
     # grammar key, and `_LITERAL_NODES` was then asked about it.
     lang = god_file_language(ext)
+    # The absence is read before the table, not through it. `None` reached `.get` and then
+    # reached the parser, so a file whose extension this reader has no grammar for was asked
+    # about as though `None` were a language.
+    if lang is None:
+        return total
     literal_types = _LITERAL_NODES.get(lang)
     if not literal_types:
         return total
@@ -1003,7 +1019,7 @@ def _compute_decision_space(repo: Path, lang: str) -> L1Result:
               "test-execution trace")
     return {"value": decision_points, "band": "n/a", "details": _with_skipped(detail, skipped)}
 
-def _compute_external_indicators(repo: Path, lang: str) -> dict[str, L1Result]:
+def _compute_external_indicators(repo: Path, lang: str) -> Panel:
     """L1.13 near-duplicate code, measured here since 2026-08-19 rather than shelled out.
 
     It was delegated to jscpd, which was installed on no machine that ever ran this panel,

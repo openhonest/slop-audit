@@ -257,7 +257,8 @@ def data_classes(source: Source) -> list[Finding] | None:
     spec, raw = source["spec"], source["raw"]
     if not spec["constructor_names"] and not spec["constructor_types"]:
         return None
-    shapes = DECLARED_SHAPES | local_declared_shapes(source)
+    shapes = (DECLARED_SHAPES | local_declared_shapes(source)
+              | source.get("repository_shapes", frozenset()))
     found: list[Finding] = []
     for node in class_nodes(source["root"], spec):
         if set(base_names(node, spec, raw)) & shapes:
@@ -372,7 +373,8 @@ def inheritance_for_reuse(source: Source) -> list[Finding] | None:
     past its own imports. Both stay reported, which sends a reader to look rather than
     hiding it."""
     spec, raw = source["spec"], source["raw"]
-    shapes = DECLARED_SHAPES | local_declared_shapes(source)
+    shapes = (DECLARED_SHAPES | local_declared_shapes(source)
+              | source.get("repository_shapes", frozenset()))
     found: list[Finding] = []
     for node in walk(source["root"]):
         if node.type not in spec["class_types"]:

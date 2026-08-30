@@ -79,6 +79,13 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     Then the kind is one of never, not applicable or unreadable, which is what a consumer buckets on, and only unreadable is a failure
     But the sentence used to be the only thing separating those three, so a reader had to parse English to tell a rule nothing decides from a file the audit could not read
 
+  Scenario: repository_shapes names every record, protocol and exception root the whole repository declares
+    Given every file the audit reads, production and tests alike
+    When repository_shapes follows each class's bases and repeats until nothing new is admitted
+    Then a base written in one file is a declared shape to every other file, so a chain split across three files is followed the same as a chain inside one
+    And a file whose suffix names no grammar is passed over rather than counted, because there is no vocabulary to read its classes with
+    But only the whole-repository run can call this: behind a write hook there is one file and no tree to search, and that run reports what it cannot follow rather than guessing about a file it never opened
+
   Scenario: assess_file_text measures one file's text against every clause
     Given the text of a file and its path
     When assess_file_text reads and assesses it

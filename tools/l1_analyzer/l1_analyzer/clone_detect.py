@@ -36,6 +36,7 @@ from tree_sitter import Node
 from l1_analyzer.incomplete import (
     IncompleteCode,  # noqa: F401 - the refusal type, re-exported
 )
+from l1_analyzer.pytest_trace import L1Result
 
 IDENTIFIER = "I"
 LITERAL = "L"
@@ -185,7 +186,11 @@ def duplicated_lines(streams: dict[str, list[tuple[str, int]]],
     Two passes, because a window is only a clone once a SECOND occurrence is known, and
     the first occurrence's lines count as duplicated too. Counting on one pass would
     charge the copy and acquit the original."""
-    seen: dict[str, list[tuple[str, int, int]]] = defaultdict(list)
+    # A path and the lines its window's tokens sit on, however many that is. It was
+    # declared as a path and two numbers, which is neither what is appended below nor what
+    # is unpacked twice further down, and nothing checked any of the three against each
+    # other.
+    seen: dict[str, list[tuple[str, tuple[int, ...]]]] = defaultdict(list)
     for relpath, stream in streams.items():
         symbols = [symbol for symbol, _line in stream]
         lines = [line for _symbol, line in stream]
@@ -213,7 +218,7 @@ def duplicated_lines(streams: dict[str, list[tuple[str, int]]],
     return duplicated
 
 
-def analyze(repo: Path, lang: str, min_tokens: int = MIN_TOKENS) -> dict:
+def analyze(repo: Path, lang: str, min_tokens: int = MIN_TOKENS) -> L1Result:
     """L1.13 for one repository: the share of production lines inside a repeated window."""
     from l1_analyzer.indicators import LANG_CFG, _get_parser, _read_source_bytes, band
     from l1_analyzer.scope import PRODUCTION

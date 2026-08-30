@@ -104,7 +104,45 @@ _EXT_LANG: dict[str, tuple[str, str]] = {
 # One dead or undecidable definition, and the refusal this module returns when it cannot
 # measure. Both were written `dict`, the least precise mapping the language has, and the
 # key here is always a string.
-Site = dict[str, object]
+class Site(TypedDict, total=False):
+    """One definition the reader judged, and why it landed where it did.
+
+    Five fields on every entry, and one of `reason` or `category` beside them: an
+    undecidable or test-only site carries the sentence that explains it, a dead one carries
+    the category that names it. Neither is present on the other, because inventing the
+    missing one would be a blank nobody measured.
+
+    It was `dict[str, object]`. Both line numbers were read back and added to, which was an
+    assumption on a line that runs on every audit."""
+
+    file: str
+    name: str
+    kind: str
+    line: int
+    end_line: int
+    reason: str
+    category: str
+
+
+class DeadCodeRow(TypedDict):
+    """L1.12's panel row: a band and a value, and the six readings behind it.
+
+    Declared `dict[str, object]` while carrying ten fields, the same shape L1.21's row
+    carried before it was written down. The findings are what makes the number readable, and
+    the counts are what makes the denominator visible."""
+
+    value: float | int | str
+    band: str
+    details: str
+    findings: list[Site]
+    undecidable: list[Site]
+    test_only: list[Site]
+    counts: dict[str, int]
+    production_loc: int
+    flagged_lines: int
+    unreadable: int
+
+
 Refusal = dict[str, object]
 
 
@@ -744,10 +782,15 @@ _CAP = 100
 _MIN_PARSED_SHARE = 0.8
 
 
-def _na(reason: str) -> Refusal:
+def _na(reason: str) -> DeadCodeRow:
+    """The row for a repository this reader will not measure, with the reason.
+
+    Every field the measured path writes, so a reader indexing the row cannot be handed a
+    KeyError by a refusal. `unreadable` was missing here and present there, which is exactly
+    that: nine fields on the refusal and ten on the measurement, and nothing said so."""
     return {"value": "n/a", "band": "n/a", "details": reason, "findings": [],
             "undecidable": [], "test_only": [], "counts": {}, "production_loc": 0,
-            "flagged_lines": 0}
+            "flagged_lines": 0, "unreadable": 0}
 
 
 def _classify_files(repo: Path) -> tuple[frozenset[str], frozenset[str]]:
@@ -767,7 +810,7 @@ def _classify_files(repo: Path) -> tuple[frozenset[str], frozenset[str]]:
     return frozenset(production), frozenset(tests)
 
 
-def analyze(repo: Path, lang: str) -> dict[str, object]:
+def analyze(repo: Path, lang: str) -> DeadCodeRow:
     """L1.12 for one repository. Returns the ratio, the band, the two finding lists,
     and the undecidable disclosure that makes the ratio readable as a lower bound."""
     if lang not in COLLECTORS:
@@ -841,8 +884,9 @@ def analyze(repo: Path, lang: str) -> dict[str, object]:
     test_only: list[Site] = []
     excluded = 0
     for relpath, definition in definitions:
-        entry = {"file": relpath, "name": definition["name"], "kind": definition["kind"],
-                 "line": definition["line"], "end_line": definition["end_line"]}
+        entry: Site = {"file": relpath, "name": definition["name"],
+                       "kind": definition["kind"], "line": definition["line"],
+                       "end_line": definition["end_line"]}
         if definition["status"] == EXCLUDED:
             excluded += 1
         elif definition["status"] == UNDECIDABLE:

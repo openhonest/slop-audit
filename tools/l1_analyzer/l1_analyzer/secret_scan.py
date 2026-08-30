@@ -410,7 +410,23 @@ def _tracked_files(repo: Path) -> frozenset[str] | None:
 _DOC_SUFFIXES = frozenset({".md", ".markdown", ".rst", ".txt", ".adoc"})
 
 
-def analyze(repo: Path, lang: str) -> dict[str, object]:
+class SecretScanRow(TypedDict):
+    """L1.14's panel row: a band and a value, and what stands behind them.
+
+    Declared `dict[str, object]` while carrying seven fields. `confirmed` reads "not
+    evaluated" and says so in words rather than being absent, because a reader must be able
+    to tell a scan that found nothing from a scan whose findings nobody verified."""
+
+    value: float | int | str
+    band: str
+    details: str
+    findings: list[Finding]
+    counts: dict[str, int]
+    confirmed: str
+    files_scanned: int
+
+
+def analyze(repo: Path, lang: str) -> SecretScanRow:
     """L1.14 for one repository, over the current tree (never git history), which is what
     `gitleaks detect --no-git` means. `lang` is accepted for a uniform indicator
     signature; a committed credential is the same finding in any language and the
