@@ -140,7 +140,15 @@ class Clause(TypedDict):
     # sites, and never declared here: a type checker had not run over this package until
     # 2026-08-29, so nothing said the record and the table disagreed.
     nothing_to_read: str
-    check: Callable[[Source], list[Finding] | None]
+    # A clause reads one parsed source, or, when `reads` says so, the whole repository. Two
+    # signatures, and the record named only the first while one clause took the second, so
+    # the odd clause went through unchecked.
+    #
+    # `...` rather than a union of the two, because `reads` is what says which a clause has
+    # and no checker can narrow one field on the value of a sibling. A union would be true
+    # and would make every call site an error; this is true and leaves the answer checked,
+    # which is where a wrong shape would actually reach a reader.
+    check: Callable[..., list[Finding] | None]
 
 
 class Allowed(TypedDict):
@@ -221,19 +229,25 @@ GRAMMARS = _grammars()
 class Block(TypedDict):
     """One block of another language, as it is found, before anything reads it.
 
-    The same fields as the record below plus the block's own source, which travels only as
-    far as the reader and never into the published record: carrying every embedded block's
-    text into a report about the file would put the file back into the report.
+    Every field the published record below carries, plus the block's own source. The text
+    travels only as far as the reader and never into the record: carrying every embedded
+    block's source into a report about the file would put the file back into the report.
 
     Its own record rather than the published one, because the published one does not hold
     text and said so, while the code built it holding text and popped it out again. Nothing
     said the two disagreed until a type checker ran over this package.
+
+    It then said four fields while the builder wrote six, and the two it left out are the
+    two the published record keeps. So the record that exists to hold what the builder makes
+    described neither what was built nor what was published.
     """
 
     language: str
     line: int
     lines: int
     text: str
+    findings: list[Finding]
+    also_accepted_by: list[str]
 
 
 class Unexamined(TypedDict):
@@ -275,7 +289,8 @@ class Assessment(TypedDict):
     unreadable_reason: str
 
 
-def _clause(rule: int, name: str, decides: str, check: Callable[[Source], list[Finding] | None],
+def _clause(rule: int, name: str, decides: str,
+            check: Callable[..., list[Finding] | None],
             nothing_to_read: str, languages: frozenset[str] = _ALL,
             reads: str = _PYTHON_AST) -> Clause:
     """One row of the table.
@@ -410,13 +425,17 @@ def read_source_text(text: str, path: str) -> Source:
     # disagree; this shape satisfies both by naming the unknown case instead of collapsing
     # it.
     suffix = Path(path).suffix
-    blank = {"path": str(path), "text": text, "tree": ast.parse(""), "readable": False}
     if suffix not in _SUFFIXES:
-        return {**blank, "language": "",
+        return {"path": str(path), "text": text, "tree": ast.parse(""), "readable": False,
+                "language": "",
                 "unreadable_reason": f"no reader here parses a {suffix} file"}
 
+    # Named field by field rather than spread from a shared blank. The blank was declared as
+    # nothing in particular, so every field of the two sources built out of it was too, and
+    # this function's own return type checked neither of them.
     language = _SUFFIXES[suffix]
-    source = {**blank, "language": language, "unreadable_reason": ""}
+    source: Source = {"path": str(path), "text": text, "tree": ast.parse(""),
+                      "readable": False, "language": language, "unreadable_reason": ""}
     # The shared tree, for every clause already reading the per-language vocabulary. It is
     # built for any language the vocabulary covers, which is what lets a ported clause see
     # a JavaScript file that Python's own parser cannot.
@@ -696,7 +715,7 @@ def unexamined_blocks(source: Source) -> list[Unexamined]:
     if not source["readable"] or source["language"] not in _PARSED:
         return []
     documentation = _docstrings(source["tree"])
-    found: list[Unexamined] = []
+    found: list[Block] = []
     for node in ast.walk(source["tree"]):
         if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
             continue
@@ -711,8 +730,14 @@ def unexamined_blocks(source: Source) -> list[Unexamined]:
         # The block's own text travels only this far. A reader wants the findings, and
         # carrying every embedded block's source into the published record would put the
         # file back into the report that is about the file.
-        text = block.pop("text")
-        examined.append({**block, "findings": _findings_in(block, text)})
+        #
+        # Built by naming each field rather than by popping one out of the block and
+        # spreading the rest. The pop mutated the block a line before it was read, and the
+        # spread carried whatever else happened to be there into the published record.
+        examined.append({"language": block["language"], "line": block["line"],
+                         "lines": block["lines"],
+                         "also_accepted_by": block["also_accepted_by"],
+                         "findings": _findings_in(block, block["text"])})
     return examined
 
 
@@ -971,17 +996,20 @@ def analyze(repo: Path, lang: str) -> ConformityRow:
     # The clauses that read the whole tree, answered once. A reference and the thing it
     # names are in different files, so this is the only place they can be decided at all,
     # and registering one without running it here would leave it deciding nothing anywhere.
-    for clause in CLAUSES:
-        if clause["reads"] != _REPOSITORY:
+    # `over_the_repository`, not `clause`: the loop above binds that name to a clause AFTER
+    # it ran, and this one to a clause before it runs. Two shapes under one name in one
+    # function, and the second silently shadowed the first.
+    for over_the_repository in CLAUSES:
+        if over_the_repository["reads"] != _REPOSITORY:
             continue
-        over_the_tree = clause["check"](repo)
+        over_the_tree = over_the_repository["check"](repo)
         if over_the_tree is None:
             continue
-        decided.add(clause["code"])
+        decided.add(over_the_repository["code"])
         for finding in over_the_tree:
             finding.setdefault("file", "")
         if over_the_tree:
-            broken.setdefault(clause["code"], []).extend(over_the_tree)
+            broken.setdefault(over_the_repository["code"], []).extend(over_the_tree)
 
     files = production + tests
     never_decided = sorted({c["code"] for c in CLAUSES} - decided)
