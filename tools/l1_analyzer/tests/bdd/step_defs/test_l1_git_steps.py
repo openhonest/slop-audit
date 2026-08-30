@@ -13,7 +13,7 @@ building a repository that no longer matches the Gherkin.
 import subprocess
 
 import pytest
-from l1_analyzer.indicators import compute_git_indicators
+from l1_analyzer.git_indicators import compute_git_indicators
 from pytest_bdd import given, parsers, scenarios, then, when
 
 scenarios("../features/l1_git.feature")

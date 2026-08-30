@@ -17,10 +17,17 @@ gate reports the gap and fails rather than quietly honouring a number nobody upd
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from l1_analyzer import indicators, report, thread_surface
 from l1_analyzer.indicators import detect_primary_language
 from l1_analyzer.scope import PRODUCTION
+
+if TYPE_CHECKING:
+    # Only ever an annotation here, and `from __future__ import annotations` keeps it a
+    # string at run time. A plain import would close a cycle: the panel names the shapes
+    # the provers return, and a prover reads this module.
+    from l1_analyzer.panel import Panel
 
 # Deliberately not "n/a". A distinct fact needs a distinct string, and reusing the token
 # with a comment saying which one it means is how the collision was written the first time.
@@ -164,18 +171,6 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
     # static mut) must not exceed the baseline. Like the type-escape ratchet, this is a
     # bright line at the current number, not a density band: a NEW override fails the
     # commit unless the baseline is raised deliberately. It is a fact about surface, not
-    # a race claim - the meter never says "safe". n/a for a language with no scanner
-    # (so it is a no-op on a Python repo until the Python scanner lands).
-    #
-    # The ratchet is skipped, not passed, when the meter read nothing. Zero overrides over
-    # no source is not zero overrides, and worse, the downward arm below would then demand
-    # the baseline be lowered to 0 on the strength of a reading that never happened - the
-    # ratchet would ratchet itself open. `thread_ratchet` records which of the two the pass
-    # line is reporting, so it says "not measured" rather than "0/N".
-    exposed: int | None = None
-    thread_ratchet = ""
-    if max_thread_exposed is not None:
-        ts = results.get("thread_surface") or thread_surface.scan(repo, audited_lang)
     # a race claim - the meter never says "safe". Python, Rust, Go, Java, Ruby, TypeScript
     # and JavaScript have a scanner; C, C# and any language the detector does not recognise
     # have none, and there the meter reads nothing at all.
@@ -225,9 +220,13 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
     # it is zero of nothing. The gate still passes - no proven unbounded state is a real
     # result and the bright line is a proof, not a survey - but it says which of the two it
     # got. The census supplies the denominator that tells them apart.
-    census = (results.get("L1.18b") or {}).get("census")
+    # Read from the state reading rather than from an empty mapping standing in for it. The
+    # `or {}` made the absent case a bare dict, which answers `.get` for any key at all, so
+    # the one branch where nothing was measured was the branch nothing could check.
+    state_reading = results.get("L1.18b")
+    census = state_reading["census"] if state_reading else {}
     if report.census_unread(census):
-        declared = census.get("declared") if isinstance(census, dict) else 0
+        declared = census.get("declared", 0)
         one = declared == 1
         state = (f"no proven unbounded state, but the state classifier reached no verdict "
                  f"({'the' if one else 'all'} {declared} "
@@ -240,7 +239,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
     return 0
 
 
-def _audited_language(results: dict, requested: str, repo: Path) -> str:
+def _audited_language(results: Panel, requested: str, repo: Path) -> str:
     """The language the audit actually read, settled once.
 
     Six places spelled `str(results.get("lang", requested))`. Two things were wrong with

@@ -3,7 +3,6 @@
 from .indicators import (
     analyze_mutable_state,
     compute_config_indicators,
-    compute_git_indicators,
     compute_source_indicators,
     detect_primary_language,
 )

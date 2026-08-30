@@ -8,12 +8,12 @@ import os
 import subprocess
 
 import pytest
-from l1_analyzer import gate, indicators, pytest_trace, scope
+from l1_analyzer import gate, git_indicators, indicators, pytest_trace, scope
+from l1_analyzer.git_indicators import compute_git_indicators
 from l1_analyzer.incomplete import IncompleteCode
 from l1_analyzer.indicators import (
     analyze_mutable_state,
     band,
-    compute_git_indicators,
     detect_primary_language,
 )
 
@@ -630,7 +630,7 @@ def test_l1_12_and_l1_14_are_native_and_need_no_tool_on_path(tmp_path, monkeypat
 
 def test_l1_8_no_production_files_is_na(tmp_path):
     (tmp_path / "test_only.py").write_text("def test_x():\n    assert True\n")
-    assert indicators._test_to_prod_ratio(tmp_path)["band"] == "n/a"
+    assert git_indicators._test_to_prod_ratio(tmp_path)["band"] == "n/a"
 
 
 def test_l1_15_density_over_a_kloc_is_slop(tmp_path):
@@ -926,22 +926,22 @@ def test_l1_8_counts_a_dotted_dotnet_test_project_as_test_code():
     """Newtonsoft.Json reported "0 test / 193720 production LOC", band Slop, for a repo
     with 704 test files. Its tests live in Src/Newtonsoft.Json.Tests, and no arm of the
     predicate knew that shape."""
-    assert indicators._is_test_file(Path("Src/Newtonsoft.Json.Tests/Serialization/X.cs"))
+    assert git_indicators._is_test_file(Path("Src/Newtonsoft.Json.Tests/Serialization/X.cs"))
 
 
 def test_l1_8_counts_a_capitalised_test_stem_as_test_code():
     """The .NET and JVM file convention: JsonSerializerTests.cs, SmokeTest.java."""
-    assert indicators._is_test_file(Path("src/JsonSerializerTests.cs"))
-    assert indicators._is_test_file(Path("src/SmokeTest.java"))
-    assert indicators._is_test_file(Path("src/ReaderSpec.scala"))
+    assert git_indicators._is_test_file(Path("src/JsonSerializerTests.cs"))
+    assert git_indicators._is_test_file(Path("src/SmokeTest.java"))
+    assert git_indicators._is_test_file(Path("src/ReaderSpec.scala"))
 
 
 def test_l1_8_does_not_count_a_word_that_merely_ends_in_test():
     """`Latest.java` ends with "test" once lowercased. The capital in the stem arm is
     what keeps production code out of the numerator."""
-    assert not indicators._is_test_file(Path("src/Latest.java"))
-    assert not indicators._is_test_file(Path("src/manifest.py"))
-    assert not indicators._is_test_file(Path("src/Protest.cs"))
+    assert not git_indicators._is_test_file(Path("src/Latest.java"))
+    assert not git_indicators._is_test_file(Path("src/manifest.py"))
+    assert not git_indicators._is_test_file(Path("src/Protest.cs"))
 
 
 def test_l1_8_ratio_moves_when_the_dotted_project_is_recognised(tmp_path):
@@ -951,7 +951,7 @@ def test_l1_8_ratio_moves_when_the_dotted_project_is_recognised(tmp_path):
     (tmp_path / "Src" / "Foo.Tests").mkdir(parents=True)
     (tmp_path / "Src" / "Foo" / "Widget.cs").write_text("a\nb\nc\n")
     (tmp_path / "Src" / "Foo.Tests" / "WidgetTests.cs").write_text("x\ny\n")
-    res = indicators._test_to_prod_ratio(tmp_path)
+    res = git_indicators._test_to_prod_ratio(tmp_path)
     assert res["details"] == "2 test / 3 production LOC"
 
 
@@ -996,7 +996,7 @@ def _repo_whose_range_only_deletes(tmp_path):
 
 
 def test_l1_4_and_l1_5_refuse_over_a_range_that_added_nothing(tmp_path):
-    res = indicators.compute_git_indicators(_repo_whose_range_only_deletes(tmp_path), "2025-06-01", None)
+    res = git_indicators.compute_git_indicators(_repo_whose_range_only_deletes(tmp_path), "2025-06-01", None)
     for key in ("L1.4", "L1.5"):
         assert res[key]["band"] == "n/a", f"{key} must not band a share of no lines"
         assert res[key]["value"] == "n/a", f"{key} must not publish a number over nothing"
@@ -1006,5 +1006,5 @@ def test_l1_4_and_l1_5_refuse_over_a_range_that_added_nothing(tmp_path):
 def test_the_other_git_indicators_still_answer_over_the_same_range(tmp_path):
     # The refusal is per indicator. A range with commits still measures everything that
     # divides by the commit count, and only the two that divide by added lines refuse.
-    res = indicators.compute_git_indicators(_repo_whose_range_only_deletes(tmp_path), "2025-06-01", None)
+    res = git_indicators.compute_git_indicators(_repo_whose_range_only_deletes(tmp_path), "2025-06-01", None)
     assert res["L1.1"]["band"] != "n/a" and res["L1.6"]["band"] != "n/a"

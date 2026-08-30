@@ -18,7 +18,7 @@ is why nothing found it until the handlers were swept.
 import pathlib
 
 import pytest
-from l1_analyzer import card, indicators
+from l1_analyzer import card, git_indicators, indicators
 
 GIT_INDICATORS = tuple(f"L1.{n}" for n in range(1, 9))
 
@@ -31,7 +31,7 @@ def not_a_repository(tmp_path_factory) -> pathlib.Path:
 
 @pytest.mark.parametrize("code", GIT_INDICATORS)
 def test_no_number_is_published_when_git_cannot_be_read(code, not_a_repository):
-    result = indicators.compute_git_indicators(not_a_repository, None, None)[code]
+    result = git_indicators.compute_git_indicators(not_a_repository, None, None)[code]
     assert result["band"] == "n/a"
     assert result["value"] == "n/a", (
         f"{code} publishes {result['value']!r} for a repository nobody could read; the card "
@@ -42,13 +42,13 @@ def test_no_number_is_published_when_git_cannot_be_read(code, not_a_repository):
 @pytest.mark.parametrize("code", GIT_INDICATORS)
 def test_the_card_shows_it_as_not_measured(code, not_a_repository):
     """The reader's view, which is what the defect was about."""
-    result = indicators.compute_git_indicators(not_a_repository, None, None)[code]
+    result = git_indicators.compute_git_indicators(not_a_repository, None, None)[code]
     assert card._value_str(result, "%") == "n/a"
 
 
 def test_the_reason_is_still_named(not_a_repository):
     """Refusing without saying why would be the other half of the same fault."""
-    details = indicators.compute_git_indicators(not_a_repository, None, None)["L1.1"]["details"]
+    details = git_indicators.compute_git_indicators(not_a_repository, None, None)["L1.1"]["details"]
     assert "git" in details.lower()
     assert details.strip()
 
@@ -60,7 +60,7 @@ def test_a_range_holding_no_commit_publishes_no_number_either(code):
     bare zero, and a reader would have taken a range they chose too narrow for a repository
     that deletes nothing."""
     repo = pathlib.Path(indicators.__file__).resolve().parents[3]
-    result = indicators.compute_git_indicators(repo, since="2001-01-01", until="2001-01-02")[code]
+    result = git_indicators.compute_git_indicators(repo, since="2001-01-01", until="2001-01-02")[code]
     assert result["band"] == "n/a"
     assert result["value"] == "n/a"
     assert "no commits in range" in result["details"]
@@ -103,7 +103,7 @@ def test_a_real_repository_still_publishes_its_numbers():
     """The measure still measures. This repository is a git working copy, so every one of
     the eight comes back with a number rather than the refusal above."""
     repo = pathlib.Path(indicators.__file__).resolve().parents[3]
-    results = indicators.compute_git_indicators(repo, None, None)
+    results = git_indicators.compute_git_indicators(repo, None, None)
     for code in GIT_INDICATORS:
         assert results[code]["value"] != "n/a", code
         assert results[code]["band"] != "n/a", code

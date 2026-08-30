@@ -31,33 +31,6 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     And when higher is better the tests are inclusive, while when lower is better they are strict, so a value sitting exactly on a lower-is-better healthy threshold lands in the middle band
     But it has no answer for "not measured": every caller needing one writes the n/a band itself
 
-  Scenario: _classify_file sorts one commit path into doc, code or other
-    Given one repository-relative path taken from a commit
-    When _classify_file reads the end of the lowercased path
-    Then it answers doc, code or other
-    And the code list holds configuration and data as well as source, so a change to a workflow file, a lock file or a container file counts as code
-    But a path matching neither list, such as a licence or a makefile, is other, and no indicator downstream counts it as either
-
-  # The three commit-mix percentages divide by every commit, including the ones classified as neither doc nor code.
-  Scenario: compute_git_indicators reads the commit history into the first eight indicators
-    Given a repository and the optional earliest and latest dates
-    When compute_git_indicators reads the commit log with per-file line counts and closes each commit as it goes
-    Then it returns the eight results L1.1 through L1.8, each carrying the counts behind its number rather than a bare percentage
-    And a commit that touched only files classified as other still raises the commit total while joining none of the three mix counts, so all three percentages are diluted by it
-    But a merge commit carries no per-file lines in this log form and is invisible to every count here, and when the log fails or the date range holds no commits all eight come back as zero under the n/a band
-
-  Scenario: _is_test_file decides whether one path is test code
-    Given a path from anywhere in the repository
-    When _is_test_file tries the directory rule, the dotted-project rule, the filename rule and the capitalised-stem rule in turn
-    Then it answers yes as soon as one of them matches
-    And the capitalised-stem rule reads the name in its original casing on purpose, so a production file whose name merely ends in the letters of the word test is not swept up with the real ones
-
-  Scenario: _test_to_prod_ratio weighs the test tree against the production tree
-    Given every source file in the repository, the test tree included
-    When _test_to_prod_ratio splits the files by the test rule and counts lines on each side
-    Then it returns the ratio of test lines to production lines, its band, and both line totals
-    But with no production lines at all it refuses with n/a rather than divide, and a file it could not open is counted and disclosed
-
   Scenario: compute_config_indicators checks the repository root for three pieces of tooling
     Given the repository root
     When compute_config_indicators looks for a pre-commit configuration, counts the workflow files and looks for a container file
@@ -224,12 +197,6 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     Then it returns L1.13 as the percentage it read and banded, or n/a naming the reason when the tool is absent, could not be executed, or printed nothing it could parse
     And the tool's non-zero exit is read rather than used to throw the output away, because crossing a duplication threshold is exactly what makes it exit non-zero
     But it takes the first percentage anywhere in the output as the duplication figure, and the language it is handed is never used at all
-
-  Scenario: _ratio_indicator measures one of the ratio indicators by its row
-    Given the code of a ratio indicator and its numerator and denominator
-    When _ratio_indicator reads the row for its label, thresholds and wording
-    Then the share is banded and the counts read back in that row's own words
-    But a denominator of zero is absent rather than zero, and the row says why in the refusal
 
   Scenario: _is_a_bare_generic says whether a node names a container without saying what it holds
     Given a node, its language's configuration, and the text of that node

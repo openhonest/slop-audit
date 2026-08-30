@@ -79,12 +79,17 @@ class Site(TypedDict):
     path: str
 
 
-class Scan(L1Result):
+class Scan(L1Result, total=False):
     """What this scan returns: an indicator result, and the sites behind the count.
 
     It was `dict[str, object]`, the least precise mapping the language has, and the panel
     then carried it as an ordinary indicator row while it holds two fields more. `verdict`
-    is the word a card prints; `findings` is what a reader follows to fix them."""
+    is the word a card prints; `findings` is what a reader follows to fix them.
+
+    The two are absent, not empty, on a refusal. A scan that ran and found nothing carries
+    an empty list; a scan that refused to run carries no list at all, and a reader must be
+    able to tell those apart. The refusal is built by the package's single handler for a
+    measure that declines, which knows a value, a band and a reason and nothing else."""
 
     verdict: str
     findings: list[Site]
@@ -120,7 +125,7 @@ def scan(repo: Path, lang: str) -> Scan:
         raise incomplete.refuse(
             "absolute-path scan",
             f"no production file carried a scanned extension, so nothing was searched ({sorted(_CODE_EXTS)})")
-    findings = [
+    findings: list[Site] = [
         {"file": str(path.relative_to(repo)) if repo in path.parents else str(path),
          "line": lineno, "path": matched}
         for path, text in files

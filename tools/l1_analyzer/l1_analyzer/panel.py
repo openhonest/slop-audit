@@ -28,6 +28,7 @@ from l1_analyzer.dead_code import DeadCodeRow
 from l1_analyzer.honest_code import ConformityRow
 from l1_analyzer.interleaving_robustness import InterleavingRobustnessResult
 from l1_analyzer.path_cover import PathCover
+from l1_analyzer.prove import ProofRun
 from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.race_harness import RaceResult
 from l1_analyzer.secret_scan import SecretScanRow
@@ -60,9 +61,10 @@ Panel = TypedDict("Panel", {
     "coverage_proofs": Sweep,
     "race": RaceResult,
     "interleaving_robustness": InterleavingRobustnessResult,
-    # What `--prove` retained, one entry per proof, built by the CLI rather than by an
-    # indicator. Declared as the list it is; the entries' own shape is the prover's.
-    "proofs": list[dict[str, object]],
+    # What `--prove` did, built by the CLI rather than by an indicator: a verdict, what it
+    # attempted, and every record it made. It was declared as a list of records, which is
+    # what the summary CONTAINS rather than what it is.
+    "proofs": ProofRun,
     # The language the audit ran as, which the card prints and several readers branch on.
     "lang": str,
 }, total=False)

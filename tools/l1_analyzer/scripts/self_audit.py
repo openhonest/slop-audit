@@ -25,7 +25,7 @@ import json
 import pathlib
 import sys
 
-from l1_analyzer import indicators, vacuity
+from l1_analyzer import git_indicators, indicators, vacuity
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 BASELINE = pathlib.Path(__file__).resolve().parent / "self-audit-baseline.json"
@@ -34,7 +34,7 @@ BASELINE = pathlib.Path(__file__).resolve().parent / "self-audit-baseline.json"
 def panel(repo: pathlib.Path) -> dict[str, str]:
     """Every indicator's band, keyed by indicator. `--no-exec`, so L1.19 and L1.20 are
     n/a: executing an arbitrary test suite is not something a ratchet should do."""
-    results = indicators.compute_git_indicators(repo, None, None)
+    results = git_indicators.compute_git_indicators(repo, None, None)
     results.update(indicators.compute_config_indicators(repo))
     results.update(indicators.compute_source_indicators(
         repo, lang="auto", exec_tests=False, timeout_seconds=60, classify_state_bounds=False,

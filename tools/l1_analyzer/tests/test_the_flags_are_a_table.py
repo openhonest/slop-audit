@@ -34,7 +34,7 @@ def test_every_flag_lives_in_the_table():
 
 def test_the_table_names_every_flag_the_parser_offers():
     """Nothing is added outside the table, and nothing in the table goes missing."""
-    named = {row["flags"][0] for row in cli.FLAGS if row["flags"][0].startswith("--")}
+    named = {names[0] for names, _options in cli.FLAGS if names[0].startswith("--")}
     offered = {a for a in cli.build_parser()._option_string_actions if a.startswith("--")}
     assert offered - {"--help"} == named
 
@@ -54,7 +54,7 @@ def test_each_flag_still_parses_the_way_it_did(argv, attribute, expected):
 def test_every_flag_carries_help_a_reader_can_use():
     """A row with no help is a flag nobody can discover, and a table makes that checkable
     where thirty-one separate calls did not."""
-    missing = [row["flags"][0] for row in cli.FLAGS if not row.get("help", "").strip()]
+    missing = [names[0] for names, options in cli.FLAGS if not options.get("help", "").strip()]
     assert missing == [], missing
 
 
@@ -63,13 +63,13 @@ def test_the_table_found_two_flags_with_no_help_at_all():
     with no help text since they were added, and thirty-one scattered calls gave nobody a
     place to notice. Both are written now and the test above keeps them written."""
     for flag in ("--format", "--verbose"):
-        row = next(r for r in cli.FLAGS if r["flags"][0] == flag)
+        row = next(o for n, o in cli.FLAGS if n[0] == flag)
         assert row["help"].strip(), flag
 
 
 def test_the_positional_argument_is_in_the_table_too():
     """It is a row like any other, so nothing sits outside the one place a reader looks."""
-    assert any(not row["flags"][0].startswith("-") for row in cli.FLAGS)
+    assert any(not names[0].startswith("-") for names, _options in cli.FLAGS)
 
 
 def test_no_help_string_ends_a_line_flush_against_the_next():

@@ -24,7 +24,7 @@ import pathlib
 import subprocess
 
 import pytest
-from l1_analyzer import indicators
+from l1_analyzer import git_indicators
 
 
 def _commit(repo: pathlib.Path, message: str) -> None:
@@ -52,7 +52,7 @@ def prose_heavy(tmp_path) -> pathlib.Path:
 def test_prose_additions_do_not_drown_the_code_ratio(prose_heavy):
     """The defect, end to end. Nineteen code lines deleted against twenty added is a
     refactoring signal; two hundred lines of prose in the divisor buries it."""
-    result = indicators.compute_git_indicators(prose_heavy, None, None)["L1.5"]
+    result = git_indicators.compute_git_indicators(prose_heavy, None, None)["L1.5"]
     assert result["value"] > 50, (
         f"L1.5 read {result['value']}, which is the whole-tree ratio. The canon divides by "
         f"lines added across CODE files: {result['details']}"
@@ -61,13 +61,13 @@ def test_prose_additions_do_not_drown_the_code_ratio(prose_heavy):
 
 def test_the_details_line_says_it_counted_code(prose_heavy):
     """A reader has to be able to tell which divisor produced the number."""
-    assert "code" in indicators.compute_git_indicators(prose_heavy, None, None)["L1.5"]["details"]
+    assert "code" in git_indicators.compute_git_indicators(prose_heavy, None, None)["L1.5"]["details"]
 
 
 def test_l1_4_still_divides_by_every_added_line(prose_heavy):
     """The other half of the same split, and it is right as it stands: L1.4 is the doc
     share OF ALL additions, so its divisor is the whole tree by definition."""
-    result = indicators.compute_git_indicators(prose_heavy, None, None)["L1.4"]
+    result = git_indicators.compute_git_indicators(prose_heavy, None, None)["L1.4"]
     assert result["value"] > 80, result["details"]
 
 
@@ -77,6 +77,6 @@ def test_a_repository_with_no_code_refuses_rather_than_reading_zero(tmp_path):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "README.md").write_text("just prose\n")
     _commit(tmp_path, "docs only")
-    result = indicators.compute_git_indicators(tmp_path, None, None)["L1.5"]
+    result = git_indicators.compute_git_indicators(tmp_path, None, None)["L1.5"]
     assert result["band"] == "n/a"
     assert result["value"] == "n/a"

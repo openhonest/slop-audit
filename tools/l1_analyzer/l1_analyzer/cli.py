@@ -11,11 +11,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
 from l1_analyzer import (
     card,
+    git_indicators,
     indicators,
     interleaving_robustness,
     prove,
@@ -25,6 +27,7 @@ from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.gate import _audited_language, _run_gate
 from l1_analyzer.honest_code import CLAUSES
 from l1_analyzer.incomplete import IncompleteCode
+from l1_analyzer.panel import Panel
 from l1_analyzer.thread_surface import Finding as ThreadFinding
 
 # Which indicators each stage computes. One table, read by the branches below.
@@ -113,7 +116,8 @@ def window_around(lines: list[str], line: int) -> str:
 
 
 @boundary
-def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: int, timeout: float) -> dict[str, object]:
+def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: int,
+               timeout: float) -> prove.ProofRun:
     """Locate -> generate -> run -> retain over the review-tier findings. Deterministic
     locate; the model only fills a located gap; the execution gate keeps only what fires."""
     import tempfile
@@ -418,11 +422,19 @@ class Flag(TypedDict, total=False):
 
     `total=False` because argparse takes a different set for each kind of flag: a switch
     carries an action, a number carries a type and a default, and no flag carries all of
-    them. `flags` is the one key every row has."""
+    them.
 
-    flags: list[str]
+    The option NAMES are not in here, because they are not one of argparse's keywords. They
+    sat in the row beside them, so the builder had to strip them back out with a
+    comprehension, and a comprehension over a record hands back a mapping of strings to
+    anything: eight separate readings of what argparse was actually given, none of them
+    checked. The names travel beside the row now and the row goes straight through."""
+
     action: str
-    type: object
+    # What argparse calls a converter: it is handed the raw string and returns the value.
+    # Declared `object`, which said nothing, so the one thing argparse does with this field
+    # was the one thing nothing checked.
+    type: Callable[[str], object]
     choices: list[str]
     default: object
     # argparse takes either a count or one of its words, so this holds both. It was
@@ -441,50 +453,50 @@ class Flag(TypedDict, total=False):
 # It is also the only place a reader sees every flag at once, which thirty-one scattered
 # calls never allowed, and it makes "does every flag carry help" a question a test can ask.
 # Two of them had shipped with none.
-FLAGS: tuple[Flag, ...] = (
-    {"flags": ["repo"],
+FLAGS: tuple[tuple[list[str], Flag], ...] = (
+    (["repo"], {
      "type": Path,
      "nargs": "?",
      "default": None,
      "help": "Path to git repository root",
-     },
-    {"flags": ["--since"],
+     }),
+    (["--since"], {
      "default": None,
      "help": "Start date for git log (e.g. 2025-01-01)",
-     },
-    {"flags": ["--until"],
+     }),
+    (["--until"], {
      "default": None,
      "help": "End date",
-     },
-    {"flags": ["--indicators"],
+     }),
+    (["--indicators"], {
      "default": "all",
      "help": "Comma-separated L1 numbers or 'all' (default). E.g. 1,2,18",
-     },
-    {"flags": ["--lang"],
+     }),
+    (["--lang"], {
      "default": "auto",
      "choices": ['auto', *sorted(indicators.LANG_CFG)],
      "help": "Primary language for source-based indicators (L1.12+). 'auto' detects "
              "from files.",
-     },
-    {"flags": ["--format"],
+     }),
+    (["--format"], {
      "choices": ['text', 'json', 'hook'],
      "default": None,
      "help": "How to print the result. `text` is the report a person reads, `json` "
              "is the whole result for another program, and `hook` is the short "
              "form a write hook shows. Defaults to text, or hook for one file.",
-     },
-    {"flags": ["--no-exec"],
+     }),
+    (["--no-exec"], {
      "action": "store_true",
      "help": "Do not execute the target repo's test suite (skips the runtime half of "
              "L1.19 and all of L1.20).",
-     },
-    {"flags": ["--timeout"],
+     }),
+    (["--timeout"], {
      "type": float,
      "default": 300.0,
      "help": "Seconds allowed for each test-suite execution in L1.19/L1.20 (default "
              "300).",
-     },
-    {"flags": ["--python"],
+     }),
+    (["--python"], {
      "default": None,
      "metavar": "PATH",
      "help": "Interpreter that runs the target suite for L1.19/L1.20. Defaults to "
@@ -492,43 +504,43 @@ FLAGS: tuple[Flag, ...] = (
              "python when the target needs a different Python (e.g. a 3.11 target "
              "audited from a 3.12+ analyzer). The target package must be importable "
              "there, or coverage/determinism report n/a with the reason.",
-     },
-    {"flags": ["--no-state-bounds"],
+     }),
+    (["--no-state-bounds"], {
      "action": "store_true",
      "help": "Turn off the additive L1.18b state-bounds classifier. Pre-registered "
              "runs use this so the output is exactly the frozen L1.18 set; on by "
              "default for everyone else.",
-     },
-    {"flags": ["--verbose"],
+     }),
+    (["--verbose"], {
      "action": "store_true",
      "help": "Print what each stage did while it ran, including the commands it "
              "shelled out to and why a stage refused. Off by default, because a "
              "report is for a reader and a trace is for whoever is debugging.",
-     },
-    {"flags": ["--gate"],
+     }),
+    (["--gate"], {
      "action": "store_true",
      "help": "Dogfood mode for a pre-commit hook: run the source indicators against "
              "the repo and exit non-zero if the audit flags the repo's own code (a "
              "production god-file, or promiscuous state that breaks exhaustive "
              "testability). Ignores git/config indicators.",
-     },
-    {"flags": ["--max-type-escapes"],
+     }),
+    (["--max-type-escapes"], {
      "type": int,
      "default": None,
      "help": "Ratchet the L1.15 type-escape count (Any / # type: ignore): with "
              "--gate, fail if the count exceeds this baseline. Set it to the current "
              "count so a NEW escape fails the commit; lower it as escapes are typed "
              "away. No effect without --gate.",
-     },
-    {"flags": ["--max-honest-code"],
+     }),
+    (["--max-honest-code"], {
      "type": int,
      "default": None,
      "help": "Ratchet the Honest Code conformity check: with --gate, fail if L1.21's "
              "clause findings exceed this baseline. Opt-in, because L1.21 states an "
              "opinion and grades nobody who has not chosen it. Set it to the current "
              "count so a NEW violation fails the commit. No effect without --gate.",
-     },
-    {"flags": ["--max-thread-exposed"],
+     }),
+    (["--max-thread-exposed"], {
      "type": int,
      "default": None,
      "help": "Ratchet the thread-safety surface: with --gate, fail if the count of "
@@ -536,8 +548,8 @@ FLAGS: tuple[Flag, ...] = (
              "Send/Sync, static mut) exceeds this baseline. A fact about audit "
              "surface, not a race verdict. Set it to the current count so a NEW "
              "override fails the commit. No effect without --gate.",
-     },
-    {"flags": ["--race"],
+     }),
+    (["--race"], {
      "action": "store_true",
      "help": "Runtime thread-safety: build and run the repo's test suite under "
              "ThreadSanitizer (Rust) and report data races that actually fire. The "
@@ -545,8 +557,8 @@ FLAGS: tuple[Flag, ...] = (
              "and needs a nightly toolchain, so this is CLI/CI only and opt-in. A "
              "race observed is proven; no race observed is bounded by the suite, "
              "never a proof of safety.",
-     },
-    {"flags": ["--prove"],
+     }),
+    (["--prove"], {
      "action": "store_true",
      "help": "Prove located hazards: for each review-tier concurrency finding, ask a "
              "model to write a Rust test that reproduces the race, run it under the "
@@ -555,15 +567,15 @@ FLAGS: tuple[Flag, ...] = (
              "decides. Needs ANTHROPIC_API_KEY, cargo, and the anthropic package "
              "(pip install anthropic). Opt-in and CLI-only - it generates and runs "
              "code.",
-     },
-    {"flags": ["--prove-max"],
+     }),
+    (["--prove-max"], {
      "type": int,
      "default": 3,
      "help": "With --prove, the maximum number of located hazards to attempt "
              "(default 3). With --prove-coverage-repo it is the per-MODULE cap: how "
              "many gaps one module may offer.",
-     },
-    {"flags": ["--prove-max-total"],
+     }),
+    (["--prove-max-total"], {
      "type": int,
      "default": 5,
      "help": "With --prove-coverage-repo, the total gaps the whole run may hand to a "
@@ -571,8 +583,8 @@ FLAGS: tuple[Flag, ...] = (
              "things: five per module over forty modules is two hundred attempts, "
              "and this is what stops that. A sweep that stops here says so in its "
              "own report.",
-     },
-    {"flags": ["--coverage-repair-rounds"],
+     }),
+    (["--coverage-repair-rounds"], {
      "type": int,
      "default": 3,
      "help": "With --prove-coverage, the max compiler-feedback repair rounds per "
@@ -581,8 +593,8 @@ FLAGS: tuple[Flag, ...] = (
              "values), up to this many times. Generic (the compiler is the oracle; "
              "no per-type knowledge), but each round is another in-crate compile - "
              "set 0 to skip repair and take only the first attempt.",
-     },
-    {"flags": ["--prove-coverage-repo"],
+     }),
+    (["--prove-coverage-repo"], {
      "action": "store_true",
      "help": "Prove coverage gaps across the ENTIRE Rust crate: one coverage build, "
              "then every module with uncovered branches is swept (batched into one "
@@ -591,14 +603,14 @@ FLAGS: tuple[Flag, ...] = (
              "running (one build per module); native slop-audit; needs "
              "ANTHROPIC_API_KEY, cargo, cargo-llvm-cov. --prove-max caps gaps per "
              "module.",
-     },
-    {"flags": ["--version"],
+     }),
+    (["--version"], {
      "action": "store_true",
      "help": "Print which build this is and exit. Every panel and every card carries "
              "the same string, so a measurement can be traced to the instrument that "
              "made it.",
-     },
-    {"flags": ["--honest-code"],
+     }),
+    (["--honest-code"], {
      "nargs": "+",
      "default": None,
      "metavar": "FILE",
@@ -611,14 +623,14 @@ FLAGS: tuple[Flag, ...] = (
              "whole saving: the analysis costs about nothing and the bill is "
              "interpreter startup, paid once here instead of once per file. One file "
              "returns exactly what it always returned.",
-     },
-    {"flags": ["--honest-code-clauses"],
+     }),
+    (["--honest-code-clauses"], {
      "action": "store_true",
      "help": f"Add L1.21 to the full audit. Off by default: {len(CLAUSES)} clauses over a "
              "large tree is a cost a caller chooses rather than one imposed on every "
              "run.",
-     },
-    {"flags": ["--call-map"],
+     }),
+    (["--call-map"], {
      "nargs": "+",
      "default": None,
      "metavar": "PATH",
@@ -628,14 +640,14 @@ FLAGS: tuple[Flag, ...] = (
              "writes a target. A write in the pure lane is marked, and the charge "
              "rests on the watched run rather than on a guess, so a function nobody "
              "watched is not accused.",
-     },
-    {"flags": ["--layer"],
+     }),
+    (["--layer"], {
      "default": "",
      "choices": ['', 'foundation', 'data', 'domain', 'ui', 'tooling'],
      "help": "The layer to declare in the emitted .hd. Left out by default: a layer "
              "is an architectural intent and no reading of the source decides it.",
-     },
-    {"flags": ["--proof-cap"],
+     }),
+    (["--proof-cap"], {
      "type": int,
      "default": 0,
      "metavar": "N",
@@ -643,8 +655,8 @@ FLAGS: tuple[Flag, ...] = (
              "one signature and one gap and no source, so what leaves this machine "
              "is a function's shape rather than a repository. Nothing is asked for "
              "by default, because a request is what gets sent to a model.",
-     },
-    {"flags": ["--prove-facet"],
+     }),
+    (["--prove-facet"], {
      "nargs": 6,
      "default": None,
      "metavar": "ARG",
@@ -654,8 +666,8 @@ FLAGS: tuple[Flag, ...] = (
              "audited function raise, is retained. A passing test proves the "
              "opposite of the claim and is discarded. Nothing is written into your "
              "test file.",
-     },
-    {"flags": ["--facets"],
+     }),
+    (["--facets"], {
      "nargs": "+",
      "default": None,
      "metavar": "PATH",
@@ -667,8 +679,8 @@ FLAGS: tuple[Flag, ...] = (
              "unasserted return contracts and exception paths, and lists undeclared "
              "domains separately because those are closed by declaring a type rather "
              "than by adding a test.",
-     },
-    {"flags": ["--prove-coverage"],
+     }),
+    (["--prove-coverage"], {
      "default": None,
      "metavar": "MODULE",
      "help": "Prove coverage gaps for one Rust MODULE (a path relative to the repo, "
@@ -678,8 +690,8 @@ FLAGS: tuple[Flag, ...] = (
              "closes the gap. Retained tests appear in the report's Adoptable proofs "
              "section. Native slop-audit; needs ANTHROPIC_API_KEY, cargo, and cargo- "
              "llvm-cov. Opt-in and CLI-only (it runs code).",
-     },
-    {"flags": ["--report"],
+     }),
+    (["--report"], {
      "nargs": "?",
      "const": ".",
      "default": None,
@@ -687,7 +699,7 @@ FLAGS: tuple[Flag, ...] = (
      "help": "Write the full Slop Audit report (the grade, verdict, audit checks, "
              "and concurrency layer - the way try.slopaudit.org renders it) as "
              "<slug>.md and <slug>.html into DIR (default the current directory).",
-     },
+     }),
 )
 
 
@@ -701,9 +713,8 @@ def build_parser() -> argparse.ArgumentParser:
     adopter to a command that does not exist, at the moment they are most likely to trust
     the output."""
     parser = argparse.ArgumentParser(prog="slop-audit-l1")
-    for row in FLAGS:
-        parser.add_argument(*row["flags"],
-                            **{key: value for key, value in row.items() if key != "flags"})
+    for names, options in FLAGS:
+        parser.add_argument(*names, **options)
     return parser
 
 
@@ -793,9 +804,12 @@ def main(argv: list[str] | None) -> int:
         return _run_gate(args.repo, args.lang, args.max_type_escapes,
                          args.max_thread_exposed, args.max_honest_code)
 
-    # object, not Any: the panel holds L1Result dicts beside the detected language
-    # string and the additive payloads, and a reader must narrow before use.
-    results: dict[str, object] = {}
+    # The panel, by its own declaration. It was `dict[str, object]` with a comment saying a
+    # reader must narrow before use, which is the instruction a record replaces: the rows
+    # are known, every one is produced by a function that declares what it returns, and the
+    # narrowing was thirty-odd unchecked reads spread across this file and the two
+    # renderers.
+    results: Panel = {}
 
     try:
         inds = _selected_indicators(args.indicators)
@@ -805,7 +819,7 @@ def main(argv: list[str] | None) -> int:
 
     # L1.1-8: git based, language agnostic
     if inds is None or inds & _GIT_INDICATORS:
-        git_results = indicators.compute_git_indicators(
+        git_results = git_indicators.compute_git_indicators(
             args.repo, since=args.since, until=args.until
         )
         results.update(git_results)

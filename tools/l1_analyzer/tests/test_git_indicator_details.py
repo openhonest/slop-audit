@@ -18,7 +18,7 @@ import pathlib
 import subprocess
 
 import pytest
-from l1_analyzer import indicators
+from l1_analyzer import git_indicators
 
 
 def _repo(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -40,7 +40,7 @@ def _repo(tmp_path: pathlib.Path) -> pathlib.Path:
 
 @pytest.mark.parametrize("key", ["L1.1", "L1.2", "L1.3", "L1.4", "L1.5", "L1.6", "L1.7", "L1.8"])
 def test_every_git_indicator_publishes_the_counts_behind_its_number(tmp_path, key):
-    r = indicators.compute_git_indicators(_repo(tmp_path), None, None)
+    r = git_indicators.compute_git_indicators(_repo(tmp_path), None, None)
     details = (r[key] or {}).get("details")
     assert details, f"{key} publishes a band with no counts behind it"
     assert any(ch.isdigit() for ch in details), f"{key} details name no number: {details!r}"
@@ -49,6 +49,6 @@ def test_every_git_indicator_publishes_the_counts_behind_its_number(tmp_path, ke
 def test_the_delete_ratio_names_both_sides_of_its_fraction(tmp_path):
     """The one that sent me to git log. A reader must be able to see the two line counts
     without re-deriving them."""
-    r = indicators.compute_git_indicators(_repo(tmp_path), None, None)
+    r = git_indicators.compute_git_indicators(_repo(tmp_path), None, None)
     details = r["L1.5"]["details"]
     assert "deleted" in details and "added" in details, details

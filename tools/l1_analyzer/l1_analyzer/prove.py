@@ -71,6 +71,24 @@ class RunResult(TypedDict):
     detail: str
 
 
+class ProofRun(TypedDict, total=False):
+    """A whole prove run: the verdict, what it attempted, and every record it made.
+
+    The panel declared this as a LIST of records, and the CLI writes this summary, so the
+    field that says what a prove run produced described neither the summary nor the records
+    inside it. Two readers then indexed it, one for `outcomes` and one for `verdict`, both
+    through an isinstance check that could only ask whether it was a mapping.
+
+    `detail` is present only on a run that refused, and `attempted` only on one that ran.
+    Each is the reason the other is absent, so neither is invented as a blank."""
+
+    verdict: str
+    demonstrated: int
+    attempted: int
+    detail: str
+    outcomes: list[ProofRecord]
+
+
 class ProofOutcome(TypedDict):
     request: ProofRequest
     generated_test: str | None

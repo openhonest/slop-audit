@@ -62,7 +62,7 @@ def test_the_documented_starting_ceiling_lives_at_the_boundary():
 
     The flag is the operator's control. The bound is now unskippable rather than
     defaulted, which is the stronger version of what this test was written to protect."""
-    row = next(r for r in cli.FLAGS if r["flags"][0] == "--prove-max-total")
+    row = next(o for n, o in cli.FLAGS if n[0] == "--prove-max-total")
     assert row["default"] == 5
     assert "total gaps" in row["help"], "the sentence documenting it sits with it"
     for sweep in (coverage_prove.prove_coverage_repo, python_coverage_prove.prove_coverage_repo):
