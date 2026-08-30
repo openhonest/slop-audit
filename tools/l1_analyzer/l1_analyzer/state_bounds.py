@@ -771,8 +771,15 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
     # which is the language conditional welded into shared code that this project objects
     # to elsewhere; the modifiers are a table row now and eight more languages get the rule.
     if _declared_constant(refs, sp):
+        # EMPTY, the same partition the immutable-constant branch below writes. It built a
+        # per-reference REACH here, which is what ONE reference does to the domain, where
+        # this field holds the rolled-up partition of all of them. A reach carries the
+        # partition's three fields and four more, so it fitted at run time and told the
+        # summary that every declared constant was UNORDERED. That is the distribution the
+        # coarseness bound is meant to be set from, and a one-value domain has nothing to
+        # order either way.
         verdict, drives, silence, construct, partition, silence_line = (
-            NEUTRAL, False, "", "", state_partition.finite(1, False, f"const:{key}"), 0)
+            NEUTRAL, False, "", "", state_partition.EMPTY, 0)
         return {"state": key, "verdict": verdict, "drives_decision": drives, "file": rel,
                 "line": _binding_line(refs, sp), "silence": silence, "construct": construct,
                 "silence_line": silence_line, "partition": partition}
@@ -823,7 +830,12 @@ def _finding(key: str, refs: list[Node], rel: str, sp: LangSpec, closed_sets: di
 
 
 def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ctors: set[str]) -> FileRead:
-    closed_sets = _collect_closed_sets(root) if sp is LANG_SPEC["python"] else set()
+    # An empty TABLE, not an empty set. The parameter is declared eight times over as a
+    # mapping of name to bound and three readers call `.get` on it; a set has none. It never
+    # raised, because the predicate gating each of those reads asks `name in closed_sets`
+    # first and an empty set answers no to everything, so the wrong shape was reachable only
+    # through a gate the wrong shape happened to close.
+    closed_sets = _collect_closed_sets(root) if sp["closed_set_rule"] else {}
     findings: list[Finding] = []
     visited: set[Site] = set()
     judged: set[Site] = set()

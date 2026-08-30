@@ -55,6 +55,13 @@ class LangSpec(TypedDict, total=False):
     switch_types: dict[str, tuple[str, str]]
     immutable_modifiers: frozenset[str]
     immutable_ctor_rule: bool
+    # Whether this language's reader collects closed sets: names bound to a set, tuple or
+    # list literal, with how many members each holds. Python is the only one that does, and
+    # it was spelled `sp is LANG_SPEC["python"]` in the reader, which is the language
+    # conditional welded into shared code that `_finding` had already replaced with a row
+    # two hundred lines above. A row gets a rule for nine languages; an identity check gets
+    # it for one, and the one is whichever object happens to be passed.
+    closed_set_rule: bool
     mem_object: str
     mem_attr: str
     call_types: tuple[str, ...]
@@ -491,6 +498,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         # whether its return can be mutated. Python only, and now declared here rather
         # than by an identity check on the spec object in _finding.
         "immutable_ctor_rule": True,
+        "closed_set_rule": True,
         "call_types": ("call",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -702,6 +710,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "switch_types": {"switch_statement": ("value", "switch_case")},
         "immutable_modifiers": frozenset({"const"}),
         "immutable_ctor_rule": False,
+        "closed_set_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
@@ -840,6 +849,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "switch_types": {"switch_expression": ("condition", "switch_block_statement_group")},
         "immutable_modifiers": frozenset({"final"}),
         "immutable_ctor_rule": False,
+        "closed_set_rule": False,
         "call_types": ("method_invocation",), "flat_call": True,
         "call_fn": "name", "call_args": "arguments", "call_name": "name", "call_recv": "object",
         "arglist_types": ("argument_list",),
@@ -976,6 +986,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "switch_types": {"switch_statement": ("value", "switch_section")},
         "immutable_modifiers": frozenset({"const", "readonly"}),
         "immutable_ctor_rule": False,
+        "closed_set_rule": False,
         "call_types": ("invocation_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -1127,6 +1138,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "switch_types": {"match_expression": ("value", "match_arm")},
         "immutable_modifiers": frozenset({"const", "static"}),
         "immutable_ctor_rule": False,
+        "closed_set_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("arguments",),
@@ -1274,6 +1286,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "switch_types": {"case": ("value", "when")},
         "immutable_modifiers": frozenset(),
         "immutable_ctor_rule": False,
+        "closed_set_rule": False,
         "mem_object": "receiver", "mem_attr": "method",
         "call_types": ("call",), "flat_call": True,
         "call_fn": "method", "call_args": "arguments", "call_name": "method", "call_recv": "receiver",
@@ -1416,6 +1429,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "switch_types": {"switch_statement": ("condition", "case_statement")},
         "immutable_modifiers": frozenset({"const"}),
         "immutable_ctor_rule": False,
+        "closed_set_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
@@ -1573,6 +1587,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "switch_types": {"expression_switch_statement": ("value", "expression_case")},
         "immutable_modifiers": frozenset({"const"}),
         "immutable_ctor_rule": False,
+        "closed_set_rule": False,
         "call_types": ("call_expression",), "flat_call": False,
         "call_fn": "function", "call_args": "arguments", "call_name": None,
         "arglist_types": ("argument_list",),
