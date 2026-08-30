@@ -18,6 +18,7 @@ into one interprocedural graph is the next stage; see the whole-program note.
 from __future__ import annotations
 
 import collections
+import dataclasses
 import itertools
 from collections.abc import Iterator
 from pathlib import Path
@@ -44,12 +45,29 @@ _INF = 10 ** 9
 # Minimum path cover: fewest s->t walks that cover every edge at least once.
 # --------------------------------------------------------------------------
 
-def _add(graph: dict[CfgNode, list[list[CfgNode]]], u: CfgNode | None, v: CfgNode | None, cap: int) -> None:
-    graph[u].append([v, cap, len(graph[v])])
-    graph[v].append([u, 0, len(graph[u]) - 1])
+@dataclasses.dataclass
+class Edge:
+    """One arc of the flow graph: where it goes, what is left, and where its opposite sits.
+
+    Three named fields rather than three positions. It was a list typed as a list of graph
+    NODES, and it holds a node and two numbers, so `capacity > 0` was comparing a node to a
+    number. Fourteen sites indexed it by position, where `[1]` meant capacity and `[2]` meant
+    the back-reference, and nothing but convention said which was which.
+
+    A record rather than a tuple because the capacity is spent in place as flow is pushed,
+    which is what the list was for."""
+
+    to: CfgNode
+    capacity: int
+    back: int
 
 
-def _max_flow(graph: dict[CfgNode, list[list[CfgNode]]], s: CfgNode, t: CfgNode) -> int:
+def _add(graph: dict[CfgNode, list[Edge]], u: CfgNode, v: CfgNode, cap: int) -> None:
+    graph[u].append(Edge(to=v, capacity=cap, back=len(graph[v])))
+    graph[v].append(Edge(to=u, capacity=0, back=len(graph[u]) - 1))
+
+
+def _max_flow(graph: dict[CfgNode, list[Edge]], s: CfgNode, t: CfgNode) -> int:
     total = 0
     while True:
         parent: dict[CfgNode, tuple[CfgNode, int] | None] = {s: None}
@@ -58,10 +76,10 @@ def _max_flow(graph: dict[CfgNode, list[list[CfgNode]]], s: CfgNode, t: CfgNode)
             u = q.popleft()
             if u == t:
                 break
-            for i, (v, cap, _rev) in enumerate(graph[u]):
-                if cap > 0 and v not in parent:
-                    parent[v] = (u, i)
-                    q.append(v)
+            for i, edge in enumerate(graph[u]):
+                if edge.capacity > 0 and edge.to not in parent:
+                    parent[edge.to] = (u, i)
+                    q.append(edge.to)
         if t not in parent:
             return total
         # bottleneck along the found path
@@ -69,14 +87,14 @@ def _max_flow(graph: dict[CfgNode, list[list[CfgNode]]], s: CfgNode, t: CfgNode)
         v = t
         while parent[v] is not None:
             u, i = parent[v]
-            bottleneck = min(bottleneck, graph[u][i][1])
+            bottleneck = min(bottleneck, graph[u][i].capacity)
             v = u
         v = t
         while parent[v] is not None:
             u, i = parent[v]
-            graph[u][i][1] -= bottleneck
-            back = graph[u][i][2]
-            graph[v][back][1] += bottleneck
+            graph[u][i].capacity -= bottleneck
+            back = graph[u][i].back
+            graph[v][back].capacity += bottleneck
             v = u
         total += bottleneck
 
@@ -90,7 +108,7 @@ def min_path_cover(edges: list[tuple[CfgNode, CfgNode]], source: CfgNode, sink: 
     pushing back as much t->s flow as the real residual allows."""
     if not edges:
         return 0
-    graph: dict[CfgNode, list[list[CfgNode]]] = collections.defaultdict(list)
+    graph: dict[CfgNode, list[Edge]] = collections.defaultdict(list)
     demand: dict[CfgNode, int] = collections.defaultdict(int)
     for u, v in edges:
         _add(graph, u, v, _INF)  # upper INF; lower bound 1 handled via demand
@@ -107,17 +125,16 @@ def min_path_cover(edges: list[tuple[CfgNode, CfgNode]], source: CfgNode, sink: 
             _add(graph, node, super_sink, -d)
     _max_flow(graph, super_src, super_sink)  # saturate lower bounds (feasibility)
 
-    flow_on_e = _INF - graph[e_owner][e_idx][1]
+    flow_on_e = _INF - graph[e_owner][e_idx].capacity
     # Disable the artificial edges (super nodes and E) so the pushback runs only
     # over the real residual; then minimize by pushing t->s.
     for owner in (super_src, super_sink):
-        for entry in graph[owner]:
-            v, _cap, rev = entry
-            entry[1] = 0
-            graph[v][rev][1] = 0
-    e_rev = graph[e_owner][e_idx][2]
-    graph[e_owner][e_idx][1] = 0
-    graph[source][e_rev][1] = 0
+        for edge in graph[owner]:
+            edge.capacity = 0
+            graph[edge.to][edge.back].capacity = 0
+    e_rev = graph[e_owner][e_idx].back
+    graph[e_owner][e_idx].capacity = 0
+    graph[source][e_rev].capacity = 0
 
     pushed = _max_flow(graph, sink, source)
     return flow_on_e - pushed

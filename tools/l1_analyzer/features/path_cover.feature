@@ -24,6 +24,10 @@ Feature: path_cover — the fewest end-to-end runs that walk every branch of a r
     Then the graph gains a forward edge with that capacity and a matching reverse edge with none
     And each half records where the other sits, so flow pushed one way can be pushed back the other way
     But it changes the graph it was handed rather than returning a new one, so the caller's graph is the result
+    And each arc it builds is a record with three named fields: where it goes, what capacity is left, and where its opposite sits
+    And that was a list declared as a list of graph nodes while holding a node and two numbers, so comparing an arc's capacity to zero was comparing a node to a number
+    And fourteen sites read it by position, where one meant capacity and two meant the back-reference, with nothing but convention saying which
+    But it is a record rather than a tuple, because capacity is spent in place as flow is pushed, which is what the list was for
 
   Scenario: _max_flow pushes as much flow as the graph will carry between two nodes
     Given a flow graph, a source and a sink
@@ -97,3 +101,4 @@ Feature: path_cover — the fewest end-to-end runs that walk every branch of a r
     Then it returns the total number of end-to-end runs, the number of functions counted, and a detail line saying so
     And it carries both running totals in a closure that reassigns captured names, rather than threading them through as the branch builders do
     But the band is always n/a because no threshold is set for this measure, and any language other than Python returns not-applicable without parsing anything
+

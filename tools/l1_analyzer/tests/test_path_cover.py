@@ -190,3 +190,35 @@ def test_more_arms_means_more_walks():
         return _cover(f"def f(x):\n    match x:\n{arms}    return a\n")
 
     assert [cover_with(n) for n in (1, 2, 3)] == [2, 3, 4]
+
+
+# ---------------------------------------------------------------------------
+# The edges of the flow graph, which were declared as something they are not
+#
+# An edge was typed as a list of graph nodes and holds three different things: where it
+# goes, how much capacity is left, and where its opposite sits in the other node's list. So
+# `capacity > 0` compared a node to a number, which the type checker reads as comparing a
+# string to an integer and would raise if a node ever were one.
+#
+# Nothing had type-checked this package until 2026-08-29. The algorithm is right, its tests
+# pass, and the declaration above it was false the whole time.
+# ---------------------------------------------------------------------------
+
+def test_an_edge_says_what_it_holds():
+    """Three named fields rather than three positions. Fourteen sites indexed this by
+    number, so `[1]` meant capacity and `[2]` meant the back-reference, and nothing but
+    convention said so."""
+    from l1_analyzer.path_cover import Edge
+
+    edge = Edge(to=2, capacity=5, back=0)
+    assert (edge.to, edge.capacity, edge.back) == (2, 5, 0)
+
+
+def test_capacity_is_a_number_and_can_be_spent():
+    """What the flow loop does to an edge, asserted directly. It was reachable only
+    through the whole algorithm before."""
+    from l1_analyzer.path_cover import Edge
+
+    edge = Edge(to=2, capacity=5, back=0)
+    edge.capacity -= 3
+    assert edge.capacity == 2
