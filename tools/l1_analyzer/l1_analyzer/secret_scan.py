@@ -56,7 +56,7 @@ import re
 from collections import Counter
 from pathlib import Path
 from re import Pattern
-from typing import TypedDict
+from typing import NamedTuple, TypedDict
 
 from l1_analyzer.boundary import boundary
 from l1_analyzer.dead_code import _EXT_LANG, parser
@@ -195,6 +195,37 @@ _ENV_SYNTAX_PREFIXES = (".env", "Dockerfile", "Makefile", "docker-compose")
 def _has_env_syntax(name: str) -> bool:
     return (Path(name).suffix.lower() in _ENV_SYNTAX_SUFFIXES
             or name.startswith(_ENV_SYNTAX_PREFIXES))
+
+
+class Counts(TypedDict):
+    """What the scan counted, and how the count splits.
+
+    `by_rule` is a table inside the record, which is why the record exists: declared as a
+    mapping of names to numbers, the one field that is not a number was the one nothing
+    could see."""
+
+    total: int
+    in_tests: int
+    in_docs: int
+    in_production: int
+    occurrences: int
+    by_rule: dict[str, int]
+
+
+class Hit(NamedTuple):
+    """One raw match, before matches of the same credential are grouped together.
+
+    A record rather than a positional tuple. It was declared as five fields and built with
+    six, so the comment naming the five was the only description of it anywhere and it was
+    wrong. Unpacking a six-tuple against five names is a runtime error the moment anything
+    reads it, and every read went through positions rather than names."""
+
+    rule: str
+    value: str
+    file: str
+    line: int
+    in_tests: bool
+    in_docs: bool
 
 
 class Finding(TypedDict):
@@ -421,7 +452,7 @@ class SecretScanRow(TypedDict):
     band: str
     details: str
     findings: list[Finding]
-    counts: dict[str, int]
+    counts: Counts
     confirmed: str
     files_scanned: int
 
@@ -437,7 +468,10 @@ def analyze(repo: Path, lang: str) -> SecretScanRow:
     make sense read that way. Occurrences are reported beside each finding."""
     has_packages = _repo_has_packages(repo)
     tracked = _tracked_files(repo)
-    raw_hits: list[tuple[str, str, str, int, bool]] = []   # rule, value, file, line, in_tests
+    # A record, not a positional tuple. It was declared with five fields and built with six,
+    # so the comment naming the five was the only description and it was wrong. Unpacking a
+    # six-tuple against five names is a runtime error the moment anything reads it.
+    raw_hits: list[Hit] = []
     scanned = skipped = 0
     for path in _rglob_files(repo, "*"):
         if _in_ignored_dir(path, ()) or not _scannable(path):
@@ -465,32 +499,37 @@ def analyze(repo: Path, lang: str) -> SecretScanRow:
         # decode drops it - and then every span tree-sitter returned would be shifted by the
         # dropped bytes against the offsets the regexes below report. Re-encoding costs one
         # pass and makes `_byte_offset` exact by construction rather than by assumption.
-        raw_hits.extend((rule_id, value, relpath, line, in_tests, in_docs)
+        raw_hits.extend(Hit(rule_id, value, relpath, line, in_tests, in_docs)
                         for rule_id, line, value in _scan_text(text, text.encode("utf8"), path.name))
 
-    grouped: dict[tuple[str, str], list[tuple[str, int, bool, bool]]] = {}
-    for rule_id, value, relpath, line, in_tests, in_docs in raw_hits:
-        grouped.setdefault((rule_id, value), []).append((relpath, line, in_tests, in_docs))
+    grouped: dict[tuple[str, str], list[Hit]] = {}
+    for hit in raw_hits:
+        grouped.setdefault((hit.rule, hit.value), []).append(hit)
     findings: list[Finding] = [
-        {"rule": rule_id, "file": sites[0][0], "line": sites[0][1], "excerpt": _excerpt(value),
+        {"rule": rule_id, "file": sites[0].file, "line": sites[0].line,
+         "excerpt": _excerpt(value),
          # A credential that appears anywhere outside the test tree is a production
          # finding, however many fixtures also carry it.
-         "in_tests": all(site[2] for site in sites),
+         "in_tests": all(site.in_tests for site in sites),
          # Documentation only when EVERY site is documentation, for the same reason as
          # tests: one production copy makes it a production finding however many pages
          # also print it.
-         "in_docs": all(site[3] for site in sites) and not all(site[2] for site in sites),
+         "in_docs": (all(site.in_docs for site in sites)
+                     and not all(site.in_tests for site in sites)),
          "occurrences": len(sites)}
         for (rule_id, value), sites in grouped.items()
     ]
 
+    # Named apart from the per-hit booleans above, which held the same two names. One
+    # function, two meanings, and the second silently rebound the first.
     total = len(findings)
-    in_tests = sum(1 for f in findings if f["in_tests"])
-    in_docs = sum(1 for f in findings if f["in_docs"])
-    counts = {"total": total, "in_tests": in_tests, "in_docs": in_docs,
-              "in_production": total - in_tests - in_docs,
-              "occurrences": len(raw_hits),
-              "by_rule": dict(sorted(Counter(f["rule"] for f in findings).items()))}
+    tests_only = sum(1 for f in findings if f["in_tests"])
+    docs_only = sum(1 for f in findings if f["in_docs"])
+    counts: Counts = {
+        "total": total, "in_tests": tests_only, "in_docs": docs_only,
+        "in_production": total - tests_only - docs_only,
+        "occurrences": len(raw_hits),
+        "by_rule": dict(sorted(Counter(f["rule"] for f in findings).items()))}
     scope_note = ("git-tracked files only" if tracked is not None
                   else "the whole tree: not a git working copy, so gitignored files cannot be excluded")
     # "distinct secret(s) ... in production code" counts FINDINGS, not files, and reading it
@@ -498,8 +537,8 @@ def analyze(repo: Path, lang: str) -> SecretScanRow:
     # The file counts are now named as file counts and stand on their own.
     details = (
         f"{total} distinct secret(s) in {len(raw_hits)} occurrence(s) across {scanned} scanned "
-        f"file(s); {total - in_tests - in_docs} of the secret(s) are in production code, "
-        f"{in_docs} only in documentation and {in_tests} only in the test tree; "
+        f"file(s); {total - tests_only - docs_only} of the secret(s) are in production code, "
+        f"{docs_only} only in documentation and {tests_only} only in the test tree; "
         f"scope: {scope_note}; "
         "the canon's second Slop arm, a confirmed true positive, is not evaluated: "
         "no credential is validated against its issuer"
