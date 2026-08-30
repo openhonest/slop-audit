@@ -235,7 +235,36 @@ def is_coarse(partition: Partition, drives_decision: bool, bound: int) -> bool:
 # they carry no tree-sitter knowledge and sit here rather than in the classifier.
 # --------------------------------------------------------------------------
 
-def silence_summary(findings: list[Finding], total: int) -> dict[str, object]:
+class SilenceSite(TypedDict):
+    """One reference the reader could not decide, and the shape that stopped it.
+
+    `line` is the SILENT REFERENCE's line, not the state's binding line. The two are usually
+    different, and publishing the binding line named a shape at a line that does not hold
+    it, which makes the backlog this list exists to be unworkable.
+
+    `construct` is empty on every reason but an unmodelled construct, and on that one it
+    names the syntax shape no dispatch row covered. Without it the reader is told a rule is
+    missing and not which one, which is a complaint rather than a backlog."""
+    file: str
+    line: int
+    state: str
+    reason: str
+    construct: str
+
+
+class Silence(TypedDict):
+    """What the reader could not decide, over one repository.
+
+    It was a mapping of anything to anything, so the card's read of `sites` was an
+    assumption, and the card is where the silence sites are the whole report on a repository
+    that was refused a grade."""
+    count: int
+    fraction: float
+    by_reason: dict[str, int]
+    sites: list[SilenceSite]
+
+
+def silence_summary(findings: list[Finding], total: int) -> Silence:
     """The silence index: the share of state the analyzer could not decide, and every site.
 
     This is reported BESIDE the grade and never inside it. A state we did not decide is not

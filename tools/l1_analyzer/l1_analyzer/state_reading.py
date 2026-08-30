@@ -11,6 +11,7 @@ were a list or the counts a table.
 
 from typing import TYPE_CHECKING, TypedDict
 
+from l1_analyzer.state_partition import Silence
 from l1_analyzer.state_sites import Site
 
 if TYPE_CHECKING:
@@ -37,7 +38,7 @@ class StateReading(TypedDict):
     counts: dict[str, int]
     coverage: object
     resolvable_fraction: float
-    silence: dict[str, object]
+    silence: Silence
     partition: dict[str, object]
     census: dict[str, object]
     findings: list["Finding"]

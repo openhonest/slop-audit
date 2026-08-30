@@ -23,6 +23,7 @@ from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.report import UNORDERED_CLASS_BOUND, grade_summary
 from l1_analyzer.state_bounds import Finding as StateFinding
 from l1_analyzer.state_bounds import StateReading
+from l1_analyzer.state_partition import Silence
 from l1_analyzer.thread_surface import Finding as ThreadFinding
 
 
@@ -249,7 +250,7 @@ def _value_str(result: L1Result, unit: str) -> str:
     return "n/a" if v == "n/a" else f"{v}{unit}"
 
 
-def _metric(spec: MetricSpec, result: L1Result, group: str) -> Row:
+def _metric(spec: MetricSpec, result: L1Result, group: str) -> MetricRow:
     band = str(result["band"])
     k = spec["key"]
     return {"label": _t(f"label.{k}"), "tech": _t(f"tech.{k}"), "value": _value_str(result, spec["unit"]),
@@ -257,12 +258,12 @@ def _metric(spec: MetricSpec, result: L1Result, group: str) -> Row:
             "group": group, "maps_to": spec["maps_to"]}
 
 
-def _metrics(specs: tuple[MetricSpec, ...], results: Panel, group: str) -> list[Row]:
+def _metrics(specs: tuple[MetricSpec, ...], results: Panel, group: str) -> list[MetricRow]:
     # Narrowed once, here, where a reading comes out of the panel. A panel carries an
     # indicator's reading under its code and a few named extras beside them, so the value
     # is genuinely open and every read of it downstream was an assumption. One check at the
     # gate is what makes the rest of this file's annotations mean something.
-    out: list[Row] = []
+    out: list[MetricRow] = []
     for spec in specs:
         reading = results.get(spec["key"])
         if isinstance(reading, dict):
@@ -271,7 +272,7 @@ def _metrics(specs: tuple[MetricSpec, ...], results: Panel, group: str) -> list[
 
 
 def _culprits(l18b: StateReading | None, status: str,
-              coarse: list[StateFinding]) -> tuple[list[Row], int]:
+              coarse: list[StateFinding]) -> tuple[list[CulpritRow], int]:
     """What limits the grade. CANNOT is limited by proven unbounded state, COARSE by finite
     state with too many unordered cases. The two lists are selected by different rules - one
     reads the verdict, the other reads the cardinality against a bound - so they cannot
@@ -287,14 +288,15 @@ def _culprits(l18b: StateReading | None, status: str,
     # present on every finding the analyzer produces; a default here would defend a
     # contract the signature already holds, and would render a fabricated line 0 at file
     # "" if the contract ever did break. An absent field must stop the render.
-    shown = [{"file": f["file"], "line": f["line"], "state": f["state"],
-              "verdict": f["verdict"], "drives_decision": bool(f["drives_decision"]),
-              "classes": f["partition"]["classes"]}
-             for f in flagged[:_CULPRIT_CAP]]
+    shown: list[CulpritRow] = [
+        {"file": f["file"], "line": f["line"], "state": f["state"],
+         "verdict": f["verdict"], "drives_decision": bool(f["drives_decision"]),
+         "classes": f["partition"]["classes"]}
+        for f in flagged[:_CULPRIT_CAP]]
     return shown, max(0, len(flagged) - _CULPRIT_CAP)
 
 
-def _scoped_out(l18b: StateReading | None) -> Row | None:
+def _scoped_out(l18b: StateReading | None) -> ScopedOut | None:
     # The isinstance guard is the absence: L1.18b may not be in the panel at all. Past it
     # the analyzer always writes a bucketed section carrying its counts and paths, even
     # when both are empty, so those two are subscripted.
@@ -310,7 +312,7 @@ def _scoped_out(l18b: StateReading | None) -> Row | None:
             "paths": paths[:12], "paths_more": max(0, len(paths) - 12)}
 
 
-def _honest_code(results: Panel) -> Row | None:
+def _honest_code(results: Panel) -> ConformityCard | None:
     """The card's view of L1.21, or None when the caller did not ask for it.
 
     The share is over the clauses that were DECIDED, so the card prints how many of the
@@ -329,7 +331,7 @@ def _honest_code(results: Panel) -> Row | None:
             "broken_more": max(0, len(broken) - _THREAD_CAP)}
 
 
-def _interleaving_robustness(results: Panel) -> Row | None:
+def _interleaving_robustness(results: Panel) -> InterleavingRow | None:
     """The card's view of the interleaving-robustness check, or None when it did not run.
 
     It was computed in cli.py, published into the JSON panel, and mentioned nowhere here,
@@ -350,7 +352,7 @@ def _interleaving_robustness(results: Panel) -> Row | None:
     # nothing could tie the two together: the value was read twice and only the first read
     # was ever tested.
     listed = ir.get("unmodeled")
-    unmodeled: list[object] = listed if isinstance(listed, list) else []
+    unmodeled: list[str] = listed if isinstance(listed, list) else []
     blurb = (_t("interleaving.blurb.clean") if not unmodeled
              else _t("interleaving.blurb", unmodeled=len(unmodeled),
                      surface=ir.get("surface_files", len(unmodeled))))
@@ -359,7 +361,7 @@ def _interleaving_robustness(results: Panel) -> Row | None:
             "files_more": max(0, len(unmodeled) - _THREAD_CAP)}
 
 
-def _thread_surface(lang: str, results: Panel) -> Row | None:
+def _thread_surface(lang: str, results: Panel) -> ThreadSurface | None:
     ts = results.get("thread_surface")
     if not isinstance(ts, dict):
         return None
@@ -380,9 +382,10 @@ def _thread_surface(lang: str, results: Panel) -> Row | None:
     # thread_surface.Finding is total too, so a site's fields are subscripted. Only the
     # kind's DISPLAY name defaults, and to the kind itself: a kind with no copy yet is shown
     # as the analyzer named it rather than as an empty cell.
-    sites = [{"file": f["file"], "line": f["line"],
-              "kind": _THREAD_KINDS.get(f["kind"], f["kind"]),
-              "symbol": f["symbol"], "severity": f["severity"]} for f in findings[:_THREAD_CAP]]
+    sites: list[ThreadSite] = [
+        {"file": f["file"], "line": f["line"],
+         "kind": _THREAD_KINDS.get(f["kind"], f["kind"]),
+         "symbol": f["symbol"], "severity": f["severity"]} for f in findings[:_THREAD_CAP]]
     return {"verdict": verdict, "exposed": counts.get("exposed", 0), "review": counts.get("review", 0),
             "blurb": blurb, "sites": sites, "sites_more": max(0, len(findings) - _THREAD_CAP)}
 
@@ -443,12 +446,12 @@ def _int(v: object) -> int | None:
 _PROOF_CAP = 20
 
 
-def _proofs(results: Panel) -> list[Row]:
+def _proofs(results: Panel) -> list[ProofRow]:
     """The adoptable proofs: runnable tests slop-audit generated for a located gap and
     retained only because running them settled it (Umbra's discipline). Two producers feed
     one surface - the concurrency prove loop (results['proofs']) and the coverage-gap prove
     loop (results['coverage_proofs']) - and each proof carries the test source to adopt."""
-    out: list[Row] = []
+    out: list[ProofRow] = []
 
     concurrency = results.get("proofs")
     if isinstance(concurrency, dict):
@@ -481,7 +484,7 @@ def _proofs(results: Panel) -> list[Row]:
     return out[:_PROOF_CAP]
 
 
-def footer_for(card: Row) -> str:
+def footer_for(card: CardModel) -> str:
     """The closing sentences, one for each row the CLI runs.
 
     The site never runs anyone's code, and says so. Otherwise every runtime row gets its own
@@ -506,8 +509,154 @@ def footer_for(card: Row) -> str:
     return " ".join(sentences)
 
 
+class MetricRow(TypedDict):
+    """One indicator's row in the core or audit table, as a renderer prints it."""
+    label: str
+    tech: str
+    value: str
+    band: str
+    band_word: str
+    meaning: str
+    group: str
+    maps_to: list[Dimension]
+
+
+class CulpritRow(TypedDict):
+    """One state that limits the grade: proven unbounded, or finite and too wide."""
+    file: str
+    line: int
+    state: str
+    verdict: str
+    drives_decision: bool
+    classes: int
+
+
+class SilenceSite(TypedDict):
+    """One place the reader stopped, and why in the reader's own words."""
+    file: str
+    line: int
+    state: str
+    why: str
+
+
+class ThreadSite(TypedDict):
+    """One place shared state is reachable from more than one thread."""
+    file: str
+    line: int
+    kind: str
+    symbol: str
+    severity: str
+
+
+class ThreadSurface(TypedDict):
+    """The card's view of the thread-safety surface, or nothing when it was not measured."""
+    verdict: str
+    exposed: int
+    review: bool
+    blurb: str
+    sites: list[ThreadSite]
+    sites_more: int
+
+
+class InterleavingRow(TypedDict):
+    """The card's view of interleaving robustness."""
+    verdict: str
+    blurb: str
+    files: list[str]
+    files_more: int
+
+
+class BrokenClause(TypedDict):
+    """One L1.21 clause and how many sites broke it."""
+    clause: str
+    count: int
+
+
+class ConformityCard(TypedDict):
+    """The card's view of L1.21, or nothing when the caller did not ask for it."""
+    verdict: str
+    value: float | int | str
+    detail: str
+    broken: list[BrokenClause]
+    broken_more: int
+
+
+class ScopedOut(TypedDict):
+    """What the audit did not look at, and why, so a reader can see the denominator."""
+    total: int
+    reasons: str
+    paths: list[str]
+    paths_more: int
+
+
+class ProofRow(TypedDict):
+    """One retained proof, with the test source a reader can adopt."""
+    layer: str
+    language: str
+    target: str
+    location: str
+    blurb: str
+    detail: str
+    test_source: str
+
+
+class CardModel(TypedDict):
+    """The published scorecard, as the two renderers read it.
+
+    Thirty-eight fields, written by one return statement and read by a Markdown renderer and
+    an HTML one. It was `dict[str, object]`, so every read was an assumption: nothing could
+    say whether `culprits` was a list or `grade_pct` a number, and twenty of those reads were
+    indexing an `object` as far as the checker could see. A field renamed in the builder and
+    not in a renderer is a KeyError on the line that prints it, on the run that publishes the
+    measurement.
+
+    Several fields are optional in value rather than in presence: `grade` is None when no
+    letter could be issued, `paths` when no cover was measured, `honest_code` when the caller
+    did not ask for L1.21. Every one of them is always written, and the absence is the value,
+    because a renderer must be able to tell "not asked for" from "asked for and empty"."""
+
+    slug: str
+    lang: str
+    question: str
+    status: str
+    grade: str | None
+    grade_pct: float | None
+    ran_tests: bool
+    tests_measured: bool
+    runtime_rows: list[RuntimeRow]
+    headline: str
+    basis: str
+    census: Row
+    census_note: str
+    detail: str
+    paths: int | None
+    band: str
+    band_word: str
+    testable: str | None
+    neutral_count: int
+    promiscuous_count: int
+    unresolved_count: int
+    culprits_heading: str
+    culprits_note: str
+    culprits: list[CulpritRow]
+    culprits_more: int
+    silence: Silence | None
+    silence_note: str
+    compose_note: str
+    silence_sites: list[SilenceSite]
+    scoped_out: ScopedOut | None
+    core: list[MetricRow]
+    audit: list[MetricRow]
+    thread_surface: ThreadSurface | None
+    interleaving_robustness: InterleavingRow | None
+    honest_code: ConformityCard | None
+    analyzer_version: str
+    proofs: list[ProofRow]
+    share_text: str
+
+
 def build_card(slug: str, lang: str, results: Panel, ran_tests: bool,
-               analyzer_version: str) -> Row:
+               analyzer_version: str) -> CardModel:
     """The full scorecard model, identical to the site's. ran_tests=True (the CLI) adds
     the measured runtime metrics (L1.19 coverage, L1.20 determinism); False (the site) omits
     them and the footer says the code was never executed."""
@@ -544,7 +693,7 @@ def build_card(slug: str, lang: str, results: Panel, ran_tests: bool,
     # unmeasured run and got it wrong on the first repository that reported it.
     # One row per runtime check, each carrying what it reported. Taken from the row, never
     # chosen here: the footer used to speak for both rows with one sentence and one cause.
-    runtime_rows = [
+    runtime_rows: list[RuntimeRow] = [
         {"code": code,
          "measured": isinstance(row, dict) and str(row.get("band")) != "n/a",
          "reason": str(row.get("details") or row.get("detail") or "")
@@ -588,7 +737,7 @@ def _copy_for_html() -> dict[str, str]:
     return {k: _LINK.sub(r'<a href="\2" target="_blank" rel="noopener">\1</a>', v) for k, v in CARD_COPY.items()}
 
 
-def card_html(card: Row) -> str:
+def card_html(card: CardModel) -> str:
     """Render the card via the site's own template + CSS - a standalone page."""
     from jinja2 import Environment, FileSystemLoader, select_autoescape
     env = Environment(loader=FileSystemLoader(str(_TEMPLATES)), autoescape=select_autoescape(["html"]))
@@ -604,7 +753,7 @@ def card_html(card: Row) -> str:
     )
 
 
-def _silence_sites(l18b: StateReading | None) -> list[Row]:
+def _silence_sites(l18b: StateReading | None) -> list[SilenceSite]:
     """Every site the analyzer stopped at, with the reason in the reader's words, for the
     HTML card. The model carried `silence` and the template rendered none of it, so the site
     published a grade and named not one place it stopped."""
@@ -615,7 +764,7 @@ def _silence_sites(l18b: StateReading | None) -> list[Row]:
              "why": _t("silence.reason." + s["reason"])} for s in (sil.get("sites") or [])]
 
 
-def _silence_lines(card: Row) -> list[str]:
+def _silence_lines(card: CardModel) -> list[str]:
     """Every site the analyzer stopped at. On the `na` card this is the whole content: the
     repository was refused a grade because of silence, so the sites ARE the report."""
     sil = card.get("silence")
@@ -626,7 +775,7 @@ def _silence_lines(card: Row) -> list[str]:
         for s in sil["sites"]]
 
 
-def _verdict_lines(card: Row, strip: re.Pattern) -> list[str]:
+def _verdict_lines(card: CardModel, strip: re.Pattern) -> list[str]:
     """The state verdict and what limits it. Empty on an ungraded card: the grade sentence,
     the capability claim, the three counts and the path-cover figure are all statements about
     state, and an ungraded card is one where no state was read. Printing the counts alone
@@ -670,7 +819,7 @@ def _verdict_lines(card: Row, strip: re.Pattern) -> list[str]:
     return lines
 
 
-def card_markdown(card: Row) -> str:
+def card_markdown(card: CardModel) -> str:
     """The same card as Markdown, for the CLI and agent-facing output."""
     strip = re.compile(r"<[^>]+>")
     lines = [f"# Slop Audit — {card['slug']} ({card['lang']})", ""]
@@ -689,8 +838,10 @@ def card_markdown(card: Row) -> str:
     if card["status"] != "na":
         lines += ["", "> " + strip.sub("", _t("compose.note")),
                   "", "> " + strip.sub("", _t("silence.note"))]
-    for group, title in (("core", "group.core.title"), ("audit", "group.audit.title")):
-        rows = card[group]
+    # Named one at a time rather than looped over a variable key. The model knows what
+    # `core` and `audit` hold and cannot know what a variable names, which is the whole
+    # reason for writing it down: a third group added here would otherwise read as anything.
+    for rows, title in ((card["core"], "group.core.title"), (card["audit"], "group.audit.title")):
         if not rows:
             continue
         lines += ["", f"## {_t(title)}", "", "| Check | Value | Band | Counts toward |", "|---|---|---|---|"]
