@@ -112,6 +112,7 @@ class Sweep(TypedDict, total=False):
     attempted: int
     outcomes: Outcomes
     modules: int
+    repair_rounds: int
     detail: str
 
 
@@ -646,7 +647,7 @@ def _outcome_detail(outcomes: Outcomes) -> str:
 
 
 def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: float,
-                   repair_rounds: int) -> Answer:
+                   repair_rounds: int) -> Sweep:
     """Locate uncovered decision branches in one Rust module, prove each (propose -> run,
     then compiler-feedback repair up to repair_rounds), and retain the ones that fail.
     Returns the coverage_proofs shape the card consumes. Every not-run path carries a reason."""

@@ -33,8 +33,12 @@ from typing import TypedDict
 from l1_analyzer import budget, coverage_prove, pytest_trace, python_facets
 from l1_analyzer import model_call as llm
 from l1_analyzer.boundary import boundary
+
+# The sweep shape, shared rather than restated. Both provers hand back the same six
+# fields, and the python one declared them as a mapping of anything to anything.
 from l1_analyzer.coverage_prove import (
     CoverageProof,
+    Sweep,
     SweepProgress,
     _call_model,
     _valid,
@@ -305,7 +309,7 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Coverag
 
 def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
                         timeout_seconds: float, python_executable: str | None,
-                        progress: SweepProgress | None, max_attempts: int) -> dict:
+                        progress: SweepProgress | None, max_attempts: int) -> Sweep:
     """Sweep the whole package: one coverage run to locate uncovered branches, then every module
     with uncovered branches is proven. Retained proofs (assertion-divergences) aggregate across
     the package. Directory-insensitive: the suite runs under the target's own interpreter."""
@@ -402,7 +406,26 @@ def _uncovered_lines(repo: Path, interpreter: str, timeout_seconds: float) -> di
     return {"measured": True, "files": missing_by_file(report, repo), "reason": ""}
 
 
-def missing_by_file(report: CoverageGap, repo: Path) -> dict[str, frozenset[int]]:
+class FileCoverage(TypedDict, total=False):
+    """One file's entry in coverage.py's JSON report. `missing_lines` is the only field this
+    module reads; not total, because a report written by a version that spells it otherwise
+    should be read as nothing missing rather than crash."""
+
+    missing_lines: list[int]
+
+
+class CoverageReport(TypedDict, total=False):
+    """What `coverage json` writes for a whole run, keyed by path.
+
+    Named because the parameter below said `CoverageGap`, which is one uncovered branch of
+    one function. The body read `report["files"]`, and a gap has no files. Both names came
+    out of the 2026-08-17 bulk rename that matched spellings rather than meanings, and
+    nothing could see it until the annotations were checked."""
+
+    files: dict[str, FileCoverage]
+
+
+def missing_by_file(report: CoverageReport, repo: Path) -> dict[str, frozenset[int]]:
     """The uncovered lines a coverage report holds, for this repository's files only.
 
     A suite that imports an installed package reports coverage for it too, and those lines
