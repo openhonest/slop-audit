@@ -116,17 +116,21 @@ def test_every_hazard_attempted_is_reported_whether_it_fired_or_not(tmp_path, sp
     assert {o["symbol"] for o in run["outcomes"]} == {"racy_one", "quiet_two"}
 
 
-def test_a_sweep_that_proved_nothing_reads_the_same_as_one_that_generated_nothing(tmp_path, spent):
-    """Written down because it is wrong and not because it is intended. The summary verdict
-    has two values, so a surface with no review-tier hazards and a surface where three
-    proofs ran and none fired both say "none" on that line. The counts below it are where
-    they stay apart, and a reader looking only at the verdict cannot tell them apart at
-    all. Filed rather than fixed here: changing the verdict changes what the card prints."""
+def test_a_sweep_that_proved_nothing_does_not_read_like_one_that_generated_nothing(
+        tmp_path, spent):
+    """This test was written the other way round, recording the defect, and it is kept
+    facing forward so the defect cannot come back.
+
+    The summary word was "demonstrated" or "none," and "none" covered a surface with nothing
+    worth proving as well as a surface where proofs ran and came back quiet. The counts were
+    the only place the two stayed apart, so a reader looking at the verdict could not tell
+    them apart at all. Filed as slop-audit-nn6 and fixed the same day."""
     nothing = _run(tmp_path, [_finding("racy_flag", "flag")], spent)
     tried = _run(tmp_path, [_finding("quiet_one", "review")], spent)
-    assert nothing["verdict"] == tried["verdict"] == "none"
+    assert nothing["verdict"] != tried["verdict"]
     assert nothing["attempted"] == 0
     assert tried["attempted"] == 1
+
 
 
 def test_a_language_that_is_not_rust_attempts_nothing_and_says_why(tmp_path, spent):
@@ -189,3 +193,84 @@ def test_neither_collaborator_has_a_default():
     parameters = inspect.signature(cli._run_prove).parameters
     for name in ("model_ready", "generate", "make_runner"):
         assert parameters[name].default is inspect.Parameter.empty, name
+
+
+# --------------------------------------------------------------------------
+# The summary line, which had two words for four situations (slop-audit-nn6)
+# --------------------------------------------------------------------------
+
+def _run_with(tmp_path, spent, findings, runner=None, generator=None):
+    surface = {"verdict": "review", "findings": findings, "detail": ""}
+    return cli._run_prove(tmp_path, "rust", surface, 10, 5.0, tmp_path / "w", True,
+                          generator or spent["generate"], runner or spent["make_runner"])
+
+
+def test_a_surface_with_no_hazard_worth_proving_says_it_located_nothing(tmp_path, spent):
+    """Not "none". Nothing was generated, nothing was built and nothing was run, so the
+    summary must not read as a stage that ran and came back empty. That is the vacuous
+    affirmative this instrument reports against other people's code."""
+    run = _run_with(tmp_path, spent, [_finding("racy_flag", "flag")])
+    assert run["verdict"] == "nothing-located"
+    assert run["attempted"] == 0
+
+
+def test_proofs_that_ran_and_fired_nothing_say_so_in_their_own_words(tmp_path, spent):
+    """The real negative result, and the only one of the four that is evidence. The tests
+    were written, built and stressed, and no race appeared. It is bounded rather than a
+    proof of safety, and the word has to be different from the three that measured nothing."""
+    run = _run_with(tmp_path, spent, [_finding("quiet_one", "review"),
+                                      _finding("quiet_two", "review")])
+    assert run["verdict"] == "no-race-fired"
+    assert run["attempted"] == 2
+
+
+def test_a_run_with_no_toolchain_says_nothing_was_measured(tmp_path, spent):
+    """Two proofs attempted and neither crate built. Saying no race fired here would report
+    a clean result from a stage that never executed a line of the generated code."""
+    def broken(work, timeout):
+        return lambda test: {"verdict": "n/a", "detail": "no cargo toolchain"}
+
+    run = _run_with(tmp_path, spent, [_finding("racy_one", "review"),
+                                      _finding("racy_two", "review")], runner=broken)
+    assert run["verdict"] == "not-measured"
+    assert run["attempted"] == 2
+    assert run["demonstrated"] == 0
+
+
+def test_a_generator_that_declined_every_hazard_says_nothing_was_measured(tmp_path, spent):
+    """The same reading from the other end. No test was written, so no code ran, and the
+    two failures are one situation for a reader: this stage produced no evidence."""
+    run = _run_with(tmp_path, spent, [_finding("racy_one", "review")],
+                    generator=lambda request: None)
+    assert run["verdict"] == "not-measured"
+
+
+def test_one_proof_that_fired_beats_any_number_that_did_not(tmp_path, spent):
+    """A demonstrated race is a fact about the code, and the runs that came back quiet do
+    not weigh against it. One firing settles the run."""
+    run = _run_with(tmp_path, spent, [_finding("quiet_one", "review"),
+                                      _finding("racy_two", "review"),
+                                      _finding("quiet_three", "review")])
+    assert run["verdict"] == "demonstrated"
+    assert run["demonstrated"] == 1
+
+
+def test_a_run_that_measured_some_and_could_not_measure_others_reports_what_it_measured(
+        tmp_path, spent):
+    """A partial toolchain failure is not a total one. Two crates built and came back quiet,
+    one would not build, and calling the whole run unmeasured would throw away two real
+    negative results."""
+    calls = {"n": 0}
+
+    def flaky(work, timeout):
+        def run(test):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"verdict": "n/a", "detail": "build failed"}
+            return {"verdict": "no-race-in-stress", "detail": "quiet"}
+        return run
+
+    run = _run_with(tmp_path, spent, [_finding(f"quiet_{i}", "review") for i in range(3)],
+                    runner=flaky)
+    assert run["verdict"] == "no-race-fired"
+    assert run["attempted"] == 3

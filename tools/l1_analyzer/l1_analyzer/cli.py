@@ -184,8 +184,33 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
         }
         outcomes.append(recorded)
     demonstrated = sum(o["verdict"] == prove.DEMONSTRATED for o in outcomes)
-    return {"verdict": "demonstrated" if demonstrated else "none",
+    return {"verdict": _sweep_verdict(outcomes, demonstrated),
             "demonstrated": demonstrated, "attempted": len(outcomes), "outcomes": outcomes}
+
+
+def _sweep_verdict(outcomes: list[prove.ProofRecord], demonstrated: int) -> str:
+    """One word for the whole sweep, and there are four situations, not two.
+
+    It said "demonstrated" or "none" until 2026-08-31, and "none" covered three of them: a
+    surface with nothing worth proving, a set of proofs that ran clean, and a set where no
+    crate ever built. The first and the third measured nothing at all, and reporting them
+    the same as the second turns "we did not check" into "we checked and found no race".
+    That is the vacuous affirmative this tool reports against other people's code, and it
+    was on our own summary line. Filed as slop-audit-nn6 and fixed the same day.
+
+    A single fired race settles it, because a demonstrated race is a fact about the code and
+    the quiet runs do not weigh against it. Below that, one proof that actually ran is
+    enough to make the sweep a measurement: a build that failed alongside two that ran clean
+    is a partial failure, and calling the whole sweep unmeasured would throw away two real
+    negative results."""
+    if demonstrated:
+        return "demonstrated"
+    if not outcomes:
+        return "nothing-located"
+    measured = {prove.DEMONSTRATED, prove.NOT_DEMONSTRATED}
+    if any(o["verdict"] in measured for o in outcomes):
+        return "no-race-fired"
+    return "not-measured"
 
 
 _OUTSIDE_THE_INDEX = (

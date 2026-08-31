@@ -74,7 +74,14 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     When _run_prove takes the review-tier findings up to the cap and proves each one in its own throwaway directory
     Then it returns every outcome with its verdict, its detail, and the generated test kept alongside, so a demonstrated proof can be offered as an adoptable test
     And a language other than Rust, or a missing model key, returns not-applicable with the reason and attempts nothing
-    But the summary verdict is only "demonstrated" or "none", so a sweep where nothing was generated and nothing was run reads the same at that line as a sweep that ran and fired no race; the per-hazard verdicts are where the two stay distinguishable
+    But the generator, the crate builder and the answer to whether a key is present are all handed in, because the place that knows a run is meant to spend money is the caller and not this loop
+
+  Scenario: _sweep_verdict gives the whole run one word, and there are four situations
+    Given every outcome the loop recorded and how many of them fired a race
+    When _sweep_verdict reads them
+    Then a single fired race settles it, since a demonstrated race is a fact about the code and the quiet runs do not weigh against it
+    And a surface with nothing worth proving, a set of proofs that ran clean, and a set where no crate ever built are three different answers, because two of them measured nothing and reporting them as the third turns a did-not-check into a checked-and-found-nothing
+    But one proof that actually ran makes the sweep a measurement, so a build that failed beside two that ran clean does not throw away two real negative results
 
   Scenario: main parses the command line and dispatches the requested audit
     Given the arguments the operator typed
