@@ -409,7 +409,13 @@ def _selects_on_an_open_key(refs: list[Node], sp: LangSpec) -> bool:
                 or _sub_collection(parent, sp) != ref:
             continue
         gp = parent.parent
-        store = gp is not None and (
+        # A CONDITIONAL assignment is not a store. `@cache[k] ||= compute(k)` reads what is
+        # at the key to decide whether to write there, so the answer depends on the key in
+        # exactly the way this guard exists to catch. Counting it as a store was the last
+        # thing keeping the carried-value rule Python-only: with it counted, that rule
+        # cleared Ruby's commonest memoization shape with no premise checked at all.
+        conditional = gp is not None and _text(_field(gp, "operator")) in sp["read_write_assign_ops"]
+        store = gp is not None and not conditional and (
             (gp.type in sp["assign_types"] and _field(gp, sp["assign_left"]) == parent)
             or gp.type in sp["key_removal_types"]
         )
@@ -431,6 +437,21 @@ def _selects_on_an_open_key(refs: list[Node], sp: LangSpec) -> bool:
         if called and attr_node is not None and _text(attr_node) in sp["keyed_read"] \
                 and _is_open_key(_first_arg(gp, sp)):
             return True
+    # THE FLAT-CALL SPELLING of the same read. Java and Ruby hang the receiver, the method
+    # name and the arguments off ONE node, so the loop above walks a member access those two
+    # languages never build. Java's `d.get(k)` is the vector `open-key-read-returned`, and
+    # it went unseen here while the loop beside it was written for the nested form.
+    if sp["flat_call"]:
+        for ref in refs:
+            parent = ref.parent
+            if parent is None or parent.type not in sp["call_types"]:
+                continue
+            if _field(parent, sp["call_recv"]) != ref:
+                continue
+            name = _field(parent, sp["call_name"])
+            if name is not None and _text(name) in sp["keyed_read"] \
+                    and _is_open_key(_first_arg(parent, sp)):
+                return True
     return False
 
 
@@ -764,29 +785,16 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
     # presence, and None means the question does not apply rather than "presence decides".
     if _value_reaches_condition(refs, sp) or _result_invariant(attr, refs, sp) is False:
         return False
-    # CARRIED VALUE SERVES ALL NINE, since 2026-08-18. It is one line, `no reference sits
-    # in a test expression`, and it delegates to `reads.in_test`, which is vocabulary-driven
-    # and whose own docstring works through the JavaScript, TypeScript and C# condition
-    # wrappers. It was language-independent already and sat inside the gate only because the
-    # gate wraps three rules together.
+    # WHAT IS STILL PYTHON-ONLY: memoization and write-once. Each is a claim about nine
+    # grammars the cross-language suite has not been made to hold, and widening one rule at
+    # a time is what lets the suite say which claim broke.
     #
-    # The guard above runs first and also serves all nine, so a value that DOES reach a
-    # decision on an unbounded key is still flagged in every language.
-    # Write-once, memoization and carried-value still run for Python and nobody else. Each
-    # is a claim about nine grammars the cross-language suite has not been made to hold,
-    # and widening one rule at a time is what lets the suite say which claim broke.
-    #
-    # CARRIED VALUE WAS TRIED ON 2026-08-18 AND PUT BACK. The rule itself is one line and
-    # already vocabulary-driven, so it looked free. It is not, and the dependency chain is
-    # the finding: it is only sound behind `_selects_on_an_open_key`, which was Python-only
-    # too; widening that needs the subscript spelling AND the method spelling, because six
-    # of the nine ask `d.get(k)` rather than `d[k]`; and with both of those the Ruby
-    # conditional-assignment cache still clears when it must not. The guard below now reads
-    # the vocabulary, which is the part of that work worth keeping.
-    #
-    # What a future attempt needs: `open-key-read-returned` in the cross-language vectors
-    # declares this shape promiscuous and is the assertion to satisfy, and the Ruby
-    # conditional-assignment cache is the second. Both were green before and after here.
+    # Carried value was the third and it serves all nine since 2026-08-31. The record of
+    # what that took is in test_carried_value_serves_every_language.py: the rule is one
+    # vocabulary-driven line and is sound only behind the open-key guard, and that guard
+    # needed three repairs. It read Python's node types directly, it read only the subscript
+    # spelling of a keyed read where six of the nine ask `d.get(k)`, and it counted a
+    # conditional assignment as a store when `||=` reads the key to decide whether to write.
     if _is_python(sp):
         cls = _enclosing_class(refs[0], sp)
         if cls is None:
@@ -803,8 +811,24 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
             return False
         if _is_write_once(cls, attr, refs):
             return True                               # immutable, read only in bounded ways
-        if verdict == "promiscuous" and _drives_no_decision(refs, sp):
-            return True
     if verdict != "promiscuous":
         return False
+    # CARRIED VALUE, ALL NINE. No reference sits in a test expression, so the attribute
+    # decides nothing, and unbounded data that never reaches a branch does not bound
+    # testability. One line, and vocabulary-driven since it was written.
+    #
+    # It was Python-only until 2026-08-31 and the record of why is in
+    # test_carried_value_is_not_python_only.py: it is sound only behind the open-key guard,
+    # that guard needed the method spelling of a keyed read as well as the subscript one,
+    # and with both of those Ruby's conditional-assignment cache still cleared. The first
+    # two were done on 2026-08-18. The third was this: `||=` is a read AND a write, and the
+    # guard was counting it as a plain store.
+    # The guard gates CARRIED VALUE and nothing else. The write-only accumulator below is
+    # exempt by construction: it clears a shape where every reference is a write, and a
+    # write at an open key does not make the answer depend on that key. Putting the guard
+    # in front of both turned five languages promiscuous on `presence-test-branches-converge`,
+    # a per-key tally whose key is open throughout and which the vectors declare neutral for
+    # exactly that reason.
+    if _drives_no_decision(refs, sp) and not _selects_on_an_open_key(refs, sp):
+        return True
     return _is_write_only_accumulator(attr, refs, sp)
