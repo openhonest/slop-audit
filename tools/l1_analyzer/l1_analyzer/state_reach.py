@@ -172,6 +172,30 @@ def _local_binding_name(ref: Node, sp: LangSpec) -> Node | None:
     return name if name is not None and name.type == "identifier" else None
 
 
+def _bound_to_the_discard(value: Node, sp: LangSpec) -> bool:
+    """Whether this value is bound by a declaration that names nothing to bind it to.
+
+    `let _ = f();` in Rust: the value goes nowhere and nobody reads it.
+
+    Told apart from destructuring by whether the pattern is a NAMED node. Rust spells the
+    wildcard as an anonymous token, so `_` is present in the tree and carries no name, while
+    `(a, b)` is a named tuple pattern. The first draft of this asked whether the pattern was
+    absent and found it present, which is why the distinction is written down rather than
+    assumed: destructuring takes the value apart and is a question this reader leaves to the
+    total row, and the discard is not that question."""
+    parent = value.parent
+    if parent is None:
+        return False
+    slots = sp["local_binding"].get(parent.type)
+    if slots is None:
+        return False
+    name_field, value_field = slots
+    bound = _field(parent, value_field) if value_field else (
+        parent.named_children[-1] if parent.named_children else None)
+    name = _field(parent, name_field)
+    return _same(bound, value) and name is not None and not name.is_named
+
+
 def _follow_local(ref: Node, name: Node, sp: LangSpec, closed_sets: dict[str, int | None],
                   cells: int | None, depth: int) -> Reach:
     """What the state reaches THROUGH a local it was copied into.
@@ -430,6 +454,25 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
     # was one of four rules the old fallthrough was carrying without being asked.
     if parent.type in sp["sink_types"]:
         return state_partition.output()
+    # A PATTERN TESTED AGAINST THIS VALUE, which binds on success: `if let Some(v) = x`. The
+    # pattern matches or it does not, which is the same two-class split this reader draws
+    # for a plain condition, so it shares that key. The branch's own condition field holds
+    # the let-condition node rather than the value inside it, so the truthiness row below
+    # never sees this and thirteen sites on crates/buzz-acp came back with no rule.
+    if parent.type in sp["binding_condition_types"]:
+        return state_partition.finite(2, True, "truthy")
+    # THE VALUE COMES TO REST in a shape that is not an assignment: `Reply { body: x }`. The
+    # assignment row further down draws this conclusion for a value stored in a binding, and
+    # a record literal stores it just as finally.
+    if parent.type in sp["resting_types"]:
+        return state_partition.output()
+    # A SWITCH SUBJECT REACHED BY A DERIVED VALUE: `match self.child.id() { .. }`. The
+    # categoriser has this rule for the state itself and nothing had it for a value derived
+    # from the state, which is the commoner of the two: five sites on that crate, and the
+    # arms are countable from the tree either way.
+    for switch_type, (subject_field, arm_type) in sp["switch_types"].items():
+        if parent.type == switch_type and _same(_unwrap_unary(_field(parent, subject_field), sp), node):
+            return _switch_partition(node, parent, arm_type)
     # The state value itself is invoked as a callable, possibly through a wrapper:
     # `(self.f)(x)` in Rust reaches the call via a parenthesized_expression. Same rule as
     # direct `S(x)` in _categorize: follow the call result, do not fail-close.
@@ -513,6 +556,13 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
     local = _local_binding_name(node, sp)
     if local is not None:
         return _follow_local(node, local, sp, closed_sets, cells, depth)
+    # BOUND TO NOTHING: `let _ = self.deadline.take()`. The grammar hangs no pattern on that
+    # declaration at all, so the reader above answers None and cannot say whether the value
+    # went into a name it could follow or into the discard. An ABSENT pattern is the
+    # discard; a pattern that is present and is not a plain name is destructuring, which
+    # takes the value apart and is a different question this reader leaves to the total row.
+    if _bound_to_the_discard(node, sp):
+        return state_partition.output()
 
     # THE OPERAND IS NOT READ. `sizeof(state)` and `typeof(state)` ask about the TYPE at
     # compile time and never look at the value, so the state reaches no decision through

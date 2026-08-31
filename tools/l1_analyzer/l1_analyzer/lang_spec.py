@@ -291,6 +291,15 @@ class LangSpec(TypedDict, total=False):
     # knows the spelled form. Either way no arm selector reads the value, which is the same
     # thing `return_types` concludes and is why this sits beside it.
     sink_types: tuple[str, ...]
+    # A pattern tested against a value, binding on success: Rust's `if let Some(v) = x`.
+    # The value reaches a two-class split, the same one a plain condition draws, and the
+    # branch's condition field holds this node rather than the value, so the row that reads
+    # `branch_cond` never sees it. Thirteen silences on crates/buzz-acp on 2026-08-31.
+    binding_condition_types: tuple[str, ...]
+    # The value COMES TO REST here, reaching no arm selector at this site: Rust's
+    # `Reply { body: self.buf.clone() }`. The same conclusion the assignment row draws for a
+    # value stored in a binding, at a shape that is not an assignment.
+    resting_types: tuple[str, ...]
     field_decl_types: tuple[str, ...]
     record_enum: str
     key_prefix: str
@@ -631,6 +640,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_enum": "member",
         "binding_sites": {},
         "sink_types": ("expression_statement", "global_statement", "nonlocal_statement"),
+        "binding_condition_types": (),
+        "resting_types": (),
         "field_decl_types": (),
         "record_enum": "python_class_body",
         "key_prefix": "",
@@ -788,6 +799,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_enum": "member",
         "binding_sites": {"field_definition": "property", "variable_declarator": "name"},
         "sink_types": ("expression_statement",),
+        "binding_condition_types": (),
+        "resting_types": (),
         "field_decl_types": ("field_definition",),
         "record_enum": "none",
         "key_prefix": "this.",
@@ -924,6 +937,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_enum": "identifier",
         "binding_sites": {"variable_declarator": "name"},
         "sink_types": ("expression_statement",),
+        "binding_condition_types": (),
+        "resting_types": (),
         "field_decl_types": ("field_declaration",),
         "record_enum": "none",
         "key_prefix": "",
@@ -1075,6 +1090,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_enum": "identifier",
         "binding_sites": {"variable_declarator": "name", "property_declaration": "name"},
         "sink_types": ("expression_statement",),
+        "binding_condition_types": (),
+        "resting_types": (),
         "field_decl_types": ("field_declaration", "property_declaration"),
         "record_enum": "none",
         "key_prefix": "",
@@ -1184,7 +1201,13 @@ LANG_SPEC: dict[str, LangSpec] = {
         "return_types": ("return_expression",),
         "branch_types": ("if_expression", "while_expression"), "branch_cond": "condition",
         "elif_types": (),
-        "passthrough_types": ("parenthesized_expression", "reference_expression", "unary_expression", "try_expression"),
+        # `await_expression` hands back the value the future resolves to, which is the same
+        # thing this list already says about a parenthesised expression and a `?`. It was
+        # missing, so `self.pool.acquire().await` fell to the total row: nineteen of the
+        # silences on crates/buzz-acp in github.com/block/buzz on 2026-08-31, the largest
+        # cluster there with a rule available.
+        "passthrough_types": ("parenthesized_expression", "reference_expression",
+                              "unary_expression", "try_expression", "await_expression"),
         "comparison_types": ("binary_expression",),
         "membership": "none",
         "this_idents": frozenset({"self"}),
@@ -1217,6 +1240,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_enum": "self_usage",
         "binding_sites": {"static_item": "name", "field_declaration": "name", "let_declaration": "pattern"},
         "sink_types": ("expression_statement", "block"),
+        "binding_condition_types": ("let_condition",),
+        "resting_types": ("field_initializer",),
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",
@@ -1369,6 +1394,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_enum": "ruby_ivar",
         "binding_sites": {},
         "sink_types": ("body_statement",),
+        "binding_condition_types": (),
+        "resting_types": (),
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",
@@ -1517,6 +1544,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "instance_enum": "none",
         "binding_sites": {"declaration": "declarator", "init_declarator": "declarator", "array_declarator": "declarator", "pointer_declarator": "declarator", "field_declaration": "declarator"},
         "sink_types": ("expression_statement",),
+        "binding_condition_types": (),
+        "resting_types": (),
         "field_decl_types": (),
         "record_enum": "c_struct_field",
         "key_prefix": "",
@@ -1679,6 +1708,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "scope_by_receiver": True,
         "binding_sites": {"var_spec": "name", "field_declaration": "name"},
         "sink_types": ("expression_statement",),
+        "binding_condition_types": (),
+        "resting_types": (),
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",

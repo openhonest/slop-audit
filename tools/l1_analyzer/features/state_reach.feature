@@ -131,3 +131,10 @@ Feature: state_reach — how one reference to a piece of state reaches a decisio
     Then it returns the verdict, whether the state drives a decision, the silence reason, the construct and the partition
     And the reason reported is the first undecided reference in source order, because the reader's next move is to open the site and any ranking would be invented here
     But a state with no decision-reaching reference at all is neutral and observe-only, with an empty reaching set of one class
+
+  Scenario: _bound_to_the_discard tells a value nobody keeps from a value taken apart
+    Given a value bound by a local declaration
+    When _bound_to_the_discard asks what the declaration binds it to
+    Then a pattern the grammar spells as an anonymous token is the discard, so the value goes nowhere and nobody reads it
+    And a pattern that is a named node is destructuring, which takes the value APART and is a different question this reader leaves unmeasured
+    But asking whether the pattern is absent answers neither, which is what the first draft asked and why the distinction is written down here
