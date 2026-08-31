@@ -136,7 +136,11 @@ def membership_operands(node: Node | None, sp: LangSpec) -> tuple[Node, Node] | 
         named = [c for c in node.children if c.is_named]
         return (named[0], named[-1]) if len(named) >= 2 else None
     if style == "binary_in" and node.type == "binary_expression" and _text(_field(node, "operator")) == "in":
-        return _field(node, "left"), _field(node, "right")
+        # Both halves or neither. A membership test missing one side is not a membership
+        # test, and handing back a pair with a hole in it made every caller's unpacking a
+        # promise this function never made.
+        left, right = _field(node, "left"), _field(node, "right")
+        return (left, right) if left is not None and right is not None else None
     return None
 
 

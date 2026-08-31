@@ -292,8 +292,11 @@ def compute_source_indicators(
         # a reason; this scan hands back those and its findings. The row is declared with
         # the findings absent on the refusal rather than empty, so the two paths are told
         # apart by a reader, and the annotation says which one the call site can produce.
-        refused_or_scanned: absolute_paths.Scan = _measure(absolute_paths.scan, repo, lang)
-        results["absolute_paths"] = refused_or_scanned
+        # The refusal type widened to the scan's, which is what `_measure` hands back here:
+        # the scan's own shape on the measured path, and the shared refusal on the other.
+        # `Scan` carries its two extra fields as absent rather than empty for exactly that,
+        # so both paths are one type and a reader can tell them apart.
+        results["absolute_paths"] = _measure(absolute_paths.scan, repo, lang)
     return results
 
 _WHITESPACE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"})

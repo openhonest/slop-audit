@@ -307,7 +307,7 @@ def _is_property_constant(node: ast.expr, tokens: frozenset[str]) -> bool:
 def _verdict_tokens(tree: ast.Module) -> frozenset[str]:
     """Module constants bound to a scalar literal. These are the verdict words a check
     publishes; a constant bound to a list or a dict is a table, not a verdict."""
-    out = set()
+    out: set[str] = set()
     for stmt in tree.body:
         if not (isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Constant)):
             continue

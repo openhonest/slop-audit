@@ -14,6 +14,7 @@ the recording is per process and the process is the suite's own.
 import json
 import os
 import sys
+from collections.abc import Callable
 
 from l1_analyzer.boundary import boundary
 from l1_analyzer.unopened_files import OPENS_VARIABLE
@@ -21,13 +22,13 @@ from l1_analyzer.unopened_files import OPENS_VARIABLE
 STASH = "_l1_opened"
 
 
-def watcher(seen: set) -> object:
+def watcher(seen: set[str]) -> Callable[[str, tuple[object, ...]], None]:
     """The hook the interpreter calls on every open, given somewhere to record it.
 
     Takes its store rather than reaching for one. A module-level set would be shared mutable
     state, which this project's own state check reports, in the tool that measures it."""
 
-    def watch(event: str, arguments: tuple) -> None:
+    def watch(event: str, arguments: tuple[object, ...]) -> None:
         if event == "open" and arguments and isinstance(arguments[0], str):
             seen.add(arguments[0])
 

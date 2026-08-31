@@ -138,7 +138,7 @@ def _py_is_empty_container(rhs: Node | None) -> bool:
     return False
 
 
-def _module_mutables_python(candidates: list[Node], this_idents: set[str],
+def _module_mutables_python(candidates: list[Node], this_idents: frozenset[str] | set[str],
                             type_ctors: frozenset[str]) -> set[str]:
     """Field-based module-global detection for Python. The binding name is read
     from the assignment's `left` field, so string literals and annotation tails

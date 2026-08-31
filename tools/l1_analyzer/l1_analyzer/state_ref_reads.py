@@ -129,12 +129,17 @@ def method_name(call: Node, sp: LangSpec) -> str:
 
 
 # honest-code-allow: L1.21.1 - result_discarded and is_deleted ask different questions of a parent node through different vocabulary keys, and each carries the reason its language can or cannot answer. Collapsing them would put both reasons on one function that answers neither
-def result_discarded(call: Node, sp: LangSpec) -> bool:
+def result_discarded(call: Node | None, sp: LangSpec) -> bool:
     """The call's result is thrown away. Java's `Map.put` and Rust's `HashMap::insert`
     return the value previously stored at the key, so they write and nothing more only where
     nobody reads the answer. Ruby declares no discard form - every Ruby expression is a value
     and only position decides whether anything reads it - so Ruby can never prove this, which
-    is an honest decline rather than a stretched one."""
+    is an honest decline rather than a stretched one.
+
+    Takes the absence: the caller hands it a field lookup, and a call with nothing above it
+    cannot be shown to have its result thrown away."""
+    if call is None:
+        return False
     parent = call.parent
     return parent is not None and parent.type in sp["discard_types"]
 

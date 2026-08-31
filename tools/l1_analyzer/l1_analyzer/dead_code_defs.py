@@ -445,8 +445,12 @@ def _js(root: Node, src: bytes, relpath: str, facts: RepoFacts) -> list[Definiti
 # C
 # ---------------------------------------------------------------------------
 
-def _c_declared_identifier(node: Node) -> Node | None:
+def _c_declared_identifier(node: Node | None) -> Node | None:
     """Descend a C declarator (pointer, array, function) to the identifier NODE it names.
+
+    Takes the absence, because a declaration with no declarator is what a broken parse
+    produces and every caller reads the field straight off the node. It already answers
+    "nothing" for a shape it cannot descend, so nothing is the answer for no shape at all.
 
     Named apart from ts_nodes.c_declarator_name, which it used to share a name with. They
     answer different questions and must: this one descends THROUGH a function_declarator to

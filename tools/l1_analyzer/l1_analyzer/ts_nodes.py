@@ -255,7 +255,14 @@ def is_binding_site(ref: Node, parent: Node, sp: LangSpec) -> bool:
     return binding_field is not None and same(field(parent, binding_field), ref)
 
 
-def is_write_target(ref: Node, parent: Node, sp: LangSpec) -> bool:
+def is_write_target(ref: Node, parent: Node | None, sp: LangSpec) -> bool:
+    """Whether this reference is being written to rather than read.
+
+    The parent is optional because a node at the root of a parse has none, and both callers
+    pass `node.parent` straight in. A reference with nothing above it is not being written
+    to by anything, which is the answer that was intended and the one nothing checked."""
+    if parent is None:
+        return False
     if is_lvalue(ref, sp) or is_binding_site(ref, parent, sp):
         return True
     # S[k] = v  -> ref (S) is the collection of a subscript that is the assign target

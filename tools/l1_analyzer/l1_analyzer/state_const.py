@@ -31,7 +31,7 @@ from l1_analyzer.ts_nodes import unwrap_unary as _unwrap_unary
 IMMUTABLE_WRAPPERS = frozenset({"MappingProxyType", "frozenset", "tuple", "bytes"})
 
 
-def rhs_is_immutable(rhs: Node | None, immutable_ctors: set[str]) -> bool:
+def rhs_is_immutable(rhs: Node | None, immutable_ctors: frozenset[str] | set[str]) -> bool:
     if rhs is None:
         return False
     if rhs.type in ("tuple", "true", "false", "none", "integer", "float", "string", "concatenated_string"):
@@ -127,18 +127,20 @@ def declared_constant(refs: list[Node], sp: LangSpec) -> bool:
     if not mods:
         return False
     for ref in refs:
-        node = ref
+        # `climbing`, not `node`: the loop rebinds it to the parent, which is a different
+        # thing from the reference it started at and may be nothing at all.
+        climbing: Node | None = ref
         for _ in range(4):
-            node = node.parent
-            if node is None:
+            climbing = climbing.parent if climbing is not None else None
+            if climbing is None:
                 break
             # One level deeper as well: Java gathers `private static final` into a
             # `modifiers` node, so the keyword is a grandchild, while C# hangs `const` and
             # `readonly` directly off the declaration.
             declared = any(c.type in mods or _text(c) in mods
                            or any(g.type in mods or _text(g) in mods for g in c.children)
-                           for c in node.children)
-            if declared and literal_initialiser(node, sp):
+                           for c in climbing.children)
+            if declared and literal_initialiser(climbing, sp):
                 return True
     return False
 

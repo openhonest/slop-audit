@@ -670,7 +670,11 @@ def _scan_go(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
             if n.type == "assignment_statement":
                 targets = _go_assign_bases(n.child_by_field_name("left"))
             elif n.type in ("inc_statement", "dec_statement"):
-                targets = {_go_assign_base(next((c for c in n.children if c.is_named), None))} - {None}
+                # Filtered rather than subtracted. `{x} - {None}` leaves a set whose type
+                # still admits the absence, so every reader below was handling a value the
+                # line above had just removed.
+                base = _go_assign_base(next((c for c in n.children if c.is_named), None))
+                targets = {base} if base is not None else set()
             for t in sorted(targets):
                 if t and t != "_" and t not in declared and t not in seen:  # "_" is the discard
                     seen.add(t)

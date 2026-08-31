@@ -22,7 +22,6 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from l1_analyzer.absolute_paths import Scan as AbsolutePathScan
 from l1_analyzer.coverage_prove import Sweep
 from l1_analyzer.dead_code import DeadCodeRow
 from l1_analyzer.honest_code import ConformityRow
@@ -54,7 +53,11 @@ Panel = TypedDict("Panel", {
     # wrote them on every default run, which is the drift a declaration exists to catch.
     "path_cover": PathCover,
     "thread_surface": SurfaceResult,
-    "absolute_paths": AbsolutePathScan,
+    # The row, not the scan. `scan` hands back its findings too, and nothing on the panel
+    # reads them: the single handler for a measure that declines produces a value, a band
+    # and a reason, so that is what this row is guaranteed to hold. Claiming the findings
+    # here would be a claim no reader uses and the refusal path cannot keep.
+    "absolute_paths": L1Result,
     # L1.21 is opt-in. It publishes a band and a value like any other indicator and six
     # readings more, which are what say what the share left out.
     "honest_code": ConformityRow,
