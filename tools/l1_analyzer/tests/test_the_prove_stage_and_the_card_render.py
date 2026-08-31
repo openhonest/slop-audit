@@ -7,9 +7,17 @@ reads the wrong window the model is asked about the wrong code, and the run stil
 and still reports: the failure is silent and looks like a model that could not write a
 proof.
 
-`_run_prove` is the loop that turns a thread-surface finding into a proof attempt. Its
-collaborators are parameters, so it runs here with a proposer that answers and a runner
-that reports, which is the whole point of having made them parameters.
+The prove loop used to be measured here too, and on 2026-08-31 its three tests moved to
+test_the_prove_loop_decides_which_hazards_to_spend_on.py, where the generator and the crate
+builder are handed in. The docstring here claimed they already were, and they were not: the
+loop reached into the prove module for both, so the three tests ran it with no key and it
+returned before selecting anything.
+
+One of them was worse than weak. It named the severity rule and then asserted
+`attempted == 0 if "attempted" in result else True`, which is true whichever way it goes,
+and the no-key return has no `attempted` key at all, so it was true every time. A test with
+a rule in its name and no assertion under it is exactly the reading this tool exists to
+refuse, and it sat in our own suite.
 
 `card.py`'s `_culprits` and `_verdict_lines` are what a reader actually sees when the
 grade is limited by something. They had been exercised only through whole-card renders of
@@ -56,40 +64,6 @@ def test_a_hazard_in_a_file_that_is_gone_still_yields_a_context(tmp_path):
     context = cli._hazard_context(tmp_path, finding)
     assert "put" in context
     assert "shared-mutable" in context
-
-
-# --------------------------------------------------------------------------
-# The prove loop, with its collaborators handed in
-# --------------------------------------------------------------------------
-
-def test_the_prove_stage_refuses_a_language_it_does_not_support(tmp_path):
-    surface = {"findings": [{"file": "a.py", "line": 1, "symbol": "s", "severity": "review"}]}
-    result = cli._run_prove(tmp_path, "python", surface, 3, 60.0, tmp_path / "work")
-    assert result["verdict"] == "n/a"
-    assert result["outcomes"] == []
-    assert "Rust-only" in result["detail"]
-
-
-def test_the_prove_stage_reports_zero_attempts_without_a_key(tmp_path, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    surface = {"findings": [{"file": "a.rs", "line": 1, "symbol": "s", "severity": "review"}]}
-    result = cli._run_prove(tmp_path, "rust", surface, 3, 60.0, tmp_path / "work")
-    assert result["outcomes"] == []
-    assert "ANTHROPIC_API_KEY" in result["detail"]
-
-
-def test_only_review_severity_findings_are_offered_to_the_model(tmp_path, monkeypatch):
-    """The selection rule, asserted where it lives. A candidate the surface scan graded
-    below `review` is not a located hazard, and spending a model call on one is spending
-    money to prove nothing."""
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    surface = {"findings": [
-        {"file": "a.rs", "line": 1, "symbol": "low", "severity": "candidate"},
-        {"file": "b.rs", "line": 2, "symbol": "mid", "severity": "review"},
-    ]}
-    result = cli._run_prove(tmp_path, "rust", surface, 3, 60.0, tmp_path / "work")
-    assert result["attempted"] == 0 if "attempted" in result else True
-    assert result["detail"].strip()
 
 
 # --------------------------------------------------------------------------

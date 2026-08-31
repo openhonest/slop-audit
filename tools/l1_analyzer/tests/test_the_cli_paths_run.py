@@ -110,6 +110,20 @@ def test_prove_coverage_repo_refuses_without_a_key(small_repo, capsys, monkeypat
     assert proofs["detail"].strip()
 
 
+def test_prove_coverage_on_one_module_refuses_without_a_key(small_repo, capsys, monkeypatch):
+    """The twin of the sweep above, and the one nothing asked. Both write tests for gaps and
+    keep only what fails, so both need the model, and a run that quietly proved nothing
+    would report the same zero as a module with no gaps left."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    code, out = _run([str(small_repo), "--no-exec", "--prove-coverage", "band.py",
+                      "--format", "json"], capsys)
+    assert code == 0
+    payload = json.loads(out)
+    proofs = payload["results"].get("coverage_proofs") or payload.get("coverage_proofs")
+    assert proofs["attempted"] == 0
+    assert proofs["detail"].strip()
+
+
 def test_race_refuses_on_a_language_it_does_not_support(small_repo, capsys):
     """The runtime race harness is Rust-only, and this repository is Python."""
     code, out = _run([str(small_repo), "--no-exec", "--race", "--format", "json"], capsys)

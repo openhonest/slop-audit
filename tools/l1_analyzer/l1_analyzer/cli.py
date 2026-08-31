@@ -130,7 +130,9 @@ def _stress_in(work: str, timeout: float) -> Callable[[str], prove.RunResult]:
 
 
 def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: int,
-               timeout: float, work_root: Path) -> prove.ProofRun:
+               timeout: float, work_root: Path, model_ready: bool,
+               generate: prove.ConcurrencyModelCall,
+               make_runner: Callable[[str, float], prove.RunGenerated]) -> prove.ProofRun:
     """Locate -> generate -> run -> retain over the review-tier findings. Deterministic
     locate; the model only fills a located gap; the execution gate keeps only what fires.
 
@@ -142,11 +144,23 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
 
     `work_root` is made by the caller for the same reason. It was the one piece of I/O this
     function did on its own account, and it was the whole of what the declaration was true
-    about."""
-    from l1_analyzer import prove
+    about.
+
+    THE THREE COLLABORATORS ARE REQUIRED, since 2026-08-31. This reached into the prove
+    module for the generator, the crate builder and the answer to whether a key is present,
+    so the only way to ask this function what it picks was to replace those three names
+    inside the module under test. `prove_hazard` had the identical shape and fixed it in
+    August, and the reason it wrote then is the reason here: the place that knows a run is
+    meant to spend money is the place that names the real generator and the real runner.
+    That place is `main`, one level up.
+
+    What is left here is the deciding, and it is the part that would be wrong quietly: only
+    review-tier hazards are worth proving, the cap binds on hazards attempted rather than
+    proofs kept, and each proof is built somewhere of its own because two sharing a
+    directory means one overwrites the other's crate."""
     if lang != "rust":
         return {"verdict": "n/a", "detail": f"prove is Rust-only for now; {lang} not supported", "demonstrated": 0, "outcomes": []}
-    if not prove.model_available():
+    if not model_ready:
         return {"verdict": "n/a", "detail": "needs ANTHROPIC_API_KEY to generate proofs", "demonstrated": 0, "outcomes": []}
     ts = thread_surface_result if isinstance(thread_surface_result, dict) else thread_surface.scan(repo, lang)
     # SurfaceResult and its Finding are both total, and `ts` above is either a scan result
@@ -156,19 +170,11 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
     outcomes: list[prove.ProofRecord] = []
     for i, f in enumerate(candidates):
         request = prove.proof_request(f, _hazard_context(repo, f))
-        # The real collaborators, named here because this is the boundary that knows a run
-        # is meant to spend money and build a crate. They used to be defaults inside
-        # prove_hazard, one forgotten argument away from any test.
+        # A directory of its own for every proof. Each one writes a crate and stresses it,
+        # so two sharing a directory means the second overwrites the first's crate and both
+        # verdicts come from whichever won.
         work = str(work_root / f"proof-{i}")
-        outcome = prove.prove_hazard(
-            request,
-            prove.generate,
-            # The work directory is bound at the call rather than captured, because the loop
-            # rebinds it every turn and a captured name would run every proof in the last
-            # one's directory. Annotated so the binding is a parameter with a type rather
-            # than a default nothing describes.
-            _stress_in(work, timeout),
-        )
+        outcome = prove.prove_hazard(request, generate, make_runner(work, timeout))
         # Keep the generated test on the outcome so the card can expose a retained (demonstrated)
         # proof as an adoptable test - the runnable repro, not just a verdict line.
         recorded: prove.ProofRecord = {
@@ -931,10 +937,13 @@ def main(argv: list[str] | None) -> int:
     # Prove (opt-in): locate -> generate -> run -> retain, in one command. Generates and
     # runs code, so CLI-only and explicit.
     if args.prove:
+        # The real generator and the real crate builder are named HERE, because this is the
+        # line that knows the operator asked for a run that spends money and builds crates.
         results["proofs"] = _run_prove(
             args.repo, _audited_language(results, args.lang, args.repo),
             results.get("thread_surface"), args.prove_max, args.timeout,
-            Path(tempfile.mkdtemp(prefix="l1-prove-")))
+            Path(tempfile.mkdtemp(prefix="l1-prove-")),
+            prove.model_available(), prove.generate, _stress_in)
 
     # Coverage-gap proofs (opt-in): locate -> propose -> render -> run in-crate -> retain.
     # Generates and runs code, so CLI-only and explicit. --prove-coverage-repo sweeps the
