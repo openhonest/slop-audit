@@ -330,13 +330,9 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
         if holder is not None and _same(_unwrap_unary(_field(holder, subject_field), sp), ref):
             return _switch_partition(ref, holder, arm_type)
 
-    # ITERATING THE STATE reads every cell it holds, so its reach is the cell set and
-    # nothing wider. `for k := range s.m` had no row anywhere and came back as a construct
-    # with no rule, which inflated Go's silence on the plainest loop the language has.
-    if parent.type in sp["iterate_types"]:
-        if cells is not None:
-            return state_partition.finite(cells + 1, False, "cells")
-        return state_partition.unbounded()
+    iterated = _iterated_reach(ref, parent, sp, cells)
+    if iterated is not None:
+        return iterated
 
     # S(...) : the state supplies WHAT RUNS. No arm selector reads its value, so call-target
     # position is compositional exactly as return position is, and the meter neither
@@ -387,6 +383,39 @@ def _categorize(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None], cel
     # below is where the table ends. It matters which of the two is the last one, because
     # only the last one can be the total handler and only one of them can be it.
     return _flow(ref, sp, closed_sets, cells, depth)
+
+
+def _iterated_reach(value: Node, parent: Node, sp: LangSpec, cells: int | None) -> Reach | None:
+    """The reach of a collection being WALKED by a loop, or None when this shape is not that.
+
+    Iterating reads every cell the collection holds, so its reach is the cell set and
+    nothing wider. `for k := range s.m` had no row anywhere and came back as a construct
+    nobody had taught the reader, which inflated Go's silence on the plainest loop it has.
+
+    Asked from both the categoriser and the flow, which is why it is a function. It lived in
+    the categoriser alone, so it saw a loop over the state itself and never a loop over a
+    value derived from it: `self.tags.iter().map(..).collect()` fed into a `for` walked all
+    the way to the loop and stopped there.
+
+    Read from the loop's own field naming what is walked, never the node type alone. Rust
+    holds the pattern, the value and the body as three children of one node, so matching on
+    the type would read a state mentioned anywhere in the BODY as the collection being
+    walked, which is a different claim and a false one.
+
+    Matched against the field as written and as unwrapped, because a reference arrives here
+    either way: Go's ranged value is the bare name, and Rust's arrives already peeled out of
+    the `&` the passthrough row walked through on the way up."""
+    walked = sp["iterate_types"].get(parent.type)
+    if walked is None:
+        return None
+    holder = _field(parent, walked)
+    if holder is None:
+        return None
+    if not (_same(holder, value) or _same(_unwrap_unary(holder, sp), value)):
+        return None
+    if cells is not None:
+        return state_partition.finite(cells + 1, False, "cells")
+    return state_partition.unbounded()
 
 
 def _member_reach(value: Node, parent: Node, sp: LangSpec, closed_sets: dict[str, int | None],
@@ -495,6 +524,11 @@ def _flow(node: Node | None, sp: LangSpec, closed_sets: dict[str, int | None], c
     through_member = _member_reach(node, parent, sp, closed_sets, cells, depth)
     if through_member is not None:
         return through_member
+    # A LOOP WALKING THIS VALUE, asked here as well as in the categoriser. A chain that ends
+    # in a `for` reaches the loop through this path and not that one.
+    walked = _iterated_reach(node, parent, sp, cells)
+    if walked is not None:
+        return walked
     # THE TWO ROWS THE COMMENT ABOVE PROMISED AND NOBODY WROTE. It excludes the call form
     # deliberately and correctly, but excluding a shape from one row is not the same as
     # handling it, and until 2026-08-17 both forms fell through to the total row. That is why

@@ -138,3 +138,10 @@ Feature: state_reach — how one reference to a piece of state reaches a decisio
     Then a pattern the grammar spells as an anonymous token is the discard, so the value goes nowhere and nobody reads it
     And a pattern that is a named node is destructuring, which takes the value APART and is a different question this reader leaves unmeasured
     But asking whether the pattern is absent answers neither, which is what the first draft asked and why the distinction is written down here
+
+  Scenario: _iterated_reach gives the reach of a collection a loop walks
+    Given a loop and the language's own table of the loop forms that walk a collection
+    When _iterated_reach reads which child of the loop holds the thing being walked
+    Then the collection's reach is the set of cells it holds and nothing wider, because walking it reads every one
+    And the table names the child rather than the loop, so a state mentioned anywhere in the loop's BODY is not read as the collection being walked
+    But it is asked from the flow as well as from the categoriser: a chain that ends in a loop reaches the loop by the first path and never the second

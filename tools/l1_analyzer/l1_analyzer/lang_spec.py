@@ -43,7 +43,16 @@ class LangSpec(TypedDict, total=False):
     key_removal_types: tuple[str, ...]
     cond_at_index: dict[str, int]
     writing_builtins: frozenset[str]
-    iterate_types: tuple[str, ...]
+    # The loop forms that WALK a collection, each naming the child that holds the thing
+    # being walked. Iterating reads every cell the collection holds, so its reach is the
+    # cell set and nothing wider.
+    #
+    # A mapping rather than a list of node types, because Rust holds the pattern, the value
+    # and the body as three children of one `for_expression`, so a rule matching the node
+    # type alone would read a state mentioned anywhere in the BODY as the collection being
+    # walked. Go's range clause names its own half too, and matched nothing but the type
+    # until now by luck rather than by rule.
+    iterate_types: dict[str, str]
     local_binding: dict[str, tuple[str, str | None]]
     # A match or switch, as {node type: (subject field, arm type)}. Two readers want it: the
     # state classifier, which has read it since it was written, and clause 1, for which a
@@ -545,7 +554,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         # dispatch row is unmeasured rather than clean, and giving it a row makes the
         # example stale rather than the property wrong. Replacing that fixture needs a
         # construct still unread today, which is its own small piece of work.
-        "iterate_types": (),
+        "iterate_types": {},
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {"match_statement": ("subject", "case_clause")},
         "immutable_modifiers": frozenset(),
@@ -765,7 +774,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_removal_types": ("unary_expression",),
         "cond_at_index": {},
         "writing_builtins": frozenset(),
-        "iterate_types": (),
+        "iterate_types": {},
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {"switch_statement": ("value", "switch_case")},
         "immutable_modifiers": frozenset({"const"}),
@@ -909,7 +918,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_removal_types": (),
         "cond_at_index": {},
         "writing_builtins": frozenset(),
-        "iterate_types": (),
+        "iterate_types": {},
         "local_binding": {"variable_declarator": ("name", "value")},
         "switch_types": {"switch_expression": ("condition", "switch_block_statement_group")},
         "immutable_modifiers": frozenset({"final"}),
@@ -1051,7 +1060,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_removal_types": (),
         "cond_at_index": {},
         "writing_builtins": frozenset(),
-        "iterate_types": (),
+        "iterate_types": {},
         "local_binding": {"variable_declarator": ("name", None)},
         "switch_types": {"switch_statement": ("value", "switch_section")},
         "immutable_modifiers": frozenset({"const", "readonly"}),
@@ -1208,7 +1217,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_removal_types": (),
         "cond_at_index": {},
         "writing_builtins": frozenset(),
-        "iterate_types": (),
+        "iterate_types": {"for_expression": "value"},
         "local_binding": {"let_declaration": ("pattern", "value")},
         "switch_types": {"match_expression": ("value", "match_arm")},
         "immutable_modifiers": frozenset({"const", "static"}),
@@ -1367,7 +1376,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_removal_types": (),
         "cond_at_index": {},
         "writing_builtins": frozenset(),
-        "iterate_types": (),
+        "iterate_types": {},
         "local_binding": {"assignment": ("left", "right")},
         "switch_types": {"case": ("value", "when")},
         "immutable_modifiers": frozenset(),
@@ -1515,7 +1524,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_removal_types": (),
         "cond_at_index": {},
         "writing_builtins": frozenset(),
-        "iterate_types": (),
+        "iterate_types": {},
         "local_binding": {"init_declarator": ("declarator", "value")},
         "switch_types": {"switch_statement": ("condition", "case_statement")},
         "immutable_modifiers": frozenset({"const"}),
@@ -1678,7 +1687,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         # because it is not in extra_bounded, which is the list of builtins whose
         # RESULT flows on. Different question, so a different row.
         "writing_builtins": frozenset({"delete", "clear"}),
-        "iterate_types": ("range_clause",),
+        "iterate_types": {"range_clause": "right"},
         "local_binding": {"short_var_declaration": ("left", "right")},
         "switch_types": {"expression_switch_statement": ("value", "expression_case")},
         "immutable_modifiers": frozenset({"const"}),
