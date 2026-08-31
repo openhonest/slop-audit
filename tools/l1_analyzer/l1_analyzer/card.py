@@ -23,6 +23,7 @@ from l1_analyzer.pytest_trace import L1Result
 from l1_analyzer.report import UNORDERED_CLASS_BOUND, grade_summary
 from l1_analyzer.state_bounds import Finding as StateFinding
 from l1_analyzer.state_bounds import StateReading
+from l1_analyzer.state_census import Census
 from l1_analyzer.state_partition import Silence
 from l1_analyzer.thread_surface import Finding as ThreadFinding
 
@@ -386,8 +387,11 @@ def _thread_surface(lang: str, results: Panel) -> ThreadSurface | None:
         {"file": f["file"], "line": f["line"],
          "kind": _THREAD_KINDS.get(f["kind"], f["kind"]),
          "symbol": f["symbol"], "severity": f["severity"]} for f in findings[:_THREAD_CAP]]
-    return {"verdict": verdict, "exposed": counts.get("exposed", 0), "review": counts.get("review", 0),
-            "blurb": blurb, "sites": sites, "sites_more": max(0, len(findings) - _THREAD_CAP)}
+    surface: ThreadSurface = {
+        "verdict": verdict, "exposed": counts.get("exposed", 0),
+        "review": bool(counts.get("review", 0)), "blurb": blurb, "sites": sites,
+        "sites_more": max(0, len(findings) - _THREAD_CAP)}
+    return surface
 
 
 def _detail(status: str, basis: str, promiscuous: int, cover: int | None,
@@ -418,7 +422,7 @@ def _detail(status: str, basis: str, promiscuous: int, cover: int | None,
     return _t("detail.coarse")
 
 
-def _census_note(census: Row) -> str:
+def _census_note(census: Census) -> str:
     """What this repository declares that the reader never reached, on a card that GRADED.
 
     The refusal used to fire whenever nothing was admitted, which caught this case by
@@ -626,7 +630,7 @@ class CardModel(TypedDict):
     runtime_rows: list[RuntimeRow]
     headline: str
     basis: str
-    census: Row
+    census: Census
     census_note: str
     detail: str
     paths: int | None
@@ -675,7 +679,10 @@ def build_card(slug: str, lang: str, results: Panel, ran_tests: bool,
     g = grade_summary(results, UNORDERED_CLASS_BOUND)
     status, pct, grade = g["status"], g["testable_pct"], g["grade"]
     path_cover = results.get("path_cover")
-    pc: Row = path_cover if isinstance(path_cover, dict) else {}
+    # The path cover's own record when the panel carries one, and an empty row when it does
+    # not. Declared as the row, because the two branches are two shapes and the reads below
+    # only ever ask for a value that either may hold.
+    pc: Row = dict(path_cover) if path_cover else {}
     # The path-cover figure is coverage of the ENUMERATED state, so on an ungraded card it
     # would be a precise number standing next to a refusal to give one. It was the worst part
     # of the defect: "1,080 runs cover them all" is a coverage claim over an empty set.

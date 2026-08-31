@@ -12,6 +12,7 @@ were a list or the counts a table.
 from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from l1_analyzer.scope import BucketedPaths
+from l1_analyzer.state_census import Census
 from l1_analyzer.state_partition import Silence
 from l1_analyzer.state_sites import Site
 
@@ -41,7 +42,7 @@ class StateReading(TypedDict):
     resolvable_fraction: NotRequired[float]
     silence: Silence
     partition: dict[str, object]
-    census: dict[str, object]
+    census: Census
     findings: list["Finding"]
     # The scope module's own record, not a second copy of it. This file declared the
     # same two fields under another name, and the copy typed each scoped-out path as a

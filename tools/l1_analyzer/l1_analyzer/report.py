@@ -22,6 +22,7 @@ from typing import TypedDict
 
 from l1_analyzer import incomplete, state_census, state_partition
 from l1_analyzer.panel import Panel
+from l1_analyzer.state_census import Census
 from l1_analyzer.state_partition import Finding
 from l1_analyzer.state_reading import StateReading
 
@@ -169,7 +170,7 @@ Tally = dict[str, int]
 _NO_STATE_READING: StateReading = {
     "verdict": "n/a", "value": "n/a", "band": "n/a", "counts": {}, "coverage": {},
     "silence": {"count": 0, "fraction": 0.0, "by_reason": {}, "sites": []},
-    "partition": {}, "census": {},
+    "partition": {}, "census": state_census.uncounted(0),
     "findings": [], "bucketed": {"counts": {}, "paths": []},
     "details": "no state reading was produced",
 }
@@ -408,7 +409,10 @@ class GradeSummary(TypedDict):
     hygiene: float | None       # weighted health of the audit checks, 0..1
     grade: str | None           # A/B/C (can), D (coarse), F (cannot), None (na)
     silence: float              # share of state the analyzer could not decide
-    census: dict[str, object]   # declared vs admitted: the independent denominator
+    # Declared against admitted: the independent denominator. The census module's own
+    # record, not a mapping of names to anything, so the fractions that decide whether a
+    # grade is issued are read through the shape that publishes them.
+    census: Census
     coarse: list[Finding]          # the states that made the verdict coarse, widest first
 
 
@@ -426,11 +430,17 @@ def grade_summary(results: Panel, unordered_class_bound: int | None) -> GradeSum
     # Resolved ONCE, here, where the untyped panel arrives. Four isinstance checks on one
     # value inside one function was the smell that said this step was missing, and each
     # reader below then had to distrust the type its own signature declares.
+    # Resolved COMPLETELY here, not merely narrowed. A payload can be a partial reading as
+    # well as no reading at all: an older panel, or one assembled by hand, carries some
+    # fields and not others, and every reader below would then have to ask about each one.
+    # Laid over the empty reading, so what is there wins and what is missing is the absence
+    # this module already spells out once.
     panel_l18b = results.get("L1.18b")
-    l18b: StateReading = panel_l18b if isinstance(panel_l18b, dict) else _NO_STATE_READING
+    l18b: StateReading = ({**_NO_STATE_READING, **panel_l18b}
+                          if isinstance(panel_l18b, dict) else _NO_STATE_READING)
     counts = l18b.get("counts") or {"neutral": 0, "promiscuous": 0, "unresolved": 0}
     coarse = coarse_states(l18b, unordered_class_bound)
-    census = l18b.get("census")
+    census = l18b["census"]
     basis = _basis(band, counts, _meter_ran(l18b), census)
     status = _status(basis, counts, bool(coarse))
     # The denominator is DECIDED state, not all state. Undecided state is no longer held
@@ -475,4 +485,4 @@ def grade_summary(results: Panel, unordered_class_bound: int | None) -> GradeSum
     return {"status": status, "basis": basis, "counts": counts, "testable_pct": pct,
             "hygiene": hygiene, "grade": _grade(status, pct, hygiene),
             "silence": silence_fraction(counts),
-            "census": census if isinstance(census, dict) else {}, "coarse": coarse}
+            "census": census, "coarse": coarse}
