@@ -76,8 +76,7 @@ from l1_analyzer.state_partition import (
     Partition,
     Reach,
 )
-from l1_analyzer.state_reading import (  # noqa: F401 - re-exported: callers read these from here
-    Bucketed,
+from l1_analyzer.state_reading import (
     FileRead,
     StateReading,
 )
@@ -891,12 +890,16 @@ def _analyze_file(root: Node, rel: str, sp: LangSpec, cfg: LangCfg, immutable_ct
 # object, not Any: the verdict payload mixes strings, counts, nested dicts and a findings
 # list, so no single value type fits. `object` still forces a caller to narrow before use,
 # which is the property Any throws away. Same argument as thread_surface's scan result.
-def _na(lang: str) -> dict[str, object]:
+def _na(lang: str) -> StateReading:
+    """The reading for a language this classifier has no spec for.
+
+    `resolvable_fraction` is absent rather than "n/a": a reading that did not happen has no
+    fraction, and a string in a number's field made the one question a reader asks first
+    into a type check."""
     return {
         "verdict": "n/a", "value": "n/a", "band": "n/a",
         "counts": {NEUTRAL: 0, PROMISCUOUS: 0, UNRESOLVED: 0},
         "coverage": {v: {"observe_only": 0, "drives_decision": 0} for v in (NEUTRAL, PROMISCUOUS, UNRESOLVED)},
-        "resolvable_fraction": "n/a",
         "silence": state_partition.silence_summary([], 0),
         "partition": state_partition.partition_summary([]),
         # `declared: None`, not 0. A language with no spec was not counted, and a confident

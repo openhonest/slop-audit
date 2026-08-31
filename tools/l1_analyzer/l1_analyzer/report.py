@@ -167,8 +167,9 @@ Tally = dict[str, int]
 # of those checks distrusted the type its own signature declared, which is what a panel of
 # `object` obliged them to do.
 _NO_STATE_READING: StateReading = {
-    "value": "n/a", "band": "n/a", "counts": {}, "coverage": {},
-    "resolvable_fraction": 0.0, "silence": {}, "partition": {}, "census": {},
+    "verdict": "n/a", "value": "n/a", "band": "n/a", "counts": {}, "coverage": {},
+    "silence": {"count": 0, "fraction": 0.0, "by_reason": {}, "sites": []},
+    "partition": {}, "census": {},
     "findings": [], "bucketed": {"counts": {}, "paths": []},
     "details": "no state reading was produced",
 }
