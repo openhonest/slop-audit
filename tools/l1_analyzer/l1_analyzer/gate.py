@@ -19,7 +19,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from l1_analyzer import indicators, report, thread_surface
+from l1_analyzer import indicators, report, state_census, thread_surface
 from l1_analyzer.indicators import detect_primary_language
 from l1_analyzer.scope import PRODUCTION
 
@@ -223,10 +223,13 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
     # Read from the state reading rather than from an empty mapping standing in for it. The
     # `or {}` made the absent case a bare dict, which answers `.get` for any key at all, so
     # the one branch where nothing was measured was the branch nothing could check.
+    # The census module's own record for the absent case too, rather than a bare dict. An
+    # empty mapping answers `.get` for any key at all, so the one branch where nothing was
+    # measured was the branch nothing could check.
     state_reading = results.get("L1.18b")
-    census = state_reading["census"] if state_reading else {}
+    census = state_reading["census"] if state_reading else state_census.uncounted(0)
     if report.census_unread(census):
-        declared = census.get("declared", 0)
+        declared = census["declared"] or 0
         one = declared == 1
         state = (f"no proven unbounded state, but the state classifier reached no verdict "
                  f"({'the' if one else 'all'} {declared} "

@@ -84,18 +84,25 @@ def _max_flow(graph: dict[CfgNode, list[Edge]], s: CfgNode, t: CfgNode) -> int:
             return total
         # bottleneck along the found path
         bottleneck = _INF
+        # Read once, then used. `parent[v] is not None` narrows nothing about the NEXT
+        # lookup of the same key, so both walks unpacked a value the checker had every
+        # reason to think could be the absence they had just tested for.
         v = t
-        while parent[v] is not None:
-            u, i = parent[v]
+        step = parent[v]
+        while step is not None:
+            u, i = step
             bottleneck = min(bottleneck, graph[u][i].capacity)
             v = u
+            step = parent[v]
         v = t
-        while parent[v] is not None:
-            u, i = parent[v]
+        step = parent[v]
+        while step is not None:
+            u, i = step
             graph[u][i].capacity -= bottleneck
             back = graph[u][i].back
             graph[v][back].capacity += bottleneck
             v = u
+            step = parent[v]
         total += bottleneck
 
 

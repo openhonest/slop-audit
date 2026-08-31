@@ -197,8 +197,11 @@ def _categorize_read(ref: Node, sp: LangSpec, closed_sets: dict[str, int | None]
     return state_partition.finite(2, True, "truthy")
 
 
-def _out_argument_local(call: Node, sp: LangSpec) -> Node | None:
+def _out_argument_local(call: Node | None, sp: LangSpec) -> Node | None:
     """The local an `out` argument of this call binds, or None.
+
+    Takes the absence, because the caller hands it a field lookup and a node with nothing
+    above it binds no argument. It already answers None for a call that has none.
 
     `_d.Remove(k, out var v)` hands the stored value back through `v`. `Remove` is a
     mutating method, so the reference read as a write and stopped, and the value leaving
@@ -211,7 +214,7 @@ def _out_argument_local(call: Node, sp: LangSpec) -> Node | None:
 
     C# alone of the nine spells this; the other eight declare an empty vocabulary."""
     kinds = sp["out_argument_types"]
-    if not kinds:
+    if not kinds or call is None:
         return None
     for node in _refs(call, lambda n: n.type in kinds):
         # The NAME, not the first named child. `out var v` parses as an implicit_type
@@ -270,7 +273,9 @@ def _follow_local(ref: Node, name: Node, sp: LangSpec, closed_sets: dict[str, in
     """
     if depth <= 0:
         return state_partition.silence_kind(ref, sp)
-    scope = ref
+    # `scope`, declared as what it becomes: the walk assigns the parent to it and a parent
+    # can be nothing, which the line below already tests for and the declaration denied.
+    scope: Node | None = ref
     while scope is not None and scope.type not in sp["func_types"]:
         scope = scope.parent
     if scope is None:

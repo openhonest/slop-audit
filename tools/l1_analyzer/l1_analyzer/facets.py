@@ -447,11 +447,16 @@ def _region_facets(fn: ast.FunctionDef,
 
 def _return_facet(fn: ast.FunctionDef, asserted: set[str]) -> list[Facet]:
     """A declared return type is a contract, and an unasserted result is no evidence."""
-    if _annotation(fn.returns) in ("", "None"):
+    # Read once and used, rather than tested through one call and rendered through another.
+    # `_annotation` answers the empty string for a function with no return type, so the
+    # guard above passed a function that HAS one to `unparse`, and nothing tied the two
+    # readings together.
+    declared = fn.returns
+    if declared is None or _annotation(declared) in ("", "None"):
         return []
     return [{
         "kind": "unasserted_return_contract", "function": fn.name, "line": fn.lineno,
-        "detail": f"declares `-> {ast.unparse(fn.returns)}` and no test asserts its result",
+        "detail": f"declares `-> {ast.unparse(declared)}` and no test asserts its result",
         "silent": fn.name not in asserted,
     }]
 

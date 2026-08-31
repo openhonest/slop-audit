@@ -395,7 +395,7 @@ def _thread_surface(lang: str, results: Panel) -> ThreadSurface | None:
 
 
 def _detail(status: str, basis: str, promiscuous: int, cover: int | None,
-            counts: dict[str, int], census: Row) -> str:
+            counts: dict[str, int], census: Census) -> str:
     # Three different things produce `na`, and telling the reader the wrong one wastes their
     # time: "there is no code here I can read" sends them to check the language, "I could not
     # follow most of your state" sends them to the sites, and "I read none of your state"

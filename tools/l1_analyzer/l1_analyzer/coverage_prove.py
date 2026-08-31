@@ -190,7 +190,23 @@ def _call_model(instruction: str, payload: str) -> Answer | None:
         LAST_REFUSAL["reason"] = llm.DECLINED
         return None
     LAST_REFUSAL["reason"] = llm.ANSWERED
-    return data
+    # Built field by field from what parsed, rather than handed back whole. The record says
+    # it holds "as much of it as arrived", and returning the parse made that a hope: a reply
+    # carrying a number where a body belongs went straight to a caller that renders it.
+    # Each field is taken only when it is the string this record says it is, so a partial
+    # answer is a partial record rather than a wrong one, which is what "not total" means.
+    answer: Answer = {}
+    if isinstance(data.get("function"), str):
+        answer["function"] = data["function"]
+    if isinstance(data.get("explanation"), str):
+        answer["explanation"] = data["explanation"]
+    if isinstance(data.get("test_source"), str):
+        answer["test_source"] = data["test_source"]
+    if isinstance(data.get("module"), str):
+        answer["module"] = data["module"]
+    if isinstance(data.get("body"), str):
+        answer["body"] = data["body"]
+    return answer
 
 
 def _signature(gap: CoverageGap) -> str:

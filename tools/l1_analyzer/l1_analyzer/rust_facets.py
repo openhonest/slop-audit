@@ -89,7 +89,9 @@ class RustFunction(TypedDict):
 
 def _is_test_scoped(src: bytes, node: Node) -> bool:
     """A function under #[cfg(test)] or annotated #[test] is test code, not a subject."""
-    cur = node
+    # Declared as what it becomes. The walk assigns the parent to it and a parent can be
+    # nothing, which the line below already tests for and the declaration denied.
+    cur: Node | None = node
     while cur is not None:
         prev = cur.prev_sibling
         while prev is not None and prev.type in ("attribute_item", "line_comment", "block_comment"):
