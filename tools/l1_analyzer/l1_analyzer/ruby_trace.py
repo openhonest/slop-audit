@@ -28,6 +28,7 @@ import os
 import re
 import shutil
 from pathlib import Path
+from typing import TypedDict
 
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
@@ -62,7 +63,25 @@ _COVERAGE_COMMAND = {
 # The environment a run is given, and the coverage result set it produces. Both were written
 # `dict`, the least precise mapping the language has, with a string key.
 Environment = dict[str, str]
-ResultSet = dict[str, object]
+class FileCoverage(TypedDict, total=False):
+    """One file's entry in a SimpleCov resultset.
+
+    `branches` is absent in the old line-only format, which is why it is not total: a file
+    stored that way contributes nothing rather than reading as a file with no branches."""
+
+    branches: dict[str, dict[str, int]]
+
+
+class Command(TypedDict, total=False):
+    """One recorded run in a SimpleCov resultset, keyed by the command that produced it."""
+
+    coverage: dict[str, FileCoverage]
+
+
+# Every recorded run in `.resultset.json`, by the command that produced it. It was
+# `dict[str, object]`, so the three levels of nesting the branch reader walks were three
+# unchecked reads on the file that decides the whole indicator.
+ResultSet = dict[str, Command]
 
 
 
