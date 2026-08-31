@@ -43,3 +43,4 @@ cardinality-distribution.json
 # so it named a path at the repository root that does not exist and the real file was
 # committed anyway. A leading `**/` matches at any depth, which is what was meant.
 **/l1_analyzer/_build.py
+.coverage

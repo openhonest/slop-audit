@@ -53,7 +53,14 @@ _RUST_MUTATING = frozenset({
 })
 _JAVA_KEYED_READ = frozenset({"get", "containsKey", "getOrDefault", "contains", "containsValue"})
 _CS_KEYED_READ = frozenset({"ContainsKey", "TryGetValue", "Contains", "ContainsValue", "GetValueOrDefault"})
-_RUST_KEYED_READ = frozenset({"get", "get_mut", "contains_key", "contains", "get_or_insert"})
+# `entry` is the Rust map idiom and was missing, so `m.entry(k).or_default().push(v)` -- the
+# ordinary way to write into a map -- read as a construct with no rule. It asks about ONE
+# cell, exactly as `get` does, and what the caller does with the entry afterwards does not
+# widen the key. A production run over a public crate on 2026-08-30 reported 290 of 392
+# state-keeping places unread, and this shape was most of them.
+_RUST_KEYED_READ = frozenset({
+    "get", "get_mut", "contains_key", "contains", "get_or_insert", "entry",
+})
 _RUBY_MUTATING = frozenset({
     "push", "store", "delete", "delete_if", "clear", "concat", "unshift", "append",
     "pop", "shift", "insert", "merge!", "update", "reject!", "map!", "fill", "<<",

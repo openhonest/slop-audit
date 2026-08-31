@@ -21,9 +21,9 @@ That is why the last test here points at the type checker rather than repeating 
 import pytest
 from l1_analyzer import (
     coverage_gates,
-    state_bounds,
     state_cells,
     state_partition,
+    state_reach,
     vacuity,
 )
 from l1_analyzer.lang_spec import LANG_SPEC
@@ -34,13 +34,13 @@ def test_a_membership_reader_handed_nothing_returns_nothing():
 
 
 def test_a_comparison_reader_handed_nothing_returns_false():
-    assert state_bounds._is_comparison(None, LANG_SPEC["python"]) is False
+    assert state_reach._is_comparison(None, LANG_SPEC["python"]) is False
 
 
 def test_a_flow_reader_handed_nothing_does_not_raise():
     """Whatever it answers, it must answer. A crash here loses the whole audit for a file
     that happened to hold a shape the parser left a hole in."""
-    state_bounds._flow(None, LANG_SPEC["python"], {}, None, 0)
+    state_reach._flow(None, LANG_SPEC["python"], {}, None, 0)
 
 
 def test_an_attribution_reader_handed_nothing_says_so():
