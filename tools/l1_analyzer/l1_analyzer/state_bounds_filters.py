@@ -73,10 +73,12 @@ from l1_analyzer.lang_spec import (
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import first_arg as _first_arg
 from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
+from l1_analyzer.ts_nodes import mutable_alias_value as _mutable_alias_value
 from l1_analyzer.ts_nodes import same as _same
 from l1_analyzer.ts_nodes import sub_collection as _sub_collection
 from l1_analyzer.ts_nodes import sub_key as _sub_key
 from l1_analyzer.ts_nodes import text as _text
+from l1_analyzer.ts_nodes import written_in_place as _written_in_place
 
 _PY = LANG_SPEC["python"]
 # Method names that mutate a container in place. The docstring used to CLAIM this was a
@@ -132,31 +134,39 @@ def _drives_no_decision(refs: list[Node], sp: LangSpec) -> bool:
 
 # --- Rule: write-once, receiver-aware --------------------------------------------
 
-def _attribute_targets(left: Node | None) -> list[Node]:
+def _attribute_targets(left: Node | None, sp: LangSpec) -> list[Node]:
     """Every `<recv>.attr` node an assignment target binds, unwrapping tuple and list
     patterns. A plain target yields itself; a pattern yields one node per element.
     """
     if left is None:
         return []
-    if left.type == "attribute":
+    if left.type in sp["member_types"]:
         return [left]
-    return [n for n in left.children if n.type == "attribute"]
+    targets = [n for n in left.children if n.type in sp["member_types"]]
+    # A LANGUAGE THAT NAMES ITS STATE WITHOUT A RECEIVER writes it as the target itself.
+    # Ruby hangs an instance_variable there and Java a bare identifier, and neither is a
+    # member access, so a walk looking only for `<recv>.attr` found no writes at all and
+    # every such attribute read as written zero times, which is not once.
+    return targets or [left]
 
 
-def _member_writes(cls: Node, attr: str) -> list[Node]:
+def _member_writes(cls: Node, attr: str, sp: LangSpec) -> list[Node]:
     """Every assignment target `<recv>.attr` inside the class, through ANY receiver. A
     builder writes the attribute through another instance (new._q = self._q.f()), so a
     self-only scan is blind to it; over-approximating writes is the safe direction."""
     writes: list[Node] = []
 
     def walk(n: Node) -> None:
-        if n.type == "assignment":
-            left = n.child_by_field_name("left")
+        if n.type in sp["assign_types"]:
+            left = _field(n, sp["assign_left"])
             # Every attribute IN the target, not the target itself. `self.a, self.b = m, m`
             # puts a pattern_list here, and reading only `left.type == "attribute"` counted
             # neither write, so an attribute written twice could still read as write-once.
-            writes.extend(t for t in _attribute_targets(left)
-                          if _text(t.child_by_field_name("attribute")) == attr)
+            # The attribute the target names, through a receiver or as its own whole text.
+            # Over-approximating writes is the safe direction: a local sharing the name
+            # counts as a write and the rule declines to clear.
+            writes.extend(t for t in _attribute_targets(left, sp)
+                          if attr in (_text(_field(t, sp["mem_attr"])), _text(t)))
         for c in n.children:
             walk(c)
 
@@ -164,7 +174,7 @@ def _member_writes(cls: Node, attr: str) -> list[Node]:
     return writes
 
 
-def _mutated_in_place(refs: list[Node], attr: str) -> bool:
+def _mutated_in_place(refs: list[Node], attr: str, sp: LangSpec) -> bool:
     """Any `self.attr.<method>(...)` with an in-place method, `self.attr[k] = v`, or
     `del self.attr[k]` - a mutation route beyond the single assignment."""
     for ref in refs:
@@ -172,61 +182,68 @@ def _mutated_in_place(refs: list[Node], attr: str) -> bool:
         if parent is None:
             continue
         # self.attr[...] as an assignment/del target
-        if parent.type == "subscript" and parent.child_by_field_name("value") == ref:
+        if parent.type in sp["subscript_types"] and _field(parent, sp["sub_value"]) == ref:
             gp = parent.parent
             if gp is not None and (
-                (gp.type == "assignment" and gp.child_by_field_name("left") == parent)
-                or (gp.type in ("delete_statement", "augmented_assignment"))
+                (gp.type in sp["assign_types"] and _field(gp, sp["assign_left"]) == parent)
+                or gp.type in sp["key_removal_types"]
             ):
                 return True
         # self.attr.method(...) with an in-place method
-        if parent.type == "attribute" and parent.child_by_field_name("object") == ref:
+        if parent.type in sp["member_types"] and _field(parent, sp["mem_object"]) == ref:
             gp = parent.parent
-            called = gp is not None and gp.type == "call" and gp.child_by_field_name("function") == parent
-            if called and _text(parent.child_by_field_name("attribute")) in _IN_PLACE:
+            called = gp is not None and gp.type in sp["call_types"] \
+                and _field(gp, sp["call_fn"]) == parent
+            if called and _text(_field(parent, sp["mem_attr"])) in sp["mutates_in_place"]:
                 return True
-        # augmented assignment straight to self.attr
-        if parent.type == "augmented_assignment" and parent.child_by_field_name("left") == ref:
+        # The flat-call spelling of the same mutation. Java and Ruby hang the receiver, the
+        # method and the arguments off ONE node, so the branch above walks a member access
+        # those two never build.
+        if sp["flat_call"] and parent.type in sp["call_types"] \
+                and _field(parent, sp["call_recv"]) == ref:
+            name = _field(parent, sp["call_name"])
+            if name is not None and _text(name) in sp["mutates_in_place"]:
+                return True
+        # WRITTEN WHERE IT STANDS: `n++`, `@xs << x`. One runtime step spelled several ways
+        # and not one of them an assignment node, so nothing above reaches any of them. Ruby
+        # spells the shovel as an ordinary binary operator, which is why the reader checks
+        # the OPERATOR the language declared and not the node type.
+        if _written_in_place(parent, sp) == ref:
+            return True
+        # An assignment straight to self.attr that WRITES IN PLACE: `self.n += 1`. Every
+        # grammar here spells the compound form as a node carrying its operator and the
+        # plain form as one carrying none, so the presence of the operator is the test.
+        #
+        # Written as "an operator is there", not as "the operator is not `=`". An absent
+        # operator read as a mutation, which is what a plain assignment has, so every
+        # write-once attribute in the language came back mutated and the rule cleared
+        # nothing at all.
+        if parent.type in sp["assign_types"] and _field(parent, sp["assign_left"]) == ref \
+                and _field(parent, "operator") is not None:
             return True
     return False
 
 
-def _returned_whole(refs: list[Node]) -> bool:
+def _returned_whole(refs: list[Node], sp: LangSpec) -> bool:
     """`return self.attr` hands the object itself out; a caller can then mutate it.
     Returning a slice or a copy (`return self.attr[:]`, `list(self.attr)`) is fine."""
-    return any(r.parent is not None and r.parent.type == "return_statement" for r in refs)
+    return any(r.parent is not None and r.parent.type in sp["return_types"] for r in refs)
 
 
-# Builtins that read or copy their argument without retaining or mutating it. Passing the
-# bare attribute to one of these is safe; passing it anywhere else could let an unknown
-# callee mutate it, so the finding stays.
-_SAFE_ARG_BUILTINS = frozenset({
-    "list", "tuple", "set", "frozenset", "dict", "sorted", "reversed", "len", "iter",
-    "any", "all", "sum", "min", "max", "next", "bool", "str", "repr",
-})
-
-
-# Nodes Python inserts between a reference and the argument list holding it. Reading only
-# `argument_list` meant `f(*self.a)`, `f(**self.a)` and `f(rows=self.a)` each handed the bare
-# container to an unmodelled callee without the walk seeing it leave. Written out as a table
-# so a fourth spelling is a missing row here rather than a silent escape.
-_ARGUMENT_WRAPPERS = frozenset({"list_splat", "dictionary_splat", "keyword_argument"})
-
-
-def _argument_list_above(parent: Node) -> Node | None:
+def _argument_list_above(parent: Node, sp: LangSpec) -> Node | None:
     """The argument list this reference is an argument of, through any wrapper, or None.
 
     Returns the node rather than a bool so the caller can still reach the callee, and None
     rather than raising because a reference that is not an argument is the ordinary case.
     """
-    if parent.type == "argument_list":
+    if parent.type in sp["arglist_types"]:
         return parent
-    if parent.type in _ARGUMENT_WRAPPERS and parent.parent is not None:
-        return parent.parent if parent.parent.type == "argument_list" else None
+    if parent.type in sp["argument_wrapper_types"] and parent.parent is not None:
+        return parent.parent if parent.parent.type in sp["arglist_types"] else None
     return None
 
 
-def _escapes(refs: list[Node]) -> bool:
+def _escapes(refs: list[Node], sp: LangSpec) -> bool:
     """The attribute is invoked as a callable (dynamic dispatch) or passed as a bare
     argument to a callee that is not a known read-only builtin. Either lets an unbounded or
     unknown context act on it, so the value does not provably stay bounded."""
@@ -234,21 +251,49 @@ def _escapes(refs: list[Node]) -> bool:
         parent = ref.parent
         if parent is None:
             continue
-        if parent.type == "call" and parent.child_by_field_name("function") == ref:
+        if parent.type in sp["call_types"] and _field(parent, sp["call_fn"]) == ref:
             return True                               # self.attr(...) : dynamic dispatch
-        arglist = _argument_list_above(parent)
+        # The flat-call spelling of the same dispatch, and it is NOT every call on the
+        # value. Java and Ruby hang the receiver, the method and the arguments off one node,
+        # so `@rows.size` and a stored callable being invoked look alike there; what tells
+        # them apart is the method NAME, which the language declares. Ruby invokes a stored
+        # callable as `.call`, and reading any receiver position as dispatch made every
+        # ordinary method call on a field an escape.
+        if sp["flat_call"] and parent.type in sp["call_types"] \
+                and _field(parent, sp["call_recv"]) == ref:
+            name = _field(parent, sp["call_name"])
+            if name is not None and _text(name) in sp["dispatch_methods"]:
+                return True
+        # HANDED OUT AS A MUTABLE ALIAS. `let r = &mut self.v; r.push(1)` writes the field
+        # through a local whose name has no relation to it, so from that line on there is a
+        # write this rule's own references do not contain. The reader for it already exists
+        # and this rule never asked it: its docstring says no rule arguing from a state's
+        # own references is sound past that point, and write-once is exactly such a rule.
+        #
+        # A SHARED borrow is not this. `&self.v` is a transparent wrapper and cannot be
+        # written through; only the mutability marker separates the two, which is why the
+        # reader checks the marker and not the node type.
+        if _mutable_alias_value(parent, sp) == ref:
+            return True
+        arglist = _argument_list_above(parent, sp)
         if arglist is not None:
             call = arglist.parent
-            callee = call.child_by_field_name("function") if call is not None else None
-            if _text(callee) not in _SAFE_ARG_BUILTINS:
+            callee = _field(call, sp["call_fn"]) if call is not None else None
+            if _text(callee) not in sp["safe_arg_calls"]:
                 return True                           # passed to an unknown callee
     return False
 
 
-def _is_write_once(cls: Node, attr: str, refs: list[Node]) -> bool:
-    if len(_member_writes(cls, attr)) != 1:
+def _is_write_once(cls: Node, attr: str, refs: list[Node], sp: LangSpec) -> bool:
+    """Assigned exactly once and never reachable for mutation afterwards.
+
+    Read from the vocabulary since 2026-08-31. It named Python's node types and field names
+    directly, so it ran for Python and nobody else, and every shape it clears is a shape
+    where Python could disagree with the other eight."""
+    if len(_member_writes(cls, attr, sp)) != 1:
         return False
-    return not _mutated_in_place(refs, attr) and not _returned_whole(refs) and not _escapes(refs)
+    return (not _mutated_in_place(refs, attr, sp) and not _returned_whole(refs, sp)
+            and not _escapes(refs, sp))
 
 
 def _has_presence_gate(refs: list[Node], sp: LangSpec) -> bool:
@@ -268,7 +313,7 @@ def _value_reaches_condition(refs: list[Node], sp: LangSpec) -> bool:
 
 # --- Rule: presence-gated, result-invariant memoization cache --------------------
 
-def _writes_are_plain_stores(cls: Node, attr: str, refs: list[Node]) -> bool:
+def _writes_are_plain_stores(cls: Node, attr: str, refs: list[Node], sp: LangSpec) -> bool:
     """Writes are only `d[k] = v`, `del d[k]`, empty-dict rebind, or cache methods. An
     augmented assignment through the attribute (self.attr[k] += 1) fails - that inspects and
     rewrites the value, which is what a counter does."""
@@ -287,7 +332,7 @@ def _writes_are_plain_stores(cls: Node, attr: str, refs: list[Node]) -> bool:
             if called and method in _IN_PLACE and method not in _CACHE_READS:
                 return False
     # a whole-attribute rebind must be to an empty dict literal
-    for w in _member_writes(cls, attr):
+    for w in _member_writes(cls, attr, sp):
         assign = w.parent
         rhs = assign.child_by_field_name("right") if assign is not None else None
         if rhs is not None and not (rhs.type == "dictionary" and not rhs.named_children):
@@ -333,7 +378,7 @@ def _result_invariant(attr: str, refs: list[Node], sp: LangSpec) -> bool | None:
 
 
 def _is_memoization(cls: Node, attr: str, refs: list[Node], sp: LangSpec) -> bool:
-    return _has_presence_gate(refs, sp) and _writes_are_plain_stores(cls, attr, refs)
+    return _has_presence_gate(refs, sp) and _writes_are_plain_stores(cls, attr, refs, sp)
 
 
 # --- Guard: an open key selects among the stored values --------------------------
@@ -795,22 +840,49 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
     # needed three repairs. It read Python's node types directly, it read only the subscript
     # spelling of a keyed read where six of the nine ask `d.get(k)`, and it counted a
     # conditional assignment as a store when `||=` reads the key to decide whether to write.
-    if _is_python(sp):
-        cls = _enclosing_class(refs[0], sp)
-        if cls is None:
-            return False
-        # Memoization is settled BEFORE the open-key guard, and it is the one shape allowed
-        # past it. A presence-gated, result-invariant cache answers the same for a key
-        # whether or not that key is stored, so the partition its keyed read cuts belongs to
-        # the function being memoised and not to the cache: delete the cache and every
-        # observable answer is unchanged. No other rule can make that argument, which is why
-        # no other rule is exempt.
-        if verdict == "promiscuous" and _is_memoization(cls, attr, refs, sp):
-            return True
-        if _selects_on_an_open_key(refs, sp):
-            return False
-        if _is_write_once(cls, attr, refs):
-            return True                               # immutable, read only in bounded ways
+    # The enclosing class, or None where the language has none. Go declares no class types
+    # at all and Rust's scope is an impl block, so returning early on a missing one refused
+    # every rule below for those two: their per-key tallies stopped clearing the day this
+    # was hoisted out of the Python-only branch. The two rules that need a class check it
+    # for themselves, and the ones that argue from references alone do not care.
+    cls = _enclosing_class(refs[0], sp)
+    # THE OPEN-KEY GUARD, for every rule below except the write-only accumulator. A
+    # reference that selects on a key nobody bounded makes the answer depend on that key,
+    # and no rule below can argue past it. Memoization alone is settled ABOVE it, for the
+    # reason given there.
+    #
+    # The accumulator at the foot is exempt by construction: it clears a shape where every
+    # reference is a write, and a write at an open key does not make the answer depend on
+    # the key. Putting the guard in front of that one turned five languages promiscuous on a
+    # per-key tally the vectors declare neutral.
+    # Memoization is settled BEFORE the open-key guard, and it is the one shape allowed past
+    # it. A presence-gated, result-invariant cache answers the same for a key whether or not
+    # that key is stored, so the partition its keyed read cuts belongs to the function being
+    # memoised and not to the cache: delete the cache and every observable answer is
+    # unchanged. No other rule can make that argument, which is why no other rule is exempt.
+    #
+    # The one rule still Python-only. It is a separate claim about nine grammars, and
+    # widening one rule at a time is what lets the suite say which claim broke.
+    if (_is_python(sp) and cls is not None and verdict == "promiscuous"
+            and _is_memoization(cls, attr, refs, sp)):
+        return True
+    # WRITE-ONCE, ALL NINE since 2026-08-31. Assigned exactly once, never mutated after,
+    # never handed out whole, never passed to a callee nobody modelled. That claim is about
+    # programs rather than about Python, and every node type it needed was already in the
+    # vocabulary; it named Python's directly, which is the only reason it ran for one
+    # language. It clears an UNRESOLVED as well as a promiscuous, which is why it sits above
+    # the verdict gate: a value that provably never escapes was never unresolved.
+    cls = _enclosing_class(refs[0], sp)
+    # THE WRITE-ONLY ACCUMULATOR, settled before the guard because it is exempt from it.
+    # It clears a shape where every reference is a WRITE, and a write at an open key does
+    # not make the answer depend on that key. Behind the guard it stopped clearing a per-key
+    # tally in five languages, which the vectors declare neutral for exactly this reason.
+    if verdict == "promiscuous" and _is_write_only_accumulator(attr, refs, sp):
+        return True
+    if _selects_on_an_open_key(refs, sp):
+        return False
+    if cls is not None and _is_write_once(cls, attr, refs, sp):
+        return True
     if verdict != "promiscuous":
         return False
     # CARRIED VALUE, ALL NINE. No reference sits in a test expression, so the attribute
@@ -829,6 +901,4 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
     # in front of both turned five languages promiscuous on `presence-test-branches-converge`,
     # a per-key tally whose key is open throughout and which the vectors declare neutral for
     # exactly that reason.
-    if _drives_no_decision(refs, sp) and not _selects_on_an_open_key(refs, sp):
-        return True
-    return _is_write_only_accumulator(attr, refs, sp)
+    return _drives_no_decision(refs, sp)

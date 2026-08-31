@@ -20,7 +20,7 @@ import pathlib
 import tempfile
 
 import pytest
-from l1_analyzer import state_bounds, state_bounds_filters
+from l1_analyzer import state_bounds
 
 _SHAPES = {
     "keyword": "        return sink(rows=self._a)\n",
@@ -49,6 +49,20 @@ def test_a_value_handed_to_an_unknown_callee_through_a_wrapper_is_not_cleared(sh
 
 def test_the_wrapper_vocabulary_still_names_all_three():
     """The direct assertion. Removing an entry here reopens the hole c562cda closed, and
-    for `keyword_argument` that is now a live path rather than a future one."""
-    assert state_bounds_filters._ARGUMENT_WRAPPERS == {
+    for `keyword_argument` that is now a live path rather than a future one.
+
+    Read from the language's own table since 2026-08-31, when the rule this guards was
+    ported off Python's node types so it serves all nine. The table moved and the three
+    entries did not."""
+    from l1_analyzer.lang_spec import LANG_SPEC
+
+    assert LANG_SPEC["python"]["argument_wrapper_types"] == {
         "list_splat", "dictionary_splat", "keyword_argument"}
+
+
+def test_a_language_that_wraps_nothing_declares_so():
+    """Eight of the nine name no wrapper, and that is an answer rather than a blank: a
+    reference in an argument list is in the argument list, with nothing between."""
+    from l1_analyzer.lang_spec import LANG_SPEC
+
+    assert LANG_SPEC["go"]["argument_wrapper_types"] == frozenset()

@@ -313,6 +313,12 @@ class LangSpec(TypedDict, total=False):
     record_enum: str
     key_prefix: str
     mutating: frozenset[str]
+    # Every method that mutates a container IN PLACE, which is a superset of `mutating`:
+    # that one is what the classifier treats as a write, and this one is every name that
+    # makes a value no longer provably unchanged. Python's `reverse` and its three set
+    # updates are here and not there, because the classifier has no use for them and the
+    # write-once rule does. Same set as `mutating` wherever a language draws no distinction.
+    mutates_in_place: frozenset[str]
     keyed_read: frozenset[str]
     dispatch_methods: frozenset[str]
     literal_types: frozenset[str]
@@ -395,6 +401,15 @@ class LangSpec(TypedDict, total=False):
     # operator it has. A language that writes nothing in place declares the empty table, and
     # the reader then never asks for an operator.
     read_write_assign_ops: tuple[str, ...]
+    # Nodes a grammar inserts between a reference and the argument list holding it. Python's
+    # `f(*a)`, `f(**a)` and `f(rows=a)` each hand the bare value to a callee, and a walk
+    # reading only the argument list saw none of them leave. Written out per language so a
+    # spelling nobody listed is a missing row rather than a silent escape.
+    argument_wrapper_types: frozenset[str]
+    # Calls that READ or COPY an argument without retaining or mutating it. Handing a
+    # collection to one of these is safe; handing it anywhere else lets an unknown callee
+    # act on it, so the finding stands.
+    safe_arg_calls: frozenset[str]
     write_in_place_ops: dict[str, tuple[str, ...]]
     # Unary operators the language does NOT let a value pass through untouched. Go's `<-ch`
     # is a `unary_expression` like `-x` and `!b`, and unary_expression is declared a
@@ -675,7 +690,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         # walk then met an assignment it had no row for. `setdefault` and `pop` are keyed
         # too but they mutate, and _PY_MUTATING already claims them; a name in both sets
         # would be read by whichever branch ran first, so `get` is the only addition.
-        "mutating": _PY_MUTATING, "keyed_read": frozenset({"get"}),
+        "mutating": _PY_MUTATING,
+        "mutates_in_place": _PY_IN_PLACE, "keyed_read": frozenset({"get"}),
         "literal_types": _PY_LITERALS,
         "unary_types": ("unary_operator",),
         "value_wrapper_types": ('unary_operator', 'parenthesized_expression'),
@@ -691,6 +707,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_body_types": ("block", "elif_clause", "else_clause"),
         "delete_stmt_types": ("delete_statement",),
         "read_write_assign_ops": (),  # the language has no conditional-assignment operator
+        "argument_wrapper_types": frozenset({"list_splat", "dictionary_splat",
+                                            "keyword_argument"}),
+        "safe_arg_calls": frozenset({
+            "list", "tuple", "set", "frozenset", "dict", "sorted", "reversed", "len",
+            "iter", "any", "all", "sum", "min", "max", "next", "bool", "str", "repr",
+        }),
         "write_in_place_ops": {},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -829,7 +851,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "field_decl_types": ("field_definition",),
         "record_enum": "none",
         "key_prefix": "this.",
-        "mutating": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
+        "mutating": _JS_MUTATING,
+        "mutates_in_place": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
         "unary_types": ("unary_expression",),
         "value_wrapper_types": ('unary_expression', 'parenthesized_expression'),
@@ -845,6 +868,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_body_types": ("statement_block", "else_clause"),
         "delete_stmt_types": (),
         "read_write_assign_ops": ("||=", "&&=", "??="),
+        "argument_wrapper_types": frozenset(),
+        "safe_arg_calls": frozenset(),
         "write_in_place_ops": {"update_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -969,7 +994,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "record_enum": "none",
         "key_prefix": "",
         "module_enum": "none",
-        "mutating": _JAVA_MUTATING, "keyed_read": _JAVA_KEYED_READ,
+        "mutating": _JAVA_MUTATING,
+        "mutates_in_place": _JAVA_MUTATING, "keyed_read": _JAVA_KEYED_READ,
         "literal_types": _JAVA_LITERALS,
         "unary_types": ("unary_expression",),
         "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'cast_expression'),
@@ -988,6 +1014,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_body_types": ("block", "constructor_body"),
         "delete_stmt_types": (),                  # `map.remove(k)` yields the removed value
         "read_write_assign_ops": (),  # the language has no conditional-assignment operator
+        "argument_wrapper_types": frozenset(),
+        "safe_arg_calls": frozenset(),
         "write_in_place_ops": {"update_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -1123,7 +1151,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "record_enum": "none",
         "key_prefix": "",
         "module_enum": "none",
-        "mutating": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
+        "mutating": _CS_MUTATING,
+        "mutates_in_place": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
         "literal_types": _CS_LITERALS,
         "unary_types": ("prefix_unary_expression",),
         "value_wrapper_types": ('prefix_unary_expression', 'parenthesized_expression', 'cast_expression'),
@@ -1140,6 +1169,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_body_types": ("block",),
         "delete_stmt_types": (),                  # `dict.Remove(k)` answers with a bool
         "read_write_assign_ops": ("??=",),
+        "argument_wrapper_types": frozenset(),
+        "safe_arg_calls": frozenset(),
         "write_in_place_ops": {"postfix_unary_expression": ("++", "--"), "prefix_unary_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -1273,7 +1304,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",
-        "mutating": _RUST_MUTATING, "keyed_read": _RUST_KEYED_READ,
+        "mutating": _RUST_MUTATING,
+        "mutates_in_place": _RUST_MUTATING, "keyed_read": _RUST_KEYED_READ,
         "literal_types": _RUST_LITERALS,
         "unary_types": ("unary_expression",),
         "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'reference_expression', 'type_cast_expression'),
@@ -1297,6 +1329,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_body_types": ("block", "else_clause"),
         "delete_stmt_types": (),                  # `map.remove(&k)` yields an Option
         "read_write_assign_ops": (),  # the language has no conditional-assignment operator
+        # `&x` and `&mut x` sit between a value and the argument list holding it, so a
+        # walk reading only the list saw `dispatch(&self.config, r)` hand the field to a
+        # callee nobody modelled without seeing it leave.
+        "argument_wrapper_types": frozenset({"reference_expression"}),
+        "safe_arg_calls": frozenset(),
         "write_in_place_ops": {},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -1429,7 +1466,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "record_enum": "none",
         "key_prefix": "",
         "module_enum": "none",
-        "mutating": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
+        "mutating": _RUBY_MUTATING,
+        "mutates_in_place": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
         "literal_types": _RUBY_LITERALS,
         "unary_types": ("unary",),
         "value_wrapper_types": ('unary', 'parenthesized_statements'),
@@ -1455,6 +1493,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_body_types": ("then", "else", "body_statement"),
         "delete_stmt_types": (),                  # `h.delete(k)` yields the removed value
         "read_write_assign_ops": ("||=", "&&="),
+        "argument_wrapper_types": frozenset(),
+        "safe_arg_calls": frozenset(),
         "write_in_place_ops": {"binary": ("<<",)},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -1579,7 +1619,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "field_decl_types": (),
         "record_enum": "c_struct_field",
         "key_prefix": "",
-        "mutating": frozenset(), "keyed_read": frozenset(),
+        "mutating": frozenset(),
+        "mutates_in_place": frozenset(), "keyed_read": frozenset(),
         "literal_types": _C_LITERALS,
         "unary_types": ("unary_expression",),
         "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'cast_expression'),
@@ -1599,6 +1640,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_body_types": ("compound_statement",),
         "delete_stmt_types": (),
         "read_write_assign_ops": (),  # the language has no conditional-assignment operator
+        "argument_wrapper_types": frozenset(),
+        "safe_arg_calls": frozenset(),
         "write_in_place_ops": {"update_expression": ("++", "--")},
         "opaque_unary_ops": frozenset(),
         "bare_cond_types": {},
@@ -1744,7 +1787,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "field_decl_types": (),
         "record_enum": "none",
         "key_prefix": "",
-        "mutating": frozenset(), "keyed_read": frozenset(),
+        "mutating": frozenset(),
+        "mutates_in_place": frozenset(), "keyed_read": frozenset(),
         "extra_bounded": frozenset({"append", "len", "cap", "copy", "make", "new"}),
         "literal_types": _GO_LITERALS,
         "unary_types": ("unary_expression",),
@@ -1766,6 +1810,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "gate_body_types": ("block", "statement_list"),
         "delete_stmt_types": (),                  # `delete(d, k)` is a builtin call
         "read_write_assign_ops": (),  # the language has no conditional-assignment operator
+        "argument_wrapper_types": frozenset(),
+        "safe_arg_calls": frozenset(),
         "write_in_place_ops": {"inc_statement": ("++",), "dec_statement": ("--",)},
         "opaque_unary_ops": frozenset({"<-"}),
         "bare_cond_types": {"for_statement": ("block", "for_clause", "range_clause")},
