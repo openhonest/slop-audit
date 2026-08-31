@@ -22,7 +22,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-# What the checker reports today. Lower it as errors are fixed.
+# What the checker reports today. Zero since 2026-08-30, which makes this a bright line
+# rather than a ratchet: a new error fails the commit and there is no slack to spend.
+#
+# It is still written as a number rather than assumed, because the downward arm below is
+# what got it here. A baseline looser than reality lets the next error in for free, and this
+# script refused every intermediate number that was one too high on the way down from 283.
 #
 # It went 283 to 284 on a round that fixed five real defects, and that is not a regression.
 # Writing down a shape lets the checker see disagreements it could not see before: a mapping
@@ -33,7 +38,7 @@ from pathlib import Path
 # The same thing happened to the type-escape count the day it learned to see a bare generic:
 # 0 became 157 without a line of behaviour changing. A number that rises when a measurement
 # gets sharper is the measurement working.
-CEILING = 3
+CEILING = 0
 
 _COUNT = re.compile(r"Found (\d+) error")
 

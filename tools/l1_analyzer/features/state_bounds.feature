@@ -142,6 +142,12 @@ Feature: state_bounds — the finite-testability classifier that grades every pi
     And a neutral verdict earned by the compositional rule for an invoked slot is demoted to unresolved when that rule's premises fail
     But the attribute-level false-positive filter runs last, for Python only, and can clear a non-neutral verdict back to neutral and observe-only
 
+  Scenario: _named builds a test for identifiers spelling one name
+    Given the name of one piece of module-level state
+    When _named binds it into a test the tree walk can run over every node
+    Then an identifier spelling that name answers yes and everything else answers no
+    But the name is a parameter with a name and a type, not a default value standing in for a capture: the loop rebinds it each turn, and a test reading it from around itself would judge every state against the last
+
   Scenario: _analyze_file classifies every piece of state in one file and records what was looked at
     Given a parsed file, its path, the language spec, the language config and the immutable constructors
     When _analyze_file runs the module, receiver-grouped, class and record enumerators in turn

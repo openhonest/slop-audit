@@ -20,8 +20,8 @@ about the model.
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
-from typing import TypedDict
+from collections.abc import Callable, Iterable
+from typing import Protocol, TypedDict
 
 MODEL = "claude-sonnet-5"
 
@@ -70,10 +70,46 @@ class ModelReply(TypedDict):
 # for a module-level import was the third appearance. Eight tests had to overwrite that
 # name to exercise a missing SDK, a raised request or a thinking-block reply, which is a
 # test asserting against its own fixture.
-SdkMaker = Callable[[], Callable[..., object] | None]
+class Block(Protocol):
+    """One content block, as this module needs it: something that may carry text.
+
+    A thinking-capable model puts a block with no text first, so `text` is read through
+    getattr and this says only that a block may or may not have one."""
 
 
-def anthropic_sdk() -> Callable[..., object] | None:
+class Messages(Protocol):
+    """The one call this module makes on a client."""
+
+    def create(self, **arguments: object) -> Reply: ...
+
+
+class Reply(Protocol):
+    """The one field this module reads off a reply."""
+
+    content: list[Block]
+
+
+class Client(Protocol):
+    """The one attribute this module reaches for on a constructed client."""
+
+    messages: Messages
+
+
+class Constructor(Protocol):
+    """What a maker hands back: something that builds a client from a key.
+
+    Written out because the SDK is an optional third-party import and carries no types this
+    module can see. Saying what is REQUIRED of it is the whole of what can be checked here,
+    and it is more than `object`, which is what stood in for it: three attribute reads and
+    one call, none of them described."""
+
+    def __call__(self, *, api_key: str) -> Client: ...
+
+
+SdkMaker = Callable[[], Constructor | None]
+
+
+def anthropic_sdk() -> Constructor | None:
     """The Anthropic constructor, or nothing when the optional extra is not installed.
 
     The production maker, named at each of the two callers that mean to spend money, the
@@ -110,7 +146,7 @@ def unavailable_reason(sdk: SdkMaker) -> str:
 
 
 
-def _first_text(blocks: object) -> str | None:
+def _first_text(blocks: Iterable[Block] | None) -> str | None:
     """The first content block that carries text, or nothing.
 
     `content[0].text` assumed the first block IS text. It is not: a thinking-capable model
