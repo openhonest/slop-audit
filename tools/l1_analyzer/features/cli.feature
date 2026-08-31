@@ -15,6 +15,13 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     Then the map is printed in the Honest Framework's own grammar
     But a run that could not be watched says so first, because the violation this map shows is a write in the pure lane and reading the source alone can only guess at one
 
+  Scenario: runtime_sections appends what the two watching stages saw
+    Given the panel a run produced, which carries a race result or a proof result only when that stage was asked for
+    When runtime_sections renders whichever of the two ran
+    Then a checker that ran and found no race still says so, because that must not read the same as a checker that never ran
+    And a proposal thrown away for passing against the code as written is listed beside the ones that were kept, or the hit rate reports as perfect
+    But a run with neither stage gives back nothing at all, so the caller writes it without asking whether it is empty
+
   Scenario: _report_honest_code measures the files it was given against the nineteen clauses
     Given one or more files and the shape the caller asked for
     When _report_honest_code assesses each of them

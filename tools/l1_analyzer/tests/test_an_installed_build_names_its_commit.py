@@ -82,3 +82,49 @@ def test_the_build_hook_is_scoped_as_tooling_rather_than_production():
     from l1_analyzer import scope
 
     assert "hatch_build.py" in scope._TOOLING_FILES
+
+
+def test_a_stamp_file_that_names_no_commit_answers_rather_than_falling_through(tmp_path):
+    """Nothing, but a different nothing from a build with no stamp at all.
+
+    A build with no stamp has to fall through and ask git. A build that was stamped and
+    recorded no commit has already answered, and asking git in an installed package would
+    read whatever repository the caller happens to be standing in and name that commit as
+    the one this wheel came from."""
+    (tmp_path / "_build.py").write_text("COMMIT = ''\nDIRTY = False\n")
+    assert cli._stamp_written_at_build(str(tmp_path)) == ""
+
+
+def test_a_stamp_file_holding_the_wrong_kind_of_value_is_read_as_no_commit(tmp_path):
+    """The file is executed, so anything at all can be bound to that name. A number there
+    would be formatted into the version string and shipped as a commit that never was."""
+    (tmp_path / "_build.py").write_text("COMMIT = 1234\nDIRTY = False\n")
+    assert cli._stamp_written_at_build(str(tmp_path)) == ""
+
+
+def test_a_build_with_no_stamp_file_at_all_says_it_has_none(tmp_path):
+    """None rather than the empty string, which is the distinction the caller acts on: it
+    falls through to git for None, and stops for the empty string."""
+    assert cli._stamp_written_at_build(str(tmp_path)) is None
+
+
+def test_a_checkout_with_no_commit_yet_falls_through_to_the_stamp(tmp_path):
+    """A repository exists here and has nothing in it, which is a real state: `git init` and
+    then a build, before anything is committed. Git refuses to name a commit, so the stamp
+    written at build time answers instead.
+
+    This is what the emptiness test in `build_stamp` was guarding against, and it was
+    guarding wrong. Git exits 128 here rather than succeeding with no output, so the refusal
+    is caught and the emptiness test could never fire. It was deleted on 2026-08-31."""
+    import subprocess
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / "_build.py").write_text('COMMIT = "abcd1234"\nDIRTY = False\n')
+    assert cli.build_stamp(str(tmp_path)) == "+gabcd1234"
+
+
+def test_a_checkout_with_no_commit_and_no_stamp_names_nothing(tmp_path):
+    import subprocess
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    assert cli.build_stamp(str(tmp_path)) == ""

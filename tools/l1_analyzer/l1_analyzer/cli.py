@@ -409,7 +409,12 @@ def build_stamp(directory: str) -> str:
     a working tree the file is already stale: a developer running the suite after one commit
     was told the commit before it. The file is what an installed package has, which is how
     the tool is actually used and the case that let an adopter quote three builds all
-    calling themselves 1.0.0."""
+    calling themselves 1.0.0.
+
+    One failure path, not two. This tested the answer for emptiness as well as catching the
+    refusal, and that second test could never fire: `git rev-parse` in a checkout with no
+    commit yet exits 128 and is caught above, and on success it always prints a hash. The
+    branch was a guard against the command lying, which is not a thing the command does."""
     import subprocess
 
     try:
@@ -419,9 +424,44 @@ def build_stamp(directory: str) -> str:
                                  capture_output=True, text=True, timeout=10, check=True).stdout.strip()
     except (subprocess.SubprocessError, OSError):
         return _stamp_written_at_build(directory) or ""
-    if not commit:
-        return _stamp_written_at_build(directory) or ""
     return f"+g{commit}" + (".dirty" if changed else "")
+
+
+def runtime_sections(results: Panel) -> str:
+    """The race and proof sections, appended under the card, or nothing when neither ran.
+
+    Lifted out of `main` on 2026-08-31. It was eleven lines of printing inside the argument
+    reader, and nothing could ask what a confirmed race renders as without running an audit
+    with a thread checker installed. Four of the reader's unexercised branches were these
+    lines, which is the reader being unreadable rather than untested.
+
+    Empty rather than a heading with nothing under it. These two sections come from running
+    the code, and the static card is complete without them, so a heading over no findings
+    would read as a checker that ran and found nothing.
+
+    Ready to write as it comes back: empty, or a block ending in a newline. The caller
+    writes it without asking whether it is empty, because a test of emptiness at the caller
+    is a branch in the argument reader that exists only to avoid printing a blank line.
+
+    A race the flagged surface already named is marked. The static reader guesses from the
+    source and the runtime one watched it happen, so where they agree the reader has a
+    second witness, and where the runtime one alone found it the static reader has a gap."""
+    out: list[str] = []
+    race = results.get("race")
+    if race is not None:
+        out.append(f"\n## Thread-safety race (runtime/{race['tool']}) — "
+                   f"{race['verdict']}\n\n{race['details']}")
+        for f in race["findings"]:
+            mark = (" [confirms flagged surface]"
+                    if f in race.get("confirmed_surface", []) else "")
+            out.append(f"- race at `{f['file']}:{f['line']}` in {f['symbol']}{mark}")
+    proofs = results.get("proofs")
+    if isinstance(proofs, dict):
+        out.append(f"\n## Prove (locate → generate → run → retain) — {proofs['verdict']} "
+                   f"({proofs.get('demonstrated', 0)}/{proofs.get('attempted', 0)} demonstrated)")
+        for o in proofs.get("outcomes", []):
+            out.append(f"- `{o['file']}:{o['line']}` {o['symbol']}: {o['verdict']} — {o['detail']}")
+    return "\n".join(out) + "\n" if out else ""
 
 
 def run() -> int:
@@ -963,23 +1003,10 @@ def main(argv: list[str] | None) -> int:
         print(json.dumps(envelope, indent=2))
     else:
         print(card.card_markdown(model))
-        # Runtime results (race / prove) are not part of the static report; append them.
-        # `printed`, not `race`: the name is bound to a run above and to what the panel
-        # carries here, and the two are not the same thing.
-        printed = results.get("race")
-        if printed is not None:
-            print(f"\n## Thread-safety race (runtime/{printed['tool']}) — "
-                  f"{printed['verdict']}\n\n{printed['details']}")
-            for f in printed["findings"]:
-                mark = (" [confirms flagged surface]"
-                        if f in printed.get("confirmed_surface", []) else "")
-                print(f"- race at `{f['file']}:{f['line']}` in {f['symbol']}{mark}")
-        proofs = results.get("proofs")
-        if isinstance(proofs, dict):
-            print(f"\n## Prove (locate → generate → run → retain) — {proofs['verdict']} "
-                  f"({proofs.get('demonstrated', 0)}/{proofs.get('attempted', 0)} demonstrated)")
-            for o in proofs.get("outcomes", []):
-                print(f"- `{o['file']}:{o['line']}` {o['symbol']}: {o['verdict']} — {o['detail']}")
+        # Written rather than printed, and no test of emptiness: the sections come back
+        # ready to write, so an empty string writes nothing. Asking `if appended` here put
+        # a branch in the argument reader whose only job was to avoid a blank line.
+        sys.stdout.write(runtime_sections(results))
 
     return 0
 
