@@ -24,6 +24,7 @@ from l1_analyzer import (
     prove,
     thread_surface,
 )
+from l1_analyzer import proof as proof_module
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.gate import _audited_language, _run_gate
 from l1_analyzer.honest_code import CLAUSES
@@ -116,6 +117,18 @@ def window_around(lines: list[str], line: int) -> str:
     return "\n".join(lines[low:high])
 
 
+def _stress_in(work: str, timeout: float) -> Callable[[str], prove.RunResult]:
+    """A runner pinned to one proof's own directory.
+
+    The loop rebinds the directory every turn, so a runner reading it from the enclosing
+    scope would run every proof in the last one's. It was a lambda with a default parameter
+    standing in for that binding, which is a real reason spelled as a trick: nothing could
+    say what the default was or what it held."""
+    def run(test: str) -> prove.RunResult:
+        return prove.write_crate_and_stress(test, work, 100, timeout)
+    return run
+
+
 def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: int,
                timeout: float, work_root: Path) -> prove.ProofRun:
     """Locate -> generate -> run -> retain over the review-tier findings. Deterministic
@@ -150,7 +163,11 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
         outcome = prove.prove_hazard(
             request,
             prove.generate,
-            lambda test, at=work: prove.write_crate_and_stress(test, at, 100, timeout),
+            # The work directory is bound at the call rather than captured, because the loop
+            # rebinds it every turn and a captured name would run every proof in the last
+            # one's directory. Annotated so the binding is a parameter with a type rather
+            # than a default nothing describes.
+            _stress_in(work, timeout),
         )
         # Keep the generated test on the outcome so the card can expose a retained (demonstrated)
         # proof as an adoptable test - the runnable repro, not just a verdict line.
@@ -307,7 +324,7 @@ def _report_call_map(module: Path, tests: tuple[Path, ...], layer: str) -> int:
 
 
 @boundary
-def _prove_facet(module: Path, tests: tuple[Path, ...], index: int, proposal: dict,
+def _prove_facet(module: Path, tests: tuple[Path, ...], index: int, proposal: proof_module.Proposal,
                  output_format: str) -> int:
     """Run one caller-written proposal through the execution gate.
 
@@ -947,11 +964,15 @@ def main(argv: list[str] | None) -> int:
     else:
         print(card.card_markdown(model))
         # Runtime results (race / prove) are not part of the static report; append them.
-        race = results.get("race")
-        if isinstance(race, dict):
-            print(f"\n## Thread-safety race (runtime/{race['tool']}) — {race['verdict']}\n\n{race['details']}")
-            for f in race["findings"]:
-                mark = " [confirms flagged surface]" if f in race.get("confirmed_surface", []) else ""
+        # `printed`, not `race`: the name is bound to a run above and to what the panel
+        # carries here, and the two are not the same thing.
+        printed = results.get("race")
+        if printed is not None:
+            print(f"\n## Thread-safety race (runtime/{printed['tool']}) — "
+                  f"{printed['verdict']}\n\n{printed['details']}")
+            for f in printed["findings"]:
+                mark = (" [confirms flagged surface]"
+                        if f in printed.get("confirmed_surface", []) else "")
                 print(f"- race at `{f['file']}:{f['line']}` in {f['symbol']}{mark}")
         proofs = results.get("proofs")
         if isinstance(proofs, dict):

@@ -56,6 +56,12 @@ Feature: cli — the command that runs the audit and the gate that runs it on th
     Then it returns that window under a heading naming the hazard, and nothing else from the repository
     But a file it cannot read yields the heading alone, so generation is attempted on a weaker context rather than abandoned
 
+  Scenario: _stress_in pins one proof's runner to that proof's own directory
+    Given the directory this proof will be built and stressed in, and how long to allow
+    When _stress_in binds them into a runner the proof loop can call with a test
+    Then every proof runs in its own directory, because the loop rebinds that directory each turn and a runner reading it from around itself would run them all in the last one's
+    But the binding is a parameter with a name and a type, not a default value standing in for a capture, which is what it was and what nothing could describe
+
   Scenario: _run_prove drives locate, generate, run and retain across the review-tier hazards
     Given the repository, its language, the thread-surface result, a cap on hazards, and a timeout
     When _run_prove takes the review-tier findings up to the cap and proves each one in its own throwaway directory

@@ -21,6 +21,7 @@ from collections.abc import Callable
 from typing import TypedDict
 
 from l1_analyzer import model_call as llm
+from l1_analyzer.thread_surface import Finding as ThreadFinding
 
 DEMONSTRATED = "demonstrated"           # generated, run, and it fired a race (retained)
 NOT_DEMONSTRATED = "not-demonstrated"   # generated and run, but no race fired (NOT claimed)
@@ -108,8 +109,12 @@ _RACE_VERDICTS = frozenset({"race-observed"})
 _CLEAN_VERDICTS = frozenset({"no-race-in-tests", "no-race-in-stress"})
 
 
-def proof_request(finding: dict, context: str) -> ProofRequest:
-    """Build a proof request from a thread-surface finding plus its code context."""
+def proof_request(finding: ThreadFinding, context: str) -> ProofRequest:
+    """Build a proof request from a thread-surface finding plus its code context.
+
+    The finding is the record the thread-safety reader produces, said so. It was declared
+    `dict`, which means a mapping of anything to anything, so the five fields read off it
+    below were five assumptions about a shape that is written down two modules away."""
     return {
         "kind": finding["kind"],
         "file": finding["file"],

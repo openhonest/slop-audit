@@ -670,8 +670,15 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: f
     retained: list[CoverageProof] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     for gap in gaps:
+        # The four collaborators, named here as the repository sweep names them. The loop
+        # requires them rather than defaulting them, for the reason its own docstring gives:
+        # a default puts a real cargo invocation one forgotten argument away from a test.
+        # This call site was never updated when they became required, so the whole
+        # per-module path raised before it proved anything, and every test of the loop
+        # passes its own collaborators, which is what left this one call unexercised.
         bucket, explanation, source = _prove_one(repo, module_relpath, gap, repair_rounds,
-                                                 timeout_seconds)
+                                                 timeout_seconds, propose, repair,
+                                                 _run_in_crate, _refine_incidental)
         outcomes[bucket] += 1
         if bucket == "divergence":
             retained.append(_retained_entry(module_relpath, gap, explanation, source))

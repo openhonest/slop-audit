@@ -52,7 +52,14 @@ class RaceFinding(TypedDict):
     accesses: list[tuple[str, int]]
 
 
-class RaceResult(TypedDict):
+class RaceResult(TypedDict, total=False):
+    """What a race run found, and which of the flagged surface it confirms.
+
+    `confirmed_surface` is written by the CLI after the run, because the detector does not
+    know what the thread-safety reader flagged and the CLI does. It was written and never
+    declared, so the field a reader uses to tell a confirmed hazard from a fresh one was the
+    one field nothing described. Absent, not empty, on a run nobody cross-referenced."""
+    confirmed_surface: list[RaceFinding]
     verdict: str
     value: str
     band: str
