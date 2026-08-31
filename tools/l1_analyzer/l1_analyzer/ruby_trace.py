@@ -93,12 +93,22 @@ def _on_path(tool: str) -> str | None:
     return shutil.which(tool)
 
 
+# A gem entry in a Gemfile.lock: indented, the name, then the version in parentheses. The
+# name is anchored on both sides so `rspec-expectations` is not read as `rspec`.
+_RSPEC_GEM = re.compile(r"^\s+rspec \(", re.MULTILINE)
+
+
 def _lock_has_rspec(repo: Path) -> bool:
-    """True when Gemfile.lock names rspec, the third of three RSpec signals.
+    """True when Gemfile.lock names the rspec gem itself, the third of three RSpec signals.
 
     The other two are read independently, so a lock file that says nothing cannot by itself
-    decide the answer, and when no signal fires the caller refuses with a reason."""
-    return "rspec" in text_or_empty(repo / "Gemfile.lock")
+    decide the answer, and when no signal fires the caller refuses with a reason.
+
+    The GEM ENTRY, not the substring. It was `"rspec" in <the whole file>`, which any
+    project depending on rspec-expectations satisfies, and that gem stands alone: a Minitest
+    project can use RSpec's matchers without RSpec. Such a project was read as an RSpec
+    suite, and the harness then ran a binary that is not installed there."""
+    return bool(_RSPEC_GEM.search(text_or_empty(repo / "Gemfile.lock")))
 
 
 def _detect_runner(repo: Path) -> str | None:
