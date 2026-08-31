@@ -324,7 +324,15 @@ def test_one_visited_declaration_carries_the_unvisited_ones_and_the_report_says_
         # The disclaimer, not its wording. Pinning the phrase measured the prose, and the
         # prose was rewritten on 2026-08-23 because it was written in the vocabulary of the
         # people who built the tool rather than the vocabulary of the person reading the card.
-        assert "never looked at" in rendered
+        #
+        # "never looked at" was pinned here until 2026-08-31 and is gone from the card on
+        # purpose. The note asserted a CAUSE the census does not hold: on one real crate it
+        # said 347 places went unread, and 204 of those were fields on a record nothing
+        # attaches behaviour to, which the reader read and does not count as state. Saying
+        # we never looked was false for those, and the promise to go and learn them was one
+        # nobody would keep. What the disclosure owes a reader is the count and the fact
+        # that the grade excludes it, and those are what this pins.
+        assert "produced no verdict" in rendered
         assert "Nothing in the grade above counts" in rendered
 
 

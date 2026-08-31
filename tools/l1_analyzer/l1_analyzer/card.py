@@ -89,7 +89,7 @@ CARD_COPY: dict[str, str] = {
     "detail.cannot": "{n} {plural} of data here can be almost anything, and the code makes decisions based on it. Because it can be anything, there is always one more case to check, so no fixed number of tests can ever cover them all. Writing more tests will not fix this. The only fix is to limit what that data can be, or stop letting other parts of the code change it.",
     "detail.na": "Point it at a public repository with code in a language the analyzer reads: Python, TypeScript, JavaScript, Java, C#, Rust, Ruby, Go, or C.",
     "detail.na_unread": "We do not have enough to grade this, and we make no claim either way about whether this code can be tested. Reading the source we found {declared} {places} where it keeps data. Our tool did not read any of them, because every one is written as {kinds} and it has not learned that form. That is a limit of our reading rather than a finding about your code: we never got far enough to have an opinion. Every other number we publish is worked out over the data we did read, so on this repository each one is worked out over nothing, and we will not turn that into a good grade. Send us the repository and we will teach the tool to read that form.",
-    "census.unread": "{unread} of the {declared} places where this code keeps data {verb} written as {kinds}. Our tool has not learned to read those, so it never looked at {verb2}. Nothing in the grade above counts {verb2}, for or against. Closing that gap is our job rather than yours: send us the repository and we will teach the tool to read {verb2}.",
+    "census.unread": "{unread} of the {declared} places where this code keeps data {verb} written as {kinds}, and our reading produced no verdict on {verb2}. Nothing in the grade above counts {verb2}, for or against. Some are forms our tool cannot yet read and some are forms it read and does not count as state; the number below does not tell you which, and neither will we until it can.",
     "detail.na_silent": "No grade. We could not work out what {silent} of the {total} pieces of data here are used for, and that is more than half of them. Most often the data is handed to a library we cannot see inside. We will not hand out a good grade on the part we happened to be able to read, because that would reward code that shows us the least. The list below is every place we stopped, so you can see exactly what we could not follow.",
     "culprits.heading.coarse": "What costs too many tests",
     "culprits.heading.cannot": "What makes it impossible",
@@ -433,7 +433,18 @@ def _census_note(census: Census) -> str:
 
     The counts and the kind vocabulary come from the census and from
     report.unread_kinds_phrase, so this module keeps its own voice without being able to
-    disagree with the measurement."""
+    disagree with the measurement.
+
+    It says the count and not the cause. It used to say "our tool has not learned to read
+    those" and promise to teach it, which is three claims where the census holds one. On
+    crates/buzz-acp on 2026-08-31 it reported 347 unread, and 204 of those were fields on a
+    record nothing attaches behaviour to, whose names are never used through a receiver
+    anywhere. The reader read those files and found no state held through a receiver, which
+    is what it looks for. That is a scoping decision working, not a form nobody taught it,
+    and nobody would teach it to read them because they are not what this measure is about.
+
+    Overstating our own ignorance is the safer way to be wrong and it is still being wrong,
+    and a promise nobody will keep costs more than a number."""
     declared, visited = census.get("declared"), census.get("visited")
     if not isinstance(declared, int) or not isinstance(visited, int) or declared == visited:
         return ""
