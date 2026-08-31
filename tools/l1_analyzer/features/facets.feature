@@ -155,3 +155,10 @@ Feature: facets — closeable facets and the Silence index for one module and it
     When coverage_in finds the entry whose file name matches
     Then its missing lines and its percentage come back
     But a payload naming no such module yields no percentage either, because an empty set with a number would say a run that never saw it covered it fully
+
+  Scenario: _unusable is the audit for a pair this reader could not open
+    Given a module or a test file that does not parse, and the reason it did not
+    When _unusable builds the audit that stands in for the reading nobody could make
+    Then every count is zero and the silence index is nothing at all, which the renderer already prints as not measured
+    And the reason travels with it, naming which of the two files failed, because a suite is read as several and a reader told only that something did not parse has to go and find out which
+    But a silence index of zero is never published here: that would say the suite leaves nothing silent about a module nobody read

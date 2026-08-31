@@ -538,6 +538,20 @@ def coverage_in(payload: dict, module_name: str) -> tuple[frozenset[int], float 
             entry.get("summary", {}).get("percent_covered"))
 
 
+def _unusable(module: Path, tests: tuple[Path, ...], reason: str) -> Audit:
+    """The audit for a pair this reader could not open, carrying why.
+
+    Every count is zero and the silence index is None, which is the shape the renderer
+    already knows: None prints as "not measured", and a zero index would say the suite
+    leaves nothing silent about a module nobody read."""
+    return {
+        "module": str(module), "tests": ", ".join(str(t) for t in tests),
+        "facets": [], "undeclared": [], "total_checkable_facets": 0,
+        "closeable_silence_sites": 0, "silence_index": None, "coverage_percent": None,
+        "coverage_measured": False, "suite_succeeded": False, "unusable_reason": reason,
+    }
+
+
 def audit(module: Path, tests: Path | tuple[Path, ...]) -> Audit:
     """Every closeable facet of one module, and how many the suite leaves silent.
 
@@ -546,10 +560,23 @@ def audit(module: Path, tests: Path | tuple[Path, ...]) -> Audit:
     reader at facets that are already closed."""
     module = Path(module)
     tests = (Path(tests),) if isinstance(tests, (str, Path)) else tuple(Path(t) for t in tests)
-    module_tree = ast.parse(module.read_text())
-    tests_tree = ast.Module(
-        body=[node for path in tests for node in ast.parse(path.read_text()).body],
-        type_ignores=[])
+    # A file that does not parse is a reason, not a crash. This raised straight out of the
+    # command, so `--facets` on a broken module printed a stack trace where an adopter
+    # wanted a sentence, and the record already carried the field to say it in.
+    #
+    # The test files are read the same way and the reason names WHICH file failed, because
+    # a suite is read as several and a reader told only that something did not parse has to
+    # go and find out which.
+    try:
+        module_tree = ast.parse(module.read_text())
+    except (OSError, SyntaxError) as error:
+        return _unusable(module, tests, f"{module.name} does not parse: {error}")
+    try:
+        tests_tree = ast.Module(
+            body=[node for path in tests for node in ast.parse(path.read_text()).body],
+            type_ignores=[])
+    except (OSError, SyntaxError) as error:
+        return _unusable(module, tests, f"a test file does not parse: {error}")
     uncovered, coverage_percent, succeeded = _coverage(module, tests)
     # Imported here rather than at the top: runtime_probe reads this module's own readers,
     # and a cycle at import time would be a shape problem rather than a missing feature.
