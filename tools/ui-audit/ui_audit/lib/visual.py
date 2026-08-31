@@ -32,18 +32,24 @@ Check = dict[str, object]
 
 
 
-# The findings handed in name which components to look at, and the findings handed back are
-# what was seen. Two different kinds of finding under one type name, and the incoming one is
-# a locator: the clause cannot know that, because what counts as a place to look is a
-# project's own vocabulary and the reader only knows the language's.
-# honest-code-allow: L1.21.4 - the incoming findings name which components to screenshot, so this obtains
 @boundary
+def _screenshot_dir(screenshot_dir: str) -> Path:
+    """The directory screenshots go in, made if it is not there.
+
+    An edge, and the only one this file's own code holds: it is handed where to put things
+    and hands back the place. It used to sit inside `verify_components`, which is what made
+    that function an orchestrator performing I/O rather than an edge."""
+    directory = Path(screenshot_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
 async def verify_components(
     url: str,
     components: list[Finding],
     screenshot_dir: str,
     playground_selector: str,
-) -> list[Finding]:
+) -> list[Check]:
     """
     Visually verify flagged components using Playwright.
 
@@ -61,8 +67,7 @@ async def verify_components(
     except ImportError:
         return [{'error': 'playwright not installed. Run: uv pip install playwright && playwright install'}]
 
-    screenshots = Path(screenshot_dir)
-    screenshots.mkdir(parents=True, exist_ok=True)
+    screenshots = _screenshot_dir(screenshot_dir)
 
     results = []
 
