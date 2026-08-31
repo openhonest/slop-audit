@@ -231,13 +231,6 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     Then it is true for a per-key tally whose value cannot change an observable outcome
     And the gated form is the case only this rule reaches, since the ungated one already clears as a carried value
 
-  Scenario: _is_python says which rules this language can carry
-    Given the language spec
-    When _is_python compares it against the Python spec
-    Then it is true only for Python, which is the one language whose write-once, memoization and carried-value rules have been proven
-    And it is stated as a predicate rather than an inline comparison so the entry point can say which rules are staged and why
-    But the accumulator rule and the two guards in front of it do not consult it, because they read the spec and serve all nine
-
   Scenario: _enclosing finds the nearest ancestor of a given kind
     Given a reference and a set of node types
     When _enclosing walks up from the reference comparing each ancestor's type
@@ -322,3 +315,9 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     Then it is true only when a shape is provably testable, and any doubt at all leaves the finding standing
     And a value inspected in a branch, or a presence test that is itself the answer, ends it before any rule runs
     But an unresolved verdict admits only the write-once rule, because a fail-closed finding is not about decision space and the carried-value rule must never clear it
+
+  Scenario: _stores_into asks whether anything writes into this container at all
+    Given every reference to a piece of state the memoization rule is about to judge
+    When _stores_into looks for a keyed store or a rebind of the whole container
+    Then a container something writes into can go on to be judged a cache
+    But a container only ever READ is not one, however it is read: the shape check beside this asks whether every write is a plain store, and over no writes at all that is true of nothing, so a presence test on an unbounded key with no store anywhere satisfied it and cleared a finding the answer genuinely depends on

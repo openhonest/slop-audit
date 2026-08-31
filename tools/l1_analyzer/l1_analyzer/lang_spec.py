@@ -319,6 +319,21 @@ class LangSpec(TypedDict, total=False):
     # updates are here and not there, because the classifier has no use for them and the
     # write-once rule does. Same set as `mutating` wherever a language draws no distinction.
     mutates_in_place: frozenset[str]
+    # Container reads a memoization cache may use without inspecting a value's shape. They
+    # overlap `mutates_in_place` on purpose: `pop` and `setdefault` mutate AND are ordinary
+    # cache traffic, so the memoization rule needs to say that a mutation by one of these
+    # names does not disqualify the shape.
+    cache_reads: frozenset[str]
+    # How this language spells an EMPTY map literal. A memoization cache may be rebound
+    # whole only to an empty one, because rebinding it to anything else puts values in it
+    # that no write in the class accounts for.
+    empty_map_types: tuple[str, ...]
+    # How a language spells a SLICE, which is not a key. `xs[:4]` selects a contiguous run
+    # at a fixed width and `xs[-limit:]` one at a caller's width, and neither picks one
+    # stored value out of unboundedly many, which is the argument the open-key guard rests
+    # on. A language with no slice syntax declares none, and the guard then reads every
+    # subscript as a key, which is what a subscript is there.
+    slice_types: tuple[str, ...]
     keyed_read: frozenset[str]
     dispatch_methods: frozenset[str]
     literal_types: frozenset[str]
@@ -691,7 +706,12 @@ LANG_SPEC: dict[str, LangSpec] = {
         # too but they mutate, and _PY_MUTATING already claims them; a name in both sets
         # would be read by whichever branch ran first, so `get` is the only addition.
         "mutating": _PY_MUTATING,
-        "mutates_in_place": _PY_IN_PLACE, "keyed_read": frozenset({"get"}),
+        "mutates_in_place": _PY_IN_PLACE,
+        "cache_reads": frozenset({"pop", "clear", "get", "keys", "values", "items",
+                                  "setdefault"}),
+        "empty_map_types": ("dictionary",),
+        "slice_types": ("slice",),
+        "keyed_read": frozenset({"get"}),
         "literal_types": _PY_LITERALS,
         "unary_types": ("unary_operator",),
         "value_wrapper_types": ('unary_operator', 'parenthesized_expression'),
@@ -852,7 +872,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "record_enum": "none",
         "key_prefix": "this.",
         "mutating": _JS_MUTATING,
-        "mutates_in_place": _JS_MUTATING, "keyed_read": frozenset({"get", "has"}),
+        "mutates_in_place": _JS_MUTATING,
+        "cache_reads": frozenset(),
+        "empty_map_types": (),
+        "slice_types": (),
+        "keyed_read": frozenset({"get", "has"}),
         "literal_types": _JS_LITERALS,
         "unary_types": ("unary_expression",),
         "value_wrapper_types": ('unary_expression', 'parenthesized_expression'),
@@ -995,7 +1019,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "module_enum": "none",
         "mutating": _JAVA_MUTATING,
-        "mutates_in_place": _JAVA_MUTATING, "keyed_read": _JAVA_KEYED_READ,
+        "mutates_in_place": _JAVA_MUTATING,
+        "cache_reads": frozenset(),
+        "empty_map_types": (),
+        "slice_types": (),
+        "keyed_read": _JAVA_KEYED_READ,
         "literal_types": _JAVA_LITERALS,
         "unary_types": ("unary_expression",),
         "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'cast_expression'),
@@ -1152,7 +1180,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "module_enum": "none",
         "mutating": _CS_MUTATING,
-        "mutates_in_place": _CS_MUTATING, "keyed_read": _CS_KEYED_READ,
+        "mutates_in_place": _CS_MUTATING,
+        "cache_reads": frozenset(),
+        "empty_map_types": (),
+        "slice_types": (),
+        "keyed_read": _CS_KEYED_READ,
         "literal_types": _CS_LITERALS,
         "unary_types": ("prefix_unary_expression",),
         "value_wrapper_types": ('prefix_unary_expression', 'parenthesized_expression', 'cast_expression'),
@@ -1305,7 +1337,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "record_enum": "none",
         "key_prefix": "",
         "mutating": _RUST_MUTATING,
-        "mutates_in_place": _RUST_MUTATING, "keyed_read": _RUST_KEYED_READ,
+        "mutates_in_place": _RUST_MUTATING,
+        "cache_reads": frozenset(),
+        "empty_map_types": (),
+        "slice_types": (),
+        "keyed_read": _RUST_KEYED_READ,
         "literal_types": _RUST_LITERALS,
         "unary_types": ("unary_expression",),
         "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'reference_expression', 'type_cast_expression'),
@@ -1467,7 +1503,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "key_prefix": "",
         "module_enum": "none",
         "mutating": _RUBY_MUTATING,
-        "mutates_in_place": _RUBY_MUTATING, "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
+        "mutates_in_place": _RUBY_MUTATING,
+        "cache_reads": frozenset(),
+        "empty_map_types": (),
+        "slice_types": (),
+        "keyed_read": _RUBY_KEYED_READ, "dispatch_methods": _RUBY_DISPATCH,
         "literal_types": _RUBY_LITERALS,
         "unary_types": ("unary",),
         "value_wrapper_types": ('unary', 'parenthesized_statements'),
@@ -1620,7 +1660,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "record_enum": "c_struct_field",
         "key_prefix": "",
         "mutating": frozenset(),
-        "mutates_in_place": frozenset(), "keyed_read": frozenset(),
+        "mutates_in_place": frozenset(),
+        "cache_reads": frozenset(),
+        "empty_map_types": (),
+        "slice_types": (),
+        "keyed_read": frozenset(),
         "literal_types": _C_LITERALS,
         "unary_types": ("unary_expression",),
         "value_wrapper_types": ('unary_expression', 'parenthesized_expression', 'cast_expression'),
@@ -1788,7 +1832,11 @@ LANG_SPEC: dict[str, LangSpec] = {
         "record_enum": "none",
         "key_prefix": "",
         "mutating": frozenset(),
-        "mutates_in_place": frozenset(), "keyed_read": frozenset(),
+        "mutates_in_place": frozenset(),
+        "cache_reads": frozenset(),
+        "empty_map_types": (),
+        "slice_types": (),
+        "keyed_read": frozenset(),
         "extra_bounded": frozenset({"append", "len", "cap", "copy", "make", "new"}),
         "literal_types": _GO_LITERALS,
         "unary_types": ("unary_expression",),

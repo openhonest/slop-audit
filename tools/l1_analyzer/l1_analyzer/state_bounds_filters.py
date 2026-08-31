@@ -67,7 +67,6 @@ from l1_analyzer import state_ref_reads as reads
 from l1_analyzer.lang_spec import (
     _PY_IN_PLACE,
     COMPARISON_OPS,
-    LANG_SPEC,
     LangSpec,
 )
 from l1_analyzer.ts_nodes import field as _field
@@ -80,7 +79,6 @@ from l1_analyzer.ts_nodes import sub_key as _sub_key
 from l1_analyzer.ts_nodes import text as _text
 from l1_analyzer.ts_nodes import written_in_place as _written_in_place
 
-_PY = LANG_SPEC["python"]
 # Method names that mutate a container in place. The docstring used to CLAIM this was a
 # superset of the classifier's set and a hand-written list sat underneath, which drifted:
 # `appendleft` was in _PY_MUTATING and not here, so a deque assigned once and then grown
@@ -88,16 +86,6 @@ _PY = LANG_SPEC["python"]
 # and the derivation itself moved to lang_spec, where python's write-only set is taken from
 # it in the same breath.
 _IN_PLACE = _PY_IN_PLACE
-# Container reads that a memoization cache may use and that do not inspect a value's shape.
-_CACHE_READS = frozenset({"pop", "clear", "get", "keys", "values", "items", "setdefault"})
-
-
-def _is_python(sp: LangSpec) -> bool:
-    """The three rules that still read Python node types directly fire only for Python.
-    Stated as one predicate so the entry point says which rules are staged and why."""
-    return sp is _PY
-
-
 def _attr(key: str) -> str:
     """The bare attribute name from a state key: `self._rows` -> `_rows`. Ruby's sigil
     survives (`@hits` stays `@hits`), which is right: the sigil is part of the name the
@@ -314,28 +302,48 @@ def _value_reaches_condition(refs: list[Node], sp: LangSpec) -> bool:
 # --- Rule: presence-gated, result-invariant memoization cache --------------------
 
 def _writes_are_plain_stores(cls: Node, attr: str, refs: list[Node], sp: LangSpec) -> bool:
-    """Writes are only `d[k] = v`, `del d[k]`, empty-dict rebind, or cache methods. An
-    augmented assignment through the attribute (self.attr[k] += 1) fails - that inspects and
-    rewrites the value, which is what a counter does."""
+    """Writes are only `d[k] = v`, `del d[k]`, an empty-map rebind, or cache methods. A
+    compound assignment through the attribute (`self.attr[k] += 1`) fails: that inspects and
+    rewrites the value, which is what a counter does.
+
+    Read from the vocabulary since 2026-08-31, so the rule that uses it can be widened
+    beyond Python. Two tables were needed and neither existed: the reads a cache may perform
+    without inspecting a value, which overlap the in-place methods on purpose, and how a
+    language spells an empty map."""
     for ref in refs:
         parent = ref.parent
         if parent is None:
             continue
-        if parent.type == "subscript" and parent.child_by_field_name("value") == ref:
+        # `self.attr[k] += 1` inspects the stored value and writes it back, which is what a
+        # counter does and not what a cache does. Told from a plain store by whether the
+        # grammar hung an operator on the assignment, which every one of the nine does.
+        if parent.type in sp["subscript_types"] and _field(parent, sp["sub_value"]) == ref:
             gp = parent.parent
-            if gp is not None and gp.type == "augmented_assignment":
+            if gp is not None and gp.type in sp["assign_types"] \
+                    and _field(gp, "operator") is not None:
                 return False
-        if parent.type == "attribute" and parent.child_by_field_name("object") == ref:
+        if parent.type in sp["member_types"] and _field(parent, sp["mem_object"]) == ref:
             gp = parent.parent
-            called = gp is not None and gp.type == "call" and gp.child_by_field_name("function") == parent
-            method = _text(parent.child_by_field_name("attribute"))
-            if called and method in _IN_PLACE and method not in _CACHE_READS:
+            called = gp is not None and gp.type in sp["call_types"] \
+                and _field(gp, sp["call_fn"]) == parent
+            method = _text(_field(parent, sp["mem_attr"]))
+            if called and method in sp["mutates_in_place"] and method not in sp["cache_reads"]:
                 return False
-    # a whole-attribute rebind must be to an empty dict literal
+        # The flat-call spelling of the same mutation, for the two languages that hang the
+        # receiver, the method and the arguments off one node.
+        if sp["flat_call"] and parent.type in sp["call_types"] \
+                and _field(parent, sp["call_recv"]) == ref:
+            name = _text(_field(parent, sp["call_name"]))
+            if name in sp["mutates_in_place"] and name not in sp["cache_reads"]:
+                return False
+    # A whole-attribute rebind must be to an EMPTY map. Rebinding it to anything else puts
+    # values in the cache that no write in the class accounts for, so the shape is no longer
+    # one this rule can argue about. A language that declares no empty-map literal cannot
+    # satisfy this and the rule declines, which is the safe direction.
     for w in _member_writes(cls, attr, sp):
         assign = w.parent
-        rhs = assign.child_by_field_name("right") if assign is not None else None
-        if rhs is not None and not (rhs.type == "dictionary" and not rhs.named_children):
+        rhs = _field(assign, sp["assign_right"]) if assign is not None else None
+        if rhs is not None and not (rhs.type in sp["empty_map_types"] and not rhs.named_children):
             return False
     return True
 
@@ -377,8 +385,34 @@ def _result_invariant(attr: str, refs: list[Node], sp: LangSpec) -> bool | None:
     return True
 
 
+def _stores_into(refs: list[Node], sp: LangSpec) -> bool:
+    """Whether anything WRITES into this container: `d[k] = v`, or a whole rebind.
+
+    A cache nobody writes is not a cache. The shape check below asks whether every write is
+    a plain store, and over zero writes that is vacuously true, so a container only ever
+    READ satisfied it. Rust's `if self.by_id.contains_key(&k)` with a variable key is that
+    shape exactly: a presence test on an unbounded key, no store anywhere, and the answer
+    depends on the key, which is the finding the rule then cleared.
+
+    The same vacuous-affirmative failure the result-invariance check was fixed for on
+    2026-08-18, one premise along."""
+    for ref in refs:
+        parent = ref.parent
+        if parent is None:
+            continue
+        if parent.type in sp["subscript_types"] and _field(parent, sp["sub_value"]) == ref:
+            gp = parent.parent
+            if gp is not None and gp.type in sp["assign_types"] \
+                    and _field(gp, sp["assign_left"]) == parent:
+                return True
+        if parent.type in sp["assign_types"] and _field(parent, sp["assign_left"]) == ref:
+            return True
+    return False
+
+
 def _is_memoization(cls: Node, attr: str, refs: list[Node], sp: LangSpec) -> bool:
-    return _has_presence_gate(refs, sp) and _writes_are_plain_stores(cls, attr, refs, sp)
+    return (_has_presence_gate(refs, sp) and _stores_into(refs, sp)
+            and _writes_are_plain_stores(cls, attr, refs, sp))
 
 
 # --- Guard: an open key selects among the stored values --------------------------
@@ -404,21 +438,31 @@ def _is_memoization(cls: Node, attr: str, refs: list[Node], sp: LangSpec) -> boo
 # rather than take one out, and the accumulator rule below argues separately about them.
 
 
-def _unwrap_unary(node: Node | None) -> Node | None:
+def _unwrap_unary(node: Node | None, sp: LangSpec) -> Node | None:
     """Peel unary operators off a key. `s[-1]` is the last element, one compile-time value,
-    so the wrapper must not hide the literal underneath it."""
-    while node is not None and node.type in _PY["unary_types"]:
+    so the wrapper must not hide the literal underneath it.
+
+    Read from the language's own vocabulary since 2026-08-31. It read Python's, which was
+    right while the guard above it fired for Python alone and became a claim about eight
+    other grammars the day that guard widened."""
+    while node is not None and node.type in sp["unary_types"]:
         named = node.named_children
         node = named[0] if named else None
     return node
 
 
-def _is_state_of_this_class(node: Node) -> bool:
-    """`self.x` / `cls.x`: state the enumerator reports separately, with its own verdict."""
-    return node.type == "attribute" and _text(node.child_by_field_name("object")) in ("self", "cls")
+def _is_state_of_this_class(node: Node, sp: LangSpec) -> bool:
+    """`self.x` / `cls.x`: state the enumerator reports separately, with its own verdict.
+
+    The receiver names come from the language, which declares its own: `this` in four of the
+    nine, `self` in three, a chosen name in Go. A language whose state carries no receiver
+    at all answers False here, which is right: its own enumerator finds those by another
+    route entirely."""
+    return (node.type in sp["member_types"]
+            and _text(_field(node, sp["mem_object"])) in sp["this_idents"])
 
 
-def _is_open_key(key: Node | None) -> bool:
+def _is_open_key(key: Node | None, sp: LangSpec) -> bool:
     """A single key the class does not bound. A SLICE is not a key and never reaches this
     rule: `self._hash[:4]` selects a contiguous run at a fixed width, and `self.alerts
     [-limit:]` selects a run at a caller's width, but neither picks one stored value out of
@@ -427,12 +471,12 @@ def _is_open_key(key: Node | None) -> bool:
     bounded by the literal 4, called promiscuous because the `slice` node is not itself a
     literal node. Whatever a variable-width slice is worth, the carried-value rule below is
     what decided it before this guard existed and it decides it still."""
-    if key is not None and key.type == "slice":
+    if key is not None and key.type in sp["slice_types"]:
         return False
-    key = _unwrap_unary(key)
-    if key is None or key.type in _PY["literal_types"]:
+    key = _unwrap_unary(key, sp)
+    if key is None or key.type in sp["literal_types"]:
         return False
-    return not _is_state_of_this_class(key)
+    return not _is_state_of_this_class(key, sp)
 
 
 def _selects_on_an_open_key(refs: list[Node], sp: LangSpec) -> bool:
@@ -464,7 +508,7 @@ def _selects_on_an_open_key(refs: list[Node], sp: LangSpec) -> bool:
             (gp.type in sp["assign_types"] and _field(gp, sp["assign_left"]) == parent)
             or gp.type in sp["key_removal_types"]
         )
-        if not store and _is_open_key(_sub_key(parent, sp)):
+        if not store and _is_open_key(_sub_key(parent, sp), sp):
             return True
     # THE METHOD FORM of a keyed read, which is how six of the nine spell it. Java asks
     # `d.get(k)` and C# `d.GetValueOrDefault(k)`, neither of which is a subscript, so a
@@ -480,7 +524,7 @@ def _selects_on_an_open_key(refs: list[Node], sp: LangSpec) -> bool:
         gp = parent.parent
         called = gp is not None and gp.type in sp["call_types"] and _field(gp, sp["call_fn"]) == parent
         if called and attr_node is not None and _text(attr_node) in sp["keyed_read"] \
-                and _is_open_key(_first_arg(gp, sp)):
+                and _is_open_key(_first_arg(gp, sp), sp):
             return True
     # THE FLAT-CALL SPELLING of the same read. Java and Ruby hang the receiver, the method
     # name and the arguments off ONE node, so the loop above walks a member access those two
@@ -495,7 +539,7 @@ def _selects_on_an_open_key(refs: list[Node], sp: LangSpec) -> bool:
                 continue
             name = _field(parent, sp["call_name"])
             if name is not None and _text(name) in sp["keyed_read"] \
-                    and _is_open_key(_first_arg(parent, sp)):
+                    and _is_open_key(_first_arg(parent, sp), sp):
                 return True
     return False
 
@@ -830,40 +874,39 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
     # presence, and None means the question does not apply rather than "presence decides".
     if _value_reaches_condition(refs, sp) or _result_invariant(attr, refs, sp) is False:
         return False
-    # WHAT IS STILL PYTHON-ONLY: memoization and write-once. Each is a claim about nine
-    # grammars the cross-language suite has not been made to hold, and widening one rule at
-    # a time is what lets the suite say which claim broke.
+    # ALL FOUR RULES SERVE ALL NINE LANGUAGES since 2026-08-31. This filter was the last
+    # thing in the classifier that read one language's node types directly, which made every
+    # shape it clears a shape where Python could disagree with the other eight about the
+    # same code. The records of what each widening took are in
+    # test_carried_value_serves_every_language.py and test_write_once_serves_every_language.py.
     #
-    # Carried value was the third and it serves all nine since 2026-08-31. The record of
-    # what that took is in test_carried_value_serves_every_language.py: the rule is one
-    # vocabulary-driven line and is sound only behind the open-key guard, and that guard
-    # needed three repairs. It read Python's node types directly, it read only the subscript
-    # spelling of a keyed read where six of the nine ask `d.get(k)`, and it counted a
-    # conditional assignment as a store when `||=` reads the key to decide whether to write.
+    # Widened one rule at a time, which is what let the conformance suite say which claim
+    # broke: eight vectors went red across the four, and every one named a real gap rather
+    # than a wrong verdict.
+    #
     # The enclosing class, or None where the language has none. Go declares no class types
-    # at all and Rust's scope is an impl block, so returning early on a missing one refused
-    # every rule below for those two: their per-key tallies stopped clearing the day this
-    # was hoisted out of the Python-only branch. The two rules that need a class check it
-    # for themselves, and the ones that argue from references alone do not care.
+    # at all and Rust's scope is an impl block, so returning early on a missing one refuses
+    # every rule below for those two. The two rules that need a class check it for
+    # themselves, and the ones that argue from references alone do not care.
     cls = _enclosing_class(refs[0], sp)
-    # THE OPEN-KEY GUARD, for every rule below except the write-only accumulator. A
-    # reference that selects on a key nobody bounded makes the answer depend on that key,
-    # and no rule below can argue past it. Memoization alone is settled ABOVE it, for the
-    # reason given there.
     #
-    # The accumulator at the foot is exempt by construction: it clears a shape where every
-    # reference is a write, and a write at an open key does not make the answer depend on
-    # the key. Putting the guard in front of that one turned five languages promiscuous on a
-    # per-key tally the vectors declare neutral.
+    # THE OPEN-KEY GUARD gates every rule below except the write-only accumulator, which is
+    # exempt by construction: that one clears a shape where every reference is a write, and
+    # a write at an open key does not make the answer depend on the key.
+    #
     # Memoization is settled BEFORE the open-key guard, and it is the one shape allowed past
     # it. A presence-gated, result-invariant cache answers the same for a key whether or not
     # that key is stored, so the partition its keyed read cuts belongs to the function being
     # memoised and not to the cache: delete the cache and every observable answer is
     # unchanged. No other rule can make that argument, which is why no other rule is exempt.
     #
-    # The one rule still Python-only. It is a separate claim about nine grammars, and
-    # widening one rule at a time is what lets the suite say which claim broke.
-    if (_is_python(sp) and cls is not None and verdict == "promiscuous"
+    # All nine since 2026-08-31, the last of the four to widen. Both halves read the
+    # vocabulary: the presence gate and the result-invariance check always did, and the
+    # write shapes were ported the same day, which needed two tables nobody had written
+    # down. What reads a cache may perform without inspecting a value, and how a language
+    # spells an empty map. A language declaring neither cannot satisfy the rule and it
+    # declines, which is the safe direction.
+    if (cls is not None and verdict == "promiscuous"
             and _is_memoization(cls, attr, refs, sp)):
         return True
     # WRITE-ONCE, ALL NINE since 2026-08-31. Assigned exactly once, never mutated after,
@@ -890,7 +933,7 @@ def is_false_positive(key: str, refs: list[Node], verdict: str, sp: LangSpec) ->
     # testability. One line, and vocabulary-driven since it was written.
     #
     # It was Python-only until 2026-08-31 and the record of why is in
-    # test_carried_value_is_not_python_only.py: it is sound only behind the open-key guard,
+    # test_carried_value_serves_every_language.py: it is sound only behind the open-key guard,
     # that guard needed the method spelling of a keyed read as well as the subscript one,
     # and with both of those Ruby's conditional-assignment cache still cleared. The first
     # two were done on 2026-08-18. The third was this: `||=` is a read AND a write, and the
