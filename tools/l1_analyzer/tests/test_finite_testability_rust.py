@@ -106,15 +106,37 @@ VECTORS = [
         ),
     },
     {
-        # `macro_invocation` swallows its arguments into an unparsed `token_tree`, so
-        # `format!("{}", self.v.len())` holds no field_expression and no call_expression and
-        # the reference inside it is invisible. Invisible read as absence is the failure this
+        # `macro_invocation` swallows its arguments into an unparsed `token_tree`, so the
+        # reference inside it is invisible. Invisible read as absence is the failure this
         # analyzer exists to name, so the reading is refused rather than issued on the half
         # that could be read.
-        "id": "reference-hidden-in-a-macro",
+        #
+        # `write!` and not `format!`, and the difference is the whole rule. What the refusal
+        # guards against is an unseen WRITE, and `write!` performs one on its first argument
+        # while `format!` cannot write anything it is handed. The case for a macro that only
+        # reads sits below this one.
+        "id": "reference-hidden-in-a-writing-macro",
         "state": "self.v",
         "verdict": "unresolved",
         "drives_decision": True,
+        "src": (
+            "use std::fmt::Write;\n"
+            "struct S { v: String }\n"
+            "impl S {\n"
+            "  fn set(&mut self) { self.v = String::new(); }\n"
+            "  fn show(&mut self) { write!(self.v, \"x\").unwrap(); }\n"
+            "}\n"
+        ),
+    },
+    {
+        # The other direction. A macro that only reads its arguments hides no write, so the
+        # references that WERE built are the whole reading and the verdict they earned
+        # stands. Refusing here would report a complete reading as a partial one, which is
+        # the same failure as the reverse and costs 72 of 102 silences on one real crate.
+        "id": "reference-inside-a-reading-macro",
+        "state": "self.v",
+        "verdict": "neutral",
+        "drives_decision": False,
         "src": (
             "struct S { v: Vec<i32> }\n"
             "impl S {\n"
@@ -173,7 +195,31 @@ def test_a_macro_body_is_named_as_an_unparsed_region(tmp_path):
     """Rust's macro arguments come back as a flat `token_tree`: no field_expression, no
     call_expression, and the token sequence does not even keep the field name attached to
     `self`. There is no row to write, because there is nothing parsed to match, so the
-    silence has to say that rather than name a construct."""
+    silence has to say that rather than name a construct.
+
+    Written with `write!`, which writes its first argument. It used to be written with
+    `format!`, which cannot write anything, and that example no longer earns the refusal:
+    what the refusal guards against is an unseen write, and a macro that only reads hides
+    none. The claim is unchanged and the example now carries it."""
+    src = ("use std::fmt::Write;\n"
+           "struct S { v: String }\n"
+           "impl S {\n"
+           "  fn set(&mut self) { self.v = String::new(); }\n"
+           "  fn show(&mut self) { write!(self.v, \"x\").unwrap(); }\n"
+           "}\n")
+    f = _finding(_classify(tmp_path, src), "self.v")
+    assert f is not None
+    assert f["verdict"] == "unresolved"
+    assert f["silence"] == state_partition.UNPARSED_REGION
+
+
+def test_a_macro_that_only_reads_does_not_refuse_the_reading(tmp_path):
+    """The other direction, and the one that was costing real audits. `format!` cannot write
+    what it is handed, so the references built outside it are the whole reading and the
+    verdict they earned stands.
+
+    A named list of macros, never a general rule: a macro expands to anything, and one this
+    reader does not know keeps the refusal."""
     src = ("struct S { v: Vec<i32> }\n"
            "impl S {\n"
            "  fn set(&mut self) { self.v = Vec::new(); }\n"
@@ -181,8 +227,8 @@ def test_a_macro_body_is_named_as_an_unparsed_region(tmp_path):
            "}\n")
     f = _finding(_classify(tmp_path, src), "self.v")
     assert f is not None
-    assert f["verdict"] == "unresolved"
-    assert f["silence"] == state_partition.UNPARSED_REGION
+    assert f["silence"] == ""
+    assert f["verdict"] == "neutral"
 
 
 def test_a_mutable_borrow_of_a_field_is_named_as_an_alias(tmp_path):

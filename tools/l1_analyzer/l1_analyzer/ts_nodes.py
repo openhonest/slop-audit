@@ -217,8 +217,28 @@ def hidden_names(scope: Node, sp: LangSpec) -> frozenset[str]:
         return frozenset()
     names: set[str] = set()
     for region in refs(scope, lambda n: n.type in sp["opaque_region_types"]):
+        if _only_reads(region, sp):
+            continue
         names.update(text(n) for n in refs(region, lambda n: n.is_named and not n.children))
     return frozenset(names)
+
+
+def _only_reads(region: Node, sp: LangSpec) -> bool:
+    """Whether this opaque region is one whose contract says it only READS what it is given.
+
+    The override above exists to catch an unseen WRITE. A region that cannot perform one
+    hides nothing, so a name inside it is a name the reading reached, and forcing the state
+    unresolved would report a complete reading as a partial one.
+
+    Read from a NAMED list, never a general rule, because a macro expands to anything. The
+    name is matched on its last segment, so `tracing::info` and a bare `info` are one entry,
+    and a region whose name this reader does not know keeps the override."""
+    if not sp["reading_macros"]:
+        return False
+    named = [c for c in region.children if c.is_named]
+    if not named:
+        return False
+    return text(named[0]).rsplit("::", 1)[-1] in sp["reading_macros"]
 
 
 def is_lvalue(node: Node | None, sp: LangSpec) -> bool:

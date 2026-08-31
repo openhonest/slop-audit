@@ -156,3 +156,10 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
     Then it returns that text decoded
     But it returns nothing for an absent node, which is what its callers test for, unlike text, which answers the empty string
 
+
+  Scenario: _only_reads decides whether an opaque region can hide a write
+    Given a region the grammar handed back as tokens, and the language's list of the ones whose contract is known
+    When _only_reads reads the region's name against that list, matching on its last segment so a qualified name and a bare one are one entry
+    Then a region that only formats, logs, compares or collects hides no write, so the references built outside it are the whole reading
+    And a region whose name the list does not carry keeps the refusal, because a macro expands to anything and this reader cannot know what
+    But the list names the writers out: a macro that writes its first argument is exactly the case the refusal exists for

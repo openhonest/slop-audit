@@ -58,6 +58,19 @@ _CS_KEYED_READ = frozenset({"ContainsKey", "TryGetValue", "Contains", "ContainsV
 # cell, exactly as `get` does, and what the caller does with the entry afterwards does not
 # widen the key. A production run over a public crate on 2026-08-30 reported 290 of 392
 # state-keeping places unread, and this shape was most of them.
+# Rust macros whose arguments are read and never written. Formatting, logging, comparing,
+# panicking and collecting: none of them can mutate what it is handed. `write!` and
+# `writeln!` are absent on purpose, because they write their first argument, and that is the
+# case the opaque-region override exists for.
+_RUST_READING_MACROS = frozenset({
+    "format", "println", "print", "eprintln", "eprint", "panic", "todo", "unimplemented",
+    "unreachable", "assert", "assert_eq", "assert_ne", "debug_assert", "debug_assert_eq",
+    "debug_assert_ne", "matches", "vec", "json", "dbg",
+    # The tracing and log families, matched on the last segment so `tracing::info` and a
+    # bare `info` are one entry.
+    "trace", "debug", "info", "warn", "error",
+})
+
 _RUST_KEYED_READ = frozenset({
     "get", "get_mut", "contains_key", "contains", "get_or_insert", "entry",
 })

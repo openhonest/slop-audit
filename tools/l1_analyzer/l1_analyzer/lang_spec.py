@@ -420,6 +420,20 @@ class LangSpec(TypedDict, total=False):
     # rather than judged on the half that could be read. The eight whose grammars parse
     # everything declare the empty tuple.
     opaque_region_types: tuple[str, ...]
+    # Macros whose arguments are READ and never written. A name inside one of these is not
+    # a name the reading missed: the region is opaque, but the danger the opacity guards
+    # against is an unseen WRITE, and formatting, comparing, logging and collecting cannot
+    # perform one.
+    #
+    # Named macros, never a general rule, because a macro expands to anything. `write!` and
+    # `writeln!` are deliberately absent: they write their first argument, which is exactly
+    # the case the override exists for.
+    #
+    # Matched on the LAST segment of the name, so `tracing::info` and a bare `info` are one
+    # entry. 72 of the 102 remaining silences on crates/buzz-acp were these, and the macros
+    # in that crate are the ordinary ones: 3600 uses across assert, assert_eq, vec, format,
+    # json, matches, panic and four tracing levels.
+    reading_macros: frozenset[str]
 
 from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table below and its readers use these
     _C_LITERALS,
@@ -443,6 +457,7 @@ from l1_analyzer.lang_vocab import (  # noqa: F401 - re-exported: the table belo
     _RUST_KEYED_READ,
     _RUST_LITERALS,
     _RUST_MUTATING,
+    _RUST_READING_MACROS,
     COMPARISON_OPS,
     DECISION_NODE_TYPES,
 )
@@ -672,6 +687,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "bare_cond_types": {},
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
+        "reading_macros": frozenset(),
         "extra_test_positions": {
             "conditional_expression": "second",   # a if <cond> else b: no condition field
             "assert_statement": "first",
@@ -825,6 +841,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "bare_cond_types": {},
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
+        "reading_macros": frozenset(),
         "extra_test_positions": {"ternary_expression": "field"},
         # Calls here are not flat, so there is no receiver field on the call node; the
                 # receiver is reached through member_types instead. Guarded by flat_call, and
@@ -967,6 +984,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "bare_cond_types": {},
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
+        "reading_macros": frozenset(),
         "extra_test_positions": {"ternary_expression": "field", "assert_statement": "first"},
         # No dynamic-dispatch spelling in this grammar.
         "dispatch_methods": frozenset(),
@@ -1118,6 +1136,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "bare_cond_types": {},
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
+        "reading_macros": frozenset(),
         "extra_test_positions": {"conditional_expression": "field"},
         # Calls here are not flat, so there is no receiver field on the call node; the
                 # receiver is reached through member_types instead. Guarded by flat_call, and
@@ -1274,6 +1293,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "bare_cond_types": {},
         "alias_types": {"reference_expression": "value"}, "alias_marker": "mutable_specifier",
         "opaque_region_types": ("macro_invocation",),
+        "reading_macros": _RUST_READING_MACROS,
         "extra_test_positions": {},               # `if` is an expression, already in branch_types
         # Calls here are not flat, so there is no receiver field on the call node; the
                 # receiver is reached through member_types instead. Guarded by flat_call, and
@@ -1431,6 +1451,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "bare_cond_types": {},
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
+        "reading_macros": frozenset(),
         "extra_test_positions": {"conditional": "field"},
         # No language builtins beyond the shared bounded set.
         "extra_bounded": frozenset(),
@@ -1574,6 +1595,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "bare_cond_types": {},
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
+        "reading_macros": frozenset(),
         "extra_test_positions": {"conditional_expression": "field"},
         # Calls here are not flat, so there is no receiver field on the call node; the
                 # receiver is reached through member_types instead. Guarded by flat_call, and
@@ -1740,6 +1762,7 @@ LANG_SPEC: dict[str, LangSpec] = {
         "bare_cond_types": {"for_statement": ("block", "for_clause", "range_clause")},
         "alias_types": {}, "alias_marker": "",
         "opaque_region_types": (),
+        "reading_macros": frozenset(),
         "extra_test_positions": {},               # no ternary, no assert expression
         # Calls here are not flat, so there is no receiver field on the call node; the
                 # receiver is reached through member_types instead. Guarded by flat_call, and
