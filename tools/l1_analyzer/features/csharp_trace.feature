@@ -65,3 +65,9 @@ Feature: csharp_trace — the L1.19 and L1.20 runtime harness for C# repositorie
     Then it returns the count of clean runs out of the total, Healthy only when every run passed, Not Healthy when exactly one failed, and Slop below that
     And the detail says the order was varied by the scheduler rather than controlled by a seed, because the runner takes no seed, and it quotes the first line of up to three failing runs
     But a missing SDK, a run that timed out, and any run where the suite did not actually execute each return an explicit not-applicable with its reason rather than a misleading count of zero
+
+  Scenario: _branch_totals reads the two branch counts a Cobertura report carries
+    Given the text of a Cobertura coverage report
+    When _branch_totals reads the branch attributes off its top-level element
+    Then it hands back the covered count first and the valid count second, because the verdict takes them that way round and the report writes them the other
+    But a report carrying neither attribute hands back nothing at all, since that is a schema this reader does not know rather than a project with no branches, and reading it as zero would publish a grade on coverage nobody measured

@@ -88,3 +88,17 @@ Feature: rust_trace — running a Rust crate's own test suite to measure coverag
     Then it returns the passing count over the run count, banded Healthy when every run passes, Not Healthy at one short, and Slop below that
     And a missing build tool returns not-applicable before any run is attempted, and a timed-out run returns not-applicable naming the run that hung
     But only the first run is checked for having collected any tests, so a build that starts failing on a later run is counted as a failing run rather than reported as a suite that never executed
+
+  Scenario: _region_totals reads the region counts a coverage export carries
+    Given the parsed export cargo-llvm-cov writes for a whole run
+    When _region_totals walks to the run's totals and reads its regions
+    Then it hands back how many regions there are and how many were exercised
+    And a tree with no regions at all comes back as zero of zero, which the verdict below tells apart from a run that covered none of forty
+    But an export this reader cannot find totals in hands back nothing, because that is a schema it does not know and reading it as zero would grade coverage nobody measured
+
+  Scenario: _coverage_verdict turns finished region totals into the published reading
+    Given the region totals, how the run exited, and the toolchain that measured it
+    When _coverage_verdict applies the published band table
+    Then above ninety per cent is Healthy, sixty to ninety is Not Healthy, and below sixty is Slop
+    And the sentence says region coverage and names the toolchain, because branch coverage needs a nightly toolchain and a reader comparing this against another language has to know which they are looking at
+    But a run that timed out, and a tree that exercised no region, are refused with the reason rather than graded, since neither is a coverage of zero

@@ -190,6 +190,81 @@ def repo_uncovered_lines(repo: Path, timeout_seconds: float) -> RepoUncovered:
     return {"measured": True, "files": files, "reason": ""}
 
 
+class Regions(TypedDict):
+    """The two region counts cargo-llvm-cov writes into a report's totals."""
+    count: int
+    covered: int
+
+
+class Totals(TypedDict):
+    """The grand totals of one coverage run. Only the regions are read here."""
+    regions: Regions
+
+
+class Run(TypedDict):
+    """One measured run in a cargo-llvm-cov export."""
+    totals: Totals
+    files: list[Entry]
+
+
+class Report(TypedDict):
+    """What `cargo llvm-cov --json` writes. Declared because the four levels this reader
+    walks were four unchecked subscripts on a value nothing described, and they decide the
+    whole indicator for Rust."""
+    data: list[Run]
+
+
+def _region_totals(report: Report) -> tuple[int, int] | None:
+    """(count, covered) regions from a cargo-llvm-cov export, or None when it has no totals.
+
+    None, never (0, 0), for a report this reader cannot find totals in. That is a schema it
+    does not know, which is a different fact from a tree with no regions, and reading it as
+    zero would publish Slop for a repository whose coverage was never measured.
+
+    A tree with no regions at all comes back as (0, 0) and is refused by the verdict below,
+    where the reason can say which of the two happened."""
+    try:
+        regions = report["data"][0]["totals"]["regions"]
+        return int(regions["count"]), int(regions["covered"])
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None
+
+
+def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
+                      toolchain: str) -> L1Result:
+    """L1.19 from a finished run and cargo-llvm-cov's region totals. No I/O, so it can be
+    asserted.
+
+    Lifted out of the function that runs cargo, which is what every other harness here did
+    on 2026-08-17 and this one did not. Until now the totals, both refusals and the band all
+    sat inside the subprocess path, so proving any of them needed a Rust toolchain and
+    cargo-llvm-cov on the machine, and after the stand-ins were removed they were proved by
+    nothing at all.
+
+    The timeout is decided first, before any total is touched: a killed run wrote no summary,
+    so the caller has nothing to hand over.
+
+    Region coverage, and the details line says so. LLVM branch coverage is the closer
+    analogue of what the other harnesses report, and on a stable toolchain it is not
+    available, so a reader comparing this number against another language's has to be told
+    which one they are looking at."""
+    if returncode == 124:
+        return _na("test suite timed out before coverage could be measured")
+    if totals is None:
+        return _na("coverage report had no region totals")
+    count, covered = totals
+    if count == 0:
+        return _na("no coverage regions found (did the suite run any tests?)")
+    pct = covered / count * 100
+    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
+    return {
+        "value": round(pct, 1),
+        "band": coverage_band(pct),
+        "details": f"{covered}/{count} llvm-cov regions exercised by tests, region coverage "
+                   f"({suite}; ran under {toolchain})",
+    }
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:
     """L1.19 for Rust: region coverage from cargo-llvm-cov. Bands match the spec:
     >90% Healthy, 60-90% Not Healthy, <60% Slop."""
@@ -217,23 +292,8 @@ def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:
         except (OSError, json.JSONDecodeError):
             return _na("coverage report was unreadable")
 
-    try:
-        regions = report["data"][0]["totals"]["regions"]
-        count, covered = int(regions["count"]), int(regions["covered"])
-    except (KeyError, IndexError, TypeError, ValueError):
-        return _na("coverage report had no region totals")
-    if count == 0:
-        return _na("no coverage regions found (did the suite run any tests?)")
-
-    pct = covered / count * 100
-    result_band = coverage_band(pct)
-    suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": result_band,
-        "details": f"{covered}/{count} llvm-cov regions exercised by tests, region coverage "
-                   f"({suite}; ran under {_toolchain(repo, timeout_seconds)})",
-    }
+    return _coverage_verdict(_region_totals(report), run.returncode,
+                             _toolchain(repo, timeout_seconds))
 
 
 # ---------------------------------------------------------------------------

@@ -43,6 +43,27 @@ _BRANCHES_COVERED = re.compile(r"<coverage[^>]*\bbranches-covered=\"(\d+)\"")
 _RAN = ("Passed!", "Failed!", "Passed: ", "Failed: ", "Total tests:", "Passed :", "Failed :")
 
 
+def _branch_totals(xml_text: str) -> tuple[int, int] | None:
+    """(covered, valid) branches from a Cobertura report, or None when it carries no counts.
+
+    Covered first, then valid, because the verdict takes (covered, total) and the report
+    writes the pair the other way round. One transposition is a coverage of 105%.
+
+    None, never (0, 0), for a report with no branch attributes. That is a schema this reader
+    does not know, which is a different fact from a project with no branches to cover, and
+    reading it as zero would publish Slop for a repository whose coverage was never measured.
+
+    Lifted out of the function that runs `dotnet test` so a test can call it. It was proved
+    by a stand-in until the 2026-08-17 sweep removed those, and by nothing after: 58% of this
+    harness went unreached, the lowest of the nine, and every line that decides what a report
+    says was in the unreached part. Java and Ruby lift theirs out for the same reason."""
+    valid = _BRANCHES_VALID.search(xml_text)
+    covered = _BRANCHES_COVERED.search(xml_text)
+    if valid is None or covered is None:
+        return None
+    return int(covered.group(1)), int(valid.group(1))
+
+
 def _dotnet() -> str | None:
     return shutil.which("dotnet")
 
@@ -94,12 +115,9 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         reports = sorted(Path(directory).rglob("coverage.cobertura.xml"))
         if run.returncode == 124 or not reports:
             return _coverage_verdict(None, run.returncode, sdk)
-        text = reports[0].read_text(errors="ignore")
-        valid_match = _BRANCHES_VALID.search(text)
-        covered_match = _BRANCHES_COVERED.search(text)
-        if valid_match is None or covered_match is None:
+        branches = _branch_totals(reports[0].read_text(errors="ignore"))
+        if branches is None:
             return _na("cobertura report had no branch counts")
-        branches = (int(covered_match.group(1)), int(valid_match.group(1)))
 
     return _coverage_verdict(branches, run.returncode, sdk)
 
