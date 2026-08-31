@@ -17,8 +17,8 @@ dispatch chain, and counting it as one would teach a reader to ignore the number
 import ast
 
 import pytest
+from l1_analyzer import honest_code
 from l1_analyzer import honest_code_edges as edges
-from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_read as read
 from l1_analyzer import honest_code_rules as rules
 
@@ -236,7 +236,7 @@ def test_the_strangler_clause_never_returns_a_verdict():
     and found nothing. The refusal is loud now, and the two tests below say why: the gate
     answers before this is reached, so reaching it is itself the defect."""
     with pytest.raises(NotImplementedError):
-        python_rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))
+        rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))
 
 
 # --------------------------------------------------------------------------
@@ -329,7 +329,6 @@ def test_the_clause_nothing_decides_is_never_asked():
     """`_skip_reason` answers `never` for clause 17 before any checker runs, so its body is
     unreachable during a normal assessment. A stub checker flagged the empty return and was
     right for a better reason than it knew: not unwritten, never run."""
-    from l1_analyzer import honest_code
 
     asked = []
     original = honest_code.CLAUSES
@@ -350,4 +349,4 @@ def test_reaching_the_clause_nothing_decides_is_itself_a_defect():
     nothing. Reaching it means the gate that answers `never` has stopped working, and a
     silent None would let that failure arrive somewhere else as a clean result."""
     with pytest.raises(NotImplementedError):
-        python_rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))
+        rules.strangler_migration(_module("def f(n: int) -> int:\n    return n\n"))

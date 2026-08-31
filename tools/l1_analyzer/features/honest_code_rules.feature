@@ -170,3 +170,9 @@ Feature: honest_code_rules — the nineteen clause checkers of L1.21
     When _script_spans reads the markup grammar for what a script element holds
     Then it returns those spans and nothing else, so an attribute value is never read as script
     But it reads the grammar rather than matching the text, because an attribute whose value happens to name a script tag is not a script tag
+
+  Scenario: strangler_migration refuses to answer, because nothing can
+    Given any module at all
+    When strangler_migration is called
+    Then it raises, because the clause is a property of how work is sequenced over weeks and no file carries the sequence of the work that produced it
+    But the gate answers never for this clause before any checker runs, so reaching this body means that gate has stopped working, and returning nothing would let the failure arrive somewhere else as a clean result

@@ -157,20 +157,6 @@ def _classes(source: Source) -> list[ast.ClassDef]:
     return [n for n in ast.walk(source["tree"]) if isinstance(n, ast.ClassDef)]
 
 
-def _methods(node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
-    """Every method on this class, async ones included, for the reason above."""
-    return [n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-
-
-def _called(node: ast.AST) -> set[str]:
-    from l1_analyzer.facets import called_name
-    return {called_name(n) for n in ast.walk(node) if isinstance(n, ast.Call)}
-
-
-def _base_names(node: ast.ClassDef) -> list[str]:
-    return [ast.unparse(base).split("[")[0].split(".")[-1] for base in node.bases]
-
-
 # ---------------------------------------------------------------------------
 # Reading one language's shapes through its own vocabulary
 #

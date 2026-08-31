@@ -30,13 +30,11 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     Then the node itself and everything beneath it come back
     But nothing about order is promised, because a clause that depends on tree-walk order is reading the walk rather than the code
 
-
   Scenario: _finding records one site a clause found
     Given the clause, the symbol, the line, what is wrong, what to do instead and what was not decided
     When _finding assembles them
     Then every field is stated by the caller
     But undecided is required rather than defaulted, because this module's own clause 14 flagged the default and was right
-
 
   Scenario: _functions lists every function in a source
     Given a parsed source
@@ -44,40 +42,12 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     Then both plain and async definitions come back
     But a nested definition comes back too, since a closure that violates a clause violates it wherever it sits
 
-
   Scenario: _classes lists every class in a source
     Given a parsed source
     When _classes walks the tree
     Then each class definition comes back
     But nothing about whether a class was the right choice, which no reading of the source decides
 
-
-  Scenario: _methods lists the functions defined directly in one class
-    Given a class definition
-    When _methods reads its body
-    Then only the functions of that class body come back
-    But a function nested inside one of them does not, since it belongs to the method rather than to the class
-
-
-  Scenario: _called names every function a node calls
-    Given any tree node
-    When _called walks its calls
-    Then each called name comes back once
-    But a call on a computed target names nothing, because there is no name a clause could report
-
-
-  Scenario: _base_names names the classes a definition inherits from
-    Given a class definition
-    When _base_names reads its bases
-    Then a dotted or subscripted base comes back as its bare name
-    But nothing here says whether the base belongs to a framework, which is the half clause 5 cannot decide
-
-  # The undecidable case. Every feature carries exactly one, and the gate requires it, because
-  # a measure that meets a construct it has no rule for must say so rather than return a verdict.
-  # Whether a tree is the RIGHT reading of a file is not decidable here. A grammar accepts what it
-  # accepts, and a file that parses cleanly under the wrong one produces a tree nobody should trust.
-  # This module refuses a language it has no grammar for, which is a different guarantee.
-  @undecidable @not-implemented
   Scenario: undecidable whether a tree that parsed is the right reading of the file
     Given a source that parsed without error under the grammar for its declared language
     When someone asks whether that grammar was the right one for this file

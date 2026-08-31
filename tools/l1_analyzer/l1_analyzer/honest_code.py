@@ -33,7 +33,6 @@ from tree_sitter import Language, Node, Parser
 from l1_analyzer import honest_code_contracts as contracts
 from l1_analyzer import honest_code_edges as edges
 from l1_analyzer import honest_code_markers as markers
-from l1_analyzer import honest_code_python_rules as python_rules
 from l1_analyzer import honest_code_references as references
 from l1_analyzer import honest_code_rules as rules
 from l1_analyzer.honest_code_read import Source, read_tree
@@ -312,6 +311,8 @@ def _clause(rule: int, name: str, decides: str,
 
 # The table IS the measure. Adding a principle is adding a row, which is Lookup Polymorphism applied
 # to the module that checks Lookup Polymorphism.
+
+
 CLAUSES: tuple[Clause, ...] = (
     # Ported to the shared vocabulary: decided for every language the spec covers.
     _clause(1, "Lookup Polymorphism", _TREE, rules.dispatch_chains, nothing_to_read="",
@@ -361,7 +362,7 @@ CLAUSES: tuple[Clause, ...] = (
     # never uses, and the undecided disclosure read that as a port we owe: a JavaScript
     # repository was told this clause "is unported, not silent", promising work that cannot
     # be done. What it decides and what it reads are one answer for this row.
-    _clause(17, "Strangler Pattern for Migration", _NOTHING, python_rules.strangler_migration,
+    _clause(17, "Strangler Pattern for Migration", _NOTHING, rules.strangler_migration,
             nothing_to_read="", reads=_NOTHING),
     _clause(18, "Dispatch Tables Close Open Input", _TREE, rules.open_dispatch, nothing_to_read="",
             reads=_TREE_READER),

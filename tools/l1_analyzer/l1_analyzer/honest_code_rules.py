@@ -641,6 +641,23 @@ def _is_literal_node(node: Node, spec: LangSpec) -> bool:
 # 18. Dispatch tables close open input
 # --------------------------------------------------------------------------
 
+def strangler_migration(source: Source) -> list[Finding] | None:
+    """Never a verdict, and never called.
+
+    A property of how a migration is sequenced over weeks. No file, and no set of files,
+    carries the sequence of the work that produced them, so a pass here would be a claim
+    nobody could support. It is the one clause excluded by its nature rather than by the
+    reach of this reader.
+
+    The gate answers `never` for this clause before any checker runs, so this body is
+    unreachable. It used to return None, which reads to a caller exactly like a clause that
+    ran and found nothing; reaching it means that gate has stopped working, and a silent
+    None would let the failure arrive somewhere else as a clean result."""
+    raise NotImplementedError(
+        "clause 17 has no checker: nothing decides the strangler pattern, and the gate "
+        "should have answered `never` before reaching this")
+
+
 def open_dispatch(source: Source) -> list[Finding] | None:
     """A read of a table this file declares that supplies a value for an absent key.
 
