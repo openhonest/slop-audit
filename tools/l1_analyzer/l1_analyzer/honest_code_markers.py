@@ -15,6 +15,8 @@ third answer: the clause was not decided for this file, which is different from 
 meaning the clause ran and found nothing.
 """
 
+from tree_sitter import Node
+
 from l1_analyzer.honest_code_read import (
     Finding,
     Source,
@@ -238,17 +240,20 @@ def statements_in(node, spec: LangSpec) -> int:
     return counted
 
 
-def _step_definitions(source: Source) -> list[tuple[str, object]]:
+def _step_definitions(source: Source) -> list[tuple[str, Node]]:
     """Every step definition in this file, as (what to call it, the node holding its body).
 
     Two shapes. Python, Java and C# mark a declaration with a decorator, an annotation or an
     attribute, so the step is the thing marked. JavaScript and Ruby pass the body to `Given`,
     so the step has no declaration at all and a reader looking for one finds none of them.
 
+    Nodes, said so. Handing them back as `object` meant the two readers below asked a parse
+    tree where a finding should point through a declaration that said it had no position.
+
     The call form yields the CALL, whose line span is the step, rather than the anonymous
     function inside it."""
     spec, raw = source["spec"], source["raw"]
-    steps: list[tuple[str, object]] = []
+    steps: list[tuple[str, Node]] = []
     # By the node holding the body, because a step can carry more than one marker: a
     # pytest-bdd function bound to three scenarios has three decorators. Collecting markers
     # and mapping each back to its function reported one adopter's step three times and

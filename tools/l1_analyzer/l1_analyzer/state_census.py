@@ -596,7 +596,7 @@ def _walk(repo: Path, lang: str) -> dict[str, set[Site]]:
     return by_file
 
 
-def uncounted(admitted: int) -> dict[str, object]:
+def uncounted(admitted: int) -> Census:
     """The census of a language it has no spec for. Every count is None rather than 0.
 
     A confident zero is exactly the failure this module exists to stop: it would let an
@@ -607,7 +607,38 @@ def uncounted(admitted: int) -> dict[str, object]:
             "judged": None, "judged_fraction": None}
 
 
-def _tally(by_file: dict[str, set[Site]], lang: str) -> dict[str, object]:
+class Tally(TypedDict):
+    """What one walk of the parse trees counts on its own: how many declarations there are,
+    how they split by kind, and how many files carried them."""
+
+    declared: int | None
+    by_kind: dict[str, int]
+    files: int
+
+
+class Census(Tally):
+    """The tally beside what the classifier's own walk reached.
+
+    Six fields more than the tally, and it was a mapping of names to anything, so the two
+    fractions that decide whether a grade is issued at all were read through a declaration
+    that said nothing about them. Both are None when there is no denominator: nothing
+    declared is not "we read none of it", and nothing reached is not "we judged none of
+    what we reached"."""
+
+    admitted: int
+    # None, not 0, on a language this module has no spec for. A confident zero is the
+    # failure this module exists to stop: it would let an unread repository report a full
+    # denominator and pass. None says "not counted here", which withholds the gap check
+    # rather than faking it, and the refusal builder above has said so in prose since it
+    # was written while the declaration said these were numbers.
+    visited: int | None
+    judged: int | None
+    unread_kinds: list[str] | None
+    visited_fraction: float | None
+    judged_fraction: float | None
+
+
+def _tally(by_file: dict[str, set[Site]], lang: str) -> Tally:
     """The counts one walk of the parse trees can produce on its own, rolled up per file.
 
     Declarations only. Nothing here says whether anything READ them, because this walk has no
@@ -662,7 +693,7 @@ def _hit_by_kind(by_file: dict[str, set[Site]], reached: dict[str, set[Site]]) -
 
 
 def compare(repo: Path, lang: str, admitted: int,
-            visited: dict[str, set[Site]], judged: dict[str, set[Site]]) -> dict[str, object]:
+            visited: dict[str, set[Site]], judged: dict[str, set[Site]]) -> Census:
     """The census beside what the classifier's own walk reached, which is the only comparison
     that can see non-enumeration.
 

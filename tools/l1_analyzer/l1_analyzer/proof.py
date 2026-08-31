@@ -130,8 +130,11 @@ def malformed(proposal: Proposal) -> str:
     Both code fields must parse as EXPRESSIONS: the gate executes what it renders, and a
     statement in an argument list is a way to run something other than the function under
     audit."""
-    for field, wrapper in (("concrete_input", "f({})"), ("expected_property", "({})")):
-        text = proposal.get(field, "")
+    # The two code fields, named one at a time. Looping over a variable key asks the record
+    # for a field it cannot know, so it answers with anything at all, and every read below
+    # was a call on a value nothing described.
+    for field, text, wrapper in (("concrete_input", proposal.get("concrete_input", ""), "f({})"),
+                                 ("expected_property", proposal.get("expected_property", ""), "({})")):
         if not text.strip():
             return f"{field} is empty; it has to carry the code the test will run"
         if len(text) > _MAX_FIELD:
