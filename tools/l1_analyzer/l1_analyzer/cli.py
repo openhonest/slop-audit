@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
@@ -115,13 +116,20 @@ def window_around(lines: list[str], line: int) -> str:
     return "\n".join(lines[low:high])
 
 
-@boundary
 def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: int,
-               timeout: float) -> prove.ProofRun:
+               timeout: float, work_root: Path) -> prove.ProofRun:
     """Locate -> generate -> run -> retain over the review-tier findings. Deterministic
-    locate; the model only fills a located gap; the execution gate keeps only what fires."""
-    import tempfile
+    locate; the model only fills a located gap; the execution gate keeps only what fires.
 
+    Not declared an edge, and the declaration it used to carry was the reason clause 4 grew
+    its second half. This function takes the thread-safety surface and hands back a prove
+    summary: it received the domain's data, decided about it, and returned the decision. The
+    real edges are below it, in `prove.generate` and `prove.write_crate_and_stress`, which is
+    where the money is spent and the crate is built.
+
+    `work_root` is made by the caller for the same reason. It was the one piece of I/O this
+    function did on its own account, and it was the whole of what the declaration was true
+    about."""
     from l1_analyzer import prove
     if lang != "rust":
         return {"verdict": "n/a", "detail": f"prove is Rust-only for now; {lang} not supported", "demonstrated": 0, "outcomes": []}
@@ -132,7 +140,6 @@ def _run_prove(repo: Path, lang: str, thread_surface_result: object, prove_max: 
     # or a fresh scan, so both reads are guaranteed. A default here would have quietly
     # proven nothing on a malformed surface rather than saying it could not read one.
     candidates = [f for f in ts["findings"] if f["severity"] == "review"][:prove_max]
-    work_root = Path(tempfile.mkdtemp(prefix="l1-prove-"))
     outcomes: list[prove.ProofRecord] = []
     for i, f in enumerate(candidates):
         request = prove.proof_request(f, _hazard_context(repo, f))
@@ -867,8 +874,10 @@ def main(argv: list[str] | None) -> int:
     # Prove (opt-in): locate -> generate -> run -> retain, in one command. Generates and
     # runs code, so CLI-only and explicit.
     if args.prove:
-        results["proofs"] = _run_prove(args.repo, _audited_language(results, args.lang, args.repo),
-                                       results.get("thread_surface"), args.prove_max, args.timeout)
+        results["proofs"] = _run_prove(
+            args.repo, _audited_language(results, args.lang, args.repo),
+            results.get("thread_surface"), args.prove_max, args.timeout,
+            Path(tempfile.mkdtemp(prefix="l1-prove-")))
 
     # Coverage-gap proofs (opt-in): locate -> propose -> render -> run in-crate -> retain.
     # Generates and runs code, so CLI-only and explicit. --prove-coverage-repo sweeps the

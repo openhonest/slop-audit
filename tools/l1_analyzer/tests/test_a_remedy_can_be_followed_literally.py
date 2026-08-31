@@ -67,7 +67,8 @@ def test_no_remedy_names_a_function_this_ecosystem_does_not_have(banned):
 # unsaid: what `data` holds, whether the class survives, and what happens at the call sites.
 _INSTRUCTIONS = ("take", "make", "let", "read", "call", "move", "profile", "extract",
                  "scope", "declare", "trust", "put", "return", "use", "replace", "map",
-                 "assert", "add", "fix", "give", "hand", "keep", "raise", "render", "send")
+                 "assert", "add", "fix", "give", "hand", "keep", "raise", "render", "send",
+                 "split")
 
 
 def test_every_remedy_contains_something_the_reader_does():

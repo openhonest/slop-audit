@@ -112,3 +112,29 @@ Feature: The three clauses about a program's edges
     Then it returns the last of them in source order, which is the local name rather than the type
     And that is a different question from what type was caught, and the only thing that tells one rendering of the exception from any other call by the same name
     But taking whichever identifier the walk happened to yield last picked the type and matched nothing
+
+  Scenario: _bare_type strips a declared type down to the thing that crosses the edge
+    Given one type as its grammar spells it, with the punctuation and the absence beside it
+    When _bare_type reduces it
+    Then a colon a grammar hangs on an annotation is gone, so TypeScript's spelling and Python's compare as one
+    But a type and the same type written as possibly absent reduce to one answer, because what kind of thing crosses an edge does not change with whether it might be missing
+
+  Scenario: _declared_types reads what a function takes and what it hands back
+    Given one function and its language's vocabulary for parameter types and return types
+    When _declared_types reads both
+    Then it hands back every parameter's declared type and the declared return type
+    But a language that declares neither hands back nothing at all, which is the honest answer for JavaScript and Ruby rather than a claim that the function takes nothing
+
+  Scenario: carries_domain_data decides whether one type holds the domain's own data
+    Given one declared type and the language's tables of locators and statuses
+    When carries_domain_data reads through it
+    Then a locator does not, because it says where to look and how long to wait, and a status does not, because it says only whether something landed
+    And a container is read through to its contents, so a list of paths is still a list of places to look and a tuple of a flag, a reason and a duration is still a report that something happened
+    But a type the tables do not name carries the domain, because a reader that assumed otherwise would clear every edge in every repository
+
+  Scenario: declared_edge_direction says whether a declared edge obtains, emits, or does neither
+    Given a function carrying its project's own declaration that it is an edge
+    When declared_edge_direction reads its signature
+    Then it obtains when nothing it takes carries the domain's data, and emits when nothing it hands back does
+    And it is neither only when both halves carry the domain, which is a function that received something, decided about it, and returned the decision
+    But a language that declares no types, and a function nobody annotated, are undecided rather than reported: a function nobody annotated is not a function doing the wrong thing

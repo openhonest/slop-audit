@@ -32,6 +32,11 @@ Check = dict[str, object]
 
 
 
+# The findings handed in name which components to look at, and the findings handed back are
+# what was seen. Two different kinds of finding under one type name, and the incoming one is
+# a locator: the clause cannot know that, because what counts as a place to look is a
+# project's own vocabulary and the reader only knows the language's.
+# honest-code-allow: L1.21.4 - the incoming findings name which components to screenshot, so this obtains
 @boundary
 async def verify_components(
     url: str,

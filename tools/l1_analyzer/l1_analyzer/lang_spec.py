@@ -168,6 +168,25 @@ class LangSpec(TypedDict, total=False):
     type_test_operators: frozenset[str]  # operator text that makes the node a type test
     type_test_calls: frozenset[str]      # call forms, value first argument and type second
     scalar_types: frozenset[str]         # declarations that fix the type on their own
+    # The two halves of what a declared edge's signature may say.
+    #
+    # A `locator_types` value tells an edge WHERE to look or HOW LONG to wait: a path, a URL,
+    # a command line, a timeout. It is not the domain's data, so taking one and handing back
+    # data is obtaining. A `status_types` value says whether something landed: a boolean, an
+    # exit code, a row count. Handing one back is emitting.
+    #
+    # A declared edge that takes the domain's data and hands back different domain data is
+    # doing neither. It received something, decided about it, and returned the decision,
+    # which is business logic wearing the declaration. Its own module says so and nothing
+    # could tell the two apart, because a function performing any I/O at all satisfied the
+    # other half of the clause.
+    #
+    # Types rather than a framework list, and no threshold. A route decorator would say the
+    # same thing for one framework at a time, and every count that was tried first ("a
+    # boundary that decides", "an edge is a leaf of the call graph") measured size and
+    # convicted half of this package.
+    locator_types: frozenset[str]
+    status_types: frozenset[str]
     default_param_name: str
     # The two ways a language supplies a value for a key that is not in a table. One is a
     # method taking the key and the answer to give when it is absent; the other is an
@@ -461,6 +480,18 @@ LANG_SPEC: dict[str, LangSpec] = {
         "type_test_calls": frozenset({"isinstance"}),
         "scalar_types": frozenset({"int", "str", "float", "bool", "bytes",
                                    "list", "dict", "set", "tuple"}),
+        # Where to look and how long to wait. `str` is here because a path, a URL, a name
+        # and a command are all spelled `str` in Python, so refusing it would report every
+        # edge that takes a filename. What that costs is the reverse: an edge taking the
+        # domain's data AS a string is read as obtaining. That is the direction to be wrong
+        # in, because this rule only ever accuses.
+        "locator_types": frozenset({
+            "Path", "str", "bytes", "int", "float", "bool", "None",
+            "list[str]", "tuple[str, ...]", "dict[str, str]", "Environment",
+        }),
+        # Whether it landed. A writer hands back one of these and nothing else; handing back
+        # the domain's data is what says a function did more than write.
+        "status_types": frozenset({"None", "bool", "int"}),
         "class_types": ("class_definition",),
         "func_types": ("function_definition",),
         "assign_types": ("assignment", "augmented_assignment"),
@@ -692,6 +723,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "type_test_operators": frozenset({"instanceof"}),
         "type_test_calls": frozenset(),
         "scalar_types": frozenset(),
+        "locator_types": frozenset(),
+        "status_types": frozenset(),
         "class_types": ("class_declaration",),
         "func_types": ("function_declaration", "method_definition", "arrow_function", "function_expression", "generator_function_declaration"),
         "assign_types": ("assignment_expression", "augmented_assignment_expression"),
@@ -831,6 +864,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "type_test_calls": frozenset(),
         "scalar_types": frozenset({"int", "long", "short", "byte", "char",
                                    "float", "double", "boolean", "String"}),
+        "locator_types": frozenset(),
+        "status_types": frozenset(),
         "class_types": ("class_declaration",),
         "func_types": ("method_declaration", "constructor_declaration"),
         "assign_types": ("assignment_expression",),   # `+=` is an assignment_expression with a += operator
@@ -968,6 +1003,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "type_test_calls": frozenset(),
         "scalar_types": frozenset({"int", "long", "short", "byte", "char", "float",
                                    "double", "decimal", "bool", "string"}),
+        "locator_types": frozenset(),
+        "status_types": frozenset(),
         "class_types": ("class_declaration",),
         "func_types": ("method_declaration", "constructor_declaration"),
         "assign_types": ("assignment_expression",),
@@ -1117,6 +1154,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "type_test_operators": frozenset(),
         "type_test_calls": frozenset(),
         "scalar_types": frozenset(),
+        "locator_types": frozenset(),
+        "status_types": frozenset(),
         # No classes: state is struct fields used as self.<field> inside a separate
         # impl block, so the impl is the scope and state is enumerated from usage.
         "class_types": ("impl_item",),
@@ -1267,6 +1306,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "type_test_operators": frozenset(),
         "type_test_calls": frozenset({"is_a?", "kind_of?", "instance_of?"}),
         "scalar_types": frozenset(),
+        "locator_types": frozenset(),
+        "status_types": frozenset(),
         "class_types": ("class", "module"),
         "func_types": ("method", "singleton_method"),
         "assign_types": ("assignment", "operator_assignment"),
@@ -1410,6 +1451,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "type_test_operators": frozenset(),
         "type_test_calls": frozenset(),
         "scalar_types": frozenset(),
+        "locator_types": frozenset(),
+        "status_types": frozenset(),
         # No classes or methods: state is file-scope variables only (module_enum: c).
         "class_types": (),
         "func_types": ("function_definition",),
@@ -1555,6 +1598,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "type_test_calls": frozenset(),
         "scalar_types": frozenset({"int", "int8", "int16", "int32", "int64", "uint",
                                    "float32", "float64", "bool", "string", "byte", "rune"}),
+        "locator_types": frozenset(),
+        "status_types": frozenset(),
         # No classes: state is struct fields, methods bound by a named receiver. State
         # is grouped by receiver type (scope_by_receiver) and keyed <Type>.<field>.
         "class_types": (),

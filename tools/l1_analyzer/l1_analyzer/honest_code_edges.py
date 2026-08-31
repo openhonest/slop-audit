@@ -43,6 +43,89 @@ from l1_analyzer.lang_spec import LangSpec
 # below is the success condition rather than a swallow.
 _RECORDS_A_FAILURE = frozenset({"append", "add", "extend", "fail", "error", "insert"})
 
+def _bare_type(text: str) -> str:
+    """One declared type, stripped of the punctuation a grammar hangs on it and of the
+    absence a language spells beside it.
+
+    `str | None` and `str` are the same answer to the question this asks, which is what kind
+    of thing crosses the edge. TypeScript's annotation node carries its colon and Python's
+    does not."""
+    return text.lstrip(":").strip().split("|")[0].strip()
+
+
+def carries_domain_data(declared: str, spec: LangSpec, plain: frozenset[str]) -> bool:
+    """Whether one declared type carries the domain's own data.
+
+    It does not when every type in it is a locator, saying WHERE to look and how long to
+    wait, or a status, saying whether something landed. A container is read through to its
+    contents: a list of paths is still a list of places to look, and a tuple of a flag, a
+    reason and a duration is still a report that something happened. Read as a rule rather
+    than listed, because `list[Path]`, `tuple[Path, ...]`, `frozenset[Path]` and
+    `Sequence[Path]` are one fact spelled four ways and a list of spellings goes quiet on
+    the fifth. Both false positives this rule produced on its first run over this package
+    were exactly that, and the third was a status spelled as a tuple."""
+    if not declared:
+        return False
+    if declared in plain:
+        return False
+    if "[" not in declared:
+        return True
+    inside = declared[declared.index("[") + 1:declared.rindex("]")]
+    parts = [p.strip().rstrip(".") for p in inside.split(",") if p.strip().strip(".")]
+    return not parts or any(carries_domain_data(_bare_type(p), spec, plain) for p in parts)
+
+
+def _declared_types(fn: Node, spec: LangSpec, raw: bytes) -> tuple[list[str], str]:
+    """(what this function takes, what it hands back), by declared type.
+
+    Empty where a language declares neither, which is the honest answer for JavaScript and
+    Ruby: nothing was read, so nothing is decided."""
+    taken = []
+    for parameter in walk(fn):
+        if parameter.type in spec["typed_param_types"]:
+            declared = parameter.child_by_field_name(spec["typed_param_type"])
+            taken.append(_bare_type(node_text(declared, raw) or ""))
+    given = ""
+    if spec["return_type_field"]:
+        given = _bare_type(node_text(fn.child_by_field_name(spec["return_type_field"]), raw) or "")
+    return taken, given
+
+
+def declared_edge_direction(fn: Node, spec: LangSpec, raw: bytes) -> str:
+    """Whether a declared edge obtains, emits, or does neither.
+
+    An edge that OBTAINS takes locators, which is to say where to look and how long to wait,
+    and hands back what it found. An edge that EMITS takes the data and hands back whether
+    it landed. A function taking the domain's data and handing back different domain data is
+    doing neither: it received something, decided about it, and returned the decision.
+
+    `""` where nothing can be decided: a language that declares no types, or a function
+    that declares none. A function nobody annotated is not a function doing the wrong thing.
+
+    Two rules were tried before this one and are recorded because they look right and are
+    not. "A declared edge that decides" convicts half of this package, including a function
+    choosing between the two places one file can live. "An edge is a leaf of the call graph"
+    convicts the same half, including an edge that asks two small questions before reading.
+    Both measure size. A signature measures direction, which is what the declaration is a
+    claim about."""
+    if not spec["locator_types"] or not spec["status_types"]:
+        return ""
+    taken, given = _declared_types(fn, spec, raw)
+    if not given:
+        return ""
+    plain = spec["locator_types"] | spec["status_types"]
+    # Symmetric, and the symmetry is the rule. A function OBTAINS when nothing it takes
+    # carries the domain's data: it was told where to look and handed back what it found. It
+    # EMITS when nothing it hands back does: it was given the data and reported whether it
+    # landed. It is NEITHER only when both halves carry the domain, which is a function that
+    # received something, decided about it, and returned the decision.
+    if not any(carries_domain_data(t, spec, plain) for t in taken):
+        return "obtains"
+    if not carries_domain_data(given, spec, plain):
+        return "emits"
+    return "neither"
+
+
 def io_below_the_boundary(source: Source) -> list[Finding] | None:
     """A function that performs I/O and is itself reached by a sibling.
 
@@ -101,6 +184,20 @@ def io_below_the_boundary(source: Source) -> list[Finding] | None:
                 "so the declaration states an edge that is not there",
                 "take the declaration off, or move the read or the call this function was "
                 "meant to be the edge for into it", ""))
+            continue
+        # The other half of the same claim. A function performing any I/O at all satisfied
+        # the check above, so the declaration on an orchestrator carrying fifteen branches
+        # and one read came back clean. This module's own docstring names that gap: applying
+        # the declaration to a function that still decides things is a suppression wearing a
+        # declaration's name, and nothing here could tell the two apart.
+        if name in declared and declared_edge_direction(fn, spec, raw) == "neither":
+            found.append(_finding(
+                "L1.21.4", name, fn.start_point[0] + 1,
+                "declares itself a boundary and its signature neither obtains nor emits: it "
+                "takes the domain's data and hands back different domain data, which is a "
+                "decision rather than an edge",
+                "split it: one function that obtains, taking only where to look and how "
+                "long to wait, and a pure one that decides, taking what was obtained", ""))
             continue
         if name not in reached or not touched:
             continue

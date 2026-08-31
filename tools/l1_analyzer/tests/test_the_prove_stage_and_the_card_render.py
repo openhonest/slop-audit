@@ -64,7 +64,7 @@ def test_a_hazard_in_a_file_that_is_gone_still_yields_a_context(tmp_path):
 
 def test_the_prove_stage_refuses_a_language_it_does_not_support(tmp_path):
     surface = {"findings": [{"file": "a.py", "line": 1, "symbol": "s", "severity": "review"}]}
-    result = cli._run_prove(tmp_path, "python", surface, 3, 60.0)
+    result = cli._run_prove(tmp_path, "python", surface, 3, 60.0, tmp_path / "work")
     assert result["verdict"] == "n/a"
     assert result["outcomes"] == []
     assert "Rust-only" in result["detail"]
@@ -73,7 +73,7 @@ def test_the_prove_stage_refuses_a_language_it_does_not_support(tmp_path):
 def test_the_prove_stage_reports_zero_attempts_without_a_key(tmp_path, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     surface = {"findings": [{"file": "a.rs", "line": 1, "symbol": "s", "severity": "review"}]}
-    result = cli._run_prove(tmp_path, "rust", surface, 3, 60.0)
+    result = cli._run_prove(tmp_path, "rust", surface, 3, 60.0, tmp_path / "work")
     assert result["outcomes"] == []
     assert "ANTHROPIC_API_KEY" in result["detail"]
 
@@ -87,7 +87,7 @@ def test_only_review_severity_findings_are_offered_to_the_model(tmp_path, monkey
         {"file": "a.rs", "line": 1, "symbol": "low", "severity": "candidate"},
         {"file": "b.rs", "line": 2, "symbol": "mid", "severity": "review"},
     ]}
-    result = cli._run_prove(tmp_path, "rust", surface, 3, 60.0)
+    result = cli._run_prove(tmp_path, "rust", surface, 3, 60.0, tmp_path / "work")
     assert result["attempted"] == 0 if "attempted" in result else True
     assert result["detail"].strip()
 
