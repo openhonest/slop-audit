@@ -38,6 +38,7 @@ from l1_analyzer.boundary import boundary
 # fields, and the python one declared them as a mapping of anything to anything.
 from l1_analyzer.coverage_prove import (
     CoverageProof,
+    Outcomes,
     Sweep,
     SweepProgress,
     _call_model,
@@ -249,8 +250,8 @@ def _prove_one(repo: Path, interpreter: str, gap: CoverageGap, import_path: str,
                repair_rounds: int, timeout_seconds: float,
                propose_fn: Callable[..., Answer | None],
                repair_fn: Callable[..., Answer | None],
-               run_fn: Callable[..., tuple[int, str]]) -> tuple[str, Answer | None, str]:
-    """Propose -> run -> (repair -> run)* for one gap. Returns (bucket, proposal, test_source):
+               run_fn: Callable[..., tuple[int, str]]) -> tuple[str, str, str]:
+    """Propose -> run -> (repair -> run)* for one gap. Returns (bucket, explanation, test_source):
     divergence (retained), pass, incidental (setup error), error (timeout), or declined
     (no reply, and counted: a model call that produced nothing still cost money).
 
@@ -286,7 +287,7 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Coverag
                   repair_rounds: int, timeout_seconds: float,
                   propose_fn: Callable[..., Answer | None],
                   repair_fn: Callable[..., Answer | None],
-                  run_fn: Callable[..., tuple[int, str]]) -> tuple[list[CoverageGap], dict]:
+                  run_fn: Callable[..., tuple[int, str]]) -> tuple[list[CoverageProof], Outcomes]:
     """Every gap in one module. Threads the three collaborators through rather than
     reaching for the module's globals, for the reason `_prove_one` gives."""
     outcomes = dict(EMPTY_OUTCOMES)

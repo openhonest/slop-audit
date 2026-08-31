@@ -16,6 +16,8 @@ list meaning the clause ran and found nothing.
 
 from pathlib import Path
 
+from tree_sitter import Node
+
 from l1_analyzer.honest_code_read import (
     Finding,
     Source,
@@ -80,8 +82,11 @@ def _type_tests_in(fn, spec: LangSpec, raw: bytes) -> list[tuple[str, str, int]]
     return tests
 
 
-def _call_arguments(call) -> list[object]:
-    """The argument nodes of a call, whatever the grammar calls the list holding them."""
+def _call_arguments(call: Node) -> list[Node]:
+    """The argument nodes of a call, whatever the grammar calls the list holding them.
+
+    Nodes, said so. Handing them back as `object` meant every reader below asked a parse
+    tree for its fields through a declaration that said it had none."""
     holder = call.child_by_field_name("arguments")
     return list(holder.children) if holder is not None else []
 
@@ -242,7 +247,7 @@ def unscoped_resources(source: Source) -> list[Finding] | None:
 _MOCK_LIMIT = 3
 
 
-def _test_bodies(source: Source) -> list[tuple[str, object, int]]:
+def _test_bodies(source: Source) -> list[tuple[str, Node, int]]:
     """Every test in this file, as (what to call it, the node holding its body, its line).
 
     Two shapes, because a test is not the same kind of thing everywhere. Python, Java and C#
@@ -252,7 +257,7 @@ def _test_bodies(source: Source) -> list[tuple[str, object, int]]:
     The block form yields the CALL, not the anonymous function inside it, so the mocks in the
     body are reached without the same body being counted twice under two names."""
     spec, raw = source["spec"], source["raw"]
-    bodies: list[tuple[str, object, int]] = []
+    bodies: list[tuple[str, Node, int]] = []
     for fn in function_nodes(source["root"], spec):
         name = node_text(fn.child_by_field_name("name"), raw) or ""
         if spec["test_name_prefixes"] and name.startswith(spec["test_name_prefixes"]):

@@ -144,7 +144,11 @@ def _finding(clause: str, symbol: str, line: int, detail: str, instead: str,
             "detail": detail, "instead": instead, "undecided": undecided}
 
 
-def _functions(source: Source) -> list[ast.FunctionDef]:
+def _functions(source: Source) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+    """Every function in this file, async ones included.
+
+    Said so. It declared only the synchronous kind while collecting both, so a reader
+    checking whether a clause reaches `async def` was told it does not, and it does."""
     return [n for n in ast.walk(source["tree"])
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
 
@@ -153,7 +157,8 @@ def _classes(source: Source) -> list[ast.ClassDef]:
     return [n for n in ast.walk(source["tree"]) if isinstance(n, ast.ClassDef)]
 
 
-def _methods(node: ast.ClassDef) -> list[ast.FunctionDef]:
+def _methods(node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+    """Every method on this class, async ones included, for the reason above."""
     return [n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
 
 
@@ -616,7 +621,11 @@ def subscript_keys_called_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]
         target = inner.child_by_field_name(spec["call_fn"])
         if target is None or target.type not in spec["subscript_types"]:
             continue
-        key = target.child_by_field_name(spec["sub_index"])
+        # A language that names no index field has no subscript key to read. It is declared
+        # optional and was passed straight to a reader that takes a name, so the languages
+        # this rule cannot serve reached it as `None` rather than being turned away.
+        index_field = spec["sub_index"]
+        key = target.child_by_field_name(index_field) if index_field else None
         if key is not None:
             called.add(node_text(key, raw).strip("\"'"))
     return called
