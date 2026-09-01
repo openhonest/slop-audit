@@ -125,8 +125,11 @@ def test_a_large_data_table_is_not_counted_as_duplicated_code(tmp_path):
     table = "\n".join(row.format(lang=f"lang_{n}") for n in range(20))
     (tmp_path / "table.py").write_text(f"TABLE = {{\n{table}\n}}\n")
     result = clone_detect.analyze(tmp_path, "python", min_tokens=50)
-    assert float(result["value"]) == 0.0, result["details"]
-    assert "data" in result["details"]
+    # n/a, not 0.0, since 2026-09-01. The table is discounted and so is the line that binds
+    # it to a name, so this file carries no code line at all. A share over no code lines is
+    # absent rather than zero, and zero is the healthy end of this scale.
+    assert result["value"] == "n/a", result["details"]
+    assert "no python code line carried a token" in result["details"]
 
 
 def test_duplicated_logic_beside_a_data_table_is_still_counted(tmp_path):

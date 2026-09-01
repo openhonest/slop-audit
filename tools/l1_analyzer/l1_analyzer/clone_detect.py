@@ -117,6 +117,13 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
     # same reason a literal is, and reading only the container's own children stops one
     # level short of it.
     spec_pairs = frozenset({"pair", "keyword_argument", "key_value_pair", "pair_expression"})
+    # How a grammar wraps one statement, and how it spells binding a name.
+    spec_statements = frozenset({"expression_statement", "lexical_declaration",
+                                 "variable_declaration", "assignment"})
+    spec_assignments = frozenset({"assignment", "variable_declarator",
+                                  "augmented_assignment"})
+    spec_calls = frozenset({"call", "call_expression", "method_invocation",
+                            "invocation_expression"})
     out: list[tuple[str, int]] = []
 
     def is_table(node: Node) -> bool:
@@ -174,10 +181,48 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
             part.type in literals or (part.type in tables and is_data(part))
             for part in parts)
 
+    def declares_data(node: Node) -> bool:
+        """Whether this statement only binds a name to a table.
+
+        The last step of the same argument the three discounts below already make.
+        Discounting a table's contents leaves the declaration around it: a name, an equals
+        sign, an empty pair of brackets. Nine of those in a row is fifty tokens that match
+        nine in a row anywhere else, so this package's own file of per-language vocabularies
+        came back as its own largest repeated block, with every table inside it discounted.
+
+        A record declaration is already discounted whole, because a record IS its field
+        names. A data declaration is the same sentence: nine languages need nine names, and
+        `NAME = <data>` holds nothing for an author to factor out.
+
+        Only a declaration OF DATA. One that runs something to build its value is a
+        statement like any other, or a copied block could hide behind an equals sign."""
+        if node.type not in spec_statements:
+            return False
+        inner = node.named_children[0] if node.named_children else None
+        if inner is None or inner.type not in spec_assignments:
+            return False
+        value = inner.child_by_field_name("right") or inner.child_by_field_name("value")
+        return value is not None and (is_table(value) or builds_a_table(value))
+
+    def builds_a_table(node: Node) -> bool:
+        """A call that wraps one table and nothing else: `frozenset({...})`, `tuple([...])`.
+
+        One argument, and that argument is data. Two arguments or an argument that is not a
+        table means a call doing work, so `compute(1, 2)` and `build_the_table(source)` stay
+        code. Without this arm the discount never reached this package's own vocabularies,
+        which are written as nine frozensets."""
+        if node.type not in spec_calls:
+            return False
+        arguments = node.child_by_field_name("arguments")
+        if arguments is None:
+            return False
+        given = [child for child in arguments.named_children if "comment" not in child.type]
+        return len(given) == 1 and is_table(given[0])
+
     def walk(node: Node) -> None:
         if "comment" in node.type:
             return
-        if is_table(node):
+        if is_table(node) or declares_data(node):
             return
         # A record declaration, for the same reason as a data table. This check erases
         # identifiers so that two functions doing one thing with different names read alike,

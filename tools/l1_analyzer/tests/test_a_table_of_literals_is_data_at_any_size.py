@@ -106,3 +106,26 @@ def test_a_mapping_of_names_to_tables_is_data_at_any_size():
               + "".join(f'    "lang{i}": ["a", "b"],\n' for i in range(3))
               + "}\n")
     assert "L" not in _tokens(source)
+
+
+def test_a_run_of_table_declarations_is_not_a_repeated_block():
+    """The last step of the same argument, and the one the inventory kept pointing at.
+
+    Discounting a table's contents leaves the declaration around it: a name, an equals sign,
+    and an empty pair of brackets. Nine of those in a row is fifty tokens that match nine in
+    a row anywhere else, so a file holding nothing but per-language vocabularies came back as
+    its own largest repeated block.
+
+    A record declaration was already discounted whole for this reason, because a record IS
+    its field names. A data declaration is the same sentence: nine languages need nine
+    names, and there is nothing in `NAME = <data>` for an author to factor out."""
+    tables = "".join(
+        f'_{name}_METHODS = frozenset({{\n    "{name.lower()}_a", "{name.lower()}_b",\n}})\n'
+        for name in ("PY", "JS", "JAVA", "CS", "RUST", "RUBY", "C", "GO", "TS"))
+    assert _tokens(tables) == []
+
+
+def test_a_declaration_whose_value_is_computed_is_still_code():
+    """The premise from the other side. Only a declaration OF DATA goes; one that runs
+    something to build its value is a statement like any other."""
+    assert _tokens("TABLE = build_the_table(source)\n") != []
