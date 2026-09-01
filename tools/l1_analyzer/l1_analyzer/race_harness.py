@@ -193,8 +193,25 @@ def detect_races(repo: Path, lang: str, timeout_seconds: float) -> RaceResult:
         timeout_seconds=timeout_seconds,
     )
     output = (run.stderr or "") + "\n" + (run.stdout or "")   # TSan writes to stderr
-    if run.returncode == 124:
-        # A race already found before the kill still counts; else it's simply not measured.
+    return tsan_verdict(output, run.returncode)
+
+
+def tsan_verdict(output: str, returncode: int) -> RaceResult:
+    """What the sanitizer's own output says, read on any machine.
+
+    Lifted out of the run above on 2026-08-31, for the reason `toolchain_reason_in` two
+    hundred lines up already gives about its own probe: a decision made inside the function
+    that starts the subprocess can only be exercised on a machine with a nightly Rust
+    toolchain, and that is not the machine this suite runs on. Fifty-seven per cent of this
+    module was unmeasured and both of its verdicts were inside that.
+
+    Four readings, and three of them are about whether anything was measured at all. A race
+    the sanitizer saw is proven. A suite that ran clean bounds the answer by what the tests
+    exercised and is not a proof of safety. A suite that would not build measured nothing,
+    and reporting it beside the clean one is the failure this tool names in other people's
+    code. A race printed before a timeout still counts, because the sanitizer prints when it
+    sees, not at the end, and throwing it away would discard the one certain result."""
+    if returncode == 124:
         found = parse_tsan(output)
         if found:
             verdict, band, value = _verdict(found)
@@ -206,7 +223,7 @@ def detect_races(repo: Path, lang: str, timeout_seconds: float) -> RaceResult:
 
     findings = parse_tsan(output)
     verdict, band, value = _verdict(findings)
-    suite = "suite passed" if run.returncode == 0 else f"suite exit {run.returncode}"
+    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
     return {"verdict": verdict, "value": value, "band": band, "tool": "tsan", "findings": findings,
             "details": f"{value} ({suite})"}
 
@@ -295,6 +312,26 @@ def stress_races(repo: Path, lang: str, runs: int, timeout_seconds: float) -> Ra
                 return _na(f"could not build the suite: {_first_error(output)}", tool=STRESS)
             panics.extend(hit)
 
+    return stress_verdict(passed, runs, panics)
+
+
+def stress_verdict(passed: int, runs: int, panics: list[PanicFinding]) -> RaceResult:
+    """What a set of stress runs means, read from the tally, on any machine.
+
+    Lifted out of the loop above on 2026-08-31, beside the sanitizer's verdict and for the
+    same reason: it decided inside the function that runs cargo, so exercising it needed a
+    Rust toolchain, and this suite runs where there is none.
+
+    Three answers, and only one of them is a proof. Runs that disagree prove a race, because
+    the suite's own assertion caught it on some runs and not others. Runs that all pass are
+    bounded by the suite and the run count, and the details say so, because a reader who
+    takes that for a proof stops looking. Runs that all fail the same way are deterministic,
+    and calling that a race sends someone hunting a concurrency bug that is not there.
+
+    Panics at one place are one finding. Ten runs of one racy assertion listed ten times
+    would read as ten separate races. And a mixed result with no panic located keeps its
+    verdict: the runs disagreed, which is the finding, and an output this could not parse
+    must not downgrade a real nondeterministic failure to a clean sweep."""
     if passed == runs:
         return {"verdict": NO_RACE_IN_STRESS, "value": f"{runs}/{runs} stress runs passed", "band": "Healthy",
                 "tool": "stress", "findings": [], "details": f"no panic across {runs} contended runs (bounded by the suite)"}

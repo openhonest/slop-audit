@@ -3,6 +3,20 @@ Feature: race_harness — running a repository's own tests under a race detector
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  Scenario: tsan_verdict reads what the sanitizer printed
+    Given the output of a run under ThreadSanitizer and the exit code it gave
+    When tsan_verdict reads them
+    Then a race the sanitizer saw is proven, and a suite that ran clean is bounded by what the tests exercised rather than proven safe
+    And a race printed before a timeout still counts, because the sanitizer prints when it sees rather than at the end
+    But a suite that would not build measured nothing at all, and reporting that beside a clean run is the failure this tool names in other people's code
+
+  Scenario: stress_verdict reads what a set of contended runs came to
+    Given how many of the runs passed, how many there were, and every panic they printed
+    When stress_verdict reads the tally
+    Then runs that disagree prove a race, since the suite's own assertion caught it on some runs and not others
+    And runs that all fail the same way are deterministic, so calling that a race sends someone hunting a concurrency bug that is not there
+    But panics at one place are one finding, or ten runs of one racy assertion would read as ten separate races
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
