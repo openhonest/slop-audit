@@ -69,3 +69,40 @@ def test_a_container_holding_anything_but_literals_is_still_code():
 def test_a_short_container_holding_a_call_is_code_too():
     """Size never enters it, in either direction."""
     assert "(" in _tokens("PAIR = [compute(1), 2]\n")
+
+
+def test_a_short_mapping_of_names_to_names_is_data_too():
+    """The half I missed when I wrote the rule this morning.
+
+    A mapping's elements are pairs, not literals, so a dictionary of eleven lines satisfied
+    neither arm: too short for the size test, and its pairs are not literals. The pair is
+    where the premise lives, one level down. `"read_text": "filesystem"` has no logic in it
+    any more than `"read_text"` does.
+
+    Found by reading the inventory the check produces about this package. Two tables in one
+    file, eleven lines and eight, and what survived the discount was the skeleton around
+    them, which matched the skeleton around every other file's tables."""
+    source = ('READS = {\n'
+              '    "read_text": "filesystem",\n'
+              '    "connect": "network",\n'
+              '}\n')
+    assert "L" not in _tokens(source)
+
+
+def test_a_mapping_whose_values_are_computed_is_still_code():
+    """The premise from the other side, and the reason this reads the pair rather than
+    assuming a mapping is always data."""
+    source = ('HANDLERS = {\n'
+              '    "resize": build(one),\n'
+              '    "crop": build(two),\n'
+              '}\n')
+    assert "(" in _tokens(source)
+
+
+def test_a_mapping_of_names_to_tables_is_data_at_any_size():
+    """Nine languages, each with a list of node types. This is the shape the size arm was
+    already catching, held here so the two arms cannot drift apart."""
+    source = ("SPEC = {\n"
+              + "".join(f'    "lang{i}": ["a", "b"],\n' for i in range(3))
+              + "}\n")
+    assert "L" not in _tokens(source)

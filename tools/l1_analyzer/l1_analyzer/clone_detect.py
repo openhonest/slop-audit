@@ -113,6 +113,10 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
     # neither is duplicated code: both are one table with a row per language, which is the
     # shape this project tells other people to separate data into.
     tables = frozenset(_LITERAL_NODES.get(lang, ()))
+    # How a grammar spells one entry of a mapping. A pair of literals is data for the
+    # same reason a literal is, and reading only the container's own children stops one
+    # level short of it.
+    spec_pairs = frozenset({"pair", "keyword_argument", "key_value_pair", "pair_expression"})
     out: list[tuple[str, int]] = []
 
     def is_table(node: Node) -> bool:
@@ -141,8 +145,34 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
             return False
         if node.end_point[0] - node.start_point[0] + 1 >= _MIN_TABLE_LINES:
             return True
+        return is_data(node)
+
+    def is_data(node: Node) -> bool:
+        """Whether every element of this container is a literal, a pair of them, or another
+        such container.
+
+        Read down rather than one level, which is the half I missed when I first wrote the
+        size arm's companion. A mapping's elements are PAIRS, not literals, so a dictionary
+        of eleven lines satisfied neither arm: too short for the size test, and its pairs are
+        not literals. The premise lives one level down. `"read_text": "filesystem"` has no
+        logic in it any more than `"read_text"` does.
+
+        What that cost was visible in this package's own inventory: two tables in one file,
+        eleven lines and eight, and what survived the discount was the skeleton around them,
+        which matched the skeleton around every other file's tables."""
         elements = [child for child in node.named_children if "comment" not in child.type]
-        return bool(elements) and all(child.type in literals for child in elements)
+        if not elements:
+            return False
+        return all(child.type in literals
+                   or (child.type in tables and is_data(child))
+                   or (child.type in spec_pairs and is_pair_of_data(child))
+                   for child in elements)
+
+    def is_pair_of_data(pair: Node) -> bool:
+        parts = [child for child in pair.named_children if "comment" not in child.type]
+        return bool(parts) and all(
+            part.type in literals or (part.type in tables and is_data(part))
+            for part in parts)
 
     def walk(node: Node) -> None:
         if "comment" in node.type:
