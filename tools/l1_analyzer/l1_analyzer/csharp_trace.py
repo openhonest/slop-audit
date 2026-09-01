@@ -139,12 +139,13 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], sdk: str,
     return determinism_tally(
         outcomes,
         {"unit": "run",
-         "never_ran": f"no test project built or executed under {sdk}",
+         "timed_out": "a run timed out",
          "no_runs": "no `dotnet test` runs were made; determinism not measured",
          "describe": f"`dotnet test` runs passed cleanly (order is scheduler-varied, "
                      f"not seed-controlled; under {sdk})"},
         _ran_tests,
         _first_line,
+        lambda _returncode, _output: f"no test project built or executed under {sdk}",
         timeout_seconds=timeout_seconds,
     )
 

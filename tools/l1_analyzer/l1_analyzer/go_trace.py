@@ -30,7 +30,7 @@ from l1_analyzer.pytest_trace import (
     _na,
     _run_untrusted,
     coverage_band,
-    determinism_band,
+    determinism_tally,
 )
 
 _TOTAL = re.compile(r"total:\s+\(statements\)\s+([\d.]+)%")
@@ -140,47 +140,29 @@ def _ran_tests(output: str) -> bool:
     return any(marker in output for marker in _RAN)
 
 
-def _determinism_verdict(outcomes: list[tuple[int, int, str]], runs: int, toolchain: str,
+def _determinism_verdict(outcomes: list[tuple[int, str]], toolchain: str,
                          timeout_seconds: float) -> L1Result:
-    """L1.20 for Go from the shuffled runs' outcomes alone: one `(seed, exit code, combined
-    output)` per run, in seed order. No I/O, so it can be asserted as a value.
+    """L1.20 for Go from every shuffled run. Only the words are here.
 
-    Extracted for the same reason as `_coverage_verdict`: the loop that produced these outcomes
-    also owned the band table and the three refusals, so a fake subprocess was the only way to
-    reach them, and the fake's canned success meant an unrecognised command scored as a clean
-    run.
+    The rules are in `pytest_trace.determinism_tally`, shared with four other languages
+    since 2026-09-01. Go carried its own copy and one extra rule with it: it refused when it
+    held fewer outcomes than the caller had asked for. That check could never fire. Its only
+    caller stops early on exactly the two cases the loop above already refuses, so a short
+    list always carried the refusal that shortened it.
 
-    A failing seed is quoted with its own first line, up to three of them, because a bare 3/5
-    is a score a reader cannot act on. A run that timed out and a run whose suite never
-    executed are not failing runs at all: they say so and stop, rather than lowering a count
-    that would read as a suite falling over when reordered.
-
-    Fewer outcomes than `runs` with nothing among them to refuse over is the same absence one
-    step out: a fraction over runs that were never made. It is named, not banded.
-    """
-    passing = 0
-    failing: list[str] = []
-    for seed, returncode, output in outcomes:
-        if returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not "
-                       "measured" + disclosure.timeout_note(timeout_seconds))
-        if not _ran_tests(output):
-            return _na(f"the suite did not run (seed {seed}: no test packages built or executed under "
-                       f"{toolchain}); determinism not measured")
-        if returncode == 0:
-            passing += 1
-        else:
-            failing.append(f"seed {seed}: {_first_line(output)}")
-
-    if len(outcomes) != runs:
-        return _na(f"only {len(outcomes)} of {runs} shuffled-order runs produced an outcome; "
-                   f"determinism not measured (under {toolchain})")
-
-    result_band = determinism_band(passing, runs)
-    details = f"{passing} of {runs} shuffled-order runs passed cleanly (under {toolchain})"
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {"value": f"{passing}/{runs}", "band": result_band, "details": details}
+    The seed is the position. Go shuffles with seeds one to N in order, so the Nth outcome
+    is seed N and carrying the number alongside it was a second copy of the same fact."""
+    return determinism_tally(
+        outcomes,
+        {"unit": "seed",
+         "timed_out": "a randomized run timed out",
+         "no_runs": "no shuffled-order runs were made; determinism not measured",
+         "describe": f"shuffled-order runs passed cleanly (under {toolchain})"},
+        _ran_tests,
+        _first_line,
+        lambda _returncode, _output: f"no test packages built or executed under {toolchain}",
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
@@ -192,18 +174,20 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         return _na("needs the Go toolchain (go) in PATH")
     toolchain = _toolchain(go, repo, timeout_seconds)
 
-    outcomes: list[tuple[int, int, str]] = []
+    # The seed is the position: shuffled one to N in order, so the Nth outcome is seed N.
+    # Carrying the number alongside it was a second copy of the same fact.
+    outcomes: list[tuple[int, str]] = []
     for seed in range(1, runs + 1):
         run = _run_untrusted(
             [go, "test", "./...", f"-shuffle={seed}", "-count=1"],
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
         output = (run.stdout or "") + (run.stderr or "")
-        outcomes.append((seed, run.returncode, output))
+        outcomes.append((run.returncode, output))
         # Stop spending suite runs once the verdict can only be a refusal. This is the stopping
         # rule and nothing else: the reason, the band and the value stay in _determinism_verdict,
         # which reaches the same two cases from the outcome it was handed.
         if run.returncode == 124 or not _ran_tests(output):
             break
 
-    return _determinism_verdict(outcomes, runs, toolchain, timeout_seconds)
+    return _determinism_verdict(outcomes, toolchain, timeout_seconds)

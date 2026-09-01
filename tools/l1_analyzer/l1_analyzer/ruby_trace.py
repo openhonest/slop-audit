@@ -30,7 +30,6 @@ import shutil
 from pathlib import Path
 from typing import TypedDict
 
-from l1_analyzer import disclosure
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -38,7 +37,7 @@ from l1_analyzer.pytest_trace import (
     _na,
     _run_untrusted,
     coverage_verdict,
-    determinism_band,
+    determinism_tally,
     resolve_via_shim,
 )
 
@@ -236,41 +235,28 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
 
 def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runs: int,
                          version: str, timeout_seconds: float) -> L1Result:
-    """L1.20 from the outcome of every randomized-order run. No I/O, so it can be asserted.
+    """L1.20 for Ruby from every randomized-order run. Only the words are here.
 
-    `per_seed` is one `(returncode, combined output)` pair per run made, in seed order, so seed
-    N is the Nth pair. `runs` is the number of runs asked for, and it is the denominator: the
-    score says how many of the runs the spec requires came back clean, not how many of the runs
-    that happened did. A run that stopped the count leaves a shorter list and reaches an n/a
-    before the denominator is used, so the two numbers can only meet when every run was made.
+    The rules are in `pytest_trace.determinism_tally`, shared with four other languages
+    since 2026-09-01. Ruby is the one the shared rule genuinely could not say: it quotes the
+    exit code and the first line the runner printed when a suite did not run, and that
+    sentence cannot be fixed in advance. The reason is read from the outcome now, which is
+    the same kind of parameter the failure summary already was.
 
-    No runs at all is n/a as well: zero clean out of zero satisfies `passing == runs`, which is
-    how a measure that ran nothing issues itself a clean bill.
-    """
-    if not per_seed:
-        return _na("no randomized-order runs were made; determinism not measured")
-    passing = 0
-    failing: list[str] = []
-    for seed, (returncode, output) in enumerate(per_seed, start=1):
-        if returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not "
-                       "measured" + disclosure.timeout_note(timeout_seconds))
-        if _ran(runner, output) == 0:
-            return _na(f"the suite did not run (seed {seed}, exit {returncode}: {_first_line(output)}); "
-                       f"determinism not measured under {version}")
-        if returncode == 0:
-            passing += 1
-        else:  # the suite ran, but not every test passed
-            failing.append(f"seed {seed}: {_summary_line(runner, output)}")
-
-    details = f"{passing} of {runs} randomized-order runs passed cleanly (under {version})"
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {
-        "value": f"{passing}/{runs}",
-        "band": determinism_band(passing, runs),
-        "details": details,
-    }
+    `runs` is no longer read. The count comes from the outcomes handed over, because a
+    promised total and a list of outcomes are two statements of one fact and only one of
+    them can be right when they disagree."""
+    return determinism_tally(
+        per_seed,
+        {"unit": "seed",
+         "timed_out": "a randomized run timed out",
+         "no_runs": "no randomized-order runs were made; determinism not measured",
+         "describe": f"randomized-order runs passed cleanly (under {version})"},
+        lambda output: _ran(runner, output) > 0,
+        lambda output: _summary_line(runner, output),
+        lambda returncode, output: f"exit {returncode}: {_first_line(output)}, under {version}",
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:

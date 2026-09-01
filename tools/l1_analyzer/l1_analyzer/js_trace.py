@@ -40,7 +40,7 @@ from l1_analyzer.pytest_trace import (
     _na,
     _run_untrusted,
     coverage_band,
-    determinism_band,
+    determinism_tally,
 )
 
 # The default `npm init` test script; a real command, but it runs no tests.
@@ -370,43 +370,24 @@ def _failure_summary(output: str) -> str:
 
 def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runtime: str,
                          timeout_seconds: float) -> L1Result:
-    """L1.20 from the outcome of every shuffled-order run. No I/O, so it can be asserted.
+    """L1.20 for JavaScript from every shuffled-order run. Only the words are here.
 
-    `per_seed` is one `(returncode, combined output)` pair per run made, in seed order, so seed
-    N is the Nth pair. The denominator is the number of pairs handed over rather than a count
-    passed alongside them: a promised total and a list of outcomes are two statements of one
-    fact, and only one of them can be right when they disagree.
-
-    A run that stopped the count leaves a shorter list, and its own row says which run it was,
-    so the n/a is reached before the denominator matters. No runs at all is n/a as well: zero
-    clean out of zero satisfies `passing == runs`, which is how a measure that ran nothing
-    issues itself a clean bill.
-    """
-    if not per_seed:
-        return _na("no shuffled-order runs were made; determinism not measured")
-    passing = 0
-    failing: list[str] = []
-    for seed, (returncode, output) in enumerate(per_seed, start=1):
-        if returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not "
-                       "measured" + disclosure.timeout_note(timeout_seconds))
-        if not _suite_ran(runner, output):
-            return _na(f"the suite did not run (seed {seed}: no {runner} tests executed under "
-                       f"{runtime}); determinism not measured")
-        if returncode == 0:
-            passing += 1
-        else:
-            failing.append(f"seed {seed}: {_failure_summary(output)}")
-
-    runs = len(per_seed)
-    details = f"{passing} of {runs} shuffled-order {runner} runs passed cleanly (under {runtime})"
-    if failing:
-        details += f"; runs with failures: {'; '.join(failing[:3])}"
-    return {
-        "value": f"{passing}/{runs}",
-        "band": determinism_band(passing, runs),
-        "details": details,
-    }
+    The rules are in `pytest_trace.determinism_tally`, shared with four other languages
+    since 2026-09-01. This module carried its own copy, and the note that left it out said
+    three languages were not that shape. What this one actually needed was a word for what a
+    timed-out attempt is called, because the shared rule said "a seed timed out" and a
+    shuffled run is not a seeded one to a JavaScript reader."""
+    return determinism_tally(
+        per_seed,
+        {"unit": "seed",
+         "timed_out": "a randomized run timed out",
+         "no_runs": "no shuffled-order runs were made; determinism not measured",
+         "describe": f"shuffled-order {runner} runs passed cleanly (under {runtime})"},
+        lambda output: _suite_ran(runner, output),
+        _failure_summary,
+        lambda _returncode, _output: f"no {runner} tests executed under {runtime}",
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:

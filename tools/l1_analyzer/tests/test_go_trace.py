@@ -95,23 +95,25 @@ def test_a_profile_carrying_no_total_is_its_own_reason():
 
 # --- L1.20: the shuffled runs counted from their outcomes --------------------
 
-def _clean(seed: int) -> tuple[int, int, str]:
-    return (seed, 0, f"ok  \tacme/widget\t0.2{seed}s\n")
+# The seed is the position. Go shuffles with seeds one to N in order, so the Nth outcome is
+# seed N, and carrying the number alongside it was a second copy of the same fact.
+def _clean(seed: int) -> tuple[int, str]:
+    return (0, f"ok  \tacme/widget\t0.2{seed}s\n")
 
 
-def _failed(seed: int) -> tuple[int, int, str]:
-    return (seed, 1, f"--- FAIL: TestResize (seed {seed})\nFAIL\tacme/widget\t0.3s\n")
+def _failed(seed: int) -> tuple[int, str]:
+    return (1, f"--- FAIL: TestResize (seed {seed})\nFAIL\tacme/widget\t0.3s\n")
 
 
 def test_every_shuffled_run_passing_is_healthy():
-    r = go_trace._determinism_verdict([_clean(s) for s in range(1, 6)], 5, "go1.24.0", 300.0)
+    r = go_trace._determinism_verdict([_clean(s) for s in range(1, 6)], "go1.24.0", 300.0)
     assert r["value"] == "5/5" and r["band"] == "Healthy"
     assert "go1.24.0" in r["details"]
 
 
 def test_one_short_of_every_run_is_not_healthy_and_names_the_seed_that_failed():
     outcomes = [_clean(1), _clean(2), _failed(3), _clean(4), _clean(5)]
-    r = go_trace._determinism_verdict(outcomes, 5, "go1.24.0", 300.0)
+    r = go_trace._determinism_verdict(outcomes, "go1.24.0", 300.0)
     assert r["value"] == "4/5" and r["band"] == "Not Healthy"
     # A bare 4/5 is a score with no reason. The failing seed and its own first line are what
     # let a reader start chasing the flake.
@@ -120,20 +122,20 @@ def test_one_short_of_every_run_is_not_healthy_and_names_the_seed_that_failed():
 
 def test_two_failing_runs_are_slop():
     outcomes = [_clean(1), _failed(2), _failed(3), _clean(4), _clean(5)]
-    r = go_trace._determinism_verdict(outcomes, 5, "go1.24.0", 300.0)
+    r = go_trace._determinism_verdict(outcomes, "go1.24.0", 300.0)
     assert r["value"] == "3/5" and r["band"] == "Slop"
 
 
 def test_at_most_three_failing_seeds_are_quoted():
-    r = go_trace._determinism_verdict([_failed(s) for s in range(1, 6)], 5, "go1.24.0", 300.0)
+    r = go_trace._determinism_verdict([_failed(s) for s in range(1, 6)], "go1.24.0", 300.0)
     assert r["value"] == "0/5" and r["band"] == "Slop"
     assert "seed 4" not in r["details"] and "seed 5" not in r["details"]
     assert "seed 1" in r["details"] and "seed 3" in r["details"]
 
 
 def test_a_timed_out_run_is_not_a_failing_run():
-    outcomes = [_clean(1), (2, 124, "panic: test timed out after 10m0s\ntimed out")]
-    r = go_trace._determinism_verdict(outcomes, 5, "go1.24.0", 300.0)
+    outcomes = [_clean(1), (124, "panic: test timed out after 10m0s\ntimed out")]
+    r = go_trace._determinism_verdict(outcomes, "go1.24.0", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "seed 2" in r["details"] and "timed out" in r["details"]
     assert "1/5" not in r["details"]
@@ -143,22 +145,30 @@ def test_a_suite_that_never_executed_is_not_a_suite_that_failed():
     # The not-run guard. A build error prints none of go's ran-a-package banners, and scoring
     # it 0/5 would read as a suite that falls over when shuffled rather than one that never
     # shuffled at all.
-    outcomes = [(1, 1, "widget.go:9:2: undefined: helper\n")]
-    r = go_trace._determinism_verdict(outcomes, 5, "go1.24.0", 300.0)
+    outcomes = [(1, "widget.go:9:2: undefined: helper\n")]
+    r = go_trace._determinism_verdict(outcomes, "go1.24.0", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "seed 1" in r["details"] and "did not run" in r["details"]
     assert "go1.24.0" in r["details"] and "0/5" not in r["details"]
 
 
-def test_fewer_outcomes_than_runs_promised_is_absent_not_a_low_score():
-    # A short list with nothing in it to refuse over: the count it would band is a fraction
-    # over runs that were never made, which is absent rather than bad.
-    r = go_trace._determinism_verdict([_clean(1), _clean(2)], 5, "go1.24.0", 300.0)
-    assert r["band"] == "n/a" and r["value"] == "n/a"
-    assert "2 of 5" in r["details"]
+def test_a_short_list_is_banded_on_what_it_holds():
+    """This test asserted the opposite until 2026-09-01, and the rule it held is gone.
+
+    Go used to refuse a list shorter than the number of runs requested, on the argument that
+    a fraction over runs never made is absent rather than bad. The check could never fire.
+    Its only caller stops early on exactly the two cases the loop already refuses, so a short
+    list always carried the refusal that shortened it, and this test reached the branch by
+    handing the verdict a state the caller cannot produce.
+
+    What is left is the rule every language shares: the denominator is the outcomes handed
+    over. Two clean runs are two clean runs, and the count says two."""
+    r = go_trace._determinism_verdict([_clean(1), _clean(2)], "go1.24.0", 300.0)
+    assert r["value"] == "2/2"
+    assert "2 of 2" in r["details"]
 
 
 def test_no_outcomes_at_all_is_absent_rather_than_nought_out_of_five():
-    r = go_trace._determinism_verdict([], 5, "go1.24.0", 300.0)
+    r = go_trace._determinism_verdict([], "go1.24.0", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert r["value"] != "0/5"

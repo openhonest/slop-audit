@@ -241,11 +241,14 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str,
     return determinism_tally(
         outcomes,
         {"unit": "seed",
-         "never_ran": f"no tests executed under {jdk}",
+         "timed_out": "a seed timed out",
          "no_runs": "no randomized-order runs were made; determinism not measured",
          "describe": f"randomized-order runs passed cleanly (under {jdk})"},
         _ran_tests,
         _surefire_summary,
+        # Java knows the sentence before it looks: Maven either ran the suite or it did not,
+        # and there is nothing in the output a reader needs beyond that.
+        lambda _returncode, _output: f"no tests executed under {jdk}",
         timeout_seconds=timeout_seconds,
     )
 

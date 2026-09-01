@@ -70,9 +70,10 @@ def test_the_shared_coverage_verdict_names_the_timeout_it_was_given():
 
 def test_the_shared_determinism_tally_names_it_too():
     said = pytest_trace.determinism_tally(
-        [(124, "")], {"unit": "seed", "never_ran": "nothing ran", "no_runs": "no runs",
+        [(124, "")], {"unit": "seed", "timed_out": "a seed timed out", "no_runs": "no runs",
                       "describe": "runs passed"},
-        lambda _out: True, lambda _out: "", timeout_seconds=300.0)
+        lambda _out: True, lambda _out: "", lambda _rc, _out: "nothing ran",
+        timeout_seconds=300.0)
     assert "300s" in said["details"]
     assert "--timeout" in said["details"]
 

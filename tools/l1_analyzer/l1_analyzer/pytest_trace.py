@@ -192,14 +192,15 @@ class RunWords(TypedDict):
     must not be told about seeds. The words differ and the RULES do not, which is why the
     words travel as a value and the rules live in one function."""
     unit: str            # what one attempt is called: "run", "seed"
-    never_ran: str       # why a suite that produced no tests did not run, under this toolchain
+    timed_out: str       # what a timed-out attempt is called: "a randomized run timed out"
     no_runs: str         # the sentence for zero attempts
     describe: str        # the tail of the details line, after "N of M "
 
 
 def determinism_tally(outcomes: Iterable[tuple[int, str]], words: RunWords,
                       ran_tests: Callable[[str], bool],
-                      summarise: Callable[[str], str], *,
+                      summarise: Callable[[str], str],
+                      why_it_did_not_run: Callable[[int, str], str], *,
                       timeout_seconds: float) -> L1Result:
     """L1.20 from a sequence of finished runs. No I/O, so it can be asserted as a value.
 
@@ -216,20 +217,30 @@ def determinism_tally(outcomes: Iterable[tuple[int, str]], words: RunWords,
     suite one attempt at a time. Returning on the first terminal outcome is then what stops
     the remaining attempts from each burning a full timeout.
 
-    Go, JavaScript and Ruby are NOT this shape and keep their own tallies. Forcing them in
-    would need a callback per message, which is machinery invented for a problem the right
-    shape does not have."""
+    Five languages, one tally, since 2026-09-01. C# and Java came first, in August, and the
+    note here said Go, JavaScript and Ruby were not this shape and that forcing them in
+    would need a callback per message. The note was half right and the half it got wrong
+    cost a day: when every timeout refusal in this package learned to name the seconds it
+    allowed, this one rule had to be edited in five places by hand.
+
+    What the three needed was two things. A word for what a timed-out attempt is called,
+    because "a randomized run timed out" and "a seed timed out" are different sentences
+    about one event. And the reason a suite did not run, read from the outcome rather than
+    fixed in advance, because Ruby quotes the exit code and the runner's first line while
+    Java knows the sentence before it looks. The second is the same kind of parameter
+    `summarise` already was, and a language that knows the answer in advance passes a reader
+    that ignores what it is given."""
     passing = 0
     made = 0
     failing: list[str] = []
     for returncode, output in outcomes:
         made += 1
         if returncode == 124:
-            return _na(f"a {words['unit']} timed out ({words['unit']} {made}); determinism "
+            return _na(f"{words['timed_out']} ({words['unit']} {made}); determinism "
                        "not measured" + disclosure.timeout_note(timeout_seconds))
         if not ran_tests(output):
-            return _na(f"the suite did not run ({words['unit']} {made}: {words['never_ran']}); "
-                       "determinism not measured")
+            return _na(f"the suite did not run ({words['unit']} {made}: "
+                       f"{why_it_did_not_run(returncode, output)}); determinism not measured")
         if returncode == 0:
             passing += 1
         else:
