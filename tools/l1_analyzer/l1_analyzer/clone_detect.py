@@ -46,11 +46,12 @@ MIN_TOKENS = 50            # the canon's threshold, named rather than spelled at
 def literal_types(lang: str) -> frozenset[str]:
     """The node types this language spells a literal with.
 
-    Subscripted, not defaulted: a supported language whose literals nobody declared would
-    compare unnormalized text and report near-zero duplication on a codebase full of it."""
-    from l1_analyzer.lang_spec import LANG_SPEC
+    Re-exported from `data_tables`, which is where the rule that reads them lives now. A
+    second copy here is a second answer to one question, and this module's history is that
+    defect: the data-table rule was written twice and the two disagreed for half a day."""
+    from l1_analyzer import data_tables
 
-    return frozenset(LANG_SPEC[lang]["literal_types"])
+    return data_tables.literal_types(lang)
 
 
 # How each language spells "bring a name in from somewhere else". The statement, never a
@@ -102,7 +103,8 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
     A comment is dropped rather than normalized. Two blocks that differ only in their
     comments are the same code, and counting comment text would let a copied block escape
     by having its comment reworded."""
-    from l1_analyzer.indicators import _LITERAL_NODES, _MIN_TABLE_LINES
+    from l1_analyzer import data_tables
+    from l1_analyzer.indicators import _LITERAL_NODES
 
     literals = literal_types(lang)
     # The same discount L1.17 applies, for the same stated reason: a god-file is a pile of
@@ -113,116 +115,13 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
     # neither is duplicated code: both are one table with a row per language, which is the
     # shape this project tells other people to separate data into.
     tables = frozenset(_LITERAL_NODES.get(lang, ()))
-    # How a grammar spells one entry of a mapping. A pair of literals is data for the
-    # same reason a literal is, and reading only the container's own children stops one
-    # level short of it.
-    spec_pairs = frozenset({"pair", "keyword_argument", "key_value_pair", "pair_expression"})
-    # How a grammar wraps one statement, and how it spells binding a name.
-    spec_statements = frozenset({"expression_statement", "lexical_declaration",
-                                 "variable_declaration", "assignment"})
-    spec_assignments = frozenset({"assignment", "variable_declarator",
-                                  "augmented_assignment"})
-    spec_calls = frozenset({"call", "call_expression", "method_invocation",
-                            "invocation_expression"})
     out: list[tuple[str, int]] = []
-
-    def is_table(node: Node) -> bool:
-        """A container that is data: long, or holding nothing but literals.
-
-        Two arms, and the second was added on 2026-09-01 because the first alone made this
-        module's own argument into a rule about layout. Nine per-language vocabularies
-        written as nine short frozensets came back as duplicated code, while the identical
-        content written as one long dictionary was discounted. That reads how an author laid
-        a table out, not whether anything was copied.
-
-        Every element a literal is the premise the size was standing in for. There is no
-        logic in such a container to duplicate, which is the same sentence this module
-        already says about a record declaration and about an import block.
-
-        The size arm stays, and replacing it rather than joining it was my first attempt: a
-        table mapping names to tables holds containers rather than literals, so the package's
-        own nine-language grammar spec stopped being data and the reading went from 8.7 per
-        cent to 18.3. The suite caught it. Long-and-mixed and short-and-literal are both
-        data, and neither test covers the other.
-
-        A container holding anything else, and short, is code: a list of calls is a pile of
-        logic laid out like a table, and discounting it would let anyone hide a copied block
-        behind brackets."""
-        if node.type not in tables:
-            return False
-        if node.end_point[0] - node.start_point[0] + 1 >= _MIN_TABLE_LINES:
-            return True
-        return is_data(node)
-
-    def is_data(node: Node) -> bool:
-        """Whether every element of this container is a literal, a pair of them, or another
-        such container.
-
-        Read down rather than one level, which is the half I missed when I first wrote the
-        size arm's companion. A mapping's elements are PAIRS, not literals, so a dictionary
-        of eleven lines satisfied neither arm: too short for the size test, and its pairs are
-        not literals. The premise lives one level down. `"read_text": "filesystem"` has no
-        logic in it any more than `"read_text"` does.
-
-        What that cost was visible in this package's own inventory: two tables in one file,
-        eleven lines and eight, and what survived the discount was the skeleton around them,
-        which matched the skeleton around every other file's tables."""
-        elements = [child for child in node.named_children if "comment" not in child.type]
-        if not elements:
-            return False
-        return all(child.type in literals
-                   or (child.type in tables and is_data(child))
-                   or (child.type in spec_pairs and is_pair_of_data(child))
-                   for child in elements)
-
-    def is_pair_of_data(pair: Node) -> bool:
-        parts = [child for child in pair.named_children if "comment" not in child.type]
-        return bool(parts) and all(
-            part.type in literals or (part.type in tables and is_data(part))
-            for part in parts)
-
-    def declares_data(node: Node) -> bool:
-        """Whether this statement only binds a name to a table.
-
-        The last step of the same argument the three discounts below already make.
-        Discounting a table's contents leaves the declaration around it: a name, an equals
-        sign, an empty pair of brackets. Nine of those in a row is fifty tokens that match
-        nine in a row anywhere else, so this package's own file of per-language vocabularies
-        came back as its own largest repeated block, with every table inside it discounted.
-
-        A record declaration is already discounted whole, because a record IS its field
-        names. A data declaration is the same sentence: nine languages need nine names, and
-        `NAME = <data>` holds nothing for an author to factor out.
-
-        Only a declaration OF DATA. One that runs something to build its value is a
-        statement like any other, or a copied block could hide behind an equals sign."""
-        if node.type not in spec_statements:
-            return False
-        inner = node.named_children[0] if node.named_children else None
-        if inner is None or inner.type not in spec_assignments:
-            return False
-        value = inner.child_by_field_name("right") or inner.child_by_field_name("value")
-        return value is not None and (is_table(value) or builds_a_table(value))
-
-    def builds_a_table(node: Node) -> bool:
-        """A call that wraps one table and nothing else: `frozenset({...})`, `tuple([...])`.
-
-        One argument, and that argument is data. Two arguments or an argument that is not a
-        table means a call doing work, so `compute(1, 2)` and `build_the_table(source)` stay
-        code. Without this arm the discount never reached this package's own vocabularies,
-        which are written as nine frozensets."""
-        if node.type not in spec_calls:
-            return False
-        arguments = node.child_by_field_name("arguments")
-        if arguments is None:
-            return False
-        given = [child for child in arguments.named_children if "comment" not in child.type]
-        return len(given) == 1 and is_table(given[0])
 
     def walk(node: Node) -> None:
         if "comment" in node.type:
             return
-        if is_table(node) or declares_data(node):
+        if (data_tables.is_table(node, tables, literals)
+                or data_tables.declares_a_table(node, tables, literals)):
             return
         # A record declaration, for the same reason as a data table. This check erases
         # identifiers so that two functions doing one thing with different names read alike,

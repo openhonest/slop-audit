@@ -120,7 +120,7 @@ def test_a_large_data_table_is_not_counted_as_duplicated_code(tmp_path):
     row = ('    "{lang}": {{"class_types": ("class_declaration",), '
            '"func_types": ("function_declaration",), "assign_left": "left", '
            '"assign_right": "right", "member_op": ".", "receiver_scan": "fixed"}},')
-    # More rows than _MIN_TABLE_LINES, which is 12: the discount applies to a LARGE
+    # More rows than data_tables.MIN_TABLE_LINES, which is 12: one arm of the discount
     # container literal, and a short one is as likely to be code as data.
     table = "\n".join(row.format(lang=f"lang_{n}") for n in range(20))
     (tmp_path / "table.py").write_text(f"TABLE = {{\n{table}\n}}\n")

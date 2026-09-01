@@ -32,6 +32,7 @@ from tree_sitter import Node, Parser
 from l1_analyzer import (
     c_trace,
     csharp_trace,
+    data_tables,
     go_trace,
     java_trace,
     js_trace,
@@ -318,7 +319,7 @@ def _trailing_whitespace(repo: Path) -> L1Result:
 # nobody hand-piles logic into a lookup table, and it has no merge-conflict surface a
 # reviewer would split. So god-file size is measured in CODE lines, subtracting large
 # container literals. Per language, the container-literal node types; a literal must
-# span at least _MIN_TABLE_LINES to read as a table (small inline literals stay code).
+# read as a table by `data_tables`, which is the rule L1.13 asks too.
 _GOD_FILE_LANG = {".py": "python", ".rs": "rust", ".c": "c", ".h": "c", ".js": "javascript",
                   ".ts": "typescript", ".java": "java", ".cs": "csharp", ".go": "go", ".rb": "ruby"}
 _LITERAL_NODES = {
@@ -332,16 +333,21 @@ _LITERAL_NODES = {
     "rust": frozenset({"array_expression"}),
     "c": frozenset({"initializer_list"}),
 }
-_MIN_TABLE_LINES = 12
 
+def _data_literal_lines(node: Node, containers: frozenset[str], literals: frozenset[str]) -> int:
+    """Lines spanned by data tables under `node`. A counted table is not recursed into, so
+    nested tables are counted once rather than compounded.
 
-def _data_literal_lines(node: Node, literal_types: frozenset[str]) -> int:
-    """Lines spanned by large container literals under `node`. A counted literal is
-    not recursed into, so nested literals are counted once, not compounded."""
-    span = node.end_point[0] - node.start_point[0] + 1
-    if node.type in literal_types and span >= _MIN_TABLE_LINES:
-        return span
-    return sum(_data_literal_lines(c, literal_types) for c in node.children)
+    What counts as a table is `data_tables`, shared with L1.13. It was spelled here too,
+    as "a container spanning twelve lines or more", and on 2026-09-01 I widened the copy in
+    L1.13 and left this one. For half a day the same file was data to one indicator and code
+    to the other, which is the one-fact-two-owners shape this package reports in other
+    people's code."""
+    from l1_analyzer import data_tables
+
+    if data_tables.is_table(node, containers, literals):
+        return node.end_point[0] - node.start_point[0] + 1
+    return sum(_data_literal_lines(c, containers, literals) for c in node.children)
 
 
 def god_file_language(ext: str) -> str | None:
@@ -377,7 +383,7 @@ def _code_line_count(src: bytes, ext: str) -> int:
         root = _get_parser(lang).parse(src).root_node
     except Exception:  # noqa: BLE001
         return total
-    return total - _data_literal_lines(root, literal_types)
+    return total - _data_literal_lines(root, literal_types, data_tables.literal_types(lang))
 
 
 def _god_file_reason(f: Path, repo: Path, has_packages: bool) -> str | None:
