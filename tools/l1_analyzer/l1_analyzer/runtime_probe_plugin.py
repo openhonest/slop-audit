@@ -187,10 +187,21 @@ def pytest_configure(config: object) -> None:
 
 
 def pytest_unconfigure(config: object) -> None:
-    """Hand back what was seen. A run killed before this point loses its observations, and
-    the probe reports that as a run it could not watch rather than as a module with no
-    runtime properties."""
-    write_observations(getattr(config, STASH, []), os.environ.get(OUTPUT_VARIABLE, ""))
+    """Hand back what was seen, and write nothing at all when nothing was watched.
+
+    A run killed before this point writes no file, and the probe reads a missing file as a
+    run it could not watch rather than as a module with no runtime properties. This function
+    used to break that from the other end: it defaulted the absent record to an empty list,
+    so a run whose configure never installed the tracer wrote an empty list, which says the
+    module has no runtime properties. Two opposite answers, the same bytes.
+
+    Fixed on 2026-08-31, alongside the identical line in `unopened_files_plugin`. One of the
+    two was found by writing that plugin's first test; this one was found by going to look
+    at the only other plugin shaped like it."""
+    seen = getattr(config, STASH, None)
+    if seen is None:
+        return
+    write_observations(seen, os.environ.get(OUTPUT_VARIABLE, ""))
 
 
 @boundary

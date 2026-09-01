@@ -206,10 +206,19 @@ def test_unconfiguring_hands_back_what_the_run_saw(tmp_path, monkeypatch):
     assert json.loads(destination.read_text()) == [{"function": "f"}]
 
 
-def test_unconfiguring_a_run_that_never_configured_writes_an_empty_record(tmp_path, monkeypatch):
+def test_unconfiguring_a_run_that_never_configured_writes_nothing(tmp_path, monkeypatch):
+    """This test asserted the opposite until 2026-08-31, with no reason written down.
+
+    It said a run that never configured writes an empty record, and the reader one module
+    over treats a missing file as a run it could not watch and an empty list as a module
+    with no runtime properties. Those are opposite answers, and the plugin gave the same
+    bytes for both because it defaulted the absent record to an empty list.
+
+    The same line was in `unopened_files_plugin`. One was found by writing that plugin's
+    first test; this one by going to look at the only other plugin shaped like it."""
     monkeypatch.setenv(plugin.OUTPUT_VARIABLE, str(tmp_path / "seen.json"))
     plugin.pytest_unconfigure(_Config())
-    assert json.loads((tmp_path / "seen.json").read_text()) == []
+    assert not (tmp_path / "seen.json").exists()
 
 
 # --------------------------------------------------------------------------
