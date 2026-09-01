@@ -16,6 +16,7 @@ coverage build and walks a tree - so 36 of its 60 lines are untested by construc
 the ceiling logic was inside them. The rule is pure and belongs outside.
 """
 
+import ast
 import inspect
 
 import pytest
@@ -41,10 +42,22 @@ def test_the_repository_sweep_asks_the_same_rule():
 
 @pytest.mark.parametrize("module", [coverage_prove, python_coverage_prove], ids=["rust", "python"])
 def test_the_module_sweep_asks_it_too(module):
-    """Read from the source, because the sweep around it runs a coverage build."""
-    assert "budget.allowance" in inspect.getsource(module.prove_coverage_repo), (
+    """Read from the source, because the sweep around it runs a coverage build.
+
+    The module rather than one function inside it. This read `prove_coverage_repo` alone and
+    broke on 2026-08-31 when the choosing was lifted out of that boundary into a function of
+    its own, which is the direction this test wants the code to go: it broke on the fix.
+    What it is here to catch is a second spelling of the rule anywhere in the sweep."""
+    calls = [node for node in ast.walk(ast.parse(inspect.getsource(module)))
+             if isinstance(node, ast.Call)
+             and ast.unparse(node.func) == "budget.allowance"]
+    assert calls, (
         f"{module.__name__} still spells the per-module ceiling as a slice, which is a "
         "second copy of the rule that decides what a run spends"
+    )
+    assert len(calls) == 1, (
+        f"{module.__name__} asks the rule in {len(calls)} places, which is the drift this "
+        "test exists to stop"
     )
 
 
