@@ -574,54 +574,6 @@ def _rust_sources(repo: Path, measured: dict[str, frozenset[int]]) -> dict[str, 
     return read
 
 
-def gaps_to_attempt(cov: rust_trace.RepoUncovered, sources: dict[str, str],
-                    host: frozenset[str], cap_per_module: int, ceiling: int
-                    ) -> tuple[list[tuple[str, list[CoverageGap]]], int, int]:
-    """Which gaps the sweep will spend on, how many it found, and how many it will try.
-
-    Lifted out of the sweep on 2026-08-31. It chose and it spent in one loop, and every step
-    of the spending costs a cargo build or a paid call, so nothing had ever asked it what it
-    picks: fifty-four per cent of this module was unmeasured and the whole of this was inside
-    that. The choosing is not the spending, and it is the half that goes wrong quietly.
-
-    A gap is located whether or not either bound lets the sweep try it, because the report
-    says how many were found as well as how many were attempted. Truncating before counting
-    hides the size of what was skipped, and a sweep reporting three of three attempted looks
-    complete when it found forty. The cap did truncate first until 2026-08-31.
-
-    Two bounds. The per-module cap stops one large module consuming the run; the ceiling is
-    what the operator authorised, and five per module across forty modules is two hundred
-    calls that only the ceiling stops.
-
-    A module the ceiling left nothing for is not in the work, because counting it would
-    report work on a file the sweep walked past. The order is settled, so a run that stops
-    at the ceiling stops in the same place as the run before it and the two reports compare.
-    """
-    work: list[tuple[str, list[CoverageGap]]] = []
-    located = 0
-    attempted = 0
-    for relpath, lines in sorted(cov["files"].items()):
-        if not relpath.endswith(".rs"):
-            continue
-        source = sources.get(relpath)
-        if source is None:
-            continue
-        functions = rust_facets.module_functions(source)
-        module_gaps = _live_gaps(rust_facets.uncovered_gaps(functions, lines), host)
-        # Counted whole, BEFORE either bound. The cap used to truncate first, so a run with
-        # a cap of one over forty modules reported forty located and forty attempted: the
-        # number `ceiling_detail` needs to say what was skipped was already wrong when it
-        # arrived. Found on 2026-08-31 by measuring this loop for the first time.
-        located += len(module_gaps)
-        # One rule, in `budget`: the module's own cap or what the run has left, whichever is
-        # smaller.
-        gaps = module_gaps[:budget.allowance(cap_per_module, ceiling, attempted)]
-        attempted += len(gaps)
-        if gaps:
-            work.append((relpath, gaps))
-    return work, located, attempted
-
-
 # honest-code-allow: L1.21.13 - the writer and both readers are one unit. `_call_model` writes LAST_REFUSAL and it is the single model boundary BOTH sweeps import, so there is no second source and no cross-module surprise. Threading the reason back would change the injected propose_fn signature, its repair counterpart and every test fake, to reach one reader at the end of one sweep. The sweeps are sequential, so the value is never stale by more than one call.
 def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
                         timeout_seconds: float, progress: SweepProgress | None,
@@ -643,8 +595,13 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
-    work, located, attempted_gaps = gaps_to_attempt(
-        cov, _rust_sources(repo, cov["files"]), host_cfg(), cap_per_module, max_attempts)
+    host = host_cfg()
+
+    def gaps_of(source: str, lines: frozenset[int]) -> list[CoverageGap]:
+        return _live_gaps(rust_facets.uncovered_gaps(rust_facets.module_functions(source), lines), host)
+
+    work, located, attempted_gaps = budget.gaps_to_attempt(
+        cov["files"], _rust_sources(repo, cov["files"]), gaps_of, cap_per_module, max_attempts)
     retained: list[CoverageProof] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     modules = 0

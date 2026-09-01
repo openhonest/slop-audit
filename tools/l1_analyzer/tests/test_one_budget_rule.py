@@ -41,24 +41,39 @@ def test_the_repository_sweep_asks_the_same_rule():
 
 
 @pytest.mark.parametrize("module", [coverage_prove, python_coverage_prove], ids=["rust", "python"])
-def test_the_module_sweep_asks_it_too(module):
+def test_neither_sweep_spells_the_ceiling_itself(module):
     """Read from the source, because the sweep around it runs a coverage build.
 
-    The module rather than one function inside it. This read `prove_coverage_repo` alone and
-    broke on 2026-08-31 when the choosing was lifted out of that boundary into a function of
-    its own, which is the direction this test wants the code to go: it broke on the fix.
-    What it is here to catch is a second spelling of the rule anywhere in the sweep."""
+    Twice over, this test has broken on the fix rather than on a regression, which is the
+    direction it wants the code to go. It first read `prove_coverage_repo` for the text
+    `budget.allowance`, and broke when the choosing was lifted out of that boundary into a
+    function of its own. It then counted the call in the module, and broke again on
+    2026-08-31 when the choosing itself moved to `budget`, shared by both sweeps: neither
+    module spells the ceiling at all now, which is what it was always asking for.
+
+    What it holds is the same thing it always held. A second spelling of this rule is how
+    the budget drifts, and the budget is what decides how much money a run spends."""
     calls = [node for node in ast.walk(ast.parse(inspect.getsource(module)))
              if isinstance(node, ast.Call)
-             and ast.unparse(node.func) == "budget.allowance"]
-    assert calls, (
-        f"{module.__name__} still spells the per-module ceiling as a slice, which is a "
-        "second copy of the rule that decides what a run spends"
+             and ast.unparse(node.func).endswith("allowance")]
+    assert calls == [], (
+        f"{module.__name__} spells the ceiling itself, which is a second copy of the rule "
+        "that decides what a run spends"
     )
-    assert len(calls) == 1, (
-        f"{module.__name__} asks the rule in {len(calls)} places, which is the drift this "
-        "test exists to stop"
-    )
+
+
+def test_the_rule_is_written_in_exactly_one_place():
+    """The whole point of the two tests above, said once about the package.
+
+    A slice and a `min` are different parse trees for the same arithmetic, so the package's
+    duplicate-rule guard cannot see a second spelling. This can."""
+    written = [node for node in ast.walk(ast.parse(inspect.getsource(budget)))
+               if isinstance(node, ast.FunctionDef) and node.name == "allowance"]
+    assert len(written) == 1
+
+    asked = [node for node in ast.walk(ast.parse(inspect.getsource(budget)))
+             if isinstance(node, ast.Call) and ast.unparse(node.func) == "allowance"]
+    assert len(asked) == 1, "the selection rule asks the allowance once, per module it walks"
 
 
 def test_a_run_that_spends_its_ceiling_offers_nothing_to_the_rest():

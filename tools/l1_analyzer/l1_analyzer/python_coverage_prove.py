@@ -308,6 +308,23 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Coverag
     return retained, outcomes
 
 
+@boundary
+def _python_sources(repo: Path, measured: dict[str, frozenset[int]]) -> dict[str, str]:
+    """The text of every file coverage measured, keyed the way coverage keys them.
+
+    The one read the sweep's choosing needs, done at the edge so the choosing has none. A
+    file that will not open is left out rather than given back empty: an empty module has no
+    functions and no gaps, which reads as a file with nothing to prove instead of a file
+    nobody could read."""
+    read: dict[str, str] = {}
+    for relpath in measured:
+        try:
+            read[relpath] = (repo / relpath).read_text(errors="ignore")
+        except OSError:
+            continue
+    return read
+
+
 def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
                         timeout_seconds: float, python_executable: str | None,
                         progress: SweepProgress | None, max_attempts: int) -> Sweep:
@@ -333,27 +350,15 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
+    def gaps_of(source: str, lines: frozenset[int]) -> list[CoverageGap]:
+        return python_facets.uncovered_gaps(python_facets.module_functions(source), lines)
+
+    work, located, attempted_gaps = budget.gaps_to_attempt(
+        cov["files"], _python_sources(repo, cov["files"]), gaps_of, cap_per_module, max_attempts)
     retained: list[CoverageProof] = []
     outcomes = dict(EMPTY_OUTCOMES)
     modules = 0
-    located = 0            # every gap the sweep found, whether or not the ceiling let it try
-    attempted_gaps = 0     # every gap the sweep handed to a model
-    for relpath, lines in sorted(cov["files"].items()):
-        try:
-            functions = python_facets.module_functions((repo / relpath).read_text(errors="ignore"))
-        except OSError:
-            continue
-        module_gaps = python_facets.uncovered_gaps(functions, lines)[:cap_per_module]
-        located += len(module_gaps)
-        # The repo-wide ceiling, applied after `located` counts the whole gap so the report
-        # can say what was left. Truncating before counting would hide the size of the miss.
-        # One rule, in `budget`: the module's own cap or what the run has left,
-        # whichever is smaller. The cap is already applied above, so what this
-        # adds is the run ceiling.
-        gaps = module_gaps[:budget.allowance(len(module_gaps), max_attempts, attempted_gaps)]
-        attempted_gaps += len(gaps)
-        if not gaps:
-            continue
+    for relpath, gaps in work:
         modules += 1
         if progress:
             progress(relpath, len(gaps), len(retained))

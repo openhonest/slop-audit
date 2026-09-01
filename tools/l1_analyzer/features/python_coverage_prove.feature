@@ -3,6 +3,12 @@ Feature: python_coverage_prove — the pytest coverage-gap prove loop, where an 
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  Scenario: _python_sources reads the text of every file coverage measured
+    Given the tree and the files a coverage run reported on
+    When _python_sources reads each of them
+    Then the choosing that follows needs no reader of its own, which is what keeps I/O out of the function that decides what to spend on
+    But a file that will not open is left out rather than given back empty, since an empty module has no gaps and would read as a file with nothing to prove instead of a file nobody could read
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md

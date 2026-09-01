@@ -8,6 +8,13 @@ Feature: budget — how much the next unit of work may spend
   see through that, and it was still two places for a budget to drift. This budget decides
   how much money a run spends.
 
+  Scenario: gaps_to_attempt chooses which gaps a sweep will spend on
+    Given the coverage a build measured, the text the edge already read, a reader that finds a module's gaps, a per-module cap and a run ceiling
+    When gaps_to_attempt walks the measured files in a settled order
+    Then every gap is counted as located whether or not either bound lets the sweep try it, since a sweep reporting three of three attempted looks complete when it found forty
+    And a module the bounds left nothing for is not in the work, because counting it would report work on a file the sweep walked past
+    But the gap reader is a parameter and the sources are text, so this never learns which language it is choosing for and does no reading of its own
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # An allowance is a count of ATTEMPTS, and an attempt is not a fixed cost. One gap may take a
