@@ -12,6 +12,7 @@ about a call, and what to do when reading a value fails, and each of them is a f
 import json
 
 import pytest
+from l1_analyzer import probe_record
 from l1_analyzer import runtime_probe_plugin as plugin
 
 
@@ -174,14 +175,14 @@ class _Config:
 
 def test_the_observations_are_written_where_the_probe_asked(tmp_path):
     destination = tmp_path / "seen.json"
-    assert plugin.write_observations([{"function": "f"}], str(destination)) is True
+    assert probe_record.write_record([{"function": "f"}], str(destination)) is True
     assert json.loads(destination.read_text()) == [{"function": "f"}]
 
 
 def test_nothing_is_written_when_no_destination_was_named(tmp_path):
     """The plugin is registered by name, so it also loads in runs nobody asked to watch.
     Writing to a path from a previous run would overwrite one audit with another."""
-    assert plugin.write_observations([{"function": "f"}], "") is False
+    assert probe_record.write_record([{"function": "f"}], "") is False
     assert list(tmp_path.iterdir()) == []
 
 
@@ -404,5 +405,5 @@ def test_writing_no_observations_still_records_the_run(tmp_path):
     """An audit that watched a suite and saw nothing is a different fact from an audit that
     could not watch one. The empty file is what says the first happened."""
     destination = tmp_path / "seen.json"
-    assert plugin.write_observations([], str(destination)) is True
+    assert probe_record.write_record([], str(destination)) is True
     assert json.loads(destination.read_text()) == []

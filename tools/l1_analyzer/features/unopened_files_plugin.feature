@@ -29,8 +29,3 @@ Feature: The plugin that records every file the suite opens
     Then the caller reads the list of files the suite opened
     But a run killed before this point reports nothing at all, which the caller reads as a run it could not watch rather than a suite that opened no files
 
-  Scenario: write_opened writes what was opened where the caller asked
-    Given what was opened and somewhere to put it
-    When write_opened writes the list
-    Then it says whether it wrote
-    But no destination means nobody asked to watch this run, since the plugin is registered by name and also loads in runs that are not audits, where writing would overwrite one answer with another

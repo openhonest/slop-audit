@@ -11,12 +11,11 @@ module is imported is counted. An audit hook cannot be removed once installed, w
 the recording is per process and the process is the suite's own.
 """
 
-import json
 import os
 import sys
 from collections.abc import Callable
 
-from l1_analyzer.boundary import boundary
+from l1_analyzer import probe_record
 from l1_analyzer.unopened_files import OPENS_VARIABLE
 
 STASH = "_l1_opened"
@@ -47,25 +46,10 @@ def pytest_unconfigure(config: object) -> None:
 
     A run killed before this point writes no file, and the caller reads a missing file as a
     run it could not watch rather than as a suite that opened nothing. That distinction is
-    the whole reading, and this function used to break it from the other end: it defaulted
-    the absent record to an empty set, so a run whose configure never installed the hook
-    wrote an empty list, which says the suite opened no files. Found on 2026-08-31 by
-    writing the first test this plugin has ever had."""
-    seen = getattr(config, STASH, None)
-    if seen is None:
-        return
-    write_opened(seen, os.environ.get(OPENS_VARIABLE, ""))
+    the whole reading, and it lives in `probe_record` now: this function and its twin in
+    `runtime_probe_plugin` broke it the same way, defaulting an absent record to empty, and
+    were fixed the same day. One copy since 2026-09-01.
 
-
-@boundary
-def write_opened(seen: set[str], destination: str) -> bool:
-    """Write what was opened where the caller asked, and say whether it did.
-
-    No destination means nobody asked to watch this run. The plugin is registered by name,
-    so it also loads in runs that are not audits, and writing to a path from a previous one
-    would overwrite one answer with another."""
-    if not destination:
-        return False
-    with open(destination, "w") as handle:
-        json.dump(sorted(seen), handle)
-    return True
+    Sorted, because the caller compares this against a listing of the tree and against the
+    run before it. An unsettled order would report changes nobody made."""
+    probe_record.hand_back(config, STASH, os.environ.get(OPENS_VARIABLE, ""), sorted)

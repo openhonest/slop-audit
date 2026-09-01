@@ -54,12 +54,6 @@ Feature: runtime_probe_plugin — watching the audited module while its suite ru
     Then they are written where the probe asked
     But a run killed before this point loses them, and the probe reports that as a run it could not watch rather than as a module with no runtime properties
 
-  Scenario: write_observations records the run where the probe asked
-    Given the observations and the destination the probe named
-    When write_observations is called
-    Then it says whether it wrote
-    But no destination means nobody asked to watch this run, and writing to a path from a previous one would overwrite one audit with another
-
   Scenario: module_state reads the module's own data, which purity is about
     Given the module being watched
     When module_state reads its namespace

@@ -17,6 +17,7 @@ installs, not the installing.
 
 import json
 
+from l1_analyzer import probe_record
 from l1_analyzer import unopened_files_plugin as plugin
 from l1_analyzer.unopened_files import OPENS_VARIABLE
 
@@ -74,7 +75,7 @@ def test_two_watchers_do_not_share_a_record():
 
 def test_what_was_opened_is_written_where_the_caller_asked(tmp_path):
     destination = tmp_path / "opened.json"
-    assert plugin.write_opened({"/b", "/a"}, str(destination)) is True
+    assert probe_record.write_record(sorted({"/b", "/a"}), str(destination)) is True
     assert json.loads(destination.read_text()) == ["/a", "/b"]
 
 
@@ -82,7 +83,7 @@ def test_the_paths_come_back_in_a_settled_order(tmp_path):
     """The caller compares this against a listing of the tree. Two runs over one suite have
     to produce the same file, or a comparison between them reports changes nobody made."""
     destination = tmp_path / "opened.json"
-    plugin.write_opened({"/z", "/a", "/m"}, str(destination))
+    probe_record.write_record(sorted({"/z", "/a", "/m"}), str(destination))
     assert json.loads(destination.read_text()) == ["/a", "/m", "/z"]
 
 
@@ -90,14 +91,14 @@ def test_a_run_nobody_asked_to_watch_writes_nothing(tmp_path):
     """The plugin is registered by name, so it loads in runs that are not audits too.
     Writing to a path left over from a previous run would overwrite one answer with
     another."""
-    assert plugin.write_opened({"/a"}, "") is False
+    assert probe_record.write_record(["/a"], "") is False
 
 
 def test_a_suite_that_opened_nothing_writes_an_empty_list_rather_than_no_file(tmp_path):
     """An empty list is a measured answer. No file at all is what a run that died before
     finishing leaves, and the caller reads that as a run it could not watch."""
     destination = tmp_path / "opened.json"
-    assert plugin.write_opened(set(), str(destination)) is True
+    assert probe_record.write_record([], str(destination)) is True
     assert json.loads(destination.read_text()) == []
 
 

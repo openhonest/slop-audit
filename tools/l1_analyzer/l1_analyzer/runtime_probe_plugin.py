@@ -14,13 +14,12 @@ object by the time a test says `from m import band` and binds the name.
 
 import importlib
 import inspect
-import json
 import os
 from collections.abc import Callable
 from functools import partial
 from typing import TypedDict
 
-from l1_analyzer.boundary import boundary
+from l1_analyzer import probe_record
 
 
 class Observation(TypedDict):
@@ -190,29 +189,11 @@ def pytest_unconfigure(config: object) -> None:
     """Hand back what was seen, and write nothing at all when nothing was watched.
 
     A run killed before this point writes no file, and the probe reads a missing file as a
-    run it could not watch rather than as a module with no runtime properties. This function
-    used to break that from the other end: it defaulted the absent record to an empty list,
-    so a run whose configure never installed the tracer wrote an empty list, which says the
-    module has no runtime properties. Two opposite answers, the same bytes.
+    run it could not watch rather than as a module with no runtime properties. That
+    distinction lives in `probe_record` now: this function and its twin in
+    `unopened_files_plugin` broke it the same way, defaulting an absent record to empty, and
+    were fixed the same day. One copy since 2026-09-01.
 
-    Fixed on 2026-08-31, alongside the identical line in `unopened_files_plugin`. One of the
-    two was found by writing that plugin's first test; this one was found by going to look
-    at the only other plugin shaped like it."""
-    seen = getattr(config, STASH, None)
-    if seen is None:
-        return
-    write_observations(seen, os.environ.get(OUTPUT_VARIABLE, ""))
-
-
-@boundary
-def write_observations(seen: list[Observation], destination: str) -> bool:
-    """Write the observations where the probe asked, and say whether it did.
-
-    No destination means nobody asked to watch this run. The plugin is registered by name,
-    so it also loads in runs that are not audits, and writing to a path from a previous one
-    would overwrite one audit with another."""
-    if not destination:
-        return False
-    with open(destination, "w") as handle:
-        json.dump(seen, handle)
-    return True
+    The observations are written in the order they happened, which is the order a reader
+    needs to see a call and then the call it made."""
+    probe_record.hand_back(config, STASH, os.environ.get(OUTPUT_VARIABLE, ""), list)
