@@ -115,11 +115,39 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
     tables = frozenset(_LITERAL_NODES.get(lang, ()))
     out: list[tuple[str, int]] = []
 
+    def is_table(node: Node) -> bool:
+        """A container that is data: long, or holding nothing but literals.
+
+        Two arms, and the second was added on 2026-09-01 because the first alone made this
+        module's own argument into a rule about layout. Nine per-language vocabularies
+        written as nine short frozensets came back as duplicated code, while the identical
+        content written as one long dictionary was discounted. That reads how an author laid
+        a table out, not whether anything was copied.
+
+        Every element a literal is the premise the size was standing in for. There is no
+        logic in such a container to duplicate, which is the same sentence this module
+        already says about a record declaration and about an import block.
+
+        The size arm stays, and replacing it rather than joining it was my first attempt: a
+        table mapping names to tables holds containers rather than literals, so the package's
+        own nine-language grammar spec stopped being data and the reading went from 8.7 per
+        cent to 18.3. The suite caught it. Long-and-mixed and short-and-literal are both
+        data, and neither test covers the other.
+
+        A container holding anything else, and short, is code: a list of calls is a pile of
+        logic laid out like a table, and discounting it would let anyone hide a copied block
+        behind brackets."""
+        if node.type not in tables:
+            return False
+        if node.end_point[0] - node.start_point[0] + 1 >= _MIN_TABLE_LINES:
+            return True
+        elements = [child for child in node.named_children if "comment" not in child.type]
+        return bool(elements) and all(child.type in literals for child in elements)
+
     def walk(node: Node) -> None:
         if "comment" in node.type:
             return
-        if (node.type in tables
-                and node.end_point[0] - node.start_point[0] + 1 >= _MIN_TABLE_LINES):
+        if is_table(node):
             return
         # A record declaration, for the same reason as a data table. This check erases
         # identifiers so that two functions doing one thing with different names read alike,
