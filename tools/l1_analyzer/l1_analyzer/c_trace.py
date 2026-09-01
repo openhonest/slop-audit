@@ -29,7 +29,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from l1_analyzer import disclosure
+from l1_analyzer import disclosure, toolchain
 from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -59,7 +59,7 @@ def _compiler(cc: str, repo: Path, timeout_seconds: float) -> str:
     """The C compiler `cc` resolves in the target's environment, named so the result says which
     toolchain measured it (or would have). Directory-insensitive: probed with cwd=repo."""
     probe = _run_untrusted([cc, "--version"], cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 30))
-    return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown C compiler"
+    return toolchain.named(probe.stdout, probe.returncode, unknown="an unknown C compiler")
 
 
 def make_target_in(text: str) -> tuple[str | None, str]:

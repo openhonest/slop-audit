@@ -29,7 +29,7 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict
 
-from l1_analyzer import disclosure
+from l1_analyzer import disclosure, toolchain
 from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -92,12 +92,15 @@ def _toolchain(repo: Path, timeout_seconds: float) -> str:
     """The rustc toolchain rustup resolves for this repo (its rust-toolchain.toml wins),
     named so the result says which environment measured it. Directory-insensitive: the
     rustup shim run with cwd=repo selects the repo's pinned toolchain."""
+    # Named once. Two reasons reach it, no cargo at all and a rustc that would not answer,
+    # and the sentence is the same for both; written twice it is two owners of one fact.
+    unknown = "an unknown rust toolchain"
     cargo = _cargo()
     if cargo is None:
-        return "an unknown rust toolchain"
+        return unknown
     probe = _run_untrusted([str(Path(cargo).with_name("rustc")), "--version"],
                            cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 30))
-    return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown rust toolchain"
+    return toolchain.named(probe.stdout, probe.returncode, unknown=unknown)
 
 
 def _llvm_cov_available() -> bool:

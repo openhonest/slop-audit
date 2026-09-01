@@ -30,6 +30,7 @@ import shutil
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer import toolchain
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -141,7 +142,7 @@ def _ruby_version(ruby: str, repo: Path, timeout_seconds: float, env: Environmen
     """The pinned ruby's version, run with cwd=repo (and the pin's PATH) so .ruby-version
     wins, named so every measured result says which interpreter measured it."""
     probe = _run_untrusted([ruby, "--version"], cwd=repo, env=env, timeout_seconds=min(timeout_seconds, 30))
-    return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown ruby"
+    return toolchain.named(probe.stdout, probe.returncode, unknown="an unknown ruby")
 
 
 def _ran(runner: str, output: str) -> int:

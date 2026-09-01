@@ -23,7 +23,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from l1_analyzer import disclosure
+from l1_analyzer import disclosure, toolchain
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -45,7 +45,7 @@ def _toolchain(go: str, repo: Path, timeout_seconds: float) -> str:
     """The toolchain `go` resolves for this module (go.mod's `toolchain` directive wins),
     named so the result says which environment measured it."""
     probe = _run_untrusted([go, "version"], cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 30))
-    return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown go toolchain"
+    return toolchain.named(probe.stdout, probe.returncode, unknown="an unknown go toolchain")
 
 
 def _coverage_verdict(func_output: str, profile_written: bool, run_returncode: int,

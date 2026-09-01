@@ -35,11 +35,10 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Literal, TypedDict
 
-from l1_analyzer import incomplete
+from l1_analyzer import incomplete, toolchain
 from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
-    _first_line,
     _na,
     _run_untrusted,
     coverage_verdict,
@@ -102,7 +101,7 @@ def _jdk(repo: Path, timeout_seconds: float, env: dict) -> str:
     """The JDK that runs the build, named so every measured result says which runtime measured
     it. `java -version` prints to stderr, so read it from there."""
     probe = _run_untrusted(["java", "-version"], cwd=repo, env=env, timeout_seconds=min(timeout_seconds, 30))
-    return _first_line(probe.stderr or probe.stdout) if probe.returncode == 0 else "an unknown JDK"
+    return toolchain.named(probe.stderr, probe.returncode, unknown="an unknown JDK")
 
 
 def _branch_totals(xml_text: str) -> tuple[int, int]:

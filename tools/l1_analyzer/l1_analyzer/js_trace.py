@@ -32,7 +32,7 @@ import tempfile
 from pathlib import Path
 from typing import Literal, TypedDict
 
-from l1_analyzer import disclosure
+from l1_analyzer import disclosure, toolchain
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -106,7 +106,7 @@ def _using_nvm() -> str:
 def _node_version(repo: Path, timeout_seconds: float) -> str:
     probe = _run_untrusted(_wrap(repo, ["node", "--version"]), cwd=repo, env={},
                            timeout_seconds=min(timeout_seconds, 30))
-    return _first_line(probe.stdout) if probe.returncode == 0 else "an unknown node runtime"
+    return toolchain.named(probe.stdout, probe.returncode, unknown="an unknown node runtime")
 
 
 def _runtime_name(repo: Path, timeout_seconds: float) -> str:

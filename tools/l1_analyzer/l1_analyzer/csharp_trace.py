@@ -27,6 +27,7 @@ import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 
+from l1_analyzer import toolchain
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -72,7 +73,10 @@ def _sdk(dotnet: str, repo: Path, timeout_seconds: float) -> str:
     """The SDK `dotnet` resolves for this repo (global.json wins), named so the result says
     which environment measured it."""
     probe = _run_untrusted([dotnet, "--version"], cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 30))
-    return f"dotnet {_first_line(probe.stdout)}" if probe.returncode == 0 else "an unknown dotnet SDK"
+    unknown = "an unknown dotnet SDK"
+    named = toolchain.named(probe.stdout, probe.returncode, unknown=unknown)
+    # `dotnet --version` prints the bare number, so the name says what the number is of.
+    return named if named == unknown else f"dotnet {named}"
 
 
 def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, sdk: str,
