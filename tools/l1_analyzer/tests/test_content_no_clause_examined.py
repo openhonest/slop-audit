@@ -21,10 +21,10 @@ literals produced eleven hits and every one was genuine embedded source held as 
 fixture.
 """
 
-from unittest import mock
 
 import pytest
-from l1_analyzer import honest_code, honest_code_report
+from l1_analyzer import honest_code, honest_code_grammars, honest_code_report
+from l1_analyzer import honest_code_embedded as embedded
 
 WIDGET = '''"""A Python module that serves a JavaScript widget."""
 
@@ -58,32 +58,32 @@ def band(n: int) -> str:
 
 
 def test_embedded_source_is_named_with_its_language_and_size():
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET, "m.py"), honest_code._findings_in)
     assert len(found) == 1
     assert found[0]["language"] == "javascript"
     assert found[0]["lines"] >= 5
 
 
 def test_the_block_is_located_so_a_reader_can_go_and_look():
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET, "m.py"), honest_code._findings_in)
     assert found[0]["line"] > 1
 
 
 def test_prose_is_not_reported_as_embedded_source():
     """The case that must not fire. A reader told their docstring is unexamined JavaScript
     stops reading the notices, and then the one that matters is skipped too."""
-    assert honest_code.unexamined_blocks(honest_code.read_source_text(PROSE, "m.py")) == []
+    assert honest_code.unexamined_blocks(honest_code.read_source_text(PROSE, "m.py"), honest_code._findings_in) == []
 
 
 def test_a_short_string_is_not_a_block():
     """One line of something that parses is a fragment, not content nobody examined."""
     source = 'CALL = "f(x);"\n\n\ndef go() -> str:\n    return CALL\n'
-    assert honest_code.unexamined_blocks(honest_code.read_source_text(source, "m.py")) == []
+    assert honest_code.unexamined_blocks(honest_code.read_source_text(source, "m.py"), honest_code._findings_in) == []
 
 
 def test_a_file_with_nothing_embedded_reports_nothing():
     source = "def band(n: int) -> str:\n    return 'high' if n > 10 else 'low'\n"
-    assert honest_code.unexamined_blocks(honest_code.read_source_text(source, "m.py")) == []
+    assert honest_code.unexamined_blocks(honest_code.read_source_text(source, "m.py"), honest_code._findings_in) == []
 
 
 # --------------------------------------------------------------------------
@@ -176,12 +176,12 @@ def test_script_content_is_found_through_its_wrapper():
     """The same JavaScript reported bare was silent once wrapped in a script tag, because
     the tags are not JavaScript and the whole-grammar test rejected the block. That is the
     case this was built for: page content usually arrives wrapped."""
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"), honest_code._findings_in)
     assert [b["language"] for b in found] == ["javascript"]
 
 
 def test_style_content_is_found_the_same_way():
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(STYLED, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(STYLED, "m.py"), honest_code._findings_in)
     assert [b["language"] for b in found] == ["css"]
 
 
@@ -195,7 +195,7 @@ def test_a_malformed_wrapper_is_never_read_as_markup():
     name is arguable, which is the same ambiguity the precedence rule above settles in the
     other direction and the reason that rule had to be written down."""
     source = honest_code.read_source_text(WRAPPED.replace("</script>", ""), "m.py")
-    found = honest_code.unexamined_blocks(source)
+    found = honest_code.unexamined_blocks(source, honest_code._findings_in)
     assert [b["language"] for b in found] != ["html"], (
         "markup that does not parse whole was read as markup anyway, so the whole-parse "
         "requirement has stopped holding")
@@ -209,7 +209,7 @@ def test_the_line_reported_points_at_the_element_in_the_file():
     string's. It used to report the string's line for everything inside it, so a reader
     given line 1 for a script starting on line 6 had to go and find it, and two elements
     carried the same line."""
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"), honest_code._findings_in)
     line = WRAPPED.split("\n")[found[0]["line"] - 1]
     assert "script" in line, f"line {found[0]['line']} is {line!r}"
 
@@ -218,14 +218,14 @@ def test_markup_with_no_script_or_style_reports_the_markup_itself():
     """Plain markup in a string is still content nothing examined, and naming it as markup
     is truer than naming it as the language of whatever it does not contain."""
     source = 'PAGE = """\n<div>\n<p>one</p>\n<p>two</p>\n</div>\n"""\n\n\ndef page() -> str:\n    return PAGE\n'
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(source, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(source, "m.py"), honest_code._findings_in)
     assert [b["language"] for b in found] == ["html"]
 
 
 def test_prose_is_still_not_markup():
     """The markup grammar is permissive enough to accept prose, which would undo the whole
     result. Prose has no element and no script, so there is nothing to name."""
-    assert honest_code.unexamined_blocks(honest_code.read_source_text(PROSE, "m.py")) == []
+    assert honest_code.unexamined_blocks(honest_code.read_source_text(PROSE, "m.py"), honest_code._findings_in) == []
 
 
 BOTH = '''PAGE = """
@@ -254,35 +254,35 @@ def test_every_embedded_element_is_named_not_just_the_first():
     read as though the block had been accounted for.
 
     This is the case the feature was built for: page content is usually both."""
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"), honest_code._findings_in)
     assert sorted(b["language"] for b in found) == ["css", "javascript"]
 
 
 def test_each_element_reports_its_own_size_rather_than_the_whole_block():
     """The block is thirteen lines. Neither element is, and reporting the block's size
     against one language says the whole string was that language."""
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"), honest_code._findings_in)
     assert all(b["lines"] < 8 for b in found), found
 
 
 def test_each_element_reports_its_own_line():
     """A reader given line 1 for a script that starts on line 6 has to search for it, and
     the two elements would carry the same line."""
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(BOTH, "m.py"), honest_code._findings_in)
     lines = sorted(b["line"] for b in found)
     assert len(set(lines)) == 2, found
     assert lines[0] < lines[1]
 
 
 def test_a_single_element_still_reports_the_element():
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WRAPPED, "m.py"), honest_code._findings_in)
     assert len(found) == 1
     assert found[0]["language"] == "javascript"
 
 
 def test_a_bare_block_still_reports_the_whole_of_itself():
     """Nothing wrapped it, so the block IS the content and its own size is the right size."""
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET, "m.py"), honest_code._findings_in)
     assert len(found) == 1 and found[0]["lines"] >= 5
 
 
@@ -300,19 +300,23 @@ def test_a_bare_block_still_reports_the_whole_of_itself():
 def test_a_language_whose_grammar_is_absent_is_named_rather_than_silently_skipped():
     """The whole reason the catch was wrong. Absence has to reach the reader."""
     with_css = honest_code.read_source_text("x = 1\n\nCSS = '''\nbody {\n    color: red;\n}\n'''\n", "m.py")
-    assert [b["language"] for b in honest_code.unexamined_blocks(with_css)] == ["css"]
+    assert [b["language"] for b in
+            honest_code.unexamined_blocks(with_css, honest_code._findings_in)] == ["css"]
 
-    without = {name: grammar for name, grammar in honest_code.GRAMMARS.items()
-               if name != "css"}
-    with mock.patch.object(honest_code, "GRAMMARS", without), \
-            pytest.raises(KeyError, match="css"):
-        honest_code.unexamined_blocks(with_css)
+    # Asked directly rather than by removing css from the table and running the reader.
+    # That patch stopped working when this moved to its own module on 2026-08-31, because
+    # the reader imports the table by value and a patch on the module never reached it: the
+    # test was swapping a name the code had already copied, which this suite refuses
+    # everywhere else. The property is the same and the function that holds it is one call
+    # away.
+    with pytest.raises(KeyError, match="cobol"):
+        embedded._grammar_root("IDENTIFICATION DIVISION.\n", "cobol")
 
 
 def test_the_grammars_this_reader_loaded_are_stated_rather_than_discovered_per_call():
     """A table built once at import, so a caller asks what is there instead of parsing and
     catching to find out."""
-    assert set(honest_code.GRAMMARS) >= {"html", "css"}
+    assert set(honest_code_grammars.GRAMMARS) >= {"html", "css"}
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +360,7 @@ WIDGET_IN_A_PAGE = (
 
 
 def test_a_block_carries_what_the_clauses_found_in_it():
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET_IN_A_PAGE, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(WIDGET_IN_A_PAGE, "m.py"), honest_code._findings_in)
     assert found, "the widget is embedded source and has to be seen"
     assert found[0]["findings"], "a block with no findings attached tells a reader nothing"
     assert any(f["clause"] == "L1.21.8" for f in found[0]["findings"]), found[0]["findings"]
@@ -365,7 +369,7 @@ def test_a_block_carries_what_the_clauses_found_in_it():
 def test_a_misnamed_block_reports_nothing_because_it_is_not_that_language():
     """The SQL case, and the whole argument. It is named ruby because ruby accepts it, and
     every ruby clause then finds nothing in it, because it is not ruby."""
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(SQL_IN_A_DRIVER, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(SQL_IN_A_DRIVER, "m.py"), honest_code._findings_in)
     assert found, "the block is still disclosed: the share above did not cover it"
     assert found[0]["findings"] == [], found[0]["findings"]
 
@@ -400,7 +404,7 @@ def test_the_name_is_a_pick_and_the_other_candidates_travel_with_it():
             "  try { return go(data); } catch (e) { return null; }\n"
             "}\n"
             "'''\n")
-    found = honest_code.unexamined_blocks(honest_code.read_source_text(real, "m.py"))
+    found = honest_code.unexamined_blocks(honest_code.read_source_text(real, "m.py"), honest_code._findings_in)
     assert found[0]["findings"], "the case this field exists for"
     assert "javascript" in found[0]["also_accepted_by"], found[0]
     assert found[0]["language"] not in found[0]["also_accepted_by"]

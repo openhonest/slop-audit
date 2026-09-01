@@ -28,13 +28,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
-from tree_sitter import Language, Node, Parser
-
 from l1_analyzer import honest_code_contracts as contracts
 from l1_analyzer import honest_code_edges as edges
 from l1_analyzer import honest_code_markers as markers
 from l1_analyzer import honest_code_references as references
 from l1_analyzer import honest_code_rules as rules
+from l1_analyzer.honest_code_embedded import Block, Unexamined, unexamined_blocks
 from l1_analyzer.honest_code_read import Source, read_tree
 from l1_analyzer.honest_code_rules import BROWSER_LANGUAGES, Finding
 from l1_analyzer.lang_spec import LANG_SPEC
@@ -177,102 +176,12 @@ class Assessed(TypedDict):
     declared: list[Allowed]
 
 
-# How much of a string constant has to parse as another language before it is worth
-# naming. Five lines, because one line of something that parses is a fragment rather than
-# content nobody examined, and a reader told about fragments stops reading the notices.
-_BLOCK_LINES = 5
-
-# A cheap gate before nine grammars are tried on a string. Trying them all on every long
-# docstring cost 203ms on this package's most fixture-heavy file, over the budget that keeps
-# this usable behind a write hook.
-#
-# Its only failure mode is SILENCE. A block that carries none of these is not reported, which
-# is exactly what happened before any of this existed; it can never invent a block that is not
-# there. That direction is the reason it is acceptable and the reason it is written down.
-_CODE_MARKS = (";", "{", "}", "=>", "<", "func ", "def ", "class ", "fn ", "public ", "var ")
-
-# Grammars this reader uses that no clause reads. They are deliberately NOT in LANG_SPEC:
-# that table is the clause vocabulary, and an entry there would tell nineteen clauses they
-# can read markup.
-#
-# Page content is why they are here. The same JavaScript reported bare went silent once
-# wrapped in a script tag, because the tags are not JavaScript and the whole-grammar test
-# rejected the block. That is the commonest way embedded source arrives.
-_MARKUP = "html"
-_STYLESHEET = "css"
-
-# The element types whose text is another language. Read by node type, so nothing is
-# stripped and nothing is matched by pattern: a wrapper removed by hand is the guess this
-# whole test exists to avoid.
-_EMBEDDING_ELEMENTS = ("script_element", "style_element")
 
 
 
-def _grammars() -> dict[str, Language]:
-    """The grammars for the languages no clause reads, loaded once and stated.
-
-    Built here rather than imported inside the parse, so a caller asks the table what is
-    present instead of parsing and catching to find out. A grammar that failed to install
-    is then a missing key at the one call that wanted it, not a rejection indistinguishable
-    from the grammar reading the text and saying no."""
-    import tree_sitter_css
-    import tree_sitter_html
-
-    return {_MARKUP: Language(tree_sitter_html.language()),
-            _STYLESHEET: Language(tree_sitter_css.language())}
 
 
-GRAMMARS = _grammars()
 
-
-class Block(TypedDict):
-    """One block of another language, as it is found, before anything reads it.
-
-    Every field the published record below carries, plus the block's own source. The text
-    travels only as far as the reader and never into the record: carrying every embedded
-    block's source into a report about the file would put the file back into the report.
-
-    Its own record rather than the published one, because the published one does not hold
-    text and said so, while the code built it holding text and popped it out again. Nothing
-    said the two disagreed until a type checker ran over this package.
-
-    It then said four fields while the builder wrote six, and the two it left out are the
-    two the published record keeps. So the record that exists to hold what the builder makes
-    described neither what was built nor what was published.
-    """
-
-    language: str
-    line: int
-    lines: int
-    text: str
-    findings: list[Finding]
-    also_accepted_by: list[str]
-
-
-class Unexamined(TypedDict):
-    """A block inside a readable file that no clause looked at.
-
-    Not a clause and not graded. The Python in a file holding a JavaScript widget really
-    does hold every clause that read it, and saying otherwise would invent a violation.
-    This says the other true thing: the file's substance was never examined.
-
-    THE FINDINGS ARE THE POINT, NOT THE LANGUAGE. A twelve-line SQL query inside a database
-    driver is accepted whole by the ruby grammar, there is no SQL grammar, so that name can
-    never be right and a driver holds dozens of such queries. Reporting a guessed name and
-    nothing else teaches a reader to skip the field, which costs the embedded-widget case it
-    was built for.
-
-    So the clauses are run on the block and travel with it. A misnamed block reports nothing,
-    because it is not that language and has none of that language's shapes. A real one
-    reports what a reader can act on, and the name it was given stops mattering."""
-
-    language: str
-    line: int
-    lines: int
-    findings: list[Finding]
-    # The other grammars that also took this block whole. A name is a pick among these, and
-    # a reader discounting a finding needs to see how much of a pick it was.
-    also_accepted_by: list[str]
 
 
 class Assessment(TypedDict):
@@ -411,6 +320,28 @@ _ALLOW = re.compile(r"honest-code-allow:\s*(L1\.21\.\d+)\s*[-\u2014:]+\s*(\S.*?)
 # declaration out of range of exactly the findings that need one. It still stops well short
 # of the next function, or one comment would excuse everything beneath it.
 _ALLOW_REACH = 4
+
+
+def _findings_in(block: Block, text: str) -> list[Finding]:
+    """What every clause that reads the shared vocabulary says about one embedded block.
+
+    Only those clauses: the ones written against Python's own parser would be handed a tree
+    the runner did not build for this text. A clause that raises on the block is skipped
+    rather than reported, because a reader cannot act on this reader's own failure to parse
+    something it already said it could parse."""
+    # An unnamed block has no clauses to run: nobody knows which language's vocabulary to
+    # read it through, which is exactly what the empty name records.
+    if block["language"] not in _VOCABULARY:
+        return []
+    source = read_tree(text, block["language"])
+    source.update({"path": "", "language": block["language"], "text": text,
+                   "readable": True, "unreadable_reason": ""})
+    found: list[Finding] = []
+    for clause in CLAUSES:
+        if clause["reads"] != _TREE_READER:
+            continue
+        found += clause["check"](source) or []
+    return [{**f, "line": f["line"] + block["line"] - 1} for f in found]
 
 
 def read_source_text(text: str, path: str) -> Source:
@@ -691,223 +622,108 @@ def assess_file_text(text: str, path: str,
         "path": str(path), "language": source["language"], "clauses": assessed,
         "conformity": share, "band": band_of(share),
         "decided_clauses": len([c for c in assessed if c["decided"]]),
-        "unexamined": unexamined_blocks(source),
+        "unexamined": unexamined_blocks(source, _findings_in),
         "unreadable_reason": source["unreadable_reason"],
     }
 
 
 def assess_file(path: Path) -> Assessment:
-    """One file on disk, measured."""
+    """One file on disk, measured, with the shapes its own tree declares.
+
+    A path is a tree, which is the difference between this and `assess_file_text` above.
+    The clause that reads inheritance excuses a base that is itself a declared record, and
+    a base written in the next file along is the same declaration as one written here, so a
+    caller that cannot see the sibling reports a record extending a record as sharing an
+    implementation.
+
+    This is what the write hook uses, and it disagreed with the commit gate about the same
+    file until 2026-08-31: the hook flagged it and the gate did not, so an agent got a
+    finding on every write that the commit then cleared. A hook whose findings the next
+    step withdraws teaches the agent that the hook is noise, which costs more than the
+    clause is worth.
+
+    The tree is searched from the nearest package or repository root, so the walk is bounded
+    by what the file is part of rather than by whatever directory the caller stood in, and
+    it is not searched at all for a file that inherits nothing. That is most files, and it
+    is what keeps a hook that fires on every write from costing a tree walk every time."""
     path = Path(path)
-    return assess_file_text(path.read_text(errors="replace"), str(path))
+    text = path.read_text(errors="replace")
+    return assess_file_text(text, str(path), shapes_around(path, text))
 
 
-def unexamined_blocks(source: Source) -> list[Unexamined]:
-    """Substantial string constants that parse cleanly as another language this tool knows.
+def shapes_around(path: Path, text: str) -> frozenset[str]:
+    """Every record, protocol and exception root declared in the tree this file belongs to,
+    or nothing when this file has no base to resolve.
 
-    A Python file holding a JavaScript widget scored 100 per cent with fourteen clauses
-    decided and no findings, and the JavaScript in it had a dispatch chain and a swallowed
-    error. Every clause examined the Python correctly; nothing examined the substance.
+    The early answer is the whole reason this is affordable. Only a base this file cannot
+    already account for sends the reader looking outside it, and a tree search settles
+    nothing for a file that has none. Two of this package's seventy-six modules have one.
 
-    Nothing is guessed from resemblance. A block is named only when a real grammar accepts
-    the WHOLE of it with no error node, which is what keeps prose out: run over this
-    package's own source, 355 long string literals produced eleven hits and every one was
-    genuine embedded source held as a test fixture."""
-    if not source["readable"] or source["language"] not in _PARSED:
-        return []
-    documentation = _docstrings(source["tree"])
-    found: list[Block] = []
-    for node in ast.walk(source["tree"]):
-        if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+    "Declares a class with a base" was the first version of that test and it was useless:
+    every TypedDict is written `class Row(TypedDict)`, so it matched forty-three of the
+    seventy-six and paid the walk for most of the package. The bases that matter are the
+    ones the clause will still be holding after it has excused the declared shapes and
+    followed this file's own hierarchy, which is a question this module already answers.
+
+    Measured on 2026-08-31: the walk costs about a second on this repository, and paying it
+    on every write to every file was worse than the finding it prevents.
+
+    The root is the outermost directory above the file that still holds a package marker, or
+    the file's own directory when there is none. A repository marker wins over a package
+    one, since a base can be declared in a sibling package."""
+    if not _bases_from_elsewhere(text, str(path)):
+        return frozenset()
+    root = _tree_root(path.resolve())
+    from l1_analyzer import scope
+
+    read, _skipped = scope._read_text_files(root, frozenset(_SUFFIXES), scope.WHOLE_REPO)
+    return repository_shapes(read)
+
+
+def _bases_from_elsewhere(text: str, path: str) -> bool:
+    """Whether any base in this file is one the file cannot account for on its own.
+
+    A base is accounted for when it names a declared shape, when it names a class in this
+    file that reaches one, or when it names the class itself. What is left is a name written
+    somewhere else, and only that sends the reader out to the tree.
+
+    Read with the same parser and the same two tables the clause uses, so the walk is paid
+    exactly when the clause would otherwise have something to say. A file this cannot parse
+    pays for the walk, which reaches the clause with the shapes it needs rather than saving
+    a second by guessing."""
+    from l1_analyzer.honest_code_read import base_names, first_name, node_text, walk
+    from l1_analyzer.honest_code_rules import DECLARED_SHAPES, local_declared_shapes
+
+    source = read_source_text(text, path)
+    if source["unreadable_reason"]:
+        return True
+    spec, raw = source["spec"], source["raw"]
+    known = DECLARED_SHAPES | local_declared_shapes(source)
+    for node in walk(source["root"]):
+        if node.type not in spec["class_types"]:
             continue
-        if id(node) in documentation:
-            continue
-        lines = node.value.count("\n") + 1
-        if lines < _BLOCK_LINES or not any(mark in node.value for mark in _CODE_MARKS):
-            continue
-        found += _blocks_in(node.value, source["language"], node.lineno)
-    examined: list[Unexamined] = []
-    for block in found:
-        # The block's own text travels only this far. A reader wants the findings, and
-        # carrying every embedded block's source into the published record would put the
-        # file back into the report that is about the file.
-        #
-        # Built by naming each field rather than by popping one out of the block and
-        # spreading the rest. The pop mutated the block a line before it was read, and the
-        # spread carried whatever else happened to be there into the published record.
-        examined.append({"language": block["language"], "line": block["line"],
-                         "lines": block["lines"],
-                         "also_accepted_by": block["also_accepted_by"],
-                         "findings": _findings_in(block, block["text"])})
-    return examined
+        name = node_text(node.child_by_field_name("name"), raw) or first_name(node, raw)
+        if any(b not in known and b != name for b in base_names(node, spec, raw)):
+            return True
+    return False
 
 
-def _findings_in(block: Block, text: str) -> list[Finding]:
-    """What every clause that reads the shared vocabulary says about one embedded block.
+def _tree_root(path: Path) -> Path:
+    """The directory this file's tree starts at.
 
-    Only those clauses: the ones written against Python's own parser would be handed a tree
-    the runner did not build for this text. A clause that raises on the block is skipped
-    rather than reported, because a reader cannot act on this reader's own failure to parse
-    something it already said it could parse."""
-    # An unnamed block has no clauses to run: nobody knows which language's vocabulary to
-    # read it through, which is exactly what the empty name records.
-    if block["language"] not in _VOCABULARY:
-        return []
-    source = read_tree(text, block["language"])
-    source.update({"path": "", "language": block["language"], "text": text,
-                   "readable": True, "unreadable_reason": ""})
-    found: list[Finding] = []
-    for clause in CLAUSES:
-        if clause["reads"] != _TREE_READER:
-            continue
-        found += clause["check"](source) or []
-    return [{**f, "line": f["line"] + block["line"] - 1} for f in found]
-
-
-def _blocks_in(text: str, own: str, line: int) -> list[Block]:
-    """Every block of another language inside this text, one entry per element.
-
-    One entry per BLOCK was wrong and it was wrong quietly. Page content usually carries a
-    style element and a script element together, and returning a single language reported
-    whichever was found first while dropping the other, so a record read as though the
-    block had been accounted for. Which one survived depended on the order they came out of
-    the tree.
-
-    Each entry carries its own line and its own size. Reporting the whole block's size
-    against one language says the entire string was that language, and giving both elements
-    line 1 makes a reader search for the one that starts on line 6."""
-    wrapper = _accepts_whole(text, _MARKUP)
-    if wrapper is not None:
-        parts = _markup_parts(wrapper, text)
-        found = [block for part, offset in parts
-                 for block in _blocks_in(part, own, line + offset)]
-        if found:
-            return found
-        # Markup carrying no embedded source this reader knows is still content nothing
-        # examined, and naming it as markup is truer than naming it as a language it does
-        # not contain.
-        #
-        # It is named BEFORE the other grammars are tried, and that order settles an
-        # ambiguity between grammars rather than expressing a preference. The JavaScript and
-        # TypeScript grammars both accept JSX, so any tag-shaped text parses cleanly as
-        # JavaScript: a plain block of divs was reported as JavaScript and an unterminated
-        # script tag as TypeScript, and which one won came down to the alphabetical order of
-        # the language names.
-        #
-        # What it costs, stated because it is a real cost: genuine JSX held in a Python
-        # string is named markup. The block is unexamined content either way and only the
-        # name is wrong, which is the direction to be wrong in.
-        if any(n.type == "element" for n in rules.walk(wrapper)):
-            return [{"language": _MARKUP, "line": line, "lines": text.count("\n") + 1,
-                     "findings": [], "text": text, "also_accepted_by": []}]
-
-    accepted = _accepted_by(text, own)
-    if not accepted:
-        return []
-    # The name is a pick among candidates, and the candidates travel with it. Counting them
-    # was tried first, on the theory that many acceptors means the name is a coin flip: two
-    # one-line functions are taken whole by five grammars, and naming that block `c` gave a
-    # finding whose symbols read "function, function". But a REAL embedded widget is taken
-    # by three, csharp among them, so any cut that refused the five refused the widget too,
-    # and the widget is the case this field exists for.
-    #
-    # So the pick stands and the ambiguity is disclosed beside it rather than acted on. A
-    # missed widget is the silence this was built to stop; a finding under a doubtful name
-    # is noise a reader can discount, once they are told.
-    language = accepted[0]
-    return [{"language": language, "line": line,
-             "lines": text.count("\n") + 1, "findings": [], "text": text,
-             "also_accepted_by": accepted[1:]}]
-
-
-def _docstrings(tree: ast.AST) -> set[int]:
-    """The string constants this file declares as documentation.
-
-    Skipped, because a docstring IS declared documentation and source inside one is an
-    example rather than shipped content. It is also where nearly all the cost was: 342 of
-    this package's 355 long string literals are docstrings and not one of its eleven real
-    embedded blocks is, so trying nine grammars on each of them bought nothing and cost
-    25 milliseconds a file.
-
-    The limit, stated because its failure mode is silence: a template genuinely held in a
-    docstring is missed."""
-    declared: set[int] = set()
-    for node in ast.walk(tree):
-        body = getattr(node, "body", None)
-        if not isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
-                                 ast.ClassDef)) or not body:
-            continue
-        first = body[0]
-        if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
-                and isinstance(first.value.value, str)):
-            declared.add(id(first.value))
-    return declared
-
-
-def _accepted_by(text: str, own: str) -> list[str]:
-    """Every grammar OTHER than the file's own that takes this text whole, in name order.
-
-    A parse with no error node and some named structure in it. tree-sitter accepts almost
-    anything and reports the trouble as error nodes rather than as a failure, so the absence
-    of them is the test.
-
-    The LIST rather than a winner, because the count is the evidence. Returning one name
-    made "nothing accepted this" and "everything accepted this" the same answer, and they
-    are opposite facts: the first is not a block at all, the second is a block whose name
-    nobody can know.
-
-    Markup is not tried here. Its caller tries it first and goes one grammar deeper when it
-    finds an element, because it is the most permissive grammar in this set and would
-    otherwise claim blocks a stricter one should have."""
-    return [language for language in sorted({*_VOCABULARY, _STYLESHEET} - {own})
-            if (root := _accepts_whole(text, language)) is not None
-            and root.named_child_count]
-
-
-def _markup_parts(root: "Node", text: str) -> list[tuple[str, int]]:
-    """The text inside each script and style element, with the line each starts on.
-
-    Found by NODE TYPE. Nothing is stripped and nothing is matched by pattern: a wrapper
-    removed by hand is the guess this whole test exists to avoid, so the markup grammar has
-    to accept the block whole first and the element is then located the way the grammar
-    names it.
-
-    The line travels with the text because a reader given the block's own line has to search
-    for the element inside it, and two elements would carry the same one."""
-    raw = text.encode()
-    parts: list[tuple[str, int]] = []
-    for node in rules.walk(root):
-        if node.type not in _EMBEDDING_ELEMENTS:
-            continue
-        for child in node.children:
-            if child.type == "raw_text":
-                inner = raw[child.start_byte:child.end_byte].decode(errors="replace")
-                parts.append((inner, child.start_point[0]))
-    return sorted(parts, key=lambda part: part[1])
-
-
-def _accepts_whole(text: str, language: str) -> "Node | None":
-    """The root a grammar produced, when it accepted the WHOLE text with no error node.
-
-    None means one thing only: that grammar read the text and rejected it. A language with
-    no grammar here raises, because a caller cannot tell a rejection from an absence and the
-    absence is the expensive one. It makes every block in that language vanish, so the file
-    reports nothing unexamined and the share claims to cover what it never read."""
-    root = _grammar_root(text, language)
-    if any(n.type == "ERROR" or n.is_missing for n in rules.walk(root)):
-        return None
+    A repository marker first, because a base can be declared in a sibling package and
+    stopping at the package would miss it. Failing that, the outermost directory that is
+    still part of the same import package, which is what `__init__.py` marks. Failing that,
+    the file's own directory: one file with no tree around it is one file."""
+    for parent in path.parents:
+        if (parent / ".git").exists() or (parent / "pyproject.toml").is_file():
+            return parent
+    root = path.parent
+    while (root / "__init__.py").is_file() and root.parent != root:
+        root = root.parent
     return root
 
 
-def _grammar_root(text: str, language: str) -> "Node":
-    """One parse, by whichever grammar owns this language.
-
-    The clause vocabulary is asked first. Markup and stylesheets are not in it, because
-    that table is what tells a clause it can read a language and no clause reads these."""
-    if language in _VOCABULARY:
-        return read_tree(text, language)["root"]
-
-    return Parser(GRAMMARS[language]).parse(text.encode()).root_node
 
 
 def _named_under(repo: Path, path: Path) -> str:

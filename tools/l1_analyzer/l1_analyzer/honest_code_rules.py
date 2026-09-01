@@ -470,7 +470,7 @@ def _script_spans(text: str) -> list[tuple[int, int]]:
     happens to name a script tag is not a script tag."""
     from tree_sitter import Parser
 
-    from l1_analyzer.honest_code import _MARKUP, GRAMMARS
+    from l1_analyzer.honest_code_grammars import _MARKUP, GRAMMARS
 
     raw = text.encode()
     root = Parser(GRAMMARS[_MARKUP]).parse(raw).root_node

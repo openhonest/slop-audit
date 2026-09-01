@@ -116,60 +116,9 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     Then a site an allow comment excused and a site a boundary decorator excused are both set apart, and each says which withheld it
     But a declaration that withheld nothing produces no record, since a marker on a function the clause would never have spoken about suppressed nothing and counting it punishes the declaration it was added to encourage
 
-  Scenario: unexamined_blocks names content inside a readable file that no clause looked at
-    Given a file that parsed, and the string constants it holds
-    When unexamined_blocks tries each substantial one against the grammars of the other languages
-    Then a block that parses with no error node is reported with its language, its line and its size, and it is not graded
-    But nothing is guessed from resemblance, since a block is only named when a real grammar accepts the whole of it, and 355 of this package's own long strings produced eleven hits and every one was genuine source
-
-  Scenario: _docstrings names the strings a file declares as documentation
-    Given a parsed file
-    When _docstrings reads the first statement of the module, each class and each function
-    Then those strings are skipped, since a docstring IS declared documentation and source inside one is an example rather than shipped content
-    But a template genuinely held in a docstring is missed, and that limit is stated because its failure mode is silence
-
-  Scenario: _accepted_by lists every grammar that takes a block whole
-    Given the text of a string constant and the language of the file holding it
-    When _accepted_by tries the grammars of every language but the file's own
-    Then a parse with no error node and some named structure in it names that language
-    But tree-sitter accepts almost anything and reports trouble as error nodes rather than as failure, so the absence of them is the test and resemblance is never enough
-
-  Scenario: _markup_parts finds the script and style content inside a block of markup
-    Given a block that the markup grammar accepts whole
-    When _markup_parts reads its script and style elements by node type
-    Then the text inside each is handed back to the same whole-grammar test, one grammar deeper
-    But nothing is stripped and nothing is matched by pattern, since a wrapper removed by hand is the guess this test exists to avoid, and page content is the case that made the depth necessary
-
-  Scenario: _accepts_whole says whether a grammar took the whole text without complaint
-    Given a block of text and a language to try it as
-    When _accepts_whole parses it and looks for error nodes
-    Then a tree with no error and nothing missing is an acceptance
-    But tree-sitter reports trouble as error nodes rather than as failure, so the absence of them is the whole test and a partial parse is never an acceptance
-
-  Scenario: _grammar_root parses one block by whichever grammar owns its language
-    Given a block of text and a language
-    When _grammar_root picks the grammar for it
-    Then the clause vocabulary is asked first, and markup and stylesheets are parsed by grammars kept outside it
-    But they are kept outside on purpose, since that table is what tells a clause it can read a language and no clause reads these
-
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Clause 17, the strangler pattern, is a property of how a migration is sequenced over weeks.
-  Scenario: _grammars states which grammars this reader loaded
-    Given the two languages no clause reads, markup and stylesheets
-    When _grammars loads them once at import
-    Then a caller asks the table what is present instead of parsing to find out
-    But a grammar that failed to install is a missing key, not a rejection that reads like prose
-
-  Scenario: _blocks_in finds each foreign block a run of text holds
-    Given a string holding both a style element and a script element
-    When _blocks_in reads it through the markup grammar and then each part
-    Then one block comes back per element, each with its own line and its own size
-    But a run that only parses as its own language is not a foreign block at all
-
-  # No reading of any file at any moment decides it, and it is the one clause here that is
-  # excluded by its nature rather than by the reach of this reader.
-  @undecidable @not-implemented
   Scenario: undecidable whether a migration followed the strangler pattern
     Given a repository holding both an old implementation and a new one
     When someone asks whether the migration was sequenced correctly
@@ -193,3 +142,22 @@ Feature: honest_code — L1.21, mechanical conformity with the Honest Code princ
     When clause_named looks for the row carrying it
     Then it returns that row, so a caller reading a clause's own words reads the table rather than a copy of it
     But a code nobody wrote down raises rather than returning a blank row, since a caller handed an empty clause would report a rule that does not exist as one that holds
+  Scenario: shapes_around gathers the records the tree around one file declares
+    Given a file on disk and its text
+    When shapes_around is asked what that file's tree declares as a record, a protocol or an exception root
+    Then a base written in the next file along is the same declaration as one written here, so the write hook and the commit gate read the file the same way
+    But a file with no base it cannot already account for gets nothing back and no search at all, because this runs on every write and a tree walk costs about a second
+
+  Scenario: _bases_from_elsewhere says whether any base sends the reader outside this file
+    Given the text of one file
+    When _bases_from_elsewhere reads its classes against the declared shapes and this file's own hierarchy
+    Then only a base neither of those accounts for is one written somewhere else
+    And a file it cannot parse counts as having one, since a file that cannot be read cannot be excused
+    But "declares a class with a base" is not the test, because every typed record is written that way and it matched forty-three of this package's seventy-six modules
+
+  Scenario: _tree_root finds the directory a file's tree starts at
+    Given the path of one file
+    When _tree_root walks up from it
+    Then a repository marker wins over a package one, because a base can be declared in a sibling package
+    But a file with neither above it has only its own directory, since one file with no tree around it is one file
+
