@@ -43,10 +43,18 @@ def pytest_configure(config: object) -> None:
 
 
 def pytest_unconfigure(config: object) -> None:
-    """Hand back what was opened. A run killed before this point reports nothing, and the
-    caller reads that as a run it could not watch rather than as a suite that opened no
-    files."""
-    write_opened(getattr(config, STASH, set()), os.environ.get(OPENS_VARIABLE, ""))
+    """Hand back what was opened, and write nothing at all when nothing was watched.
+
+    A run killed before this point writes no file, and the caller reads a missing file as a
+    run it could not watch rather than as a suite that opened nothing. That distinction is
+    the whole reading, and this function used to break it from the other end: it defaulted
+    the absent record to an empty set, so a run whose configure never installed the hook
+    wrote an empty list, which says the suite opened no files. Found on 2026-08-31 by
+    writing the first test this plugin has ever had."""
+    seen = getattr(config, STASH, None)
+    if seen is None:
+        return
+    write_opened(seen, os.environ.get(OPENS_VARIABLE, ""))
 
 
 @boundary
