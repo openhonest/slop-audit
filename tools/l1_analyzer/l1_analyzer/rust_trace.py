@@ -29,6 +29,7 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer import disclosure
 from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -231,7 +232,7 @@ def _region_totals(report: Report) -> tuple[int, int] | None:
 
 
 def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
-                      toolchain: str) -> L1Result:
+                      toolchain: str, timeout_seconds: float) -> L1Result:
     """L1.19 from a finished run and cargo-llvm-cov's region totals. No I/O, so it can be
     asserted.
 
@@ -249,7 +250,8 @@ def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
     available, so a reader comparing this number against another language's has to be told
     which one they are looking at."""
     if returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
+        return _na("test suite timed out before coverage could be measured"
+                   + disclosure.timeout_note(timeout_seconds))
     if totals is None:
         return _na("coverage report had no region totals")
     count, covered = totals
@@ -293,7 +295,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:
             return _na("coverage report was unreadable")
 
     return _coverage_verdict(_region_totals(report), run.returncode,
-                             _toolchain(repo, timeout_seconds))
+                             _toolchain(repo, timeout_seconds), timeout_seconds)
 
 
 # ---------------------------------------------------------------------------
@@ -312,7 +314,8 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float) -> L1Result:
     for i in range(1, runs + 1):
         run = _run_untrusted([cargo, "test", "--quiet"], cwd=repo, env={}, timeout_seconds=timeout_seconds)
         if run.returncode == 124:
-            return _na(f"a test run timed out (run {i}); determinism not measured")
+            return _na(f"a test run timed out (run {i}); determinism not measured"
+                       + disclosure.timeout_note(timeout_seconds))
         total, _failed = _tests_run((run.stdout or "") + (run.stderr or ""))
         if i == 1 and total == 0:
             return _na("cargo test collected no tests")

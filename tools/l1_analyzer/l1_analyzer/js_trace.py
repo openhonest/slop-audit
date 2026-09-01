@@ -32,6 +32,7 @@ import tempfile
 from pathlib import Path
 from typing import Literal, TypedDict
 
+from l1_analyzer import disclosure
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -199,7 +200,8 @@ def _c8_available(repo: Path, timeout_seconds: float) -> bool:
     return probe.returncode == 0
 
 
-def _coverage_verdict(branches: Branches | None, returncode: int, runtime: str) -> L1Result:
+def _coverage_verdict(branches: Branches | None, returncode: int, runtime: str,
+                      timeout_seconds: float) -> L1Result:
     """L1.19 from a finished run and c8's branch totals. No I/O, so it can be asserted.
 
     Extracted because it could not be reached otherwise. `decision_space_coverage` probes node,
@@ -219,7 +221,8 @@ def _coverage_verdict(branches: Branches | None, returncode: int, runtime: str) 
     under the answer written for an empty tree, which is the one thing this module must not do.
     """
     if returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
+        return _na("test suite timed out before coverage could be measured"
+                   + disclosure.timeout_note(timeout_seconds))
     if branches is None:
         return _na("the coverage run wrote no summary to read")
     if int(branches["total"]) == 0:
@@ -299,7 +302,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         )
         runtime = _runtime_name(repo, timeout_seconds)
         if run.returncode == 124:
-            return _coverage_verdict(None, run.returncode, runtime)
+            return _coverage_verdict(None, run.returncode, runtime, timeout_seconds)
         # c8 writes the summary for every file that ran, even when some tests fail. No summary
         # means the suite did not build or ran no tests: n/a with the reason, never a 0.0 that
         # reads as real-but-terrible coverage (a silent failure is a lie).
@@ -311,7 +314,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         except (OSError, json.JSONDecodeError, KeyError, TypeError):
             return _na("coverage summary had no branch totals")
 
-    return _coverage_verdict(branches, run.returncode, runtime)
+    return _coverage_verdict(branches, run.returncode, runtime, timeout_seconds)
 
 
 # ---------------------------------------------------------------------------
@@ -365,7 +368,8 @@ def _failure_summary(output: str) -> str:
     return _first_line(output)
 
 
-def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runtime: str) -> L1Result:
+def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runtime: str,
+                         timeout_seconds: float) -> L1Result:
     """L1.20 from the outcome of every shuffled-order run. No I/O, so it can be asserted.
 
     `per_seed` is one `(returncode, combined output)` pair per run made, in seed order, so seed
@@ -384,7 +388,8 @@ def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runtime: 
     failing: list[str] = []
     for seed, (returncode, output) in enumerate(per_seed, start=1):
         if returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
+            return _na(f"a randomized run timed out (seed {seed}); determinism not "
+                       "measured" + disclosure.timeout_note(timeout_seconds))
         if not _suite_ran(runner, output):
             return _na(f"the suite did not run (seed {seed}: no {runner} tests executed under "
                        f"{runtime}); determinism not measured")
@@ -447,4 +452,4 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         # verdict names which of the two happened; this only stops the spending.
         if run.returncode == 124 or not _suite_ran(runner, output):
             break
-    return _determinism_verdict(per_seed, runner, runtime)
+    return _determinism_verdict(per_seed, runner, runtime, timeout_seconds)

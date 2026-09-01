@@ -16,7 +16,7 @@ The claim is now proved by nothing. The reason is module shape: `decision_space_
 runs the suite, opens a temp directory, shells out a second time for `coverage json`, reads
 the report and decides the band inside one function, so the exit-code table can only be
 reached through a fake. Extracting
-`_coverage_verdict(returncode: int, totals: dict, provenance: str) -> L1Result` turns all six
+`_coverage_verdict(returncode: int, totals: dict, provenance: str, 300.0) -> L1Result` turns all six
 into `assert f(input) == expected`. That extraction is filed as separate work.
 """
 
@@ -90,21 +90,21 @@ def test_resolve_via_shim_none_when_no_manager(monkeypatch, tmp_path):
 
 def test_a_completed_run_yields_the_covered_share_and_its_band():
     totals = {"num_branches": 40, "covered_branches": 38}
-    r = pytest_trace._coverage_verdict(0, totals, "the analyzer's own interpreter")
+    r = pytest_trace._coverage_verdict(0, totals, "the analyzer's own interpreter", 300.0)
     assert r["value"] == 95.0 and r["band"] == "Healthy"
     assert "38/40 decision branches" in r["details"]
 
 
 def test_a_failing_but_valid_run_is_still_measured():
     # exit 1 means tests ran and some failed, which is a real coverage reading.
-    r = pytest_trace._coverage_verdict(1, {"num_branches": 10, "covered_branches": 7}, "p")
+    r = pytest_trace._coverage_verdict(1, {"num_branches": 10, "covered_branches": 7}, "p", 300.0)
     assert r["value"] == 70.0 and r["band"] == "Not Healthy"
     assert "suite exit 1" in r["details"]
 
 
 def test_the_band_boundaries_follow_the_spec():
     def band(c, n):
-        return pytest_trace._coverage_verdict(0, {"num_branches": n, "covered_branches": c}, "p")["band"]
+        return pytest_trace._coverage_verdict(0, {"num_branches": n, "covered_branches": c}, "p", 300.0)["band"]
     assert band(95, 100) == "Healthy"        # above 90
     assert band(90, 100) == "Not Healthy"    # 90 exactly is not above 90
     assert band(60, 100) == "Not Healthy"    # 60 exactly is the floor
@@ -112,7 +112,7 @@ def test_the_band_boundaries_follow_the_spec():
 
 
 def test_a_timeout_is_named_rather_than_scored():
-    r = pytest_trace._coverage_verdict(124, {}, "p")
+    r = pytest_trace._coverage_verdict(124, {}, "p", 300.0)
     assert r["band"] == "n/a" and "timed out" in r["details"]
 
 
@@ -120,7 +120,7 @@ def test_each_invalid_exit_code_names_its_own_reason():
     reasons = {2: "interrupted", 3: "internal error", 4: "usage or collection error",
                5: "collected no tests"}
     for code, phrase in reasons.items():
-        r = pytest_trace._coverage_verdict(code, {"num_branches": 9, "covered_branches": 9}, "p")
+        r = pytest_trace._coverage_verdict(code, {"num_branches": 9, "covered_branches": 9}, "p", 300.0)
         assert r["band"] == "n/a", f"exit {code} must not be scored"
         assert phrase in r["details"], f"exit {code} must say {phrase!r}"
 
@@ -128,7 +128,7 @@ def test_each_invalid_exit_code_names_its_own_reason():
 def test_an_unrecognised_exit_code_reports_the_code_rather_than_another_rows_reason():
     # The miss is a named case: it prints the actual code. It must not borrow the wording of
     # a code somebody did write a row for.
-    r = pytest_trace._coverage_verdict(137, {"num_branches": 9, "covered_branches": 9}, "p")
+    r = pytest_trace._coverage_verdict(137, {"num_branches": 9, "covered_branches": 9}, "p", 300.0)
     assert r["band"] == "n/a" and "137" in r["details"]
     assert "collected no tests" not in r["details"]
 
@@ -140,4 +140,4 @@ def test_zero_enumerable_branches_is_absent_not_zero_percent():
     import pytest as _pytest
     from l1_analyzer.incomplete import IncompleteCode
     with _pytest.raises(IncompleteCode, match="no enumerable decision branches"):
-        pytest_trace._coverage_verdict(0, {"num_branches": 0, "covered_branches": 0}, "p")
+        pytest_trace._coverage_verdict(0, {"num_branches": 0, "covered_branches": 0}, "p", 300.0)

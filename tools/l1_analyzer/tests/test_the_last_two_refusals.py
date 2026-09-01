@@ -19,7 +19,7 @@ from l1_analyzer import csharp_trace, pytest_trace
 
 
 def test_zero_instrumented_branches_is_a_refusal_not_a_zero():
-    result = csharp_trace._coverage_verdict((0, 0), 0, "dotnet 9.0.100")
+    result = csharp_trace._coverage_verdict((0, 0), 0, "dotnet 9.0.100", 300.0)
     assert result["band"] == "n/a"
     assert result["value"] == "n/a"
     assert "test assembly" in result["details"]
@@ -27,7 +27,7 @@ def test_zero_instrumented_branches_is_a_refusal_not_a_zero():
 
 def test_one_instrumented_branch_still_measures():
     """The boundary beside it: valid=1 is a denominator, so it is measured and banded."""
-    result = csharp_trace._coverage_verdict((0, 1), 0, "dotnet 9.0.100")
+    result = csharp_trace._coverage_verdict((0, 1), 0, "dotnet 9.0.100", 300.0)
     assert result["value"] == 0.0
     assert result["band"] == "Slop"
 
@@ -39,7 +39,7 @@ def test_one_instrumented_branch_still_measures():
     (5, "collected no tests"),
 ])
 def test_each_invalid_pytest_exit_refuses_with_its_own_reason(code, phrase):
-    result = pytest_trace._coverage_verdict(code, {"num_branches": 40, "covered_branches": 38}, "cpython 3.13")
+    result = pytest_trace._coverage_verdict(code, {"num_branches": 40, "covered_branches": 38}, "cpython 3.13", 300.0)
     assert result["band"] == "n/a"
     assert result["value"] == "n/a"
     assert phrase in result["details"], result["details"]
@@ -49,7 +49,7 @@ def test_each_invalid_pytest_exit_refuses_with_its_own_reason(code, phrase):
 def test_a_timeout_refuses_without_the_valid_run_wrapper():
     """124 is a timeout, and it says so on its own: the suite did not run long enough to be
     called an invalid run, it was cut off."""
-    result = pytest_trace._coverage_verdict(124, {"num_branches": 40, "covered_branches": 38}, "cpython 3.13")
+    result = pytest_trace._coverage_verdict(124, {"num_branches": 40, "covered_branches": 38}, "cpython 3.13", 300.0)
     assert result["band"] == "n/a"
     assert "timed out" in result["details"]
     assert "did not complete a valid run" not in result["details"]
@@ -57,6 +57,6 @@ def test_a_timeout_refuses_without_the_valid_run_wrapper():
 
 def test_an_exit_code_no_row_names_reports_the_code_itself():
     """A named miss rather than a default: it cannot be mistaken for a row somebody wrote."""
-    result = pytest_trace._coverage_verdict(99, {"num_branches": 40, "covered_branches": 38}, "cpython 3.13")
+    result = pytest_trace._coverage_verdict(99, {"num_branches": 40, "covered_branches": 38}, "cpython 3.13", 300.0)
     assert result["band"] == "n/a"
     assert "pytest exit 99" in result["details"]

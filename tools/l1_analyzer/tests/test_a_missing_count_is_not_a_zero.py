@@ -22,11 +22,11 @@ from l1_analyzer import incomplete, java_trace, pytest_trace
 
 def test_pytest_refuses_a_total_with_no_covered_count():
     with pytest.raises(incomplete.IncompleteCode):
-        pytest_trace._coverage_verdict(0, {"num_branches": 40}, "cpython 3.13")
+        pytest_trace._coverage_verdict(0, {"num_branches": 40}, "cpython 3.13", 300.0)
 
 
 def test_pytest_still_measures_when_both_are_there():
-    result = pytest_trace._coverage_verdict(0, {"num_branches": 40, "covered_branches": 38}, "cpython 3.13")
+    result = pytest_trace._coverage_verdict(0, {"num_branches": 40, "covered_branches": 38}, "cpython 3.13", 300.0)
     assert result["value"] == 95.0
     assert result["band"] == "Healthy"
 

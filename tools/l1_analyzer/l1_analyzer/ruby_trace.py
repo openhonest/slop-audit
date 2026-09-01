@@ -30,6 +30,7 @@ import shutil
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer import disclosure
 from l1_analyzer.boundary import boundary, text_or_empty
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -177,7 +178,8 @@ def _branch_totals(resultset: ResultSet) -> tuple[int, int]:
     return covered, total
 
 
-def _coverage_verdict(covered: int, total: int, returncode: int, version: str) -> L1Result:
+def _coverage_verdict(covered: int, total: int, returncode: int, version: str,
+                      timeout_seconds: float) -> L1Result:
     """L1.19 from a finished run and what SimpleCov's branch data carried. No I/O, so it can
     be asserted as a value.
 
@@ -193,7 +195,7 @@ def _coverage_verdict(covered: int, total: int, returncode: int, version: str) -
                "spec_helper (SimpleCov.start { enable_coverage :branch }) under " + version)
     return coverage_verdict(
         covered=covered, total=total, returncode=returncode,
-        no_report=missing, nothing_to_cover=missing,
+        timeout_seconds=timeout_seconds, no_report=missing, nothing_to_cover=missing,
         how="SimpleCov branches", toolchain=version)
 
 
@@ -212,7 +214,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     resultset_file = repo / "coverage" / ".resultset.json"
     run = _run_untrusted(_COVERAGE_COMMAND[runner](bundle), cwd=repo, env=env, timeout_seconds=timeout_seconds)
     if run.returncode == 124:
-        return _coverage_verdict(0, 0, run.returncode, version)
+        return _coverage_verdict(0, 0, run.returncode, version, timeout_seconds)
     # SimpleCov must be started in the suite's spec_helper; it cannot be injected
     # non-invasively. No resultset means we cannot measure - n/a with the exact remedy,
     # never a 0.0 that reads as real-but-terrible coverage (a silent failure is a lie).
@@ -225,14 +227,15 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         return _na("SimpleCov resultset was unreadable")
 
     covered, total = _branch_totals(resultset)
-    return _coverage_verdict(covered, total, run.returncode, version)
+    return _coverage_verdict(covered, total, run.returncode, version, timeout_seconds)
 
 
 # ---------------------------------------------------------------------------
 # L1.20 test determinism (repeated randomized-order runs)
 # ---------------------------------------------------------------------------
 
-def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runs: int, version: str) -> L1Result:
+def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runs: int,
+                         version: str, timeout_seconds: float) -> L1Result:
     """L1.20 from the outcome of every randomized-order run. No I/O, so it can be asserted.
 
     `per_seed` is one `(returncode, combined output)` pair per run made, in seed order, so seed
@@ -250,7 +253,8 @@ def _determinism_verdict(per_seed: list[tuple[int, str]], runner: str, runs: int
     failing: list[str] = []
     for seed, (returncode, output) in enumerate(per_seed, start=1):
         if returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
+            return _na(f"a randomized run timed out (seed {seed}); determinism not "
+                       "measured" + disclosure.timeout_note(timeout_seconds))
         if _ran(runner, output) == 0:
             return _na(f"the suite did not run (seed {seed}, exit {returncode}: {_first_line(output)}); "
                        f"determinism not measured under {version}")
@@ -293,4 +297,4 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         # names which of the two happened; this only stops the spending.
         if run.returncode == 124 or _ran(runner, output) == 0:
             break
-    return _determinism_verdict(per_seed, runner, runs, version)
+    return _determinism_verdict(per_seed, runner, runs, version, timeout_seconds)

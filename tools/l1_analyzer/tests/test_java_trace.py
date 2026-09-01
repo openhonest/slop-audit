@@ -12,8 +12,9 @@ returns the Gradle refusal before `_maven` is ever called.
 The cause was module shape, not test care. `decision_space_coverage` probed the JDK, ran
 `mvn test jacoco:report`, located the report, parsed it and decided the band inside one
 function, so there was no value to assert against and a fake was the only way in. That
-extraction is now done: `_coverage_verdict(branches, returncode, jdk)` and
-`_determinism_verdict(outcomes, jdk)` take plain values and return the L1Result, so the bands,
+extraction is now done: `_coverage_verdict(branches, returncode, jdk, timeout_seconds)` and
+`_determinism_verdict(outcomes, jdk, timeout_seconds)` take plain values and return the
+L1Result, so the bands,
 the not-run guard, the coverage-missing n/a and the per-seed failure reason are asserted
 below as values, with no stub anywhere in this file.
 """
@@ -65,7 +66,7 @@ def test_ran_tests_detects_execution():
 # The claims they defended are real and are restated here as values.
 
 def test_a_completed_build_yields_the_covered_share_and_its_band():
-    r = java_trace._coverage_verdict((38, 2), 0, "openjdk 21.0.2")
+    r = java_trace._coverage_verdict((38, 2), 0, "openjdk 21.0.2", 300.0)
     assert r["value"] == 95.0 and r["band"] == "Healthy"
     assert "38/40 decision branches" in r["details"]
     assert "suite passed" in r["details"] and "openjdk 21.0.2" in r["details"]
@@ -73,14 +74,14 @@ def test_a_completed_build_yields_the_covered_share_and_its_band():
 
 def test_a_failing_but_valid_build_is_still_measured():
     # A non-zero exit means tests ran and some failed, which is a real coverage reading.
-    r = java_trace._coverage_verdict((7, 3), 1, "openjdk 21")
+    r = java_trace._coverage_verdict((7, 3), 1, "openjdk 21", 300.0)
     assert r["value"] == 70.0 and r["band"] == "Not Healthy"
     assert "suite exit 1" in r["details"]
 
 
 def test_the_coverage_band_boundaries_follow_the_spec():
     def band(covered, missed):
-        return java_trace._coverage_verdict((covered, missed), 0, "j")["band"]
+        return java_trace._coverage_verdict((covered, missed), 0, "j", 300.0)["band"]
     assert band(95, 5) == "Healthy"          # above 90
     assert band(90, 10) == "Not Healthy"     # 90 exactly is not above 90
     assert band(60, 40) == "Not Healthy"     # 60 exactly is the floor
@@ -88,21 +89,21 @@ def test_the_coverage_band_boundaries_follow_the_spec():
 
 
 def test_a_timed_out_build_is_named_rather_than_scored():
-    r = java_trace._coverage_verdict((38, 2), 124, "j")
+    r = java_trace._coverage_verdict((38, 2), 124, "j", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "timed out" in r["details"]
 
 
 def test_a_build_that_wrote_no_jacoco_report_names_the_missing_plugin():
     # No report means the coverage tool is not wired into the build, NOT that coverage is 0.
-    r = java_trace._coverage_verdict(None, 0, "j")
+    r = java_trace._coverage_verdict(None, 0, "j", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "JaCoCo" in r["details"] and "jacoco.xml not produced" in r["details"]
 
 
 def test_zero_enumerable_branches_is_absent_not_zero_percent():
     # A share of no branches is absent. 0.0 here would band Slop and read as measured.
-    r = java_trace._coverage_verdict((0, 0), 0, "j")
+    r = java_trace._coverage_verdict((0, 0), 0, "j", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "zero BRANCH" in r["details"]
 
@@ -136,38 +137,38 @@ def _failed(failures=2, n=12):
 
 
 def test_every_randomized_run_passing_is_healthy():
-    r = java_trace._determinism_verdict([(0, _ok())] * 5, "openjdk 21")
+    r = java_trace._determinism_verdict([(0, _ok())] * 5, "openjdk 21", 300.0)
     assert r["value"] == "5/5" and r["band"] == "Healthy"
     assert "openjdk 21" in r["details"]
 
 
 def test_one_failing_run_is_not_healthy_and_the_seed_carries_its_counts():
     outcomes = [(0, _ok()), (0, _ok()), (1, _failed(2)), (0, _ok()), (0, _ok())]
-    r = java_trace._determinism_verdict(outcomes, "j")
+    r = java_trace._determinism_verdict(outcomes, "j", 300.0)
     assert r["value"] == "4/5" and r["band"] == "Not Healthy"
     assert "seed 3: Tests run: 12, Failures: 2, Errors: 0, Skipped: 0" in r["details"]
 
 
 def test_two_failing_runs_are_slop():
     outcomes = [(0, _ok()), (1, _failed()), (1, _failed()), (0, _ok()), (0, _ok())]
-    assert java_trace._determinism_verdict(outcomes, "j")["band"] == "Slop"
+    assert java_trace._determinism_verdict(outcomes, "j", 300.0)["band"] == "Slop"
 
 
 def test_at_most_three_failing_seeds_are_named():
-    r = java_trace._determinism_verdict([(1, _failed())] * 5, "j")
+    r = java_trace._determinism_verdict([(1, _failed())] * 5, "j", 300.0)
     assert r["value"] == "0/5" and r["band"] == "Slop"
     assert r["details"].count("seed ") == 3
 
 
 def test_a_failing_seed_with_no_summary_line_still_carries_a_reason():
-    r = java_trace._determinism_verdict([(0, _ok()), (1, "Tests run: 1\n[ERROR] boom")], "j")
+    r = java_trace._determinism_verdict([(0, _ok()), (1, "Tests run: 1\n[ERROR] boom")], "j", 300.0)
     assert "seed 2:" in r["details"]
 
 
 def test_a_run_that_executed_no_tests_is_not_a_determinism_result():
     # A compilation failure is not flakiness. 0/5 here would read as a flaky suite.
     outcomes = [(0, _ok()), (1, "[ERROR] COMPILATION ERROR : cannot find symbol")]
-    r = java_trace._determinism_verdict(outcomes, "openjdk 21")
+    r = java_trace._determinism_verdict(outcomes, "openjdk 21", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "seed 2" in r["details"] and "did not run" in r["details"]
     assert "openjdk 21" in r["details"]
@@ -175,7 +176,7 @@ def test_a_run_that_executed_no_tests_is_not_a_determinism_result():
 
 def test_a_timed_out_run_stops_the_count_and_names_its_seed():
     outcomes = [(0, _ok()), (0, _ok()), (124, "")]
-    r = java_trace._determinism_verdict(outcomes, "j")
+    r = java_trace._determinism_verdict(outcomes, "j", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "timed out" in r["details"] and "seed 3" in r["details"]
 
@@ -190,11 +191,11 @@ def test_a_terminal_run_stops_the_remaining_runs_from_being_made():
             made.append(seed)
             yield pair
 
-    java_trace._determinism_verdict(outcomes(), "j")
+    java_trace._determinism_verdict(outcomes(), "j", 300.0)
     assert made == [1]
 
 
 def test_no_runs_at_all_is_absent_not_a_clean_sweep():
     # 0 of 0 satisfies "every run passed". It must not band Healthy.
-    r = java_trace._determinism_verdict([], "j")
+    r = java_trace._determinism_verdict([], "j", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"

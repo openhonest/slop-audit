@@ -50,32 +50,32 @@ def test_a_tree_with_no_regions_is_told_apart_from_a_tree_with_none_covered():
     (24, 40, "Not Healthy"), (23, 40, "Slop"), (0, 40, "Slop"),
 ])
 def test_the_bands_sit_where_the_specification_puts_them(covered, count, band):
-    assert rust_trace._coverage_verdict((count, covered), 0, "rustc 1.80")["band"] == band
+    assert rust_trace._coverage_verdict((count, covered), 0, "rustc 1.80", 300.0)["band"] == band
 
 
 def test_a_suite_that_exercised_no_region_is_refused_rather_than_graded():
-    result = rust_trace._coverage_verdict((0, 0), 0, "rustc 1.80")
+    result = rust_trace._coverage_verdict((0, 0), 0, "rustc 1.80", 300.0)
     assert result["band"] == "n/a"
     assert result["value"] == "n/a"
 
 
 def test_a_timed_out_run_is_refused_rather_than_graded():
-    result = rust_trace._coverage_verdict(None, 124, "rustc 1.80")
+    result = rust_trace._coverage_verdict(None, 124, "rustc 1.80", 300.0)
     assert result["band"] == "n/a"
 
 
 def test_the_details_name_regions_rather_than_branches():
     """The number is region coverage, and a reader comparing it against another language's
     branch coverage has to be told which they are looking at."""
-    assert "region" in rust_trace._coverage_verdict((40, 38), 0, "rustc 1.80")["details"]
+    assert "region" in rust_trace._coverage_verdict((40, 38), 0, "rustc 1.80", 300.0)["details"]
 
 
 def test_the_details_name_the_toolchain_that_measured_it():
-    assert "rustc 1.80" in rust_trace._coverage_verdict((40, 38), 0, "rustc 1.80")["details"]
+    assert "rustc 1.80" in rust_trace._coverage_verdict((40, 38), 0, "rustc 1.80", 300.0)["details"]
 
 
 def test_a_failing_suite_is_graded_and_the_detail_says_the_suite_failed():
     """Coverage from a run whose tests failed is still coverage, and a reader has to know."""
-    result = rust_trace._coverage_verdict((40, 38), 1, "rustc 1.80")
+    result = rust_trace._coverage_verdict((40, 38), 1, "rustc 1.80", 300.0)
     assert result["band"] == "Healthy"
     assert "exit 1" in result["details"]

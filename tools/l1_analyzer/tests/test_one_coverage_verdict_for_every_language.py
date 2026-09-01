@@ -23,7 +23,7 @@ from l1_analyzer import pytest_trace
 
 
 def _verdict(**kwargs):
-    return pytest_trace.coverage_verdict(**kwargs)
+    return pytest_trace.coverage_verdict(**kwargs, timeout_seconds=300.0)
 
 
 _WORDS = {

@@ -23,6 +23,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from l1_analyzer import disclosure
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -48,7 +49,7 @@ def _toolchain(go: str, repo: Path, timeout_seconds: float) -> str:
 
 
 def _coverage_verdict(func_output: str, profile_written: bool, run_returncode: int,
-                      run_output: str, toolchain: str) -> L1Result:
+                      run_output: str, toolchain: str, timeout_seconds: float) -> L1Result:
     """L1.19 for Go from `go tool cover -func`'s stdout and the run that produced the profile.
     No I/O, so it can be asserted as a value.
 
@@ -69,7 +70,8 @@ def _coverage_verdict(func_output: str, profile_written: bool, run_returncode: i
     own first line, never a 0.0 that reads as real-but-terrible coverage.
     """
     if run_returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
+        return _na("test suite timed out before coverage could be measured"
+                   + disclosure.timeout_note(timeout_seconds))
     # The profile is written for every package that built and ran, even if some tests failed.
     # No profile means the module did not build or ran no tests.
     if not profile_written:
@@ -128,7 +130,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
             func_output = func.stdout or ""
 
     return _coverage_verdict(func_output, written, run.returncode,
-                             run.stderr or run.stdout or "", toolchain)
+                             run.stderr or run.stdout or "", toolchain, timeout_seconds)
 
 
 def _ran_tests(output: str) -> bool:
@@ -138,7 +140,8 @@ def _ran_tests(output: str) -> bool:
     return any(marker in output for marker in _RAN)
 
 
-def _determinism_verdict(outcomes: list[tuple[int, int, str]], runs: int, toolchain: str) -> L1Result:
+def _determinism_verdict(outcomes: list[tuple[int, int, str]], runs: int, toolchain: str,
+                         timeout_seconds: float) -> L1Result:
     """L1.20 for Go from the shuffled runs' outcomes alone: one `(seed, exit code, combined
     output)` per run, in seed order. No I/O, so it can be asserted as a value.
 
@@ -159,7 +162,8 @@ def _determinism_verdict(outcomes: list[tuple[int, int, str]], runs: int, toolch
     failing: list[str] = []
     for seed, returncode, output in outcomes:
         if returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
+            return _na(f"a randomized run timed out (seed {seed}); determinism not "
+                       "measured" + disclosure.timeout_note(timeout_seconds))
         if not _ran_tests(output):
             return _na(f"the suite did not run (seed {seed}: no test packages built or executed under "
                        f"{toolchain}); determinism not measured")
@@ -202,4 +206,4 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
         if run.returncode == 124 or not _ran_tests(output):
             break
 
-    return _determinism_verdict(outcomes, runs, toolchain)
+    return _determinism_verdict(outcomes, runs, toolchain, timeout_seconds)

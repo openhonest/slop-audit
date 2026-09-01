@@ -60,4 +60,4 @@ def test_a_report_that_is_not_a_report_at_all_is_refused(tmp_path):
 def test_the_bands_sit_where_the_specification_puts_them(covered, valid, band):
     """Over 90 Healthy, 60 to 90 Not Healthy, under 60 Slop. Held here because the sweep
     left them proved by nothing, and a band boundary that drifts is a grade that drifts."""
-    assert csharp_trace._coverage_verdict((covered, valid), 0, "dotnet 8")["band"] == band
+    assert csharp_trace._coverage_verdict((covered, valid), 0, "dotnet 8", 300.0)["band"] == band

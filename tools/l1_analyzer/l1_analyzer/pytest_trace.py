@@ -37,7 +37,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TypedDict
 
-from l1_analyzer import incomplete
+from l1_analyzer import disclosure, incomplete
 from l1_analyzer.boundary import boundary
 
 
@@ -199,7 +199,8 @@ class RunWords(TypedDict):
 
 def determinism_tally(outcomes: Iterable[tuple[int, str]], words: RunWords,
                       ran_tests: Callable[[str], bool],
-                      summarise: Callable[[str], str]) -> L1Result:
+                      summarise: Callable[[str], str], *,
+                      timeout_seconds: float) -> L1Result:
     """L1.20 from a sequence of finished runs. No I/O, so it can be asserted as a value.
 
     C# and Java spelled this out separately and the two were byte-identical statement for
@@ -224,7 +225,8 @@ def determinism_tally(outcomes: Iterable[tuple[int, str]], words: RunWords,
     for returncode, output in outcomes:
         made += 1
         if returncode == 124:
-            return _na(f"a {words['unit']} timed out ({words['unit']} {made}); determinism not measured")
+            return _na(f"a {words['unit']} timed out ({words['unit']} {made}); determinism "
+                       "not measured" + disclosure.timeout_note(timeout_seconds))
         if not ran_tests(output):
             return _na(f"the suite did not run ({words['unit']} {made}: {words['never_ran']}); "
                        "determinism not measured")
@@ -278,8 +280,8 @@ def _collection_was_empty(output: str) -> str:
 
 
 def coverage_verdict(*, covered: int | None, total: int | None, returncode: int,
-                     no_report: str, nothing_to_cover: str, how: str,
-                     toolchain: str) -> L1Result:
+                     timeout_seconds: float, no_report: str, nothing_to_cover: str,
+                     how: str, toolchain: str) -> L1Result:
     """L1.19 from a finished run: the share of decisions the tests reached, or why not.
 
     One function for every language. It was written seven times, once per runner, and reading
@@ -302,9 +304,12 @@ def coverage_verdict(*, covered: int | None, total: int | None, returncode: int,
 
     Every sentence is the caller's, because only the caller knows which tool it ran and what
     a reader should do about it. Nothing here is defaulted: a runner that forgets to name its
-    tool is refused rather than handed a generic sentence nobody can act on."""
+    tool is refused rather than handed a generic sentence nobody can act on. `timeout_seconds`
+    is that same kind of fact and is required for the same reason: the refusal below names
+    the number it allowed, and a runner that did not say what it allowed cannot."""
     if returncode == 124:
-        return _na("test suite timed out before coverage could be measured")
+        return _na("test suite timed out before coverage could be measured"
+                   + disclosure.timeout_note(timeout_seconds))
     if covered is None or total is None:
         return _na(no_report)
     if total == 0:
@@ -351,7 +356,8 @@ class BranchTotals(TypedDict, total=False):
     covered_branches: int
 
 
-def _coverage_verdict(returncode: int, totals: BranchTotals, provenance: str) -> L1Result:
+def _coverage_verdict(returncode: int, totals: BranchTotals, provenance: str,
+                      timeout_seconds: float) -> L1Result:
     """L1.19 from a finished run and coverage.py's totals. No I/O, so it can be asserted.
 
     Extracted because it could not be reached otherwise. `decision_space_coverage` runs the
@@ -425,7 +431,7 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
             cwd=repo, env=env, timeout_seconds=timeout_seconds,
         )
         if run.returncode not in (0, 1):
-            return _coverage_verdict(run.returncode, {}, provenance)
+            return _coverage_verdict(run.returncode, {}, provenance, timeout_seconds)
         # `coverage json` is our own trusted, fast step.
         subprocess.run(
             [exe, "-m", "coverage", "json", "-o", str(report_file)],
@@ -442,7 +448,7 @@ def decision_space_coverage(repo: Path, lang: str, timeout_seconds: float,
         except (OSError, json.JSONDecodeError):
             return _na("coverage report was unreadable")
 
-    return _coverage_verdict(run.returncode, report.get("totals", {}), provenance)
+    return _coverage_verdict(run.returncode, report.get("totals", {}), provenance, timeout_seconds)
 
 
 # ---------------------------------------------------------------------------
@@ -496,7 +502,8 @@ def test_determinism(repo: Path, lang: str, runs: int, timeout_seconds: float,
         if run.returncode == 5:
             return _na("pytest collected no tests")
         if run.returncode == 124:
-            return _na(f"a randomized run timed out (seed {seed}); determinism not measured")
+            return _na(f"a randomized run timed out (seed {seed}); determinism not "
+                       "measured" + disclosure.timeout_note(timeout_seconds))
         if run.returncode in _INCOMPLETE:
             return _na(f"the suite did not complete a valid run (seed {seed}: {_INCOMPLETE[run.returncode]}); "
                        "determinism not measured")

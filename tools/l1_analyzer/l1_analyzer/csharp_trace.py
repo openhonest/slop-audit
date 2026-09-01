@@ -75,7 +75,8 @@ def _sdk(dotnet: str, repo: Path, timeout_seconds: float) -> str:
     return f"dotnet {_first_line(probe.stdout)}" if probe.returncode == 0 else "an unknown dotnet SDK"
 
 
-def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, sdk: str) -> L1Result:
+def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, sdk: str,
+                      timeout_seconds: float) -> L1Result:
     """L1.19 from a finished run and what the Cobertura report carried. No I/O, so it can be
     asserted as a value.
 
@@ -91,6 +92,7 @@ def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, sdk: st
     covered, total = (None, None) if branches is None else branches
     return coverage_verdict(
         covered=covered, total=total, returncode=returncode,
+        timeout_seconds=timeout_seconds,
         no_report="C# branch coverage needs coverlet.collector in the test project "
                   "(coverage.cobertura.xml not produced)",
         nothing_to_cover="no branches instrumented; the code under test may be in the test "
@@ -114,12 +116,12 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         )
         reports = sorted(Path(directory).rglob("coverage.cobertura.xml"))
         if run.returncode == 124 or not reports:
-            return _coverage_verdict(None, run.returncode, sdk)
+            return _coverage_verdict(None, run.returncode, sdk, timeout_seconds)
         branches = _branch_totals(reports[0].read_text(errors="ignore"))
         if branches is None:
             return _na("cobertura report had no branch counts")
 
-    return _coverage_verdict(branches, run.returncode, sdk)
+    return _coverage_verdict(branches, run.returncode, sdk, timeout_seconds)
 
 
 def _ran_tests(output: str) -> bool:
@@ -129,7 +131,8 @@ def _ran_tests(output: str) -> bool:
     return any(marker in output for marker in _RAN)
 
 
-def _determinism_verdict(outcomes: Iterable[tuple[int, str]], sdk: str) -> L1Result:
+def _determinism_verdict(outcomes: Iterable[tuple[int, str]], sdk: str,
+                         timeout_seconds: float) -> L1Result:
     """L1.20 for C# from finished `dotnet test` runs. See pytest_trace.determinism_tally for
     the rules; only the words are here, and they are C#'s own. `dotnet test` has no seed CLI,
     so an attempt is a run whose order the scheduler varied, never a seed."""
@@ -142,6 +145,7 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], sdk: str) -> L1Res
                      f"not seed-controlled; under {sdk})"},
         _ran_tests,
         _first_line,
+        timeout_seconds=timeout_seconds,
     )
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
@@ -160,4 +164,4 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
             run = _run_untrusted([dotnet, "test"], cwd=repo, env={}, timeout_seconds=timeout_seconds)
             yield run.returncode, (run.stdout or "") + (run.stderr or "")
 
-    return _determinism_verdict(outcomes(), sdk)
+    return _determinism_verdict(outcomes(), sdk, timeout_seconds)

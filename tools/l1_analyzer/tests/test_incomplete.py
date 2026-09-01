@@ -69,7 +69,7 @@ def _repo_with_no_branches(tmp_path):
 def test_a_verdict_with_no_branches_to_measure_raises_rather_than_returning_na():
     from l1_analyzer import pytest_trace
     with pytest.raises(IncompleteCode, match="L1.19 decision-space coverage"):
-        pytest_trace._coverage_verdict(0, {"num_branches": 0, "covered_branches": 0}, "p")
+        pytest_trace._coverage_verdict(0, {"num_branches": 0, "covered_branches": 0}, "p", 300.0)
 
 
 def test_a_harness_refusal_reaches_the_report_as_an_n_a_and_not_as_a_traceback(tmp_path):

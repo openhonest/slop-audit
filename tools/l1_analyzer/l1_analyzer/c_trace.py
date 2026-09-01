@@ -29,6 +29,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from l1_analyzer import disclosure
 from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
@@ -96,7 +97,7 @@ def _read_makefile(repo: Path) -> tuple[str, str, str]:
 
 
 def _coverage_verdict(summary_text: str, build_returncode: int, build_output: str,
-                      compiler: str, target: str) -> L1Result:
+                      compiler: str, target: str, timeout_seconds: float) -> L1Result:
     """L1.19 for C from lcov's summary text and the build that produced it. No I/O, so it can
     be asserted as a value.
 
@@ -117,7 +118,8 @@ def _coverage_verdict(summary_text: str, build_returncode: int, build_output: st
     than a measurement of zero - the difference between not-looked-at and read-and-terrible.
     """
     if build_returncode == 124:
-        return _na(f"the test build/run timed out before coverage could be measured (make {target})")
+        return _na(f"the test build/run timed out before coverage could be measured "
+                   f"(make {target})" + disclosure.timeout_note(timeout_seconds))
     match = _LCOV_LINES.search(summary_text)
     # No gcov data means the instrumented build did not run the target's tests: n/a with the
     # reason, never a 0.0 that reads as real-but-terrible coverage.
@@ -142,7 +144,7 @@ def _coverage_verdict(summary_text: str, build_returncode: int, build_output: st
     }
 
 
-def _determinism_verdict(compiler: str) -> L1Result:
+def _determinism_verdict(compiler: str, timeout_seconds) -> L1Result:
     """L1.20 for C: a permanent n/a, naming the compiler that would have run the suite.
 
     Not a gap in this harness and not a failure on the repository. C ships no standard
@@ -178,18 +180,19 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         build = _run_untrusted(["make", target], cwd=repo, env=env, timeout_seconds=timeout_seconds)
         build_output = build.stderr or build.stdout or ""
         if build.returncode == 124:
-            return _coverage_verdict("", 124, build_output, compiler, target)
+            return _coverage_verdict("", 124, build_output, compiler, target, timeout_seconds)
         capture = _run_untrusted(
             [lcov, "--capture", "--directory", str(repo), "--output-file", str(info), "--quiet"],
             cwd=repo, env={}, timeout_seconds=min(timeout_seconds, 120),
         )
         if capture.returncode == 124:
-            return _na("lcov coverage capture timed out")
+            return _na("lcov coverage capture timed out"
+                       + disclosure.timeout_note(timeout_seconds))
         summary = _run_untrusted([lcov, "--summary", str(info)], cwd=repo, env={},
                                  timeout_seconds=min(timeout_seconds, 60))
         summary_text = (summary.stdout or "") + (summary.stderr or "")
 
-    return _coverage_verdict(summary_text, build.returncode, build_output, compiler, target)
+    return _coverage_verdict(summary_text, build.returncode, build_output, compiler, target, timeout_seconds)
 
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
@@ -200,4 +203,4 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     cc = _cc()
     if cc is None:
         return _na("needs a C compiler (cc/gcc/clang) in PATH")
-    return _determinism_verdict(_compiler(cc, repo, timeout_seconds))
+    return _determinism_verdict(_compiler(cc, repo, timeout_seconds), timeout_seconds)

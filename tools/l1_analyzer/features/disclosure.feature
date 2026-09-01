@@ -10,6 +10,12 @@ Feature: disclosure — the notes a result owes a reader when it did less than i
   Both are silent when there is nothing to say. A note on every result is one a reader
   learns to skip, which is how the one that mattered would be missed.
 
+  Scenario: timeout_note names the time a run was given and the flag that gives it more
+    Given the seconds one execution of a suite was allowed
+    When timeout_note is asked for the sentence a timeout refusal owes its reader
+    Then it names both the number and the flag, because every other refusal here names its repair and this was the only one an operator could do nothing about
+    But it is appended only where a timeout is the reason, since a note on every result is one a reader learns to skip and that is how the one that mattered would be missed
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # Neither note can tell whether the reader will act on it. A sentence appended to a details

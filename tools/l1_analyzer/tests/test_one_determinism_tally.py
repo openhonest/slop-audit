@@ -51,7 +51,7 @@ def test_neither_language_keeps_a_loop_of_its_own(module):
 ])
 def test_each_language_keeps_its_own_word_for_a_run(module, word, absent):
     """A timed-out attempt is reported in the vocabulary of the thing that varied."""
-    result = module._determinism_verdict(iter([(124, "")]), "toolchain 1.0")
+    result = module._determinism_verdict(iter([(124, "")]), "toolchain 1.0", 300.0)
     assert result["band"] == "n/a"
     assert word in result["details"], result["details"]
     assert absent not in result["details"], result["details"]
@@ -61,14 +61,14 @@ def test_each_language_keeps_its_own_word_for_a_run(module, word, absent):
 def test_no_runs_at_all_refuses_rather_than_banding_healthy(module):
     """Zero clean out of zero satisfies "every run passed" and would band Healthy, which is
     the zero-denominator lie this package exists to refuse."""
-    result = module._determinism_verdict(iter([]), "toolchain 1.0")
+    result = module._determinism_verdict(iter([]), "toolchain 1.0", 300.0)
     assert result["band"] == "n/a"
     assert result["value"] == "n/a"
 
 
 @pytest.mark.parametrize("module", [csharp_trace, java_trace])
 def test_a_suite_that_never_ran_is_not_a_failing_run(module):
-    result = module._determinism_verdict(iter([(0, "no tests here")]), "toolchain 1.0")
+    result = module._determinism_verdict(iter([(0, "no tests here")]), "toolchain 1.0", 300.0)
     assert result["band"] == "n/a"
     assert "did not run" in result["details"]
 
@@ -78,6 +78,6 @@ def test_a_suite_that_never_ran_is_not_a_failing_run(module):
     (java_trace, "Tests run: 3, Failures: 0, Errors: 0, Skipped: 0"),
 ])
 def test_all_clean_runs_band_healthy(module, output):
-    result = module._determinism_verdict(iter([(0, output)] * 5), "toolchain 1.0")
+    result = module._determinism_verdict(iter([(0, output)] * 5), "toolchain 1.0", 300.0)
     assert result["value"] == "5/5"
     assert result["band"] == "Healthy"

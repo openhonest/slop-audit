@@ -124,7 +124,8 @@ def _branch_totals(xml_text: str) -> tuple[int, int]:
     return 0, 0
 
 
-def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, jdk: str) -> L1Result:
+def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, jdk: str,
+                      timeout_seconds: float) -> L1Result:
     """L1.19 from a finished build and what the coverage report carried. No I/O, so it can be
     asserted as a value.
 
@@ -139,6 +140,7 @@ def _coverage_verdict(branches: tuple[int, int] | None, returncode: int, jdk: st
     covered, total = (None, None) if branches is None else (branches[0], sum(branches))
     return coverage_verdict(
         covered=covered, total=total, returncode=returncode,
+        timeout_seconds=timeout_seconds,
         no_report="Java branch coverage needs the JaCoCo plugin in the build "
                   "(jacoco.xml not produced)",
         nothing_to_cover="no enumerable decision branches found "
@@ -209,12 +211,12 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     run = _run_untrusted([maven, "-q", "test", "jacoco:report"], cwd=repo, env=env, timeout_seconds=timeout_seconds)
     report = repo / "target" / "site" / "jacoco" / "jacoco.xml"
     if run.returncode == 124 or not report.exists():
-        return _coverage_verdict(None, run.returncode, jdk)
+        return _coverage_verdict(None, run.returncode, jdk, timeout_seconds)
     try:
         branches = _branch_totals(report.read_text())
     except (OSError, ET.ParseError):
         return _na("JaCoCo report was unreadable")
-    return _coverage_verdict(branches, run.returncode, jdk)
+    return _coverage_verdict(branches, run.returncode, jdk, timeout_seconds)
 
 
 def _ran_tests(output: str) -> bool:
@@ -231,7 +233,8 @@ def _surefire_summary(output: str) -> str:
     return matches[-1].strip() if matches else "no test summary line"
 
 
-def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str) -> L1Result:
+def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str,
+                         timeout_seconds: float) -> L1Result:
     """L1.20 for Java from finished randomized-order Maven runs. See
     pytest_trace.determinism_tally for the rules; only the words are here. Surefire takes a
     seed, so the position in the sequence IS the seed and is named as one."""
@@ -243,6 +246,7 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str) -> L1Res
          "describe": f"randomized-order runs passed cleanly (under {jdk})"},
         _ran_tests,
         _surefire_summary,
+        timeout_seconds=timeout_seconds,
     )
 
 def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_override: str | None) -> L1Result:
@@ -266,4 +270,4 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
             )
             yield run.returncode, (run.stdout or "") + (run.stderr or "")
 
-    return _determinism_verdict(outcomes(), jdk)
+    return _determinism_verdict(outcomes(), jdk, timeout_seconds)

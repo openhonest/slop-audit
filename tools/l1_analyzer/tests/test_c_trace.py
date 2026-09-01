@@ -55,7 +55,7 @@ def _summary(pct: str, covered: int, total: int) -> str:
 # --- L1.19: the lcov summary read as a value ---------------------------------
 
 def test_an_instrumented_run_yields_the_line_share_and_its_band():
-    r = c_trace._coverage_verdict(_summary("95.0", 950, 1000), 0, "", "cc (GCC) 14.2.0", "check")
+    r = c_trace._coverage_verdict(_summary("95.0", 950, 1000), 0, "", "cc (GCC) 14.2.0", "check", 300.0)
     assert r["value"] == 95.0 and r["band"] == "Healthy"
     assert "950/1000 lines" in r["details"]
     assert "make check passed" in r["details"] and "cc (GCC) 14.2.0" in r["details"]
@@ -65,14 +65,14 @@ def test_the_details_disclose_that_c_publishes_line_coverage_not_branch_coverage
     # L1.19 carries branch coverage for Python. C's toolchain has no standard branch-coverage
     # convention, so gcov LINE coverage is substituted into the same field. The value and the
     # band cannot say so; the detail line must.
-    r = c_trace._coverage_verdict(_summary("72.0", 720, 1000), 0, "", "clang 18", "test")
+    r = c_trace._coverage_verdict(_summary("72.0", 720, 1000), 0, "", "clang 18", "test", 300.0)
     assert "line coverage" in r["details"].lower()
     assert "gcov" in r["details"].lower()
 
 
 def test_the_band_boundaries_follow_the_spec():
     def band(pct):
-        return c_trace._coverage_verdict(_summary(pct, 1, 1000), 0, "", "cc", "test")["band"]
+        return c_trace._coverage_verdict(_summary(pct, 1, 1000), 0, "", "cc", "test", 300.0)["band"]
     assert band("90.1") == "Healthy"        # above 90
     assert band("90.0") == "Not Healthy"    # 90 exactly is not above 90
     assert band("60.0") == "Not Healthy"    # 60 exactly is the floor
@@ -82,20 +82,20 @@ def test_the_band_boundaries_follow_the_spec():
 def test_a_failing_test_target_is_still_measured():
     # The gcov data is written by the instrumented run whether or not the tests passed, so a
     # non-zero make exit is a real coverage reading and says so.
-    r = c_trace._coverage_verdict(_summary("64.0", 320, 500), 2, "make: *** [test] Error 1", "cc", "test")
+    r = c_trace._coverage_verdict(_summary("64.0", 320, 500), 2, "make: *** [test] Error 1", "cc", "test", 300.0)
     assert r["value"] == 64.0 and r["band"] == "Not Healthy"
     assert "make test exit 2" in r["details"]
 
 
 def test_a_timed_out_build_is_named_rather_than_scored():
-    r = c_trace._coverage_verdict("", 124, "timed out", "cc", "check")
+    r = c_trace._coverage_verdict("", 124, "timed out", "cc", "check", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "timed out" in r["details"] and "make check" in r["details"]
 
 
 def test_a_summary_with_no_line_reading_names_the_build_that_produced_it():
     r = c_trace._coverage_verdict("lcov: ERROR: no valid records found\n", 2,
-                                  "cc: fatal error: no input files\nmake: *** [test] Error 1", "cc", "test")
+                                  "cc: fatal error: no input files\nmake: *** [test] Error 1", "cc", "test", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "no gcov data" in r["details"] and "exit 2" in r["details"]
     assert "cc: fatal error: no input files" in r["details"]
@@ -106,7 +106,7 @@ def test_a_summary_with_no_line_reading_names_the_build_that_produced_it():
 def test_nought_of_nought_lines_is_absent_not_nought_percent():
     # lcov prints 0.0% for an instrumented build that executed no instrumented code. A rate
     # over no lines is the absence of a measurement, not a measurement of zero.
-    r = c_trace._coverage_verdict(_summary("0.0", 0, 0), 0, "", "cc (GCC) 14.2.0", "test")
+    r = c_trace._coverage_verdict(_summary("0.0", 0, 0), 0, "", "cc (GCC) 14.2.0", "test", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert r["value"] != 0.0
     assert "no gcov lines" in r["details"] and "cc (GCC) 14.2.0" in r["details"]
@@ -115,7 +115,7 @@ def test_nought_of_nought_lines_is_absent_not_nought_percent():
 def test_a_real_nought_percent_over_real_lines_is_still_a_measurement():
     # The mirror of the case above: 0 of 500 lines is a measured, terrible number and must be
     # banded Slop rather than swept into the same n/a.
-    r = c_trace._coverage_verdict(_summary("0.0", 0, 500), 0, "", "cc", "test")
+    r = c_trace._coverage_verdict(_summary("0.0", 0, 500), 0, "", "cc", "test", 300.0)
     assert r["value"] == 0.0 and r["band"] == "Slop"
 
 
@@ -125,7 +125,7 @@ def test_determinism_for_c_is_a_permanent_declination_naming_the_compiler():
     # Not a gap in this harness: C ships no standard test-order randomiser, so there is no
     # shuffled run to count. The compiler is named so a reader sees a measurement declined for
     # the language rather than one that failed on this repository.
-    r = c_trace._determinism_verdict("cc (GCC) 14.2.0")
+    r = c_trace._determinism_verdict("cc (GCC) 14.2.0", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "randomizer" in r["details"] and "cc (GCC) 14.2.0" in r["details"]
     assert "0/5" not in str(r["value"]) and "0 of 5" not in r["details"]
