@@ -35,7 +35,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
-from l1_analyzer import budget, coverage_gates, rust_facets, rust_trace
+from l1_analyzer import budget, coverage_gates, prove_gap, rust_facets, rust_trace
 from l1_analyzer import model_call as llm
 from l1_analyzer.boundary import boundary
 from l1_analyzer.rust_facets import CoverageGap
@@ -427,61 +427,65 @@ def _refine_incidental(repo: Path, module_relpath: str, gap: CoverageGap, body: 
     return "invalid_fixture" if _fail_bucket(output, "proof", permuted, gap["return_type"]) != "incidental_panic" else "incidental_panic"
 
 
-# THE TWO PROVE LOOPS ARE NOT MERGED, and that was measured rather than assumed.
+# THE BATCH IS RUST'S OWN. THE LOOP UNDER IT IS SHARED, since 2026-09-02.
 #
-# L1.13 flags this module and python_coverage_prove as the largest cross-file clone class
-# in the package, 56 overlapping windows. Six things they genuinely shared have already
-# moved out: `_valid`, `_call_model`, `ceiling_detail`, `sweep_detail`, `SweepProgress` and
-# `budget.allowance`. What is left is the loop structure, and it is less alike than the
-# clone count suggests.
+# This said the two provers were not the same shape, and gave a measurement: compared
+# statement for statement with every string blanked on 2026-08-19, `_prove_one` was 21 lines
+# here against 18 there with 8 identical, and `_prove_module` 26 against 11 with 4.
 #
-# Compared statement for statement with every string blanked, on 2026-08-19: `_prove_one`
-# is 21 lines here against 18 there with 8 identical, and `_prove_module` is 26 against 11
-# with 4. The Rust side batches every gap into one crate, compiles once, and falls back to
-# proving each gap in isolation when the batch does not build; the Python side runs each
-# proof on its own because pytest has no equivalent of a single crate compile. That is a
-# structural difference, not a vocabulary one.
+# The measurement compared whole FUNCTIONS and the duplication is path to path. This module's
+# `_prove_module` has two: batch every proposal into one crate and compile once, or, when the
+# batch does not compile, fall back to proving each gap on its own. That fallback was the
+# Python prover's whole loop, sitting inside the twenty-six lines that got measured against
+# it, so the shared half was averaged away by the batch path beside it.
 #
-# Merging them would take a callback per divergence, which is the machinery the determinism
-# tallies were left unmerged to avoid. Two implementations that differ in what they DO are
-# not a duplication to remove; the shared RULES were, and those are gone.
+# What the note got right stays true. The batch is a structural difference: compiling a crate
+# once for twenty proofs is worth a path of its own, and pytest has no equivalent, so there
+# is nothing there for Python to share. It is an addition in front of the loop rather than a
+# different loop.
+#
+# Three rules live in the shared part and none of them may drift: repair at most the rounds
+# the caller allowed, count every outcome including a decline, retain only a divergence.
+# They are in `prove_gap` now.
 
 def _prove_one(repo: Path, module_relpath: str, gap: CoverageGap, repair_rounds: int, timeout_seconds: float,
                propose_fn: Callable[..., Answer | None], repair_fn: Callable[..., Answer | None],
                run_fn: Callable[..., tuple[str, str]],
                refine_fn: Callable[..., str]) -> tuple[str, str, str]:
-    """Propose -> run -> (repair -> run)* -> gate for one gap. Returns (bucket, explanation,
-    test_source): a fail is resolved to one of _FAIL_BUCKETS (only `divergence` is retained);
-    a clean run is `pass`; `error` is did-not-compile even after repair; `declined` is no reply, and it is COUNTED: a model call that produced nothing still cost money.
+    """One gap, proven or not. The loop is `prove_gap.prove_one`, shared with the Python
+    prover since 2026-09-02; what is here is Rust's own steps and its gate.
 
-    The collaborators are parameters, as in `prove.prove` and the Python loop. They were
+    The collaborators are parameters, as in `prove.prove` and the Python prover. They were
     module-level lookups, so testing this orchestration meant patching the module's own
     globals, and those tests went in the 2026-08-17 sweep for exactly that reason.
     Required rather than defaulted: a default puts a real cargo invocation one forgotten
-    argument away from a test."""
-    proposal = propose_fn(gap)
-    if proposal is None:
-        return "declined", "", ""
-    source = render_module(proposal["body"])
-    status, output = run_fn(repo, module_relpath, source, timeout_seconds)
-    rounds = 0
-    while status == "error" and rounds < repair_rounds:
-        rounds += 1
-        fixed = repair_fn(gap, source, output)
-        if fixed is None:
-            break
-        proposal = fixed
-        source = render_module(fixed["body"])
+    argument away from a test.
+
+    The runner settles the verdict, which is where Rust's gate lives: a failing test is
+    resolved into one of the fail buckets, and an incidental panic is re-run through the
+    fifth collaborator to tell a proof from a fixture that blew up. Every fail routes
+    through here, so leaving that a module-level lookup would have kept the gating path
+    untestable however many of the other four were injected."""
+    def run(g: CoverageGap, proposal: prove_gap.Answer, source: str) -> tuple[str, str]:
         status, output = run_fn(repo, module_relpath, source, timeout_seconds)
-    if status != "fail":
-        return status, proposal["explanation"], source
-    bucket = _fail_bucket(output, "proof", proposal["body"], gap["return_type"])
-    if bucket == "incidental_panic":
-        # The fifth collaborator, and it re-runs the crate. Every fail output routes through
-        # here, so leaving it a module-level lookup would have kept the gating path
-        # untestable however many of the other four were injected.
-        bucket = refine_fn(repo, module_relpath, gap, proposal["body"], timeout_seconds)
-    return bucket, proposal["explanation"], source
+        if status != "fail":
+            return status, output
+        bucket = _fail_bucket(output, "proof", proposal["body"], g["return_type"])
+        if bucket == "incidental_panic":
+            bucket = refine_fn(repo, module_relpath, g, proposal["body"], timeout_seconds)
+        return bucket, output
+
+    return prove_gap.prove_one(
+        gap,
+        propose=propose_fn,
+        render=render_module,
+        run=run,
+        repair=lambda g, source, output: repair_fn(g, source, output),
+        # A crate that would not compile is the one verdict worth another call: the compiler
+        # said what was wrong and the model can read it.
+        repairable="error",
+        rounds=repair_rounds,
+    )
 
 
 def _prove_module(repo: Path, module_relpath: str, gaps: list[CoverageGap], repair_rounds: int,
@@ -513,16 +517,15 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[CoverageGap], repa
                 retained.append(_retained_entry(module_relpath, gap, proposal["explanation"],
                                                 render_module(proposal["body"])))
         return retained, outcomes
-    # The batch did not compile: isolate, repair, and gate each gap individually.
-    retained = []
-    for gap in gaps:
-        bucket, explanation, source = _prove_one(repo, module_relpath, gap, repair_rounds,
-                                                 timeout_seconds, propose_fn, repair_fn,
-                                                 run_fn, refine_fn)
-        outcomes[bucket] += 1
-        if bucket == "divergence":
-            retained.append(_retained_entry(module_relpath, gap, explanation, source))
-    return retained, outcomes
+    # The batch did not compile: isolate, repair, and gate each gap individually. This
+    # fallback is the Python prover's whole loop, which is why both now ask for it.
+    return prove_gap.prove_each(
+        gaps,
+        lambda gap: _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds,
+                               propose_fn, repair_fn, run_fn, refine_fn),
+        lambda gap, explanation, source: _retained_entry(module_relpath, gap, explanation, source),
+        outcomes=outcomes,
+    )
 
 
 def ceiling_detail(attempted: int, located: int, ceiling: int) -> str:

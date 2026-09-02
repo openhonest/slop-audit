@@ -30,7 +30,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
-from l1_analyzer import budget, coverage_prove, pytest_trace, python_facets
+from l1_analyzer import budget, coverage_prove, prove_gap, pytest_trace, python_facets
 from l1_analyzer import model_call as llm
 from l1_analyzer.boundary import boundary
 
@@ -251,36 +251,36 @@ def _prove_one(repo: Path, interpreter: str, gap: CoverageGap, import_path: str,
                propose_fn: Callable[..., Answer | None],
                repair_fn: Callable[..., Answer | None],
                run_fn: Callable[..., tuple[int, str]]) -> tuple[str, str, str]:
-    """Propose -> run -> (repair -> run)* for one gap. Returns (bucket, explanation, test_source):
-    divergence (retained), pass, incidental (setup error), error (timeout), or declined
-    (no reply, and counted: a model call that produced nothing still cost money).
+    """One gap, proven or not. The loop is `prove_gap.prove_one`, shared with the Rust
+    prover since 2026-09-02; what is here is Python's own three steps.
 
     THE THREE COLLABORATORS ARE PARAMETERS, as `prove.prove` already takes `model_call` and
     `run_generated`. They were module-level lookups, so the only way to test this loop was
     to patch the module's own globals, and a test that reaches in to replace what it is
-    testing asserts against its own fixture. Those tests went in the 2026-08-17 sweep and
-    the orchestration has been uncovered since.
+    testing asserts against its own fixture. Those tests went in the 2026-08-17 sweep.
 
     Required, not defaulted. A default would put the real model call and a real subprocess
     one forgotten argument away from a test, which is the open-input failure this
-    repository refuses everywhere else."""
-    proposal = propose_fn(gap, import_path)
-    if proposal is None:
-        return "declined", "", ""
-    source = render_test(proposal["body"])
-    rc, output = run_fn(repo, interpreter, source, timeout_seconds)
-    bucket = _classify(output, rc)
-    rounds = 0
-    while bucket == "incidental" and rounds < repair_rounds:
-        rounds += 1
-        fixed = repair_fn(gap, import_path, source, output)
-        if fixed is None:
-            break
-        proposal = fixed
-        source = render_test(fixed["body"])
+    repository refuses everywhere else.
+
+    The runner settles the verdict as well as executing it, because Python reads its verdict
+    out of a second pass over the output while Rust's runner returns one. Doing that here
+    keeps the shared loop's parameters to what genuinely differs."""
+    def run(_gap: CoverageGap, _proposal: prove_gap.Answer, source: str) -> tuple[str, str]:
         rc, output = run_fn(repo, interpreter, source, timeout_seconds)
-        bucket = _classify(output, rc)
-    return bucket, proposal["explanation"], source
+        return _classify(output, rc), output
+
+    return prove_gap.prove_one(
+        gap,
+        propose=lambda g: propose_fn(g, import_path),
+        render=render_test,
+        run=run,
+        repair=lambda g, source, output: repair_fn(g, import_path, source, output),
+        # A test that errored in setup is the one worth another call: the model wrote a
+        # fixture the module does not have, and the error names what was missing.
+        repairable="incidental",
+        rounds=repair_rounds,
+    )
 
 
 def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[CoverageGap],
@@ -290,22 +290,20 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Coverag
                   run_fn: Callable[..., tuple[int, str]]) -> tuple[list[CoverageProof], Outcomes]:
     """Every gap in one module. Threads the three collaborators through rather than
     reaching for the module's globals, for the reason `_prove_one` gives."""
-    outcomes = dict(EMPTY_OUTCOMES)
     import_path = _import_path(repo, repo / relpath)
-    retained: list[CoverageProof] = []
-    for gap in gaps:
-        bucket, explanation, source = _prove_one(repo, interpreter, gap, import_path,
-                                                 repair_rounds, timeout_seconds, propose_fn,
-                                                 repair_fn, run_fn)
-        outcomes[bucket] += 1
-        if bucket == "divergence":
-            entry: CoverageProof = {
-                "function": gap["function"], "language": "python",
+
+    def retain(gap: CoverageGap, explanation: str, source: str) -> CoverageProof:
+        return {"function": gap["function"], "language": "python",
                 "location": f"{relpath}:{gap['line']}",
-                "explanation": explanation, "test_source": source.strip(),
-            }
-            retained.append(entry)
-    return retained, outcomes
+                "explanation": explanation, "test_source": source.strip()}
+
+    return prove_gap.prove_each(
+        gaps,
+        lambda gap: _prove_one(repo, interpreter, gap, import_path, repair_rounds,
+                               timeout_seconds, propose_fn, repair_fn, run_fn),
+        retain,
+        outcomes=dict(EMPTY_OUTCOMES),
+    )
 
 
 @boundary
