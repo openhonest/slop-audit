@@ -15,7 +15,9 @@ This section will contain the operational version of the 18 enterprise audit dim
 
 **Source citations.** [Tier 1 / Tier 2 / Tier 3 / Tier 4 industry sources, drawn from Appendix C of the source analysis]
 
-**Compliance framework mappings.** [SOC 2 sections, NIST 800-53 control families, OWASP ASVS controls, OSFI B-13 sections, NI 31-103 sections, FFIEC booklets, SIG question domains as applicable]
+**Compliance framework mappings.** [The six the instrument claims, from `../04-compliance-frameworks.md`: SOC 2 sections, NIST 800-53 control families, OWASP controls, DORA capabilities, CIS controls, CNCF guidance, as applicable. A framework outside those six may be cited where the evidence genuinely supports it, and it joins the claim only through that file.]
+
+This template named FFIEC booklets and SIG question domains until 2026-09-04. Neither appeared in any dimension, so the template was stating a coverage the files did not carry.
 
 **Evidence inspection procedure.** [Specific files, configurations, patterns, and commands the assessor inspects to determine the score]
 

@@ -22,7 +22,7 @@ The cross-rater test is run at three points: once before any client engagement (
 
 For each dimension scored *absent* in a real client engagement, the assessor must be able to write the following sentence with confidence:
 
-> "If a financial services technology auditor or technology risk committee at [SOC 2 / NIST / OSFI / FFIEC] inspected this codebase against [the published threshold for this dimension], they would record the same finding."
+> "If a financial services technology auditor or technology risk committee working to [one of the frameworks in `04-compliance-frameworks.md`] inspected this codebase against [the published threshold for this dimension], they would record the same finding."
 
 If the assessor cannot write this sentence with confidence, the dimension was scored on judgment, not on threshold. The score is downgraded from *absent* to *partial* or removed. This test prevents the methodology from drifting toward stricter-than-published criteria, which would damage its defensibility.
 

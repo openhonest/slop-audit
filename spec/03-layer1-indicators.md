@@ -38,7 +38,7 @@ Each indicator is presented as two rows: a full-width lay-description row that e
       <td colspan="6">✓ <b>Good pattern:</b> Teams that write specifications in their own commits are giving AI coding assistants the context they need to produce auditable code. The spec is the constraint that keeps generation aligned with intent.</td>
     </tr>
     <tr style="background-color: #fce8e6;">
-      <td colspan="6">✗ <b>Antipattern:</b> Teams with no spec commits are letting AI generate from one-off prompts alone, with nothing constraining what comes out. The published research associates this condition with audit failure across 16 of 18 enterprise dimensions.</td>
+      <td colspan="6">✗ <b>Antipattern:</b> Teams with no spec commits are letting AI generate from one-off prompts alone, with nothing constraining what comes out. The published research associates this condition with audit failure across 16 of 18 enterprise production readiness dimensions.</td>
     </tr>
     <tr>
       <td>L1.2</td>

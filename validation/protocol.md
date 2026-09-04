@@ -8,7 +8,7 @@
 
 ## Why this document exists
 
-The slop audit methodology in `the methodology documents (see ../README.md)` is a v0 instrument with eighteen dimensions, each scored across four layers, drafted from first principles and from the Wasserman 2026 paper. Before the methodology is used on a paying client engagement, it must be **validated** against codebases whose true classification is already known.
+The slop audit methodology in `the methodology documents (see ../README.md)` is a v0 instrument with eighteen enterprise production readiness dimensions, each scored across four layers, drafted from first principles and from the Wasserman 2026 paper. Before the methodology is used on a paying client engagement, it must be **validated** against codebases whose true classification is already known.
 
 Validation does two things:
 
