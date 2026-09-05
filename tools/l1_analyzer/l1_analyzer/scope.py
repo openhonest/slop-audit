@@ -327,12 +327,50 @@ def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
         inside_nested[directory] = result
         return result
 
+    ignored = _ignored_paths(repo)
     return (
         p for p in repo.rglob(pattern)
         if p.is_file()
+        and p.resolve() not in ignored
         and not under_symlinked_dir(p.parent, repo)
         and not under_nested_checkout(p.parent.resolve())
     )
+
+
+def _ignored_paths(repo: Path) -> frozenset[Path]:
+    """Every path this repository's own `.gitignore` excludes, resolved.
+
+    An audit measures what the project says is part of it. A `.gitignore` entry is that
+    statement, written by whoever put it there: a build directory, a vendored dependency, a
+    scratch tree kept for reference. Reading them reports code the project has declared is
+    not its own, and a fresh clone reads differently from the working copy.
+
+    What forced it: the Honest Framework held a `python.botched` directory beside `python`,
+    262 MB and 20,743 files, ignored at line 19 of its `.gitignore`. It carried the only
+    three pieces of provably unbounded state in the whole measurement, so the repository
+    read as not exhaustively testable on the strength of code the project had disowned.
+
+    IGNORED, NOT UNTRACKED, and the difference is the whole rule. Both a build directory and
+    a module written five minutes ago are untracked. Only the first carries a statement that
+    it is not part of the project. Skipping untracked files would make this instrument blind
+    to uncommitted work, which is the work a developer most wants measured: an audit that
+    goes quiet on what you just wrote reports on the past. My first attempt at this did
+    exactly that, and it survived my own tests because a staged file counts as tracked.
+
+    An empty set where there is no git, so the walk reads everything. A tarball, an
+    extracted archive and a vendored copy are all real audit subjects, and refusing them
+    would turn a working reading into no reading at all.
+
+    A tree that is neither ignored nor part of the project has nothing to distinguish it,
+    and this cannot guess. That case wants a declaration in the audited repository rather
+    than a heuristic here."""
+    from l1_analyzer.indicators import _run_external
+
+    run = _run_external(
+        ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z"], repo)
+    if not run["ran"] or run["status"] != 0:
+        return frozenset()
+    return frozenset((repo / name).resolve() for name in run["output"].split("\0") if name)
 
 
 # Conventional build/test/dev tooling recognised by filename, not by directory.

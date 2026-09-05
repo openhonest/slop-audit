@@ -3,6 +3,13 @@ Feature: scope — deciding which files are the code under audit and which are s
   stands on, so the count of scenarios is this module's directly-counted
   function-point size (honest-gherkin section 9).
 
+  Scenario: _ignored_paths reads what the project says is not part of it
+    Given the tree being audited
+    When _ignored_paths asks git which paths this repository's own .gitignore excludes
+    Then a build output, a vendored dependency or a scratch tree kept for reference is left out, because the project has already said it is not its own code
+    And a file written five minutes ago and never added is still read, since untracked and ignored are different questions and only the second is about belonging
+    But a tree with no git at all gives back nothing to skip, so a tarball or an extracted archive still measures rather than refusing
+
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.
   # The collection half is specified in research/candidates/collecting-unmeasured-constructs.md
