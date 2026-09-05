@@ -65,6 +65,7 @@ from l1_analyzer.indicators import (
 )
 from l1_analyzer.lang_spec import LANG_SPEC
 from l1_analyzer.scope import PRODUCTION
+from l1_analyzer.ts_nodes import refs
 from l1_analyzer.ts_nodes import text as _text
 
 # ---------------------------------------------------------------------------
@@ -185,17 +186,13 @@ def _module_mutables_by_specifier(candidates: list[Node]) -> set[str]:
 def _deep_nodes(root: Node, node_types: tuple[str, ...]) -> list[Node]:
     """Every node of these types at any depth. Used only for class fields, which is
     why it is not the general candidate collector: a deep walk over a language's whole
-    assignment vocabulary would harvest function locals as module state."""
-    out: list[Node] = []
+    assignment vocabulary would harvest function locals as module state.
 
-    def walk(n: Node) -> None:
-        if n.type in node_types:
-            out.append(n)
-        for c in n.children:
-            walk(c)
-
-    walk(root)
-    return out
+    The walk is `ts_nodes.refs`, which is iterative. This held its own recursive copy until
+    2026-09-05, and parse-tree depth is set by the file being audited rather than by anyone
+    who chose it: the JDK, GraalVM, Seata, the dotnet runtime and Remotion all crashed the
+    audit here, which is five of the two hundred largest repositories in the corpus."""
+    return refs(root, lambda n: n.type in node_types)
 
 
 _MODIFIER_TYPES = ("modifiers", "modifier")

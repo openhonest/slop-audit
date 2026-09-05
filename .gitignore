@@ -44,3 +44,9 @@ cardinality-distribution.json
 # committed anyway. A leading `**/` matches at any depth, which is what was meant.
 **/l1_analyzer/_build.py
 .coverage
+
+# Corpus run scratch: cloned-and-deleted repositories leave per-repo readings and logs.
+# The runners and the corpora are tracked; the readings are regenerable and large.
+research/arms/*/results/
+research/arms/*/results_*/
+research/arms/*/run.log

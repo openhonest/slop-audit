@@ -69,6 +69,7 @@ from l1_analyzer.lang_spec import (
     COMPARISON_OPS,
     LangSpec,
 )
+from l1_analyzer.ts_nodes import descendants
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import first_arg as _first_arg
 from l1_analyzer.ts_nodes import is_lvalue as _is_lvalue
@@ -144,7 +145,7 @@ def _member_writes(cls: Node, attr: str, sp: LangSpec) -> list[Node]:
     self-only scan is blind to it; over-approximating writes is the safe direction."""
     writes: list[Node] = []
 
-    def walk(n: Node) -> None:
+    for n in descendants(cls):
         if n.type in sp["assign_types"]:
             left = _field(n, sp["assign_left"])
             # Every attribute IN the target, not the target itself. `self.a, self.b = m, m`
@@ -155,10 +156,6 @@ def _member_writes(cls: Node, attr: str, sp: LangSpec) -> list[Node]:
             # counts as a write and the rule declines to clear.
             writes.extend(t for t in _attribute_targets(left, sp)
                           if attr in (_text(_field(t, sp["mem_attr"])), _text(t)))
-        for c in n.children:
-            walk(c)
-
-    walk(cls)
     return writes
 
 
@@ -348,10 +345,19 @@ def _writes_are_plain_stores(cls: Node, attr: str, refs: list[Node], sp: LangSpe
     return True
 
 
-def _descendants(node: Node):
-    for c in node.named_children:
-        yield c
-        yield from _descendants(c)
+def _descendants(node: Node) -> list[Node]:
+    """Every named node under this one, not including it.
+
+    Iterative, and named children only, which is what separates it from `ts_nodes.
+    descendants`: punctuation is not a node any rule here asks about. It recursed until
+    2026-09-05, when a Java tree deep enough to exhaust the stack crashed the audit."""
+    out: list[Node] = []
+    stack = list(reversed(node.named_children))
+    while stack:
+        current = stack.pop()
+        out.append(current)
+        stack.extend(reversed(current.named_children))
+    return out
 
 
 def _result_invariant(attr: str, refs: list[Node], sp: LangSpec) -> bool | None:

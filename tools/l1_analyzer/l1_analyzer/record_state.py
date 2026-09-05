@@ -65,6 +65,7 @@ from l1_analyzer import state_sites
 from l1_analyzer.lang_spec import LangSpec
 from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import field as _field
+from l1_analyzer.ts_nodes import local_refs
 from l1_analyzer.ts_nodes import text as _text
 
 
@@ -105,19 +106,13 @@ def _descend(node: Node, types: tuple[str, ...], stop: tuple[str, ...]) -> list[
 
     A record nested inside another owns its own fields and is enumerated as its own scope,
     so the outer walk must stop at it. Without the stop, `struct A { struct B { int x; } b; }`
-    charges A with B's field and the same slot is counted twice."""
-    out: list[Node] = []
+    charges A with B's field and the same slot is counted twice.
 
-    def walk(n: Node, is_root: bool) -> None:
-        if not is_root and n.type in stop:
-            return
-        if n.type in types:
-            out.append(n)
-        for c in n.children:
-            walk(c, False)
-
-    walk(node, True)
-    return out
+    The walk itself is `ts_nodes.local_refs`, which is the same walk with the same stop rule
+    and a predicate instead of a type list. This held its own copy, and the copy recursed:
+    parse-tree depth is set by the file being audited, so it had a ceiling nobody chose, and
+    on 2026-09-05 it crashed the audit of Apache Seata."""
+    return local_refs(node, lambda n: n.type in types, stop)
 
 
 def _by_attr(nodes: list[Node], attr_field: str) -> dict[str, list[Node]]:

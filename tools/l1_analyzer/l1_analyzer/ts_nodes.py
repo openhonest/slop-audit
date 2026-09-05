@@ -18,35 +18,68 @@ from tree_sitter import Node
 from l1_analyzer.lang_spec import LangSpec
 
 
-def refs(scope: Node, predicate: Callable[[Node], bool]) -> list[Node]:
-    """Every node under `scope` matching `predicate`, in pre-order, which is source order."""
+def descendants(scope: Node) -> list[Node]:
+    """Every node under `scope`, `scope` included, in source order.
+
+    The walk this package writes over and over. Twenty-two functions across fourteen modules
+    each held their own copy on 2026-09-05, every one of them recursive, and every one of
+    them therefore had a depth ceiling set by the file being audited rather than by anyone
+    who chose it. Python's is a thousand frames, and five of the two hundred largest
+    repositories in the corpus crashed on it.
+
+    Children go on reversed so they come off in source order, because a stack pops last in
+    first out and callers read the first match as the declaration."""
     out: list[Node] = []
+    stack = [scope]
+    while stack:
+        node = stack.pop()
+        out.append(node)
+        stack.extend(reversed(node.children))
+    return out
 
-    def walk(n: Node) -> None:
-        if predicate(n):
-            out.append(n)
-        for c in n.children:
-            walk(c)
 
-    walk(scope)
+def refs(scope: Node, predicate: Callable[[Node], bool]) -> list[Node]:
+    """Every node under `scope` matching `predicate`, in pre-order, which is source order.
+
+    An explicit stack, not recursion. Parse-tree depth is set by the file being audited,
+    which is unbounded input, so a walk that recurses once per level has a ceiling nobody
+    chose. Python's is a thousand frames. On 2026-09-05 five of two hundred repositories
+    crashed here, and they were the five largest: the JDK, the dotnet runtime, GraalVM,
+    Seata and Remotion. The instrument could not read the codebases its claim is about.
+
+    Children go on reversed so they come off in order. A stack pops last in first out, and
+    the promise above is source order: a caller reading the first reference as the
+    declaration would otherwise get the last one."""
+    out: list[Node] = []
+    stack = [scope]
+    while stack:
+        node = stack.pop()
+        if predicate(node):
+            out.append(node)
+        stack.extend(reversed(node.children))
     return out
 
 
 def local_refs(scope: Node, predicate: Callable[[Node], bool], stop: tuple[str, ...]) -> list[Node]:
     """Like `refs`, but never descends into a nested record. An inner class owns its own
     fields and is analysed as its own scope, so the enclosing class must not harvest the
-    inner class's state, which would count it twice."""
+    inner class's state, which would count it twice.
+
+    An explicit stack, for the reason `refs` gives above: parse-tree depth is the audited
+    file's business and a recursive walk has a ceiling nobody chose. Children go on reversed
+    so they come off in source order.
+
+    The root is exempt from `stop` because the scope handed in IS a record, and a walk that
+    refused to enter it would return nothing."""
     out: list[Node] = []
-
-    def walk(n: Node, is_root: bool) -> None:
-        if not is_root and n.type in stop:
-            return
-        if predicate(n):
-            out.append(n)
-        for c in n.children:
-            walk(c, False)
-
-    walk(scope, True)
+    stack = [(scope, True)]
+    while stack:
+        node, is_root = stack.pop()
+        if not is_root and node.type in stop:
+            continue
+        if predicate(node):
+            out.append(node)
+        stack.extend((child, False) for child in reversed(node.children))
     return out
 
 
