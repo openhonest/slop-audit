@@ -129,6 +129,12 @@ class Clause(TypedDict):
 
     code: str
     rule: int
+    # The canonical principle this clause measures, as Pnn. The number is the citation and
+    # the name below is a copy of the document's current title for it: the canon says a
+    # number never changes and a title can be improved, and three were improved on
+    # 2026-08-25, which unhooked every clause here from the principle it measures without
+    # failing anything.
+    principle: str
     name: str
     decides: str
     reads: str
@@ -167,6 +173,9 @@ class Assessed(TypedDict):
     """One clause after it ran, or the reason it did not."""
 
     code: str
+    # The canonical principle number, carried into the report so a reader can look the
+    # finding up in a document whose titles are allowed to change.
+    principle: str
     name: str
     decided: bool
     undecided: str
@@ -197,11 +206,16 @@ class Assessment(TypedDict):
     unreadable_reason: str
 
 
-def _clause(rule: int, name: str, decides: str,
+def _clause(rule: int, principle: str, name: str, decides: str,
             check: Callable[..., list[Finding] | None],
             nothing_to_read: str, languages: frozenset[str] = _ALL,
             reads: str = _PYTHON_AST) -> Clause:
     """One row of the table.
+
+    `principle` is the canonical number and `name` is the title that number carries today.
+    Both, because a reader needs the title and a citation needs a key the document promises
+    not to change. A test compares the pair against the document, so an upstream retitling
+    lands here as a failure rather than as a name nobody can find.
 
     `nothing_to_read` is the sentence for a clause whose check finds nothing it can read in
     a file, where that is NOT the same as the question failing to arise. Clause 15 is the
@@ -213,7 +227,8 @@ def _clause(rule: int, name: str, decides: str,
     on the next run: a default absorbs the omission, so a row that meant "the generic
     sentence is right for me" could not be told from a row nobody thought about. The empty
     string is passed deliberately by the rows that mean it."""
-    return {"code": f"L1.21.{rule}", "rule": rule, "name": name, "decides": decides,
+    return {"code": f"L1.21.{rule}", "rule": rule, "principle": principle,
+            "name": name, "decides": decides,
             "nothing_to_read": nothing_to_read,
             "reads": reads, "languages": languages, "check": check}
 
@@ -224,40 +239,40 @@ def _clause(rule: int, name: str, decides: str,
 
 CLAUSES: tuple[Clause, ...] = (
     # Ported to the shared vocabulary: decided for every language the spec covers.
-    _clause(1, "Lookup Polymorphism", _TREE, rules.dispatch_chains, nothing_to_read="",
+    _clause(1, "P01", "Lookup Polymorphism", _TREE, rules.dispatch_chains, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(2, "Pure Functions Over Methods (typed dicts over classes)", _TREE, rules.data_classes, nothing_to_read="",
+    _clause(2, "P02", "Pure Functions Over Methods (typed dicts over classes)", _TREE, rules.data_classes, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(3, "Pure Functions Over Methods", _TREE, rules.methods_wearing_a_class, nothing_to_read="",
+    _clause(3, "P02", "Pure Functions Over Methods", _TREE, rules.methods_wearing_a_class, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(4, "I/O at the Boundary", _TREE, edges.io_below_the_boundary,
+    _clause(4, "P03", "I/O at the Boundary", _TREE, edges.io_below_the_boundary,
             reads=_TREE_READER,
             nothing_to_read=(
                 "this reader knows no I/O vocabulary for this language, so it had no way to "
                 "tell an edge from the interior")),
-    _clause(5, "Composition Over Inheritance", _TREE, rules.inheritance_for_reuse, nothing_to_read="",
+    _clause(5, "P04", "Composition Over Inheritance", _TREE, rules.inheritance_for_reuse, nothing_to_read="",
             reads=_TREE_READER),
     # The only two that read the file's TEXT, which is why they work on a language this
     # package has no parser for.
-    _clause(6, "DOM as State (DATAOS)", _TREE, rules.client_side_state,
+    _clause(6, "P05", "DOM as State (DATAOS)", _TREE, rules.client_side_state,
             nothing_to_read="", languages=BROWSER_LANGUAGES, reads=_TEXT_READER),
-    _clause(7, "HTML Attributes Over Imperative DOM Manipulation", _TREE, rules.imperative_dom,
+    _clause(7, "P06", "HTML Attributes Over Imperative DOM Manipulation", _TREE, rules.imperative_dom,
             nothing_to_read="", languages=BROWSER_LANGUAGES, reads=_TEXT_READER),
-    _clause(8, "Typed Exceptions at the Boundary", _TREE, edges.swallowed_exceptions, nothing_to_read="",
+    _clause(8, "P08", "Typed Exceptions at the Boundary", _TREE, edges.swallowed_exceptions, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(9, "SQL Over Application Caches", _PARTLY, markers.unmeasured_caches,
+    _clause(9, "P09", "SQL Over Application Caches", _PARTLY, markers.unmeasured_caches,
             nothing_to_read="", reads=_TREE_READER),
-    _clause(10, "Pure Function Assertions Over Mocks", _TREE, contracts.mock_heavy_tests,
+    _clause(10, "P10", "Pure Function Assertions Over Mocks", _TREE, contracts.mock_heavy_tests,
             nothing_to_read="", reads=_TREE_READER),
-    _clause(11, "Trust the Contract in the Interior", _TREE,
+    _clause(11, "P14", "Trust the Contract in the Interior", _TREE,
             contracts.imperative_validation, nothing_to_read="", reads=_TREE_READER),
-    _clause(12, "Context Managers Over Instance State", _TREE, contracts.unscoped_resources,
+    _clause(12, "P12", "Context Managers Over Instance State", _TREE, contracts.unscoped_resources,
             nothing_to_read="", reads=_TREE_READER),
-    _clause(13, "Configuration as Parameters", _TREE, rules.hidden_configuration, nothing_to_read="",
+    _clause(13, "P13", "Configuration as Parameters", _TREE, rules.hidden_configuration, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(14, "No Implicit Defaults", _TREE, rules.implicit_defaults, nothing_to_read="",
+    _clause(14, "P15", "No Implicit Defaults", _TREE, rules.implicit_defaults, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(15, "One Gherkin Per Function", _PARTLY,
+    _clause(15, "P20", "One Gherkin Per Function", _PARTLY,
             markers.heavy_step_definitions,
             nothing_to_read=(
                 "the rule is a bijection between functions and scenarios, and a bijection "
@@ -265,19 +280,19 @@ CLAUSES: tuple[Clause, ...] = (
                 "so it reads the secondary signal only, the length of a step definition, "
                 "and there are none here"),
             reads=_TREE_READER),
-    _clause(16, "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE,
+    _clause(16, "P22", "Declarative Equivalents Over Framework Lifecycle Hooks", _TREE,
             markers.lifecycle_hooks, nothing_to_read="", reads=_TREE_READER),
     # Reads nothing, and says so. Declaring a reader here named a capability the clause
     # never uses, and the undecided disclosure read that as a port we owe: a JavaScript
     # repository was told this clause "is unported, not silent", promising work that cannot
     # be done. What it decides and what it reads are one answer for this row.
-    _clause(17, "Strangler Pattern for Migration", _NOTHING, rules.strangler_migration,
+    _clause(17, "P23", "Strangler Pattern for Migration", _NOTHING, rules.strangler_migration,
             nothing_to_read="", reads=_NOTHING),
-    _clause(18, "Dispatch Tables Close Open Input", _TREE, rules.open_dispatch, nothing_to_read="",
+    _clause(18, "P16", "Dispatch Tables Close Open Input", _TREE, rules.open_dispatch, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(19, "Atomic Test-and-Set Over Check-Then-Act", _TREE, rules.check_then_act, nothing_to_read="",
+    _clause(19, "P17", "Atomic Test-and-Set Over Check-Then-Act", _TREE, rules.check_then_act, nothing_to_read="",
             reads=_TREE_READER),
-    _clause(20, "Logging Is a Declared Boundary, and an Error Is Returned", _PARTLY,
+    _clause(20, "P18", "Logging Is a Declared Boundary, and an Error Is Returned", _PARTLY,
             edges.undeclared_logging, reads=_TREE_READER,
             nothing_to_read=(
                 "nothing here writes a log line through a receiver this reader knows, so "
@@ -286,14 +301,14 @@ CLAUSES: tuple[Clause, ...] = (
     # The two principles that had no clause until 2026-08-28. Twenty clauses over
     # twenty-two principles meant "a hundred per cent" was a hundred per cent of what we
     # measured, and we published more than we measured.
-    _clause(21, "References Resolve Statically", _PARTLY, references.unresolved_references,
+    _clause(21, "P07", "References Resolve Statically", _PARTLY, references.unresolved_references,
             reads=_REPOSITORY,
             nothing_to_read=(
                 "this file names no template and no class, so there was no emitted "
                 "reference here to resolve. A route is passed over wherever it appears: "
                 "where a project declares its routes is a convention this reader does not "
                 "know, and a guess would report every link in the repository")),
-    _clause(22, "Type Declarations Over Imperative Validation", _PARTLY,
+    _clause(22, "P11", "Type Declarations Over Imperative Validation", _PARTLY,
             contracts.copied_constraints, reads=_TREE_READER,
             nothing_to_read=(
                 "this file declares no bound for the machinery to enforce, so nothing here "
@@ -461,7 +476,8 @@ def assess(source: Source) -> list[Assessed]:
                 "checked")
         kept, allowed, by_declaration = _split_withheld(findings or [], declared)
         assessed.append({
-            "code": clause["code"], "name": clause["name"],
+            "code": clause["code"], "principle": clause["principle"],
+            "name": clause["name"],
             "decided": reason == "", "undecided": "" if reason == "" else kind,
             "reason": reason, "findings": kept, "allowed": allowed,
             "declared": by_declaration,
