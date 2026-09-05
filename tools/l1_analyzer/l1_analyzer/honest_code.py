@@ -778,7 +778,11 @@ def analyze(repo: Path, lang: str) -> ConformityRow:
 
     repo = Path(repo)
     extensions = frozenset(_SUFFIXES)
-    production, _skipped = scope._read_text_files(repo, extensions, scope.PRODUCTION)
+    # The scope the table gives this indicator, not one named here. A conformance
+    # directory holds test doubles, and the table already says those are not
+    # production; reaching past it made this the second owner of that fact.
+    production, _skipped = scope._read_text_files(
+        repo, extensions, scope.PRODUCTION_WITHOUT_CONFORMANCE)
     everything, _also = scope._read_text_files(repo, extensions, scope.WHOLE_REPO)
     produced = {str(path) for path, _text in production}
     tests = [(path, text) for path, text in everything if str(path) not in produced]

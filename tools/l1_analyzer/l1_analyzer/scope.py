@@ -105,7 +105,14 @@ SCOPES: dict[str, Scope] = {
     PRODUCTION_WITHOUT_CONFORMANCE: {
         "excludes": ("tests", "test", "conformance"),
         "buckets": ("docs", "tooling", "root-script"),
-        "indicators": ("L1.17", "L1.18b", "thread_surface"),
+        # L1.21 joined on 2026-09-05. It had reached for PRODUCTION directly, so the table
+        # could say a directory is not production and the clause check would read it
+        # anyway. A fault-injection double that subclasses a connection IS inheritance, and
+        # it is also the right way to write one: measuring the Honest Framework, every one
+        # of its seventeen inheritance findings and all sixty-three method findings came
+        # from conformance suites and from examples demonstrating Django and Pydantic. Its
+        # module source has none of either.
+        "indicators": ("L1.17", "L1.18b", "L1.21", "thread_surface"),
     },
     # Everything, tests included, because for these three the test tree IS the subject:
     # L1.8 is the ratio of test lines to production lines, L1.16 asks whether the
