@@ -1,0 +1,53 @@
+{
+ "repos_ok": 49,
+ "repos_failed": 1,
+ "failed_detail": [
+  {
+   "repo": "mindsdb/mindsdb",
+   "status": "analyze_error"
+  }
+ ],
+ "v1_mutable_ratio_pct": {
+  "q25_median_q75": [
+   37.5,
+   52.6,
+   59.0
+  ],
+  "min": 5.0,
+  "max": 93.8
+ },
+ "v2_state_total": 171474,
+ "v2_verdict_totals": {
+  "neutral": 100935,
+  "promiscuous": 4809,
+  "unresolved": 65730
+ },
+ "v2_verdict_share": {
+  "neutral": 0.589,
+  "promiscuous": 0.028,
+  "unresolved": 0.383
+ },
+ "v2_coverage_matrix": {
+  "neutral": {
+   "observe_only": 76182,
+   "drives_decision": 24753
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 4809
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 65730
+  }
+ },
+ "v2_headline_blind_spot_unresolved_drives_decision": 65730,
+ "v2_resolvable_fraction": {
+  "q25_median_q75": [
+   0.6,
+   0.7,
+   0.7
+  ]
+ },
+ "repos_with_any_promiscuous": 48
+}

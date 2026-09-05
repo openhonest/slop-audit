@@ -1,0 +1,48 @@
+{
+ "repos_ok": 50,
+ "repos_failed": 0,
+ "failed_detail": [],
+ "v1_mutable_ratio_pct": {
+  "q25_median_q75": [
+   39.0,
+   54.8,
+   59.4
+  ],
+  "min": 0.0,
+  "max": 92.3
+ },
+ "v2_state_total": 150047,
+ "v2_verdict_totals": {
+  "neutral": 90026,
+  "promiscuous": 5047,
+  "unresolved": 54974
+ },
+ "v2_verdict_share": {
+  "neutral": 0.6,
+  "promiscuous": 0.034,
+  "unresolved": 0.366
+ },
+ "v2_coverage_matrix": {
+  "neutral": {
+   "observe_only": 68436,
+   "drives_decision": 21590
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 5047
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 54974
+  }
+ },
+ "v2_headline_blind_spot_unresolved_drives_decision": 54974,
+ "v2_resolvable_fraction": {
+  "q25_median_q75": [
+   0.7,
+   0.8,
+   0.8
+  ]
+ },
+ "repos_with_any_promiscuous": 48
+}

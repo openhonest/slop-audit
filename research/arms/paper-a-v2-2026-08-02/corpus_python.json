@@ -1,0 +1,356 @@
+{
+  "language": "Python",
+  "total_found": 500,
+  "qualifying": [
+    {
+      "full_name": "AUTOMATIC1111/stable-diffusion-webui",
+      "language": "Python",
+      "stars": 162342,
+      "default_branch": "master",
+      "url": "https://github.com/AUTOMATIC1111/stable-diffusion-webui"
+    },
+    {
+      "full_name": "huggingface/transformers",
+      "language": "Python",
+      "stars": 159297,
+      "default_branch": "main",
+      "url": "https://github.com/huggingface/transformers"
+    },
+    {
+      "full_name": "yt-dlp/yt-dlp",
+      "language": "Python",
+      "stars": 156562,
+      "default_branch": "master",
+      "url": "https://github.com/yt-dlp/yt-dlp"
+    },
+    {
+      "full_name": "langchain-ai/langchain",
+      "language": "Python",
+      "stars": 133394,
+      "default_branch": "master",
+      "url": "https://github.com/langchain-ai/langchain"
+    },
+    {
+      "full_name": "open-webui/open-webui",
+      "language": "Python",
+      "stars": 131576,
+      "default_branch": "main",
+      "url": "https://github.com/open-webui/open-webui"
+    },
+    {
+      "full_name": "Shubhamsaboo/awesome-llm-apps",
+      "language": "Python",
+      "stars": 105289,
+      "default_branch": "main",
+      "url": "https://github.com/Shubhamsaboo/awesome-llm-apps"
+    },
+    {
+      "full_name": "nvbn/thefuck",
+      "language": "Python",
+      "stars": 96475,
+      "default_branch": "master",
+      "url": "https://github.com/nvbn/thefuck"
+    },
+    {
+      "full_name": "browser-use/browser-use",
+      "language": "Python",
+      "stars": 87569,
+      "default_branch": "main",
+      "url": "https://github.com/browser-use/browser-use"
+    },
+    {
+      "full_name": "infiniflow/ragflow",
+      "language": "Python",
+      "stars": 77911,
+      "default_branch": "main",
+      "url": "https://github.com/infiniflow/ragflow"
+    },
+    {
+      "full_name": "tensorflow/models",
+      "language": "Python",
+      "stars": 77676,
+      "default_branch": "master",
+      "url": "https://github.com/tensorflow/models"
+    },
+    {
+      "full_name": "NousResearch/hermes-agent",
+      "language": "Python",
+      "stars": 74603,
+      "default_branch": "main",
+      "url": "https://github.com/NousResearch/hermes-agent"
+    },
+    {
+      "full_name": "OpenHands/OpenHands",
+      "language": "Python",
+      "stars": 71110,
+      "default_branch": "main",
+      "url": "https://github.com/OpenHands/OpenHands"
+    },
+    {
+      "full_name": "binary-husky/gpt_academic",
+      "language": "Python",
+      "stars": 70419,
+      "default_branch": "master",
+      "url": "https://github.com/binary-husky/gpt_academic"
+    },
+    {
+      "full_name": "hiyouga/LlamaFactory",
+      "language": "Python",
+      "stars": 70027,
+      "default_branch": "main",
+      "url": "https://github.com/hiyouga/LlamaFactory"
+    },
+    {
+      "full_name": "ansible/ansible",
+      "language": "Python",
+      "stars": 68359,
+      "default_branch": "devel",
+      "url": "https://github.com/ansible/ansible"
+    },
+    {
+      "full_name": "xtekky/gpt4free",
+      "language": "Python",
+      "stars": 65992,
+      "default_branch": "main",
+      "url": "https://github.com/xtekky/gpt4free"
+    },
+    {
+      "full_name": "scikit-learn/scikit-learn",
+      "language": "Python",
+      "stars": 65805,
+      "default_branch": "main",
+      "url": "https://github.com/scikit-learn/scikit-learn"
+    },
+    {
+      "full_name": "keras-team/keras",
+      "language": "Python",
+      "stars": 63982,
+      "default_branch": "master",
+      "url": "https://github.com/keras-team/keras"
+    },
+    {
+      "full_name": "unclecode/crawl4ai",
+      "language": "Python",
+      "stars": 63903,
+      "default_branch": "main",
+      "url": "https://github.com/unclecode/crawl4ai"
+    },
+    {
+      "full_name": "pathwaycom/pathway",
+      "language": "Python",
+      "stars": 63549,
+      "default_branch": "main",
+      "url": "https://github.com/pathwaycom/pathway"
+    },
+    {
+      "full_name": "openinterpreter/open-interpreter",
+      "language": "Python",
+      "stars": 63101,
+      "default_branch": "main",
+      "url": "https://github.com/openinterpreter/open-interpreter"
+    },
+    {
+      "full_name": "bytedance/deer-flow",
+      "language": "Python",
+      "stars": 61047,
+      "default_branch": "main",
+      "url": "https://github.com/bytedance/deer-flow"
+    },
+    {
+      "full_name": "Z4nzu/hackingtool",
+      "language": "Python",
+      "stars": 58067,
+      "default_branch": "master",
+      "url": "https://github.com/Z4nzu/hackingtool"
+    },
+    {
+      "full_name": "docling-project/docling",
+      "language": "Python",
+      "stars": 57715,
+      "default_branch": "main",
+      "url": "https://github.com/docling-project/docling"
+    },
+    {
+      "full_name": "soimort/you-get",
+      "language": "Python",
+      "stars": 56814,
+      "default_branch": "develop",
+      "url": "https://github.com/soimort/you-get"
+    },
+    {
+      "full_name": "RVC-Boss/GPT-SoVITS",
+      "language": "Python",
+      "stars": 56634,
+      "default_branch": "main",
+      "url": "https://github.com/RVC-Boss/GPT-SoVITS"
+    },
+    {
+      "full_name": "ultralytics/ultralytics",
+      "language": "Python",
+      "stars": 55831,
+      "default_branch": "main",
+      "url": "https://github.com/ultralytics/ultralytics"
+    },
+    {
+      "full_name": "FoundationAgents/OpenManus",
+      "language": "Python",
+      "stars": 55729,
+      "default_branch": "main",
+      "url": "https://github.com/FoundationAgents/OpenManus"
+    },
+    {
+      "full_name": "harry0703/MoneyPrinterTurbo",
+      "language": "Python",
+      "stars": 55591,
+      "default_branch": "main",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo"
+    },
+    {
+      "full_name": "psf/requests",
+      "language": "Python",
+      "stars": 53888,
+      "default_branch": "main",
+      "url": "https://github.com/psf/requests"
+    },
+    {
+      "full_name": "Zie619/n8n-workflows",
+      "language": "Python",
+      "stars": 53728,
+      "default_branch": "main",
+      "url": "https://github.com/Zie619/n8n-workflows"
+    },
+    {
+      "full_name": "pandas-dev/pandas",
+      "language": "Python",
+      "stars": 48494,
+      "default_branch": "main",
+      "url": "https://github.com/pandas-dev/pandas"
+    },
+    {
+      "full_name": "lllyasviel/Fooocus",
+      "language": "Python",
+      "stars": 48061,
+      "default_branch": "main",
+      "url": "https://github.com/lllyasviel/Fooocus"
+    },
+    {
+      "full_name": "oobabooga/text-generation-webui",
+      "language": "Python",
+      "stars": 46484,
+      "default_branch": "main",
+      "url": "https://github.com/oobabooga/text-generation-webui"
+    },
+    {
+      "full_name": "coqui-ai/TTS",
+      "language": "Python",
+      "stars": 45053,
+      "default_branch": "dev",
+      "url": "https://github.com/coqui-ai/TTS"
+    },
+    {
+      "full_name": "apache/airflow",
+      "language": "Python",
+      "stars": 45031,
+      "default_branch": "main",
+      "url": "https://github.com/apache/airflow"
+    },
+    {
+      "full_name": "getsentry/sentry",
+      "language": "Python",
+      "stars": 43569,
+      "default_branch": "master",
+      "url": "https://github.com/getsentry/sentry"
+    },
+    {
+      "full_name": "BerriAI/litellm",
+      "language": "Python",
+      "stars": 43130,
+      "default_branch": "main",
+      "url": "https://github.com/BerriAI/litellm"
+    },
+    {
+      "full_name": "zhayujie/CowAgent",
+      "language": "Python",
+      "stars": 43079,
+      "default_branch": "master",
+      "url": "https://github.com/zhayujie/CowAgent"
+    },
+    {
+      "full_name": "mitmproxy/mitmproxy",
+      "language": "Python",
+      "stars": 43062,
+      "default_branch": "main",
+      "url": "https://github.com/mitmproxy/mitmproxy"
+    },
+    {
+      "full_name": "apachecn/ailearning",
+      "language": "Python",
+      "stars": 42180,
+      "default_branch": "master",
+      "url": "https://github.com/apachecn/ailearning"
+    },
+    {
+      "full_name": "ray-project/ray",
+      "language": "Python",
+      "stars": 42099,
+      "default_branch": "master",
+      "url": "https://github.com/ray-project/ray"
+    },
+    {
+      "full_name": "deepspeedai/DeepSpeed",
+      "language": "Python",
+      "stars": 42077,
+      "default_branch": "master",
+      "url": "https://github.com/deepspeedai/DeepSpeed"
+    },
+    {
+      "full_name": "ccxt/ccxt",
+      "language": "Python",
+      "stars": 41841,
+      "default_branch": "master",
+      "url": "https://github.com/ccxt/ccxt"
+    },
+    {
+      "full_name": "microsoft/qlib",
+      "language": "Python",
+      "stars": 40663,
+      "default_branch": "main",
+      "url": "https://github.com/microsoft/qlib"
+    },
+    {
+      "full_name": "666ghj/BettaFish",
+      "language": "Python",
+      "stars": 40382,
+      "default_branch": "main",
+      "url": "https://github.com/666ghj/BettaFish"
+    },
+    {
+      "full_name": "HKUDS/nanobot",
+      "language": "Python",
+      "stars": 39337,
+      "default_branch": "main",
+      "url": "https://github.com/HKUDS/nanobot"
+    },
+    {
+      "full_name": "vnpy/vnpy",
+      "language": "Python",
+      "stars": 39309,
+      "default_branch": "master",
+      "url": "https://github.com/vnpy/vnpy"
+    },
+    {
+      "full_name": "mindsdb/mindsdb",
+      "language": "Python",
+      "stars": 38968,
+      "default_branch": "main",
+      "url": "https://github.com/mindsdb/mindsdb"
+    },
+    {
+      "full_name": "paperless-ngx/paperless-ngx",
+      "language": "Python",
+      "stars": 38049,
+      "default_branch": "dev",
+      "url": "https://github.com/paperless-ngx/paperless-ngx"
+    }
+  ]
+}

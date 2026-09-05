@@ -1,0 +1,73 @@
+{
+ "corpus": 199,
+ "measured_ok": 191,
+ "not_measured": [
+  {
+   "repo": "AvaloniaUI/Avalonia",
+   "status": "clone_failed",
+   "detail": "Cloning into '/tmp/ex200_l14eacv_/repo'...\nwarning: Could not find remote branch master to clone.\nfatal: Remote branch master not found in upstream origin\n"
+  },
+  {
+   "repo": "apache/incubator-seata",
+   "status": "analyze_error",
+   "detail": "RecursionError('maximum recursion depth exceeded')"
+  },
+  {
+   "repo": "daytonaio/daytona",
+   "status": "analyze_error",
+   "detail": "IncompleteCode('INCOMPLETE CODE: L1.18 unbounded mutable state cannot answer: no function was enumerated in typescript, so the share of them touching unbounded state is absent, not zero')"
+  },
+  {
+   "repo": "dotnet/runtime",
+   "status": "analyze_error",
+   "detail": "RecursionError('maximum recursion depth exceeded')"
+  },
+  {
+   "repo": "mindsdb/mindsdb",
+   "status": "analyze_error",
+   "detail": "IncompleteCode('INCOMPLETE CODE: L1.18 unbounded mutable state cannot answer: no function was enumerated in python, so the share of them touching unbounded state is absent, not zero')"
+  },
+  {
+   "repo": "openjdk/jdk",
+   "status": "analyze_error",
+   "detail": "RecursionError('maximum recursion depth exceeded')"
+  },
+  {
+   "repo": "oracle/graal",
+   "status": "analyze_error",
+   "detail": "RecursionError('maximum recursion depth exceeded')"
+  },
+  {
+   "repo": "remotion-dev/remotion",
+   "status": "analyze_error",
+   "detail": "RecursionError('maximum recursion depth exceeded')"
+  }
+ ],
+ "tally": {
+  "not testable": 179,
+  "exhaustively testable": 2,
+  "undetermined": 7,
+  "no state found": 3
+ },
+ "by_language": {
+  "C#": {
+   "not testable": 48
+  },
+  "Python": {
+   "not testable": 48,
+   "exhaustively testable": 1
+  },
+  "TypeScript": {
+   "exhaustively testable": 1,
+   "undetermined": 6,
+   "not testable": 37,
+   "no state found": 3
+  },
+  "Java": {
+   "not testable": 46,
+   "undetermined": 1
+  }
+ },
+ "exhaustively_testable_share_of_measured": 0.0105,
+ "exhaustively_testable_share_of_corpus": 0.0101
+}

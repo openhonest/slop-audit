@@ -1,0 +1,1402 @@
+[
+ {
+  "full_name": "ultraworkers/claw-code",
+  "language": "Rust",
+  "stars": 195171,
+  "default_branch": "main",
+  "url": "https://github.com/ultraworkers/claw-code.git"
+ },
+ {
+  "full_name": "farion1231/cc-switch",
+  "language": "Rust",
+  "stars": 131198,
+  "default_branch": "main",
+  "url": "https://github.com/farion1231/cc-switch.git"
+ },
+ {
+  "full_name": "rustdesk/rustdesk",
+  "language": "Rust",
+  "stars": 122687,
+  "default_branch": "master",
+  "url": "https://github.com/rustdesk/rustdesk.git"
+ },
+ {
+  "full_name": "openai/codex",
+  "language": "Rust",
+  "stars": 121726,
+  "default_branch": "main",
+  "url": "https://github.com/openai/codex.git"
+ },
+ {
+  "full_name": "rust-lang/rust",
+  "language": "Rust",
+  "stars": 117466,
+  "default_branch": "main",
+  "url": "https://github.com/rust-lang/rust.git"
+ },
+ {
+  "full_name": "tauri-apps/tauri",
+  "language": "Rust",
+  "stars": 110825,
+  "default_branch": "dev",
+  "url": "https://github.com/tauri-apps/tauri.git"
+ },
+ {
+  "full_name": "denoland/deno",
+  "language": "Rust",
+  "stars": 108381,
+  "default_branch": "main",
+  "url": "https://github.com/denoland/deno.git"
+ },
+ {
+  "full_name": "oven-sh/bun",
+  "language": "Rust",
+  "stars": 95889,
+  "default_branch": "main",
+  "url": "https://github.com/oven-sh/bun.git"
+ },
+ {
+  "full_name": "ruvnet/RuView",
+  "language": "Rust",
+  "stars": 92541,
+  "default_branch": "main",
+  "url": "https://github.com/ruvnet/RuView.git"
+ },
+ {
+  "full_name": "zed-industries/zed",
+  "language": "Rust",
+  "stars": 89803,
+  "default_branch": "main",
+  "url": "https://github.com/zed-industries/zed.git"
+ },
+ {
+  "full_name": "astral-sh/uv",
+  "language": "Rust",
+  "stars": 89489,
+  "default_branch": "main",
+  "url": "https://github.com/astral-sh/uv.git"
+ },
+ {
+  "full_name": "rtk-ai/rtk",
+  "language": "Rust",
+  "stars": 78817,
+  "default_branch": "develop",
+  "url": "https://github.com/rtk-ai/rtk.git"
+ },
+ {
+  "full_name": "unionlabs/union",
+  "language": "Rust",
+  "stars": 73811,
+  "default_branch": "main",
+  "url": "https://github.com/unionlabs/union.git"
+ },
+ {
+  "full_name": "openinterpreter/openinterpreter",
+  "language": "Rust",
+  "stars": 68244,
+  "default_branch": "main",
+  "url": "https://github.com/openinterpreter/openinterpreter.git"
+ },
+ {
+  "full_name": "BurntSushi/ripgrep",
+  "language": "Rust",
+  "stars": 67981,
+  "default_branch": "master",
+  "url": "https://github.com/BurntSushi/ripgrep.git"
+ },
+ {
+  "full_name": "dani-garcia/vaultwarden",
+  "language": "Rust",
+  "stars": 66889,
+  "default_branch": "main",
+  "url": "https://github.com/dani-garcia/vaultwarden.git"
+ },
+ {
+  "full_name": "alacritty/alacritty",
+  "language": "Rust",
+  "stars": 65626,
+  "default_branch": "master",
+  "url": "https://github.com/alacritty/alacritty.git"
+ },
+ {
+  "full_name": "warpdotdev/warp",
+  "language": "Rust",
+  "stars": 64820,
+  "default_branch": "master",
+  "url": "https://github.com/warpdotdev/warp.git"
+ },
+ {
+  "full_name": "rust-lang/rustlings",
+  "language": "Rust",
+  "stars": 64048,
+  "default_branch": "main",
+  "url": "https://github.com/rust-lang/rustlings.git"
+ },
+ {
+  "full_name": "FuelLabs/sway",
+  "language": "Rust",
+  "stars": 61457,
+  "default_branch": "master",
+  "url": "https://github.com/FuelLabs/sway.git"
+ },
+ {
+  "full_name": "tw93/Pake",
+  "language": "Rust",
+  "stars": 61300,
+  "default_branch": "main",
+  "url": "https://github.com/tw93/Pake.git"
+ },
+ {
+  "full_name": "sharkdp/bat",
+  "language": "Rust",
+  "stars": 60374,
+  "default_branch": "master",
+  "url": "https://github.com/sharkdp/bat.git"
+ },
+ {
+  "full_name": "starship/starship",
+  "language": "Rust",
+  "stars": 59793,
+  "default_branch": "main",
+  "url": "https://github.com/starship/starship.git"
+ },
+ {
+  "full_name": "rust-unofficial/awesome-rust",
+  "language": "Rust",
+  "stars": 59205,
+  "default_branch": "main",
+  "url": "https://github.com/rust-unofficial/awesome-rust.git"
+ },
+ {
+  "full_name": "meilisearch/meilisearch",
+  "language": "Rust",
+  "stars": 59189,
+  "default_branch": "main",
+  "url": "https://github.com/meilisearch/meilisearch.git"
+ },
+ {
+  "full_name": "FuelLabs/fuel-core",
+  "language": "Rust",
+  "stars": 56863,
+  "default_branch": "master",
+  "url": "https://github.com/FuelLabs/fuel-core.git"
+ },
+ {
+  "full_name": "typst/typst",
+  "language": "Rust",
+  "stars": 55861,
+  "default_branch": "main",
+  "url": "https://github.com/typst/typst.git"
+ },
+ {
+  "full_name": "lencx/ChatGPT",
+  "language": "Rust",
+  "stars": 54486,
+  "default_branch": "v2-dev",
+  "url": "https://github.com/lencx/ChatGPT.git"
+ },
+ {
+  "full_name": "aaif-goose/goose",
+  "language": "Rust",
+  "stars": 53936,
+  "default_branch": "main",
+  "url": "https://github.com/aaif-goose/goose.git"
+ },
+ {
+  "full_name": "astral-sh/ruff",
+  "language": "Rust",
+  "stars": 49498,
+  "default_branch": "main",
+  "url": "https://github.com/astral-sh/ruff.git"
+ },
+ {
+  "full_name": "bevyengine/bevy",
+  "language": "Rust",
+  "stars": 48054,
+  "default_branch": "main",
+  "url": "https://github.com/bevyengine/bevy.git"
+ },
+ {
+  "full_name": "helix-editor/helix",
+  "language": "Rust",
+  "stars": 46092,
+  "default_branch": "master",
+  "url": "https://github.com/helix-editor/helix.git"
+ },
+ {
+  "full_name": "sharkdp/fd",
+  "language": "Rust",
+  "stars": 44319,
+  "default_branch": "master",
+  "url": "https://github.com/sharkdp/fd.git"
+ },
+ {
+  "full_name": "juspay/hyperswitch",
+  "language": "Rust",
+  "stars": 43584,
+  "default_branch": "main",
+  "url": "https://github.com/juspay/hyperswitch.git"
+ },
+ {
+  "full_name": "FuelLabs/fuels-rs",
+  "language": "Rust",
+  "stars": 43037,
+  "default_branch": "master",
+  "url": "https://github.com/FuelLabs/fuels-rs.git"
+ },
+ {
+  "full_name": "vercel-labs/agent-browser",
+  "language": "Rust",
+  "stars": 42000,
+  "default_branch": "main",
+  "url": "https://github.com/vercel-labs/agent-browser.git"
+ },
+ {
+  "full_name": "sxyazi/yazi",
+  "language": "Rust",
+  "stars": 41956,
+  "default_branch": "main",
+  "url": "https://github.com/sxyazi/yazi.git"
+ },
+ {
+  "full_name": "GyulyVGC/sniffnet",
+  "language": "Rust",
+  "stars": 41033,
+  "default_branch": "main",
+  "url": "https://github.com/GyulyVGC/sniffnet.git"
+ },
+ {
+  "full_name": "Hmbown/Codewhale",
+  "language": "Rust",
+  "stars": 40914,
+  "default_branch": "main",
+  "url": "https://github.com/Hmbown/Codewhale.git"
+ },
+ {
+  "full_name": "nushell/nushell",
+  "language": "Rust",
+  "stars": 40417,
+  "default_branch": "main",
+  "url": "https://github.com/nushell/nushell.git"
+ },
+ {
+  "full_name": "pola-rs/polars",
+  "language": "Rust",
+  "stars": 39657,
+  "default_branch": "main",
+  "url": "https://github.com/pola-rs/polars.git"
+ },
+ {
+  "full_name": "tinyhumansai/openhuman",
+  "language": "Rust",
+  "stars": 39444,
+  "default_branch": "main",
+  "url": "https://github.com/tinyhumansai/openhuman.git"
+ },
+ {
+  "full_name": "ajeetdsouza/zoxide",
+  "language": "Rust",
+  "stars": 39178,
+  "default_branch": "main",
+  "url": "https://github.com/ajeetdsouza/zoxide.git"
+ },
+ {
+  "full_name": "DioxusLabs/dioxus",
+  "language": "Rust",
+  "stars": 38978,
+  "default_branch": "main",
+  "url": "https://github.com/DioxusLabs/dioxus.git"
+ },
+ {
+  "full_name": "spacedriveapp/spacedrive",
+  "language": "Rust",
+  "stars": 38911,
+  "default_branch": "main",
+  "url": "https://github.com/spacedriveapp/spacedrive.git"
+ },
+ {
+  "full_name": "lapce/lapce",
+  "language": "Rust",
+  "stars": 38823,
+  "default_branch": "master",
+  "url": "https://github.com/lapce/lapce.git"
+ },
+ {
+  "full_name": "servo/servo",
+  "language": "Rust",
+  "stars": 37923,
+  "default_branch": "main",
+  "url": "https://github.com/servo/servo.git"
+ },
+ {
+  "full_name": "firecracker-microvm/firecracker",
+  "language": "Rust",
+  "stars": 36554,
+  "default_branch": "main",
+  "url": "https://github.com/firecracker-microvm/firecracker.git"
+ },
+ {
+  "full_name": "pnpm/pnpm",
+  "language": "Rust",
+  "stars": 36423,
+  "default_branch": "main",
+  "url": "https://github.com/pnpm/pnpm.git"
+ },
+ {
+  "full_name": "casey/just",
+  "language": "Rust",
+  "stars": 35652,
+  "default_branch": "master",
+  "url": "https://github.com/casey/just.git"
+ },
+ {
+  "full_name": "herdrdev/herdr",
+  "language": "Rust",
+  "stars": 35517,
+  "default_branch": "master",
+  "url": "https://github.com/herdrdev/herdr.git"
+ },
+ {
+  "full_name": "zellij-org/zellij",
+  "language": "Rust",
+  "stars": 35290,
+  "default_branch": "main",
+  "url": "https://github.com/zellij-org/zellij.git"
+ },
+ {
+  "full_name": "AlexsJones/llmfit",
+  "language": "Rust",
+  "stars": 34923,
+  "default_branch": "main",
+  "url": "https://github.com/AlexsJones/llmfit.git"
+ },
+ {
+  "full_name": "qdrant/qdrant",
+  "language": "Rust",
+  "stars": 34400,
+  "default_branch": "master",
+  "url": "https://github.com/qdrant/qdrant.git"
+ },
+ {
+  "full_name": "swc-project/swc",
+  "language": "Rust",
+  "stars": 34196,
+  "default_branch": "main",
+  "url": "https://github.com/swc-project/swc.git"
+ },
+ {
+  "full_name": "fish-shell/fish-shell",
+  "language": "Rust",
+  "stars": 34139,
+  "default_branch": "master",
+  "url": "https://github.com/fish-shell/fish-shell.git"
+ },
+ {
+  "full_name": "TabbyML/tabby",
+  "language": "Rust",
+  "stars": 33861,
+  "default_branch": "main",
+  "url": "https://github.com/TabbyML/tabby.git"
+ },
+ {
+  "full_name": "jdx/mise",
+  "language": "Rust",
+  "stars": 33509,
+  "default_branch": "main",
+  "url": "https://github.com/jdx/mise.git"
+ },
+ {
+  "full_name": "google/comprehensive-rust",
+  "language": "Rust",
+  "stars": 33347,
+  "default_branch": "main",
+  "url": "https://github.com/google/comprehensive-rust.git"
+ },
+ {
+  "full_name": "tokio-rs/tokio",
+  "language": "Rust",
+  "stars": 33075,
+  "default_branch": "master",
+  "url": "https://github.com/tokio-rs/tokio.git"
+ },
+ {
+  "full_name": "surrealdb/surrealdb",
+  "language": "Rust",
+  "stars": 32988,
+  "default_branch": "main",
+  "url": "https://github.com/surrealdb/surrealdb.git"
+ },
+ {
+  "full_name": "yewstack/yew",
+  "language": "Rust",
+  "stars": 32792,
+  "default_branch": "master",
+  "url": "https://github.com/yewstack/yew.git"
+ },
+ {
+  "full_name": "zeroclaw-labs/zeroclaw",
+  "language": "Rust",
+  "stars": 32733,
+  "default_branch": "master",
+  "url": "https://github.com/zeroclaw-labs/zeroclaw.git"
+ },
+ {
+  "full_name": "xai-org/x-algorithm",
+  "language": "Rust",
+  "stars": 32702,
+  "default_branch": "main",
+  "url": "https://github.com/xai-org/x-algorithm.git"
+ },
+ {
+  "full_name": "block/buzz",
+  "language": "Rust",
+  "stars": 32195,
+  "default_branch": "main",
+  "url": "https://github.com/block/buzz.git"
+ },
+ {
+  "full_name": "linera-io/linera-protocol",
+  "language": "Rust",
+  "stars": 32146,
+  "default_branch": "main",
+  "url": "https://github.com/linera-io/linera-protocol.git"
+ },
+ {
+  "full_name": "dandavison/delta",
+  "language": "Rust",
+  "stars": 32088,
+  "default_branch": "main",
+  "url": "https://github.com/dandavison/delta.git"
+ },
+ {
+  "full_name": "rustfs/rustfs",
+  "language": "Rust",
+  "stars": 31757,
+  "default_branch": "main",
+  "url": "https://github.com/rustfs/rustfs.git"
+ },
+ {
+  "full_name": "influxdata/influxdb",
+  "language": "Rust",
+  "stars": 31734,
+  "default_branch": "main",
+  "url": "https://github.com/influxdata/influxdb.git"
+ },
+ {
+  "full_name": "atuinsh/atuin",
+  "language": "Rust",
+  "stars": 31541,
+  "default_branch": "main",
+  "url": "https://github.com/atuinsh/atuin.git"
+ },
+ {
+  "full_name": "iced-rs/iced",
+  "language": "Rust",
+  "stars": 31435,
+  "default_branch": "master",
+  "url": "https://github.com/iced-rs/iced.git"
+ },
+ {
+  "full_name": "jj-vcs/jj",
+  "language": "Rust",
+  "stars": 31410,
+  "default_branch": "main",
+  "url": "https://github.com/jj-vcs/jj.git"
+ },
+ {
+  "full_name": "vercel/turborepo",
+  "language": "Rust",
+  "stars": 31061,
+  "default_branch": "main",
+  "url": "https://github.com/vercel/turborepo.git"
+ },
+ {
+  "full_name": "cjpais/Handy",
+  "language": "Rust",
+  "stars": 31053,
+  "default_branch": "main",
+  "url": "https://github.com/cjpais/Handy.git"
+ },
+ {
+  "full_name": "lbjlaq/Antigravity-Manager",
+  "language": "Rust",
+  "stars": 31046,
+  "default_branch": "main",
+  "url": "https://github.com/lbjlaq/Antigravity-Manager.git"
+ },
+ {
+  "full_name": "sunface/rust-course",
+  "language": "Rust",
+  "stars": 30879,
+  "default_branch": "main",
+  "url": "https://github.com/sunface/rust-course.git"
+ },
+ {
+  "full_name": "googleworkspace/cli",
+  "language": "Rust",
+  "stars": 30750,
+  "default_branch": "main",
+  "url": "https://github.com/googleworkspace/cli.git"
+ },
+ {
+  "full_name": "emilk/egui",
+  "language": "Rust",
+  "stars": 30434,
+  "default_branch": "main",
+  "url": "https://github.com/emilk/egui.git"
+ },
+ {
+  "full_name": "Zackriya-Solutions/meetily",
+  "language": "Rust",
+  "stars": 30379,
+  "default_branch": "main",
+  "url": "https://github.com/Zackriya-Solutions/meetily.git"
+ },
+ {
+  "full_name": "ankitects/anki",
+  "language": "Rust",
+  "stars": 30337,
+  "default_branch": "main",
+  "url": "https://github.com/ankitects/anki.git"
+ },
+ {
+  "full_name": "BigPizzaV3/CodexPlusPlus",
+  "language": "Rust",
+  "stars": 30254,
+  "default_branch": "main",
+  "url": "https://github.com/BigPizzaV3/CodexPlusPlus.git"
+ },
+ {
+  "full_name": "chroma-core/chroma",
+  "language": "Rust",
+  "stars": 29230,
+  "default_branch": "main",
+  "url": "https://github.com/chroma-core/chroma.git"
+ },
+ {
+  "full_name": "sharkdp/hyperfine",
+  "language": "Rust",
+  "stars": 28804,
+  "default_branch": "master",
+  "url": "https://github.com/sharkdp/hyperfine.git"
+ },
+ {
+  "full_name": "wezterm/wezterm",
+  "language": "Rust",
+  "stars": 28768,
+  "default_branch": "main",
+  "url": "https://github.com/wezterm/wezterm.git"
+ },
+ {
+  "full_name": "nautechsystems/nautilus_trader",
+  "language": "Rust",
+  "stars": 28405,
+  "default_branch": "develop",
+  "url": "https://github.com/nautechsystems/nautilus_trader.git"
+ },
+ {
+  "full_name": "BloopAI/vibe-kanban",
+  "language": "Rust",
+  "stars": 28019,
+  "default_branch": "main",
+  "url": "https://github.com/BloopAI/vibe-kanban.git"
+ },
+ {
+  "full_name": "niri-wm/niri",
+  "language": "Rust",
+  "stars": 27468,
+  "default_branch": "main",
+  "url": "https://github.com/niri-wm/niri.git"
+ },
+ {
+  "full_name": "cloudflare/pingora",
+  "language": "Rust",
+  "stars": 27326,
+  "default_branch": "main",
+  "url": "https://github.com/cloudflare/pingora.git"
+ },
+ {
+  "full_name": "oldj/SwitchHosts",
+  "language": "Rust",
+  "stars": 27149,
+  "default_branch": "master",
+  "url": "https://github.com/oldj/SwitchHosts.git"
+ },
+ {
+  "full_name": "GraphiteEditor/Graphite",
+  "language": "Rust",
+  "stars": 27131,
+  "default_branch": "master",
+  "url": "https://github.com/GraphiteEditor/Graphite.git"
+ },
+ {
+  "full_name": "tokio-rs/axum",
+  "language": "Rust",
+  "stars": 27025,
+  "default_branch": "main",
+  "url": "https://github.com/tokio-rs/axum.git"
+ },
+ {
+  "full_name": "tree-sitter/tree-sitter",
+  "language": "Rust",
+  "stars": 26870,
+  "default_branch": "master",
+  "url": "https://github.com/tree-sitter/tree-sitter.git"
+ },
+ {
+  "full_name": "Schniz/fnm",
+  "language": "Rust",
+  "stars": 26789,
+  "default_branch": "master",
+  "url": "https://github.com/Schniz/fnm.git"
+ },
+ {
+  "full_name": "xai-org/grok-build",
+  "language": "Rust",
+  "stars": 26494,
+  "default_branch": "main",
+  "url": "https://github.com/xai-org/grok-build.git"
+ },
+ {
+  "full_name": "TheAlgorithms/Rust",
+  "language": "Rust",
+  "stars": 26040,
+  "default_branch": "master",
+  "url": "https://github.com/TheAlgorithms/Rust.git"
+ },
+ {
+  "full_name": "Wilfred/difftastic",
+  "language": "Rust",
+  "stars": 25858,
+  "default_branch": "master",
+  "url": "https://github.com/Wilfred/difftastic.git"
+ },
+ {
+  "full_name": "rwf2/Rocket",
+  "language": "Rust",
+  "stars": 25781,
+  "default_branch": "master",
+  "url": "https://github.com/rwf2/Rocket.git"
+ },
+ {
+  "full_name": "biomejs/biome",
+  "language": "Rust",
+  "stars": 25715,
+  "default_branch": "main",
+  "url": "https://github.com/biomejs/biome.git"
+ },
+ {
+  "full_name": "h4ckf0r0day/obscura",
+  "language": "Rust",
+  "stars": 25514,
+  "default_branch": "main",
+  "url": "https://github.com/h4ckf0r0day/obscura.git"
+ },
+ {
+  "full_name": "clockworklabs/SpacetimeDB",
+  "language": "Rust",
+  "stars": 25096,
+  "default_branch": "master",
+  "url": "https://github.com/clockworklabs/SpacetimeDB.git"
+ },
+ {
+  "full_name": "actix/actix-web",
+  "language": "Rust",
+  "stars": 24820,
+  "default_branch": "main",
+  "url": "https://github.com/actix/actix-web.git"
+ },
+ {
+  "full_name": "zama-ai/fhevm",
+  "language": "Rust",
+  "stars": 24817,
+  "default_branch": "main",
+  "url": "https://github.com/zama-ai/fhevm.git"
+ },
+ {
+  "full_name": "ogham/exa",
+  "language": "Rust",
+  "stars": 24441,
+  "default_branch": "master",
+  "url": "https://github.com/ogham/exa.git"
+ },
+ {
+  "full_name": "tursodatabase/turso",
+  "language": "Rust",
+  "stars": 24178,
+  "default_branch": "main",
+  "url": "https://github.com/tursodatabase/turso.git"
+ },
+ {
+  "full_name": "uutils/coreutils",
+  "language": "Rust",
+  "stars": 24041,
+  "default_branch": "main",
+  "url": "https://github.com/uutils/coreutils.git"
+ },
+ {
+  "full_name": "slint-ui/slint",
+  "language": "Rust",
+  "stars": 23703,
+  "default_branch": "master",
+  "url": "https://github.com/slint-ui/slint.git"
+ },
+ {
+  "full_name": "eza-community/eza",
+  "language": "Rust",
+  "stars": 23160,
+  "default_branch": "main",
+  "url": "https://github.com/eza-community/eza.git"
+ },
+ {
+  "full_name": "neondatabase/neon",
+  "language": "Rust",
+  "stars": 23042,
+  "default_branch": "main",
+  "url": "https://github.com/neondatabase/neon.git"
+ },
+ {
+  "full_name": "oxc-project/oxc",
+  "language": "Rust",
+  "stars": 22646,
+  "default_branch": "main",
+  "url": "https://github.com/oxc-project/oxc.git"
+ },
+ {
+  "full_name": "vectordotdev/vector",
+  "language": "Rust",
+  "stars": 22513,
+  "default_branch": "master",
+  "url": "https://github.com/vectordotdev/vector.git"
+ },
+ {
+  "full_name": "ratatui/ratatui",
+  "language": "Rust",
+  "stars": 22507,
+  "default_branch": "main",
+  "url": "https://github.com/ratatui/ratatui.git"
+ },
+ {
+  "full_name": "gitui-org/gitui",
+  "language": "Rust",
+  "stars": 22467,
+  "default_branch": "master",
+  "url": "https://github.com/gitui-org/gitui.git"
+ },
+ {
+  "full_name": "RustPython/RustPython",
+  "language": "Rust",
+  "stars": 22335,
+  "default_branch": "main",
+  "url": "https://github.com/RustPython/RustPython.git"
+ },
+ {
+  "full_name": "facebook/flow",
+  "language": "Rust",
+  "stars": 22282,
+  "default_branch": "main",
+  "url": "https://github.com/facebook/flow.git"
+ },
+ {
+  "full_name": "rust-lang/mdBook",
+  "language": "Rust",
+  "stars": 22119,
+  "default_branch": "main",
+  "url": "https://github.com/rust-lang/mdBook.git"
+ },
+ {
+  "full_name": "gleam-lang/gleam",
+  "language": "Rust",
+  "stars": 21874,
+  "default_branch": "main",
+  "url": "https://github.com/gleam-lang/gleam.git"
+ },
+ {
+  "full_name": "CapSoftware/Cap",
+  "language": "Rust",
+  "stars": 21722,
+  "default_branch": "main",
+  "url": "https://github.com/CapSoftware/Cap.git"
+ },
+ {
+  "full_name": "gitbutlerapp/gitbutler",
+  "language": "Rust",
+  "stars": 21618,
+  "default_branch": "master",
+  "url": "https://github.com/gitbutlerapp/gitbutler.git"
+ },
+ {
+  "full_name": "bee-san/Ciphey",
+  "language": "Rust",
+  "stars": 21590,
+  "default_branch": "master",
+  "url": "https://github.com/bee-san/Ciphey.git"
+ },
+ {
+  "full_name": "screenpipe/screenpipe",
+  "language": "Rust",
+  "stars": 21426,
+  "default_branch": "main",
+  "url": "https://github.com/screenpipe/screenpipe.git"
+ },
+ {
+  "full_name": "valeriansaliou/sonic",
+  "language": "Rust",
+  "stars": 21334,
+  "default_branch": "master",
+  "url": "https://github.com/valeriansaliou/sonic.git"
+ },
+ {
+  "full_name": "leptos-rs/leptos",
+  "language": "Rust",
+  "stars": 21263,
+  "default_branch": "main",
+  "url": "https://github.com/leptos-rs/leptos.git"
+ },
+ {
+  "full_name": "nikivdev/code",
+  "language": "Rust",
+  "stars": 21114,
+  "default_branch": "main",
+  "url": "https://github.com/nikivdev/code.git"
+ },
+ {
+  "full_name": "wasmerio/wasmer",
+  "language": "Rust",
+  "stars": 21016,
+  "default_branch": "main",
+  "url": "https://github.com/wasmerio/wasmer.git"
+ },
+ {
+  "full_name": "huggingface/candle",
+  "language": "Rust",
+  "stars": 20998,
+  "default_branch": "main",
+  "url": "https://github.com/huggingface/candle.git"
+ },
+ {
+  "full_name": "cube-js/cube",
+  "language": "Rust",
+  "stars": 20779,
+  "default_branch": "master",
+  "url": "https://github.com/cube-js/cube.git"
+ },
+ {
+  "full_name": "firecrawl/anydoc",
+  "language": "Rust",
+  "stars": 20396,
+  "default_branch": "main",
+  "url": "https://github.com/firecrawl/anydoc.git"
+ },
+ {
+  "full_name": "bee-san/RustScan",
+  "language": "Rust",
+  "stars": 20372,
+  "default_branch": "master",
+  "url": "https://github.com/bee-san/RustScan.git"
+ },
+ {
+  "full_name": "0x192/universal-android-debloater",
+  "language": "Rust",
+  "stars": 19883,
+  "default_branch": "main",
+  "url": "https://github.com/0x192/universal-android-debloater.git"
+ },
+ {
+  "full_name": "xi-editor/xi-editor",
+  "language": "Rust",
+  "stars": 19820,
+  "default_branch": "master",
+  "url": "https://github.com/xi-editor/xi-editor.git"
+ },
+ {
+  "full_name": "HigherOrderCO/Bend",
+  "language": "Rust",
+  "stars": 19817,
+  "default_branch": "main",
+  "url": "https://github.com/HigherOrderCO/Bend.git"
+ },
+ {
+  "full_name": "fathyb/carbonyl",
+  "language": "Rust",
+  "stars": 19476,
+  "default_branch": "main",
+  "url": "https://github.com/fathyb/carbonyl.git"
+ },
+ {
+  "full_name": "AprilNEA/OpenLogi",
+  "language": "Rust",
+  "stars": 19475,
+  "default_branch": "master",
+  "url": "https://github.com/AprilNEA/OpenLogi.git"
+ },
+ {
+  "full_name": "Rigellute/spotify-tui",
+  "language": "Rust",
+  "stars": 19343,
+  "default_branch": "master",
+  "url": "https://github.com/Rigellute/spotify-tui.git"
+ },
+ {
+  "full_name": "Orange-OpenSource/hurl",
+  "language": "Rust",
+  "stars": 19185,
+  "default_branch": "master",
+  "url": "https://github.com/Orange-OpenSource/hurl.git"
+ },
+ {
+  "full_name": "1jehuang/jcode",
+  "language": "Rust",
+  "stars": 19156,
+  "default_branch": "master",
+  "url": "https://github.com/1jehuang/jcode.git"
+ },
+ {
+  "full_name": "facebook/relay",
+  "language": "Rust",
+  "stars": 18963,
+  "default_branch": "main",
+  "url": "https://github.com/facebook/relay.git"
+ },
+ {
+  "full_name": "firecrawl/pdf-inspector",
+  "language": "Rust",
+  "stars": 18855,
+  "default_branch": "main",
+  "url": "https://github.com/firecrawl/pdf-inspector.git"
+ },
+ {
+  "full_name": "iii-hq/iii",
+  "language": "Rust",
+  "stars": 18677,
+  "default_branch": "main",
+  "url": "https://github.com/iii-hq/iii.git"
+ },
+ {
+  "full_name": "bytecodealliance/wasmtime",
+  "language": "Rust",
+  "stars": 18597,
+  "default_branch": "main",
+  "url": "https://github.com/bytecodealliance/wasmtime.git"
+ },
+ {
+  "full_name": "ruffle-rs/ruffle",
+  "language": "Rust",
+  "stars": 18497,
+  "default_branch": "master",
+  "url": "https://github.com/ruffle-rs/ruffle.git"
+ },
+ {
+  "full_name": "ccusage/ccusage",
+  "language": "Rust",
+  "stars": 18379,
+  "default_branch": "main",
+  "url": "https://github.com/ccusage/ccusage.git"
+ },
+ {
+  "full_name": "rust-lang/book",
+  "language": "Rust",
+  "stars": 18277,
+  "default_branch": "main",
+  "url": "https://github.com/rust-lang/book.git"
+ },
+ {
+  "full_name": "RightNow-AI/openfang",
+  "language": "Rust",
+  "stars": 18163,
+  "default_branch": "main",
+  "url": "https://github.com/RightNow-AI/openfang.git"
+ },
+ {
+  "full_name": "t8y2/dbx",
+  "language": "Rust",
+  "stars": 18076,
+  "default_branch": "main",
+  "url": "https://github.com/t8y2/dbx.git"
+ },
+ {
+  "full_name": "gfx-rs/wgpu",
+  "language": "Rust",
+  "stars": 17944,
+  "default_branch": "trunk",
+  "url": "https://github.com/gfx-rs/wgpu.git"
+ },
+ {
+  "full_name": "kitao/pyxel",
+  "language": "Rust",
+  "stars": 17794,
+  "default_branch": "main",
+  "url": "https://github.com/kitao/pyxel.git"
+ },
+ {
+  "full_name": "windmill-labs/windmill",
+  "language": "Rust",
+  "stars": 17785,
+  "default_branch": "main",
+  "url": "https://github.com/windmill-labs/windmill.git"
+ },
+ {
+  "full_name": "asciinema/asciinema",
+  "language": "Rust",
+  "stars": 17768,
+  "default_branch": "develop",
+  "url": "https://github.com/asciinema/asciinema.git"
+ },
+ {
+  "full_name": "louis-e/arnis",
+  "language": "Rust",
+  "stars": 17735,
+  "default_branch": "main",
+  "url": "https://github.com/louis-e/arnis.git"
+ },
+ {
+  "full_name": "eythaann/Seelen-UI",
+  "language": "Rust",
+  "stars": 17704,
+  "default_branch": "master",
+  "url": "https://github.com/eythaann/Seelen-UI.git"
+ },
+ {
+  "full_name": "denisidoro/navi",
+  "language": "Rust",
+  "stars": 17509,
+  "default_branch": "master",
+  "url": "https://github.com/denisidoro/navi.git"
+ },
+ {
+  "full_name": "transact-rs/sqlx",
+  "language": "Rust",
+  "stars": 17449,
+  "default_branch": "main",
+  "url": "https://github.com/transact-rs/sqlx.git"
+ },
+ {
+  "full_name": "getzola/zola",
+  "language": "Rust",
+  "stars": 17398,
+  "default_branch": "master",
+  "url": "https://github.com/getzola/zola.git"
+ },
+ {
+  "full_name": "jlcodes99/cockpit-tools",
+  "language": "Rust",
+  "stars": 17104,
+  "default_branch": "main",
+  "url": "https://github.com/jlcodes99/cockpit-tools.git"
+ },
+ {
+  "full_name": "tikv/tikv",
+  "language": "Rust",
+  "stars": 16830,
+  "default_branch": "master",
+  "url": "https://github.com/tikv/tikv.git"
+ },
+ {
+  "full_name": "rust-lang/rust-analyzer",
+  "language": "Rust",
+  "stars": 16820,
+  "default_branch": "master",
+  "url": "https://github.com/rust-lang/rust-analyzer.git"
+ },
+ {
+  "full_name": "clap-rs/clap",
+  "language": "Rust",
+  "stars": 16686,
+  "default_branch": "master",
+  "url": "https://github.com/clap-rs/clap.git"
+ },
+ {
+  "full_name": "RyanCodrai/turbovec",
+  "language": "Rust",
+  "stars": 16673,
+  "default_branch": "main",
+  "url": "https://github.com/RyanCodrai/turbovec.git"
+ },
+ {
+  "full_name": "diem/diem",
+  "language": "Rust",
+  "stars": 16667,
+  "default_branch": "latest",
+  "url": "https://github.com/diem/diem.git"
+ },
+ {
+  "full_name": "redox-os/redox",
+  "language": "Rust",
+  "stars": 16554,
+  "default_branch": "master",
+  "url": "https://github.com/redox-os/redox.git"
+ },
+ {
+  "full_name": "memvid/memvid",
+  "language": "Rust",
+  "stars": 16488,
+  "default_branch": "main",
+  "url": "https://github.com/memvid/memvid.git"
+ },
+ {
+  "full_name": "hyperium/hyper",
+  "language": "Rust",
+  "stars": 16305,
+  "default_branch": "master",
+  "url": "https://github.com/hyperium/hyper.git"
+ },
+ {
+  "full_name": "lsd-rs/lsd",
+  "language": "Rust",
+  "stars": 16215,
+  "default_branch": "main",
+  "url": "https://github.com/lsd-rs/lsd.git"
+ },
+ {
+  "full_name": "PyO3/pyo3",
+  "language": "Rust",
+  "stars": 16105,
+  "default_branch": "main",
+  "url": "https://github.com/PyO3/pyo3.git"
+ },
+ {
+  "full_name": "quickwit-oss/tantivy",
+  "language": "Rust",
+  "stars": 16043,
+  "default_branch": "main",
+  "url": "https://github.com/quickwit-oss/tantivy.git"
+ },
+ {
+  "full_name": "tracel-ai/burn",
+  "language": "Rust",
+  "stars": 15872,
+  "default_branch": "main",
+  "url": "https://github.com/tracel-ai/burn.git"
+ },
+ {
+  "full_name": "ast-grep/ast-grep",
+  "language": "Rust",
+  "stars": 15770,
+  "default_branch": "main",
+  "url": "https://github.com/ast-grep/ast-grep.git"
+ },
+ {
+  "full_name": "benfred/py-spy",
+  "language": "Rust",
+  "stars": 15476,
+  "default_branch": "master",
+  "url": "https://github.com/benfred/py-spy.git"
+ },
+ {
+  "full_name": "Y2Z/monolith",
+  "language": "Rust",
+  "stars": 15466,
+  "default_branch": "master",
+  "url": "https://github.com/Y2Z/monolith.git"
+ },
+ {
+  "full_name": "rust-lang/cargo",
+  "language": "Rust",
+  "stars": 15453,
+  "default_branch": "master",
+  "url": "https://github.com/rust-lang/cargo.git"
+ },
+ {
+  "full_name": "neovide/neovide",
+  "language": "Rust",
+  "stars": 15203,
+  "default_branch": "main",
+  "url": "https://github.com/neovide/neovide.git"
+ },
+ {
+  "full_name": "LGUG2Z/komorebi",
+  "language": "Rust",
+  "stars": 15136,
+  "default_branch": "master",
+  "url": "https://github.com/LGUG2Z/komorebi.git"
+ },
+ {
+  "full_name": "Automattic/harper",
+  "language": "Rust",
+  "stars": 14978,
+  "default_branch": "master",
+  "url": "https://github.com/Automattic/harper.git"
+ },
+ {
+  "full_name": "XAMPPRocky/tokei",
+  "language": "Rust",
+  "stars": 14881,
+  "default_branch": "master",
+  "url": "https://github.com/XAMPPRocky/tokei.git"
+ },
+ {
+  "full_name": "microsoft/RustTraining",
+  "language": "Rust",
+  "stars": 14846,
+  "default_branch": "main",
+  "url": "https://github.com/microsoft/RustTraining.git"
+ },
+ {
+  "full_name": "vosen/ZLUDA",
+  "language": "Rust",
+  "stars": 14802,
+  "default_branch": "master",
+  "url": "https://github.com/vosen/ZLUDA.git"
+ },
+ {
+  "full_name": "analysis-tools-dev/static-analysis",
+  "language": "Rust",
+  "stars": 14765,
+  "default_branch": "master",
+  "url": "https://github.com/analysis-tools-dev/static-analysis.git"
+ },
+ {
+  "full_name": "origin-brain/rust-by-practice",
+  "language": "Rust",
+  "stars": 14753,
+  "default_branch": "master",
+  "url": "https://github.com/origin-brain/rust-by-practice.git"
+ },
+ {
+  "full_name": "rust-embedded/rust-raspberrypi-OS-tutorials",
+  "language": "Rust",
+  "stars": 14731,
+  "default_branch": "master",
+  "url": "https://github.com/rust-embedded/rust-raspberrypi-OS-tutorials.git"
+ },
+ {
+  "full_name": "LemmyNet/lemmy",
+  "language": "Rust",
+  "stars": 14578,
+  "default_branch": "main",
+  "url": "https://github.com/LemmyNet/lemmy.git"
+ },
+ {
+  "full_name": "stalwartlabs/stalwart",
+  "language": "Rust",
+  "stars": 14541,
+  "default_branch": "main",
+  "url": "https://github.com/stalwartlabs/stalwart.git"
+ },
+ {
+  "full_name": "microsoft/edit",
+  "language": "Rust",
+  "stars": 14540,
+  "default_branch": "main",
+  "url": "https://github.com/microsoft/edit.git"
+ },
+ {
+  "full_name": "espanso/espanso",
+  "language": "Rust",
+  "stars": 14431,
+  "default_branch": "dev",
+  "url": "https://github.com/espanso/espanso.git"
+ },
+ {
+  "full_name": "ReFirmLabs/binwalk",
+  "language": "Rust",
+  "stars": 14313,
+  "default_branch": "master",
+  "url": "https://github.com/ReFirmLabs/binwalk.git"
+ },
+ {
+  "full_name": "diesel-rs/diesel",
+  "language": "Rust",
+  "stars": 14171,
+  "default_branch": "main",
+  "url": "https://github.com/diesel-rs/diesel.git"
+ },
+ {
+  "full_name": "rathole-org/rathole",
+  "language": "Rust",
+  "stars": 14113,
+  "default_branch": "main",
+  "url": "https://github.com/rathole-org/rathole.git"
+ },
+ {
+  "full_name": "longbridge/gpui-kit",
+  "language": "Rust",
+  "stars": 14015,
+  "default_branch": "main",
+  "url": "https://github.com/longbridge/gpui-kit.git"
+ },
+ {
+  "full_name": "ClementTsang/bottom",
+  "language": "Rust",
+  "stars": 13978,
+  "default_branch": "main",
+  "url": "https://github.com/ClementTsang/bottom.git"
+ },
+ {
+  "full_name": "rolldown/rolldown",
+  "language": "Rust",
+  "stars": 13941,
+  "default_branch": "main",
+  "url": "https://github.com/rolldown/rolldown.git"
+ },
+ {
+  "full_name": "dbt-labs/dbt-core",
+  "language": "Rust",
+  "stars": 13784,
+  "default_branch": "main",
+  "url": "https://github.com/dbt-labs/dbt-core.git"
+ },
+ {
+  "full_name": "EasyTier/EasyTier",
+  "language": "Rust",
+  "stars": 13503,
+  "default_branch": "main",
+  "url": "https://github.com/EasyTier/EasyTier.git"
+ },
+ {
+  "full_name": "rust-lang/rust-clippy",
+  "language": "Rust",
+  "stars": 13490,
+  "default_branch": "master",
+  "url": "https://github.com/rust-lang/rust-clippy.git"
+ },
+ {
+  "full_name": "rayon-rs/rayon",
+  "language": "Rust",
+  "stars": 13293,
+  "default_branch": "main",
+  "url": "https://github.com/rayon-rs/rayon.git"
+ },
+ {
+  "full_name": "libnyanpasu/clash-nyanpasu",
+  "language": "Rust",
+  "stars": 13151,
+  "default_branch": "main",
+  "url": "https://github.com/libnyanpasu/clash-nyanpasu.git"
+ },
+ {
+  "full_name": "volta-cli/volta",
+  "language": "Rust",
+  "stars": 13056,
+  "default_branch": "main",
+  "url": "https://github.com/volta-cli/volta.git"
+ },
+ {
+  "full_name": "Canop/broot",
+  "language": "Rust",
+  "stars": 12929,
+  "default_branch": "main",
+  "url": "https://github.com/Canop/broot.git"
+ },
+ {
+  "full_name": "web-infra-dev/rspack",
+  "language": "Rust",
+  "stars": 12888,
+  "default_branch": "main",
+  "url": "https://github.com/web-infra-dev/rspack.git"
+ },
+ {
+  "full_name": "glzr-io/glazewm",
+  "language": "Rust",
+  "stars": 12728,
+  "default_branch": "main",
+  "url": "https://github.com/glzr-io/glazewm.git"
+ },
+ {
+  "full_name": "microsoft/windows-rs",
+  "language": "Rust",
+  "stars": 12727,
+  "default_branch": "master",
+  "url": "https://github.com/microsoft/windows-rs.git"
+ }
+]
