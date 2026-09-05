@@ -238,7 +238,25 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
                  f"no rule for), so finite testability is unmeasured")
     else:
         state = "finitely testable"
-    print(f"Slop audit gate passed: 0 production god-files, {state}{ratchet}.")
+
+    # The god-file half of this line said "0 production god-files" whether or not anything
+    # was read. L1.17 is already honest and raises rather than returning zero when no
+    # production file carried a known extension; the gate tested its value for being a
+    # number, found it was not, appended no problem, and printed the zero itself.
+    #
+    # A measure that cannot speak where the discipline is absent, whose silence reads as a
+    # pass, gives the least organised codebase the best result. Named on 2026-09-05 by the
+    # session working on the Honest Framework, and true of this line as it stood.
+    if l17 is None:
+        print("Slop audit gate: NOT MEASURED. The god-file reading (L1.17) did not run, "
+              "so a clean line would be a share of nothing.")
+        return 1
+    god_files = l17["value"]
+    if not isinstance(god_files, (int, float)):
+        print(f"Slop audit gate: NOT MEASURED. The god-file reading (L1.17) could not "
+              f"answer, so a clean line would be a share of nothing: {l17['details']}")
+        return 1
+    print(f"Slop audit gate passed: {god_files:g} production god-files, {state}{ratchet}.")
     return 0
 
 
