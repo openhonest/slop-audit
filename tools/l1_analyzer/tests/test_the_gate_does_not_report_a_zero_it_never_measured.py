@@ -24,7 +24,15 @@ import pytest
 from l1_analyzer import cli
 
 
+def boundary(fn):
+    """Mark this file's one edge, and change nothing about it.
+
+    Spelled here rather than imported. This is a test module, and its edge is its own."""
+    return fn
+
+
 @pytest.fixture
+@boundary
 def no_source(tmp_path):
     (tmp_path / "README.md").write_text("# documentation only\n")
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
@@ -45,6 +53,23 @@ def test_the_line_says_which_reading_was_not_taken(no_source, capsys):
     cli.main([str(no_source), "--gate"])
     printed = capsys.readouterr().out.lower()
     assert "god-file" in printed or "l1.17" in printed
+
+
+def test_both_unmeasured_arms_of_one_line_answer_the_same_way(no_source, capsys):
+    """One gate, one answer for a reading that was not taken.
+
+    The thread-safety half settled this on 2026-08-16: an arm that read nothing says so in
+    the line and does not fail the commit, because a commit fails on a reading that was
+    taken and exceeded. The god-file half was written on 2026-09-05 to refuse instead, so
+    the same docs-only tree got a pass from one half and a non-zero exit from the other, and
+    nothing in the file made them agree. That is the two-owners shape, inside one sentence.
+    """
+    code = cli.main([str(no_source), "--gate", "--max-thread-exposed", "4"])
+    printed = capsys.readouterr().out
+    assert code == 0, printed
+    assert "god-file concentration not measured" in printed, printed
+    assert "thread-safety surface not measured" in printed, printed
+    assert "Lower the baseline" not in printed, "an unread meter drove the ratchet"
 
 
 def test_a_tree_the_gate_did_read_still_says_so(capsys):

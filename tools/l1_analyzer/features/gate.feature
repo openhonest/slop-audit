@@ -24,7 +24,15 @@ Feature: The dogfood gate
     Then it prints every problem it found with the remedy and exits non-zero
     And on a clean run it prints a pass line that reports what it CHECKED rather than a property inferred from an empty count: "finitely testable" only when the classifier reached a verdict, and otherwise "no proven unbounded state, but the state classifier reached no verdict", naming how many declarations it had no rule for
     And the thread-safety half of that line says "thread-safety surface not measured", naming which of the three ways of not reading applied, and a count against the baseline only when the meter did read source, so the downward arm never demands the baseline be lowered on a reading that never happened
-    But the same pass line always opens with "0 production god-files", which is asserted whether or not the indicator read any production source at all
+    And the god-file half of that line is _god_file_phrase, which says "not measured" on the same terms, so one gate has one answer for a reading it did not take
+
+  Scenario: _god_file_phrase says how many god-files there are, or why there is no count
+    Given the god-file entry from the results panel, which may be a reading, a refusal, or absent
+    When _god_file_phrase is asked for the god-file half of the pass line
+    Then a numeric value becomes "N production god-files", the number the indicator returned rather than a literal
+    And a refusal becomes "god-file concentration not measured", quoting the reason the indicator gave, because a share over no files is not zero
+    And an absent entry becomes the same phrase, saying the indicator did not run
+    But not measured is not a failed commit: the commit fails on a reading that was taken and exceeded, which is the bright line above, and the thread-safety half settled that on 2026-08-16 while this half was written to refuse instead
 
   Scenario: _slack fails a ratchet that is looser than the reality it guards
     Given the count actually measured, the baseline the ratchet is set at, and the label to report under

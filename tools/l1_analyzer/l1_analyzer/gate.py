@@ -239,25 +239,33 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
     else:
         state = "finitely testable"
 
-    # The god-file half of this line said "0 production god-files" whether or not anything
-    # was read. L1.17 is already honest and raises rather than returning zero when no
-    # production file carried a known extension; the gate tested its value for being a
-    # number, found it was not, appended no problem, and printed the zero itself.
-    #
-    # A measure that cannot speak where the discipline is absent, whose silence reads as a
-    # pass, gives the least organised codebase the best result. Named on 2026-09-05 by the
-    # session working on the Honest Framework, and true of this line as it stood.
-    if l17 is None:
-        print("Slop audit gate: NOT MEASURED. The god-file reading (L1.17) did not run, "
-              "so a clean line would be a share of nothing.")
-        return 1
-    god_files = l17["value"]
-    if not isinstance(god_files, (int, float)):
-        print(f"Slop audit gate: NOT MEASURED. The god-file reading (L1.17) could not "
-              f"answer, so a clean line would be a share of nothing: {l17['details']}")
-        return 1
-    print(f"Slop audit gate passed: {god_files:g} production god-files, {state}{ratchet}.")
+    print(f"Slop audit gate passed: {_god_file_phrase(l17)}, {state}{ratchet}.")
     return 0
+
+
+def _god_file_phrase(l17: object) -> str:
+    """The god-file half of the pass line: the count, or why there is no count.
+
+    It said "0 production god-files" whether or not anything was read. L1.17 is already
+    honest and raises rather than returning zero when no production file carried a known
+    extension; the gate tested its value for being a number, found it was not, appended no
+    problem, and printed the zero itself.
+
+    A measure that cannot speak where the discipline is absent, whose silence reads as a
+    pass, gives the least organised codebase the best result. Named on 2026-09-05 by the
+    session working on the Honest Framework, and true of this line as it stood.
+
+    Not measured is not a failed commit. The thread-safety half of this same line settled
+    that on 2026-08-16 and this half was written to refuse instead, so one gate had two
+    answers for one situation and nothing made them agree. An arm that did not read says so
+    in the line and gates nothing; the commit fails on a reading that was taken and
+    exceeded, which is the bright-line check above."""
+    if not isinstance(l17, dict):
+        return "god-file concentration not measured (L1.17 did not run)"
+    value = l17["value"]
+    if not isinstance(value, (int, float)):
+        return f"god-file concentration not measured ({l17['details']})"
+    return f"{value:g} production god-files"
 
 
 def _audited_language(results: Panel, requested: str, repo: Path) -> str:
