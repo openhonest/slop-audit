@@ -111,7 +111,7 @@ from typing import TypedDict
 
 from tree_sitter import Node
 
-from l1_analyzer.indicators import LANG_CFG, _get_parser, _read_source_bytes
+from l1_analyzer.indicators import LANG_CFG, _read_source_bytes, parser_for
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
 from l1_analyzer.state_sites import (
     CLASS_BODY_BINDING,
@@ -353,14 +353,38 @@ def _py_toplevel(root: Node) -> list[Site]:
     return sites
 
 
+_JS_DECLARATIONS = ("lexical_declaration", "variable_declaration")
+
+
+def _js_declarations(root: Node) -> list[Node]:
+    """Every declaration at a module's top level, whether or not it is handed out.
+
+    An exported declaration is an export statement with the declaration inside it, so a
+    reader walking the file's own children never meets it. Almost all module state in these
+    two languages is exported; a module that keeps something and never exports it keeps it
+    for itself, which is the rarer case and the only one this reader could see.
+
+    The census's own vector for this site had no export in front of it, so nothing here ever
+    exercised the gap. A fixture that supplies the property under test proves nothing.
+
+    `export default CACHE` is not reached and must not be: it hands out a binding declared
+    somewhere else and declares nothing itself, so following it would count that binding
+    twice."""
+    out: list[Node] = []
+    for child in root.children:
+        if child.type in _JS_DECLARATIONS:
+            out.append(child)
+        elif child.type == "export_statement":
+            out.extend(c for c in child.children if c.type in _JS_DECLARATIONS)
+    return out
+
+
 def _js_toplevel(root: Node) -> list[Site]:
-    """Top-level `let` / `var` / `const` declarators. `const` is included where the
-    classifier excludes it: a const binding to a mutable object is state, and the census
-    asks what was declared, not what can be reassigned."""
+    """Top-level `let` / `var` / `const` declarators, exported or not. `const` is included
+    where the classifier excludes it: a const binding to a mutable object is state, and the
+    census asks what was declared, not what can be reassigned."""
     sites: list[Site] = []
-    for decl in root.children:
-        if decl.type not in ("lexical_declaration", "variable_declaration"):
-            continue
+    for decl in _js_declarations(root):
         for vd in _of_type(decl, ("variable_declarator",)):
             name = _field(vd, "name")
             if name is not None and name.type == "identifier":
@@ -474,9 +498,12 @@ CAPABILITY: dict[tuple[str, str], Probe] = {
         "file": "m.py", "admitted": True,
         "source": "class Store:\n    def __init__(self):\n        self.cache = {}\n\n    def put(self, k, v):\n        self.cache[k] = v\n",
     },
+    # Exported, because that is how module state is written in these two languages and an
+    # unexported binding was the one shape the reader could already see. The vector supplied
+    # the property under test until 2026-09-06.
     ("javascript", MODULE_BINDING): {
         "file": "m.js", "admitted": True,
-        "source": "let cache = {};\n\nexport function put(k, v) { cache[k] = v; }\n",
+        "source": "export let cache = {};\n\nexport function put(k, v) { cache[k] = v; }\n",
     },
     ("javascript", FIELD_DECLARATION): {
         "file": "m.js", "admitted": True,
@@ -488,7 +515,7 @@ CAPABILITY: dict[tuple[str, str], Probe] = {
     },
     ("typescript", MODULE_BINDING): {
         "file": "m.ts", "admitted": True,
-        "source": "let cache: Record<string, number> = {};\n\nexport function put(k: string, v: number) { cache[k] = v; }\n",
+        "source": "export let cache: Record<string, number> = {};\n\nexport function put(k: string, v: number) { cache[k] = v; }\n",
     },
     ("typescript", FIELD_DECLARATION): {
         "file": "m.ts", "admitted": True,
@@ -589,12 +616,11 @@ def _walk(repo: Path, lang: str) -> dict[str, set[Site]]:
     files can each declare `Store.cache`, and merging them into one set would count one site
     where two exist and would let a visit to either one cover both."""
     cfg = LANG_CFG[lang]
-    parser = _get_parser(lang)
     files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
     by_file: dict[str, set[Site]] = {}
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
-        by_file[rel] = _file_sites(parser.parse(src).root_node, lang)
+        by_file[rel] = _file_sites(parser_for(path.suffix, lang).parse(src).root_node, lang)
     return by_file
 
 

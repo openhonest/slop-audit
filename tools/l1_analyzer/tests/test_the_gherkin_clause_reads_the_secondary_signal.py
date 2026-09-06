@@ -33,7 +33,7 @@ def _assess(source: str) -> dict:
 
 def test_a_long_step_is_still_reported():
     """The half it can read, unchanged by the port to the shared node vocabulary."""
-    found = markers.heavy_step_definitions(read.read_tree(_STEPS, "python"))
+    found = markers.heavy_step_definitions(read.read_tree(_STEPS, "python", ""))
     assert [f["symbol"] for f in found] == ["a_thing"], found
 
 

@@ -116,9 +116,8 @@ _C_FILE_SCOPE = (
 
 
 def _c_module_names(src: str) -> set[str]:
-    from l1_analyzer.indicators import LANG_CFG
+    from l1_analyzer.indicators import LANG_CFG, _get_parser
     from l1_analyzer.mutable_state import _find_module_mutable_names
-    from l1_analyzer.state_bounds import _get_parser
     root = _get_parser("c").parse(src.encode()).root_node
     return _find_module_mutable_names(root, LANG_CFG["c"])
 

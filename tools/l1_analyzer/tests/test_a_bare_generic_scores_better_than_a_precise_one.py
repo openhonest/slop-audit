@@ -27,7 +27,7 @@ from l1_analyzer.lang_cfg import LANG_CFG
 
 
 def _escapes(source: str, lang: str = "python") -> int:
-    return _count_type_escapes_in_tree(read.read_tree(source, lang)["root"], LANG_CFG[lang])
+    return _count_type_escapes_in_tree(read.read_tree(source, lang, "")["root"], LANG_CFG[lang])
 
 
 @pytest.mark.parametrize("generic", ["dict", "list", "tuple", "set", "frozenset"])

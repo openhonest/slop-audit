@@ -29,7 +29,7 @@ def _tree(text: str) -> dict:
     The cases below it are the ones a second language would spell identically or not at all,
     so they stayed here when their clause moved. The both-direction fixtures live in
     test_a_clause_means_the_same_in_every_language.py."""
-    return read.read_tree(text, "python")
+    return read.read_tree(text, "python", "")
 
 
 def _module(text: str) -> dict:

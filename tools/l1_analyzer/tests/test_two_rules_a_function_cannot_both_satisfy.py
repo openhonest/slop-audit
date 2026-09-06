@@ -32,7 +32,7 @@ DECORATOR = "from l1_analyzer.boundary import boundary\n\n\n"
 
 
 def _false_declarations(source: str) -> list[str]:
-    return [f["symbol"] for f in (edges.io_below_the_boundary(read.read_tree(source, "python")) or [])
+    return [f["symbol"] for f in (edges.io_below_the_boundary(read.read_tree(source, "python", "")) or [])
             if "states an edge that is not there" in f["detail"]]
 
 
@@ -56,7 +56,7 @@ def test_it_is_still_not_counted_as_input_or_output():
     boundary privilege alongside I/O; this clause is about I/O, and folding the two together
     would make it a different rule wearing the same number."""
     source = "import uuid\n\n\ndef pure():\n    return uuid.uuid4()\n\n\ndef run():\n    return pure()\n"
-    found = [f for f in (edges.io_below_the_boundary(read.read_tree(source, "python")) or [])
+    found = [f for f in (edges.io_below_the_boundary(read.read_tree(source, "python", "")) or [])
              if "performs I/O" in f["detail"]]
     assert found == [], "a random number is still not I/O"
 

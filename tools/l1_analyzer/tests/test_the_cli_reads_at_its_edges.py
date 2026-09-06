@@ -57,5 +57,5 @@ def test_no_clause_four_finding_survives_in_the_cli():
     from l1_analyzer import honest_code_read as read
 
     source = pathlib.Path(cli.__file__).read_text()
-    found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
+    found = edges.io_below_the_boundary(read.read_tree(source, "python", "")) or []
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == []

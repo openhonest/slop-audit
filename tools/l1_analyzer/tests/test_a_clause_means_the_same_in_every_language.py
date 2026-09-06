@@ -71,7 +71,7 @@ LANGUAGES = ["python", "javascript"]
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_dispatch_chain_is_found_in_this_language(language):
-    found = rules.dispatch_chains(read.read_tree(DISPATCH[language], language))
+    found = rules.dispatch_chains(read.read_tree(DISPATCH[language], language, ""))
     assert len(found) == 1, found
     assert "channel" in found[0]["symbol"]
 
@@ -80,21 +80,21 @@ def test_a_dispatch_chain_is_found_in_this_language(language):
 def test_the_same_source_without_the_chain_is_quiet(language):
     """The other direction, on the same code. Without this a fixture proves the clause
     runs, not that it is reading the thing it names."""
-    assert rules.dispatch_chains(read.read_tree(NO_DISPATCH[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(NO_DISPATCH[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_an_ordinary_conditional_is_not_a_dispatch_chain(language):
     """The rule says so itself: bounds checks and null guards are ordinary conditionals. A
     clause that fires on every function with a condition teaches a reader to ignore it."""
-    assert rules.dispatch_chains(read.read_tree(ORDINARY[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(ORDINARY[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_two_armed_test_is_not_yet_a_table(language):
     source = {"python": "def f(kind):\n    if kind == 'a':\n        return one()\n    return two()\n",
               "javascript": "function f(kind) {\n  if (kind === 'a') { return one(); }\n  return two();\n}\n"}
-    assert rules.dispatch_chains(read.read_tree(source[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -111,7 +111,7 @@ def test_a_chain_dispatching_on_two_different_names_is_not_one_table(language):
                        "  else if (b === 2) { return two(); }\n"
                        "  else if (a === 3) { return three(); }\n  return null;\n}\n"),
     }
-    assert rules.dispatch_chains(read.read_tree(source[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(source[language], language, "")) == []
 
 
 # --------------------------------------------------------------------------
@@ -119,7 +119,7 @@ def test_a_chain_dispatching_on_two_different_names_is_not_one_table(language):
 # --------------------------------------------------------------------------
 
 def test_the_tree_reader_names_the_language_it_read():
-    source = read.read_tree("const x = 1;\n", "javascript")
+    source = read.read_tree("const x = 1;\n", "javascript", "")
     assert source["language"] == "javascript"
     assert source["root"].type in ("program", "module")
 
@@ -127,7 +127,7 @@ def test_the_tree_reader_names_the_language_it_read():
 def test_the_tree_reader_carries_the_vocabulary_for_that_language():
     """A clause reads node types from the spec rather than naming them, which is what lets
     one implementation serve every language the spec covers."""
-    assert read.read_tree("x = 1\n", "python")["spec"] is LANG_SPEC["python"]
+    assert read.read_tree("x = 1\n", "python", "")["spec"] is LANG_SPEC["python"]
 
 
 def test_a_language_the_spec_does_not_cover_is_refused():
@@ -135,7 +135,7 @@ def test_a_language_the_spec_does_not_cover_is_refused():
     produces findings about a file nobody read, which is the failure this package spent the
     morning removing."""
     with pytest.raises(KeyError):
-        read.read_tree("x = 1\n", "klingon")
+        read.read_tree("x = 1\n", "klingon", "")
 
 
 # --------------------------------------------------------------------------
@@ -162,13 +162,13 @@ EXCEPTIONS = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_inheriting_an_implementation_is_found_in_this_language(language):
-    found = rules.inheritance_for_reuse(read.read_tree(INHERITS[language], language))
+    found = rules.inheritance_for_reuse(read.read_tree(INHERITS[language], language, ""))
     assert [f["symbol"] for f in found] == ["Admin"], found
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_the_same_classes_without_the_inheritance_are_quiet(language):
-    assert rules.inheritance_for_reuse(read.read_tree(NO_INHERITANCE[language], language)) == []
+    assert rules.inheritance_for_reuse(read.read_tree(NO_INHERITANCE[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -176,19 +176,19 @@ def test_an_exception_hierarchy_is_exceptions_all_the_way_down(language):
     """A class deriving from one this file defines as an exception is still an exception,
     however deep. Sixteen of these in one adopter's file fired as violations before the
     bases were followed to their root."""
-    assert rules.inheritance_for_reuse(read.read_tree(EXCEPTIONS[language], language)) == []
+    assert rules.inheritance_for_reuse(read.read_tree(EXCEPTIONS[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_declared_shape_is_not_inheritance_for_reuse(language):
     source = {"python": "class Row(TypedDict):\n    name: str\n",
               "javascript": "class Row extends Object {}\n"}
-    assert rules.inheritance_for_reuse(read.read_tree(source[language], language)) == []
+    assert rules.inheritance_for_reuse(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_the_base_names_a_definition_inherits_are_read(language):
-    tree = read.read_tree(INHERITS[language], language)
+    tree = read.read_tree(INHERITS[language], language, "")
     spec, raw = tree["spec"], tree["raw"]
     # Selected by NAME. `walk` promises no order, which this file's own feature says, and
     # taking the last node was relying on the thing that promise denies.
@@ -249,7 +249,7 @@ DOES_WORK = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_class_that_only_holds_data_is_found_in_this_language(language):
-    found = rules.data_classes(read.read_tree(DATA_ONLY[language], language))
+    found = rules.data_classes(read.read_tree(DATA_ONLY[language], language, ""))
     assert [f["symbol"] for f in found] == ["User"], found
 
 
@@ -257,7 +257,7 @@ def test_a_class_that_only_holds_data_is_found_in_this_language(language):
 def test_a_class_whose_method_writes_the_receiver_is_quiet(language):
     """The one thing that separates data from an object: a method that writes the receiver
     is doing something a free function taking the data could not."""
-    assert rules.data_classes(read.read_tree(DOES_WORK[language], language)) == []
+    assert rules.data_classes(read.read_tree(DOES_WORK[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -267,19 +267,19 @@ def test_a_class_with_no_constructor_is_not_a_data_class(language):
     source = {"python": "class User:\n    def get_email(self):\n        return self.email\n",
               "javascript": ("class User {\n  getEmail() {\n"
                              "    return this.email;\n  }\n}\n")}
-    assert rules.data_classes(read.read_tree(source[language], language)) == []
+    assert rules.data_classes(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_method_reaching_the_receiver_only_for_data_is_found(language):
-    found = rules.methods_wearing_a_class(read.read_tree(DATA_ONLY[language], language))
+    found = rules.methods_wearing_a_class(read.read_tree(DATA_ONLY[language], language, ""))
     assert [f["symbol"] for f in found] == ["User.getEmail" if language == "javascript"
                                             else "User.get_email"], found
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_method_that_writes_the_receiver_is_not_a_free_function(language):
-    assert rules.methods_wearing_a_class(read.read_tree(DOES_WORK[language], language)) == []
+    assert rules.methods_wearing_a_class(read.read_tree(DOES_WORK[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -303,7 +303,7 @@ def test_a_class_wrapping_a_resource_is_left_alone(language):
               "javascript": ("class Pool {\n"
                              "  constructor(dsn) {\n    this.conn = connect(dsn);\n  }\n\n"
                              "  close() {\n    this.conn.close();\n  }\n}\n")}
-    assert rules.data_classes(read.read_tree(source[language], language)) == []
+    assert rules.data_classes(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -314,7 +314,7 @@ def test_a_method_that_calls_another_method_is_left_alone(language):
                          "    def check(self):\n        return self.validate()\n"),
               "javascript": ("class User {\n  check() {\n"
                              "    return this.validate();\n  }\n}\n")}
-    assert rules.methods_wearing_a_class(read.read_tree(source[language], language)) == []
+    assert rules.methods_wearing_a_class(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -322,8 +322,8 @@ def test_a_language_with_no_constructor_shape_says_it_could_not_decide(language)
     """Rust, C and Go have no constructor this vocabulary names. Returning the empty list
     there would read as "no data classes in this file", which is a claim nothing checked."""
     for absent in ("rust", "c", "go"):
-        assert rules.data_classes(read.read_tree("", absent)) is None, absent
-    assert rules.data_classes(read.read_tree("", language)) is not None
+        assert rules.data_classes(read.read_tree("", absent, "")) is None, absent
+    assert rules.data_classes(read.read_tree("", language, "")) is not None
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -333,7 +333,7 @@ def test_a_keyword_argument_beside_the_bases_is_not_a_base(language):
     package's own vocabulary look like it inherited from something called `total`."""
     source = {"python": "class Row(TypedDict, total=False):\n    name: str\n",
               "javascript": "class Row extends Object {}\n"}
-    tree = read.read_tree(source[language], language)
+    tree = read.read_tree(source[language], language, "")
     node = read.class_nodes(tree["root"], tree["spec"])[0]
     assert "total" not in read.base_names(node, tree["spec"], tree["raw"])
     assert read.base_names(node, tree["spec"], tree["raw"]) == (
@@ -366,13 +366,13 @@ NO_DEFAULT = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_literal_default_is_found_in_this_language(language):
-    found = rules.implicit_defaults(read.read_tree(LITERAL_DEFAULT[language], language))
+    found = rules.implicit_defaults(read.read_tree(LITERAL_DEFAULT[language], language, ""))
     assert [f["symbol"] for f in found] == ["send(timeout)"], found
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_the_same_signature_without_the_default_is_quiet(language):
-    assert rules.implicit_defaults(read.read_tree(NO_DEFAULT[language], language)) == []
+    assert rules.implicit_defaults(read.read_tree(NO_DEFAULT[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -382,7 +382,7 @@ def test_a_default_binding_a_collaborator_is_not_an_implicit_default(language):
     source = {"python": "def send(channel, clock=default_clock()):\n    return clock\n",
               "javascript": ("function send(channel, clock = defaultClock()) {\n"
                              "  return clock;\n}\n")}
-    assert rules.implicit_defaults(read.read_tree(source[language], language)) == []
+    assert rules.implicit_defaults(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -390,7 +390,7 @@ def test_an_empty_container_default_is_a_literal_too(language):
     """The commonest one, and the one that bites: a shared mutable default nobody chose."""
     source = {"python": "def send(channel, tags=[]):\n    return tags\n",
               "javascript": "function send(channel, tags = []) {\n  return tags;\n}\n"}
-    found = rules.implicit_defaults(read.read_tree(source[language], language))
+    found = rules.implicit_defaults(read.read_tree(source[language], language, ""))
     assert [f["symbol"] for f in found] == ["send(tags)"], found
 
 
@@ -398,7 +398,7 @@ def test_a_language_with_no_default_parameters_says_the_question_cannot_arise():
     """Java has no default parameter. Reporting "unreadable" there would claim a gap in
     this reader that is really a fact about the language, and reporting the empty list
     would claim the file was checked and found clean."""
-    assert rules.implicit_defaults(read.read_tree("class U { void f(int a) {} }", "java")) is None
+    assert rules.implicit_defaults(read.read_tree("class U { void f(int a) {} }", "java", "")) is None
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -416,7 +416,7 @@ def test_every_kind_of_literal_default_is_found(language, kind):
     }[kind][language]
     body = {"python": f"def f(x, timeout={written}):\n    return x\n",
             "javascript": f"function f(x, timeout = {written}) {{\n  return x;\n}}\n"}
-    found = rules.implicit_defaults(read.read_tree(body[language], language))
+    found = rules.implicit_defaults(read.read_tree(body[language], language, ""))
     assert [f["symbol"] for f in found] == ["f(timeout)"], (kind, found)
 
 
@@ -449,14 +449,14 @@ PASSED_IN = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_module_value_one_function_writes_and_another_reads_is_found(language):
-    found = rules.hidden_configuration(read.read_tree(TURNED_KNOB[language], language))
+    found = rules.hidden_configuration(read.read_tree(TURNED_KNOB[language], language, ""))
     assert [f["symbol"] for f in found] == [
         "send(timeout)" if language == "javascript" else "send(TIMEOUT)"], found
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_the_same_value_taken_as_a_parameter_is_quiet(language):
-    assert rules.hidden_configuration(read.read_tree(PASSED_IN[language], language)) == []
+    assert rules.hidden_configuration(read.read_tree(PASSED_IN[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -468,14 +468,14 @@ def test_a_table_nobody_writes_is_a_fact_rather_than_a_knob(language):
                          "def send(kind):\n    return HANDLERS[kind]()\n"),
               "javascript": ("const handlers = {a: one, b: two};\n\n"
                              "function send(kind) {\n  return handlers[kind]();\n}\n")}
-    assert rules.hidden_configuration(read.read_tree(source[language], language)) == []
+    assert rules.hidden_configuration(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_the_function_that_turns_the_knob_is_not_itself_reported(language):
     """It is the one place the value is meant to be reached. Reporting it would name the
     setter as the victim of its own setting."""
-    found = rules.hidden_configuration(read.read_tree(TURNED_KNOB[language], language))
+    found = rules.hidden_configuration(read.read_tree(TURNED_KNOB[language], language, ""))
     assert not [f for f in found if f["symbol"].startswith("configure")], found
 
 
@@ -493,7 +493,7 @@ SUBSCRIPT_KNOB = {
 def test_a_table_written_by_subscript_is_a_knob_somebody_turns(language):
     """The write need not rebind the name. `SETTINGS['timeout'] = n` leaves the binding
     alone and changes what every reader of it sees, which is the same failure."""
-    found = rules.hidden_configuration(read.read_tree(SUBSCRIPT_KNOB[language], language))
+    found = rules.hidden_configuration(read.read_tree(SUBSCRIPT_KNOB[language], language, ""))
     assert [f["symbol"].split("(")[0] for f in found] == ["fetch"], found
 
 
@@ -504,7 +504,7 @@ def test_a_constant_nothing_can_change_is_not_configuration(language):
     source = {"python": "TIMEOUT = 30\n\n\ndef fetch(url):\n    return get(url, TIMEOUT)\n",
               "javascript": ("const timeout = 30;\n\n"
                              "function fetch(url) {\n  return get(url, timeout);\n}\n")}
-    assert rules.hidden_configuration(read.read_tree(source[language], language)) == []
+    assert rules.hidden_configuration(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -512,7 +512,7 @@ def test_the_configuration_clause_says_what_it_cannot_see(language):
     """Whether a knob was disguised as a fact is not decidable from a file. A value nobody
     writes here may still be reassigned from another module, and no reading of this file
     sees that."""
-    found = rules.hidden_configuration(read.read_tree(SUBSCRIPT_KNOB[language], language))
+    found = rules.hidden_configuration(read.read_tree(SUBSCRIPT_KNOB[language], language, ""))
     assert found
     assert found[0]["undecided"].strip()
 
@@ -547,7 +547,7 @@ CLOSED_TABLE = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_table_read_with_a_fallback_is_found_in_this_language(language):
-    found = rules.open_dispatch(read.read_tree(OPEN_TABLE[language], language))
+    found = rules.open_dispatch(read.read_tree(OPEN_TABLE[language], language, ""))
     assert [f["symbol"] for f in found] == [
         "handlers" if language == "javascript" else "HANDLERS"], found
 
@@ -556,7 +556,7 @@ def test_a_table_read_with_a_fallback_is_found_in_this_language(language):
 def test_the_same_table_read_by_subscript_is_quiet(language):
     """A subscript lets an unknown key raise, which records the gap in the table instead of
     hiding it. That is the whole of what the clause asks for."""
-    assert rules.open_dispatch(read.read_tree(CLOSED_TABLE[language], language)) == []
+    assert rules.open_dispatch(read.read_tree(CLOSED_TABLE[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -567,7 +567,7 @@ def test_a_fallback_built_from_the_key_records_the_gap_rather_than_hiding_it(lan
                          "    return COPY.get(key, key)\n"),
               "javascript": ("const copy = {a: 'A'};\n\n"
                              "function label(key) {\n  return copy[key] ?? key;\n}\n")}
-    assert rules.open_dispatch(read.read_tree(source[language], language)) == []
+    assert rules.open_dispatch(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -577,7 +577,7 @@ def test_a_fallback_on_something_this_file_never_declared_is_not_a_dispatch_tabl
     source = {"python": "def send(options):\n    return options.get('timeout', 30)\n",
               "javascript": ("function send(options) {\n"
                              "  return options['timeout'] ?? 30;\n}\n")}
-    assert rules.open_dispatch(read.read_tree(source[language], language)) == []
+    assert rules.open_dispatch(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -589,7 +589,7 @@ def test_a_fallback_naming_the_key_in_a_message_records_the_gap(language):
               "javascript": ("const reasons = {2: 'interrupted'};\n\n"
                              "function why(code) {\n"
                              "  return reasons[code] ?? `unknown exit ${code}`;\n}\n")}
-    assert rules.open_dispatch(read.read_tree(source[language], language)) == []
+    assert rules.open_dispatch(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -600,7 +600,7 @@ def test_a_fallback_that_is_a_shared_constant_is_still_open(language):
                          "def word(band):\n    return WORDS.get(band, 'No data')\n"),
               "javascript": ("const words = {Healthy: 'good'};\n\n"
                              "function word(band) {\n  return words[band] ?? 'No data';\n}\n")}
-    assert rules.open_dispatch(read.read_tree(source[language], language))
+    assert rules.open_dispatch(read.read_tree(source[language], language, ""))
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -611,14 +611,14 @@ def test_a_fallback_naming_a_different_row_is_still_open(language):
                          "def run(kind):\n    return HANDLERS.get(kind, one)\n"),
               "javascript": ("const handlers = {a: one, b: two};\n\n"
                              "function run(kind) {\n  return handlers[kind] ?? one;\n}\n")}
-    assert rules.open_dispatch(read.read_tree(source[language], language))
+    assert rules.open_dispatch(read.read_tree(source[language], language, ""))
 
 
 def test_a_language_with_neither_spelling_says_it_could_not_decide():
     """Go returns presence beside the value and C has no table type at all, so there is
     nothing to read either way and the empty list would claim the file was checked."""
     for absent in ("go", "c"):
-        assert rules.open_dispatch(read.read_tree("", absent)) is None, absent
+        assert rules.open_dispatch(read.read_tree("", absent, "")) is None, absent
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -631,7 +631,7 @@ def test_a_name_bound_inside_a_function_is_not_bound_at_module_level(language):
               "javascript": ("function read(path) {\n  const raw = load(path);\n  return raw;\n}\n\n"
                              "function size(path) {\n  const raw = read(path);\n"
                              "  return raw.length;\n}\n")}
-    tree = read.read_tree(source[language], language)
+    tree = read.read_tree(source[language], language, "")
     bound = read.module_level_bindings(tree["root"], tree["spec"], tree["raw"])
     assert "raw" not in bound, bound
     assert rules.hidden_configuration(tree) == []
@@ -670,14 +670,14 @@ RERAISES = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_handler_returning_a_stand_in_is_found_in_this_language(language):
-    found = edges.swallowed_exceptions(read.read_tree(SWALLOWS[language], language))
+    found = edges.swallowed_exceptions(read.read_tree(SWALLOWS[language], language, ""))
     assert len(found) == 1, found
     assert "reports success for work that failed" in found[0]["detail"]
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_handler_that_re_raises_is_doing_what_the_rule_asks(language):
-    assert edges.swallowed_exceptions(read.read_tree(RERAISES[language], language)) == []
+    assert edges.swallowed_exceptions(read.read_tree(RERAISES[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -687,7 +687,7 @@ def test_an_empty_handler_is_the_same_swallow(language):
                          "    except ValueError:\n        pass\n"),
               "javascript": ("function send(data) {\n  try {\n    go(data);\n"
                              "  } catch (e) {\n  }\n}\n")}
-    assert len(edges.swallowed_exceptions(read.read_tree(source[language], language))) == 1
+    assert len(edges.swallowed_exceptions(read.read_tree(source[language], language, ""))) == 1
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -698,14 +698,14 @@ def test_a_handler_that_maps_the_error_to_a_response_is_not_swallowing(language)
                          "    except ValueError as error:\n        return respond(400, str(error))\n"),
               "javascript": ("function route(request) {\n  try {\n    return go(request);\n"
                              "  } catch (error) {\n    return respond(400, error.message);\n  }\n}\n")}
-    assert edges.swallowed_exceptions(read.read_tree(source[language], language)) == []
+    assert edges.swallowed_exceptions(read.read_tree(source[language], language, "")) == []
 
 
 def test_a_language_with_no_handler_says_the_question_cannot_arise():
     """Go returns an error beside the value and Rust returns a Result. Neither is a handler
     this clause reads, and reporting the empty list would claim the file was checked."""
     for absent in ("go", "rust"):
-        assert edges.swallowed_exceptions(read.read_tree("", absent)) is None, absent
+        assert edges.swallowed_exceptions(read.read_tree("", absent, "")) is None, absent
 
 
 # --------------------------------------------------------------------------
@@ -746,7 +746,7 @@ AWAITED = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_read_then_a_write_of_a_shared_container_is_found(language):
-    found = rules.check_then_act(read.read_tree(RACE[language], language))
+    found = rules.check_then_act(read.read_tree(RACE[language], language, ""))
     assert [f["symbol"].split("(")[0] for f in found] == ["claim"], found
 
 
@@ -757,12 +757,12 @@ def test_writing_without_reading_first_is_not_a_race(language):
     source = {"python": "SEATS = {}\n\n\ndef claim(seat, who):\n    SEATS[seat] = who\n",
               "javascript": ("const seats = {};\n\n"
                              "function claim(seat, who) {\n  seats[seat] = who;\n}\n")}
-    assert rules.check_then_act(read.read_tree(source[language], language)) == []
+    assert rules.check_then_act(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_an_await_between_them_makes_the_race_certain(language):
-    found = rules.check_then_act(read.read_tree(AWAITED[language], language))
+    found = rules.check_then_act(read.read_tree(AWAITED[language], language, ""))
     assert found and "certain" in found[0]["detail"], found
     assert "occasional" not in found[0]["detail"]
 
@@ -771,7 +771,7 @@ def test_an_await_between_them_makes_the_race_certain(language):
 def test_without_an_await_the_race_is_reported_as_occasional(language):
     """The distinction is the finding. A reader deciding what to fix first needs to know
     which of the two they are looking at."""
-    found = rules.check_then_act(read.read_tree(RACE[language], language))
+    found = rules.check_then_act(read.read_tree(RACE[language], language, ""))
     assert found and "occasional" in found[0]["detail"], found
 
 
@@ -785,7 +785,7 @@ def test_a_local_container_is_not_shared_with_anyone(language):
               "javascript": ("function claim(seat, who) {\n  const seats = {};\n"
                              "  if (seats[seat]) { return false; }\n"
                              "  seats[seat] = who;\n  return true;\n}\n")}
-    assert rules.check_then_act(read.read_tree(source[language], language)) == []
+    assert rules.check_then_act(read.read_tree(source[language], language, "")) == []
 
 
 # --------------------------------------------------------------------------
@@ -824,14 +824,14 @@ RAISES_INSTEAD = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_logging_a_failure_and_carrying_on_is_found(language):
-    found = edges.undeclared_logging(read.read_tree(LOGS_A_FAILURE[language], language))
+    found = edges.undeclared_logging(read.read_tree(LOGS_A_FAILURE[language], language, ""))
     assert [f["symbol"] for f in found] == ["save"], found
     assert "carries on" in found[0]["detail"], found[0]["detail"]
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_raising_instead_of_logging_is_what_the_rule_asks_for(language):
-    assert edges.undeclared_logging(read.read_tree(RAISES_INSTEAD[language], language)) == []
+    assert edges.undeclared_logging(read.read_tree(RAISES_INSTEAD[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -841,7 +841,7 @@ def test_a_function_that_only_reports_information_is_still_an_edge(language):
     source = {"python": "def save(row):\n    logger.info('saving')\n    return store(row)\n",
               "javascript": ("function save(row) {\n  console.log('saving');\n"
                              "  return store(row);\n}\n")}
-    found = edges.undeclared_logging(read.read_tree(source[language], language))
+    found = edges.undeclared_logging(read.read_tree(source[language], language, ""))
     assert [f["symbol"] for f in found] == ["save"], found
     assert "carries on" not in found[0]["detail"]
 
@@ -854,7 +854,7 @@ def test_the_finding_says_how_many_edges_the_file_opens(language):
                          "def b(x):\n    logger.info('b')\n    return x\n"),
               "javascript": ("function a(x) {\n  console.log('a');\n  return x;\n}\n\n"
                              "function b(x) {\n  console.log('b');\n  return x;\n}\n")}
-    found = edges.undeclared_logging(read.read_tree(source[language], language))
+    found = edges.undeclared_logging(read.read_tree(source[language], language, ""))
     assert len(found) == 2
     assert "2" in found[0]["detail"], found[0]["detail"]
 
@@ -863,7 +863,7 @@ def test_the_finding_says_how_many_edges_the_file_opens(language):
 def test_a_function_that_logs_nothing_is_quiet(language):
     source = {"python": "def save(row):\n    return store(row)\n",
               "javascript": "function save(row) {\n  return store(row);\n}\n"}
-    assert edges.undeclared_logging(read.read_tree(source[language], language)) == []
+    assert edges.undeclared_logging(read.read_tree(source[language], language, "")) == []
 
 
 # --------------------------------------------------------------------------
@@ -895,7 +895,7 @@ DECLARED_BY_NAME = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_io_in_a_function_a_sibling_calls_is_found_in_this_language(language):
-    found = edges.io_below_the_boundary(read.read_tree(IO_BELOW[language], language))
+    found = edges.io_below_the_boundary(read.read_tree(IO_BELOW[language], language, ""))
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["price"], found
 
 
@@ -906,14 +906,14 @@ def test_a_function_nothing_calls_is_the_edge_and_is_left_alone(language):
     has every function looking like one."""
     source = {"python": "def price(sku):\n    return open(sku).read()\n",
               "javascript": "function price(sku) {\n  return fs.readFileSync(sku);\n}\n"}
-    assert edges.io_below_the_boundary(read.read_tree(source[language], language)) == []
+    assert edges.io_below_the_boundary(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_name_prefix_declares_the_edge_in_any_language(language):
     """The spelling every language has. A decorator is Python's, and most languages have
     none, so the framework's own architecture format puts it in the name instead."""
-    found = edges.io_below_the_boundary(read.read_tree(DECLARED_BY_NAME[language], language))
+    found = edges.io_below_the_boundary(read.read_tree(DECLARED_BY_NAME[language], language, ""))
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == [], found
     assert [f["symbol"] for f in found if f["withheld_by"] == "declaration"] == ["boundary_in_price"]
 
@@ -926,7 +926,7 @@ def test_a_function_a_table_holds_is_called_here_too(language):
                          "HANDLERS = {'price': price}\n"),
               "javascript": ("function price(sku) {\n  return fs.readFileSync(sku);\n}\n\n"
                              "const handlers = {price: price};\n")}
-    found = edges.io_below_the_boundary(read.read_tree(source[language], language))
+    found = edges.io_below_the_boundary(read.read_tree(source[language], language, ""))
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["price"], found
 
 
@@ -935,7 +935,7 @@ def test_a_function_that_touches_nothing_outside_is_quiet(language):
     source = {"python": "def price(n):\n    return n * 2\n\n\ndef total(n):\n    return price(n)\n",
               "javascript": ("function price(n) {\n  return n * 2;\n}\n\n"
                              "function total(n) {\n  return price(n);\n}\n")}
-    assert edges.io_below_the_boundary(read.read_tree(source[language], language)) == []
+    assert edges.io_below_the_boundary(read.read_tree(source[language], language, "")) == []
 
 
 # --------------------------------------------------------------------------
@@ -957,7 +957,7 @@ def test_a_chain_of_ternaries_is_a_dispatch_chain(language):
                          "if kind == 'b' else three() if kind == 'c' else four()\n"),
               "javascript": ("function send(kind) {\n  return kind === 'a' ? one() : "
                              "kind === 'b' ? two() : kind === 'c' ? three() : four();\n}\n")}
-    assert rules.dispatch_chains(read.read_tree(source[language], language))
+    assert rules.dispatch_chains(read.read_tree(source[language], language, ""))
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -971,7 +971,7 @@ def test_a_match_on_literals_is_a_dispatch_chain(language):
               "javascript": ("function send(kind) {\n  switch (kind) {\n"
                              "    case 'a': return one();\n    case 'b': return two();\n"
                              "    case 'c': return three();\n  }\n}\n")}
-    assert rules.dispatch_chains(read.read_tree(source[language], language))
+    assert rules.dispatch_chains(read.read_tree(source[language], language, ""))
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -986,7 +986,7 @@ def test_a_match_on_shapes_rather_than_literals_is_not_a_table(language):
               "javascript": ("function send(event) {\n  switch (true) {\n"
                              "    case event.kind !== undefined: return one(event);\n"
                              "    default: return three();\n  }\n}\n")}
-    assert rules.dispatch_chains(read.read_tree(source[language], language)) == []
+    assert rules.dispatch_chains(read.read_tree(source[language], language, "")) == []
 
 
 def test_suppressing_an_exception_is_a_swallow_with_no_body_to_read():
@@ -995,7 +995,7 @@ def test_suppressing_an_exception_is_a_swallow_with_no_body_to_read():
     the block raises and returns as though it succeeded."""
     source = ("import contextlib\n\n\ndef save(row):\n"
               "    with contextlib.suppress(ValueError):\n        return store(row)\n")
-    found = edges.swallowed_exceptions(read.read_tree(source, "python"))
+    found = edges.swallowed_exceptions(read.read_tree(source, "python", ""))
     assert found, found
     assert "ValueError" in found[0]["symbol"], found[0]["symbol"]
 
@@ -1003,7 +1003,7 @@ def test_suppressing_an_exception_is_a_swallow_with_no_body_to_read():
 def test_suppressing_a_control_flow_signal_is_still_not_the_failure_this_names():
     source = ("import contextlib\n\n\ndef save(row):\n"
               "    with contextlib.suppress(KeyboardInterrupt):\n        return store(row)\n")
-    assert edges.swallowed_exceptions(read.read_tree(source, "python")) == []
+    assert edges.swallowed_exceptions(read.read_tree(source, "python", "")) == []
 
 
 # ---------------------------------------------------------------------------
@@ -1090,7 +1090,7 @@ _TEST_ON_A_TYPE_THAT_PROMISES_NOTHING = [
 
 @pytest.mark.parametrize(("lang", "source"), _RECHECKS_WHAT_THE_SIGNATURE_TYPED)
 def test_a_check_the_signature_already_made_is_found_in_every_language(lang, source):
-    found = contracts.imperative_validation(read.read_tree(source, lang))
+    found = contracts.imperative_validation(read.read_tree(source, lang, ""))
     assert found, lang
     assert "already types" in found[0]["detail"]
 
@@ -1099,7 +1099,7 @@ def test_a_check_the_signature_already_made_is_found_in_every_language(lang, sou
 def test_a_check_on_a_value_the_signature_left_open_is_left_alone(lang, source):
     """The direction that matters more. A rule that fired here would ask an author to
     delete the validation their own signature asked for."""
-    assert contracts.imperative_validation(read.read_tree(source, lang)) == [], lang
+    assert contracts.imperative_validation(read.read_tree(source, lang, "")) == [], lang
 
 
 @pytest.mark.parametrize("lang", ["javascript", "ruby", "rust", "c"])
@@ -1113,7 +1113,7 @@ def test_a_language_where_the_question_cannot_arise_says_so_rather_than_nothing(
         "rust": "fn f(x: i32) -> i32 { x + 1 }\n",
         "c": "int f(int x) { return x + 1; }\n",
     }
-    assert contracts.imperative_validation(read.read_tree(sources[lang], lang)) is None, lang
+    assert contracts.imperative_validation(read.read_tree(sources[lang], lang, "")) is None, lang
 
 
 def test_a_test_for_a_type_the_parameter_cannot_hold_is_not_counted(lang="python"):
@@ -1122,7 +1122,7 @@ def test_a_test_for_a_type_the_parameter_cannot_hold_is_not_counted(lang="python
     and nothing in this clause measures it."""
     found = contracts.imperative_validation(read.read_tree(
         "def f(x: SomeProtocol):\n    if isinstance(x, str):\n        return 1\n    return 2\n",
-        lang))
+        lang, ""))
     assert found == [], found
 
 
@@ -1235,7 +1235,7 @@ end
 
 @pytest.mark.parametrize(("lang", "source"), _HOLDS_A_RESOURCE_UNSCOPED)
 def test_a_resource_on_instance_state_with_no_scope_is_found(lang, source):
-    found = contracts.unscoped_resources(read.read_tree(source, lang))
+    found = contracts.unscoped_resources(read.read_tree(source, lang, ""))
     assert found, lang
     assert "manual lifecycle" in found[0]["detail"]
 
@@ -1244,7 +1244,7 @@ def test_a_resource_on_instance_state_with_no_scope_is_found(lang, source):
 def test_a_class_that_scopes_its_own_resource_is_left_alone(lang, source):
     """The direction that matters more. A class declaring the language's own release hook
     has done what the rule asks, and reporting it would punish the remedy."""
-    assert contracts.unscoped_resources(read.read_tree(source, lang)) == [], lang
+    assert contracts.unscoped_resources(read.read_tree(source, lang, "")) == [], lang
 
 
 @pytest.mark.parametrize("lang", ["c", "go"])
@@ -1253,14 +1253,14 @@ def test_a_language_with_no_class_to_hold_the_resource_says_nothing_was_decided(
     the question cannot arise. None, not an empty list."""
     sources = {"c": "int main(void) { return 0; }\n",
                "go": "type Store struct{ conn int }\n"}
-    assert contracts.unscoped_resources(read.read_tree(sources[lang], lang)) is None, lang
+    assert contracts.unscoped_resources(read.read_tree(sources[lang], lang, "")) is None, lang
 
 
 def test_an_ordinary_value_on_instance_state_is_not_a_resource():
     """The rule is about a thing with a lifecycle, not about instance state as such."""
     assert contracts.unscoped_resources(read.read_tree(
         "class Store:\n    def __init__(self, name):\n        self.name = name.strip()\n",
-        "python")) == []
+        "python", "")) == []
 
 
 
@@ -1271,7 +1271,7 @@ _SUFFIX = {"python": ".py", "javascript": ".js", "typescript": ".ts", "java": ".
 def _source_named(source: str, lang: str, name: str) -> dict:
     """A parsed source carrying a file name, which read_tree does not add and clause 10
     asks for first. The analyzer adds it the same way."""
-    return {**read.read_tree(source, lang), "path": name + _SUFFIX[lang]}
+    return {**read.read_tree(source, lang, ""), "path": name + _SUFFIX[lang]}
 
 
 def _test_source(source: str, lang: str) -> dict:
@@ -1467,7 +1467,7 @@ _CALLS_THE_WORK_WHERE_IT_HAPPENS = [
 
 @pytest.mark.parametrize(("lang", "source"), _PARKS_BEHAVIOUR_IN_A_HOOK)
 def test_a_lifecycle_hook_is_found_in_every_language(lang, source):
-    found = markers.lifecycle_hooks(read.read_tree(source, lang))
+    found = markers.lifecycle_hooks(read.read_tree(source, lang, ""))
     assert found, lang
     assert "reader does not look" in found[0]["detail"] or "nobody reads" in found[0]["detail"]
 
@@ -1475,7 +1475,7 @@ def test_a_lifecycle_hook_is_found_in_every_language(lang, source):
 @pytest.mark.parametrize(("lang", "source"), _CALLS_THE_WORK_WHERE_IT_HAPPENS)
 def test_work_called_where_it_happens_is_left_alone(lang, source):
     """A call at the place it happens is not a hook, however much work it does."""
-    assert markers.lifecycle_hooks(read.read_tree(source, lang)) == [], lang
+    assert markers.lifecycle_hooks(read.read_tree(source, lang, "")) == [], lang
 
 
 @pytest.mark.parametrize("registration", ["atexit.register(cleanup)",
@@ -1483,7 +1483,7 @@ def test_work_called_where_it_happens_is_left_alone(lang, source):
 def test_each_registration_the_table_names_is_found(registration):
     """Moved from the Python-only tests when the clause was ported."""
     assert markers.lifecycle_hooks(read.read_tree(
-        f"def setup():\n    {registration}\n", "python")), registration
+        f"def setup():\n    {registration}\n", "python", "")), registration
 
 
 @pytest.mark.parametrize(("source", "expected"), [
@@ -1494,7 +1494,7 @@ def test_a_decorator_that_is_a_hook_names_the_function_it_decorates(source, expe
     """The name matters and it was wrong. Python makes a decorator and its function
     SIBLINGS under one wrapper, so walking up from the marker found the wrapper and never
     the function, and every decorated finding was named after the decorator's own text."""
-    found = markers.lifecycle_hooks(read.read_tree(source, "python"))
+    found = markers.lifecycle_hooks(read.read_tree(source, "python", ""))
     assert [f["symbol"] for f in found] == [expected], found
 
 
@@ -1506,20 +1506,20 @@ def test_a_marker_that_merely_mentions_a_hook_is_not_a_hook():
     What a marker does is decided by what it is, not by what it carries."""
     assert markers.lifecycle_hooks(read.read_tree(
         "@pytest.mark.parametrize('registration', ['atexit.register(cleanup)'])\n"
-        "def test_it(registration):\n    assert registration\n", "python")) == []
+        "def test_it(registration):\n    assert registration\n", "python", "")) == []
 
 
 def test_a_string_naming_a_registration_is_not_a_registration():
     """What a marker DOES is decided by what it is, not by text that looks like it. A test
     whose data is the words "atexit.register(cleanup)" registers nothing."""
     assert markers.lifecycle_hooks(read.read_tree(
-        'CASES = ["atexit.register(cleanup)"]\n', "python")) == []
+        'CASES = ["atexit.register(cleanup)"]\n', "python", "")) == []
 
 
 @pytest.mark.parametrize("lang", ["go", "c"])
 def test_a_language_with_no_hook_vocabulary_says_nothing_was_decided(lang):
     sources = {"go": "func run() { load() }\n", "c": "void run(void) { load(); }\n"}
-    assert markers.lifecycle_hooks(read.read_tree(sources[lang], lang)) is None, lang
+    assert markers.lifecycle_hooks(read.read_tree(sources[lang], lang, "")) is None, lang
 
 
 # ---------------------------------------------------------------------------
@@ -1559,7 +1559,7 @@ _PULLS_IN_SOMETHING_ELSE = [
 
 @pytest.mark.parametrize(("lang", "source"), _PULLS_IN_A_CACHE)
 def test_a_cache_dependency_is_found_in_every_language(lang, source):
-    found = markers.unmeasured_caches(read.read_tree(source, lang))
+    found = markers.unmeasured_caches(read.read_tree(source, lang, ""))
     assert found, lang
     assert "second source of truth" in found[0]["detail"]
     assert found[0]["withheld_by"] == "" and found[0]["undecided"]
@@ -1567,7 +1567,7 @@ def test_a_cache_dependency_is_found_in_every_language(lang, source):
 
 @pytest.mark.parametrize(("lang", "source"), _PULLS_IN_SOMETHING_ELSE)
 def test_an_ordinary_dependency_is_left_alone(lang, source):
-    assert markers.unmeasured_caches(read.read_tree(source, lang)) == [], lang
+    assert markers.unmeasured_caches(read.read_tree(source, lang, "")) == [], lang
 
 
 @pytest.mark.parametrize(("lang", "source", "expected"), [
@@ -1577,7 +1577,7 @@ def test_an_ordinary_dependency_is_left_alone(lang, source):
      "price"),
 ])
 def test_a_memoising_marker_is_found_and_names_what_it_caches(lang, source, expected):
-    found = markers.unmeasured_caches(read.read_tree(source, lang))
+    found = markers.unmeasured_caches(read.read_tree(source, lang, ""))
     assert [f["symbol"] for f in found] == [expected], found
     assert "before anything measured the cost" in found[0]["detail"]
 
@@ -1586,9 +1586,9 @@ def test_the_half_it_cannot_decide_is_stated_on_every_finding():
     """Partly decided, and saying so is the whole difference between this and a verdict.
     Whether the query was profiled first is in no file, so a finding that did not say so
     would claim the whole rule had been checked."""
-    for found in (markers.unmeasured_caches(read.read_tree("import redis\n", "python")),
+    for found in (markers.unmeasured_caches(read.read_tree("import redis\n", "python", "")),
                   markers.unmeasured_caches(read.read_tree(
-                      "@lru_cache\ndef p(s):\n    return q(s)\n", "python"))):
+                      "@lru_cache\ndef p(s):\n    return q(s)\n", "python", ""))):
         assert "profiled" in found[0]["undecided"], found
 
 
@@ -1877,7 +1877,7 @@ end
 
 @pytest.mark.parametrize(("lang", "source"), _A_LONG_STEP)
 def test_a_step_carrying_its_own_setup_is_found_in_every_language(lang, source):
-    found = markers.heavy_step_definitions(read.read_tree(source, lang))
+    found = markers.heavy_step_definitions(read.read_tree(source, lang, ""))
     assert found, lang
     assert "readout on the code under test" in found[0]["detail"]
 
@@ -1885,7 +1885,7 @@ def test_a_step_carrying_its_own_setup_is_found_in_every_language(lang, source):
 @pytest.mark.parametrize(("lang", "source"), _A_SHORT_STEP)
 def test_a_step_that_calls_and_checks_is_left_alone(lang, source):
     """What the rule asks for. A step of one or two lines is the shape it wants."""
-    assert markers.heavy_step_definitions(read.read_tree(source, lang)) == [], lang
+    assert markers.heavy_step_definitions(read.read_tree(source, lang, "")) == [], lang
 
 
 @pytest.mark.parametrize(("lang", "source"), [
@@ -1897,7 +1897,7 @@ def test_a_step_that_calls_and_checks_is_left_alone(lang, source):
 def test_a_file_holding_no_steps_at_all_is_not_decided(lang, source):
     """Not an empty list. A file with no step definitions was not measured against a rule
     about step definitions, and saying it passed would be a claim nobody made."""
-    assert markers.heavy_step_definitions(read.read_tree(source, lang)) is None, lang
+    assert markers.heavy_step_definitions(read.read_tree(source, lang, "")) is None, lang
 
 
 @pytest.mark.parametrize(("lang", "source"), [
@@ -1906,4 +1906,4 @@ def test_a_file_holding_no_steps_at_all_is_not_decided(lang, source):
     ("c", "int run(void) { return 1; }\n"),
 ])
 def test_a_language_with_no_step_vocabulary_says_nothing_was_decided(lang, source):
-    assert markers.heavy_step_definitions(read.read_tree(source, lang)) is None, lang
+    assert markers.heavy_step_definitions(read.read_tree(source, lang, "")) is None, lang

@@ -28,7 +28,7 @@ DECORATOR = "from l1_analyzer.boundary import boundary\n\n\n"
 
 
 def _found(source: str) -> list[dict]:
-    return [f for f in (edges.io_below_the_boundary(read.read_tree(source, "python")) or [])
+    return [f for f in (edges.io_below_the_boundary(read.read_tree(source, "python", "")) or [])
             if "states an edge that is not there" in f["detail"]]
 
 

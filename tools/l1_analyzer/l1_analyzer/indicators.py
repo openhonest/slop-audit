@@ -139,6 +139,7 @@ def compute_config_indicators(repo: Path) -> Panel:
     }
 from l1_analyzer.lang_cfg import (  # noqa: F401 - re-exported: every reader imports these from here
     LANG_CFG,
+    TSX_LANGUAGE,
     TYPESCRIPT_CFG_OVERRIDES,
     LangCfg,
 )
@@ -156,6 +157,33 @@ _LANGUAGE_UNKNOWN = "unknown"
 
 def _get_parser(lang: str) -> Parser:
     return Parser(LANG_CFG[lang]["language"])
+
+
+# Extensions whose grammar is not their language's own. One entry, and the reason it is a
+# table rather than an `if` is that the next one will be Vue or Svelte or Astro, each a
+# language's grammar with markup folded in.
+_GRAMMAR_BY_EXTENSION = {".tsx": TSX_LANGUAGE}
+
+
+def parser_for(extension: str, lang: str) -> Parser:
+    """The parser that can read a file with THIS extension, which is not always its
+    language's own.
+
+    Plain TypeScript cannot parse JSX. `.tsx` was in the TypeScript extension list and every
+    reader took the plain TypeScript parser, so a React file did not come back as a file with
+    a few odd nodes in it: every component body collapsed into ERROR nodes and the readers
+    walked wreckage. Nothing said so. The reading came back confident and nearly empty with
+    nothing marked unread.
+
+    The size of it, from the 200-repository run of 2026-09-05. Median pieces of state read:
+    Java 3,073, C# 3,042, Python 1,436, TypeScript 372. Three TypeScript repositories
+    reported zero state read AND zero unread, and every one of the low ones is React.
+
+    Per extension rather than per language, because the two grammars disagree deliberately:
+    `<T>x` is a type assertion in a .ts file and a JSX element in a .tsx one. tsc splits on
+    the same extension for the same reason."""
+    grammar = _GRAMMAR_BY_EXTENSION.get(extension)
+    return Parser(grammar) if grammar is not None else _get_parser(lang)
 
 def detect_primary_language(repo: Path) -> str:
     """Return the LANG_CFG key with the most files, or "unknown" when the repo
@@ -392,7 +420,7 @@ def _code_line_count(src: bytes, ext: str) -> int:
     if not literal_types:
         return total
     try:
-        root = _get_parser(lang).parse(src).root_node
+        root = parser_for(ext, lang).parse(src).root_node
     except Exception:  # noqa: BLE001
         return total
     return total - _data_literal_lines(root, literal_types, data_tables.literal_types(lang))
@@ -751,14 +779,14 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
     if not cfg["type_escape_patterns"]:
         # Untyped or no configured escape hatch (Ruby, JavaScript, Rust, C).
         return {"value": "n/a", "band": "n/a", "details": f"type-escape density not applicable for {lang}"}
-    parser = _get_parser(lang)
     files, skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
 
     escape_count = 0
     total_loc = 0
-    for _path, src in files:
+    for path, src in files:
         total_loc += len(src.decode("utf8", errors="ignore").splitlines())
-        escape_count += _count_type_escapes_in_tree(parser.parse(src).root_node, cfg)
+        escape_count += _count_type_escapes_in_tree(
+            parser_for(path.suffix, lang).parse(src).root_node, cfg)
 
     if total_loc == 0:
         return {"value": "n/a", "band": "n/a", "details": _with_skipped("no production source lines found", skipped)}
@@ -775,15 +803,14 @@ def _compute_decision_space(repo: Path, lang: str) -> L1Result:
     is reported as not-measured rather than fabricated."""
     if lang not in LANG_CFG:
         return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
-    parser = _get_parser(lang)
     # Subscript, not .get(): a supported language that declares no decision vocabulary
     # is a gap in the table, and a gap must raise rather than enumerate zero.
     decision_types = DECISION_NODE_TYPES[lang]
     files, skipped = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], scope=PRODUCTION)
 
     decision_points = 0
-    for _path, src in files:
-        root = parser.parse(src).root_node
+    for path, src in files:
+        root = parser_for(path.suffix, lang).parse(src).root_node
 
         # named_children, never children. An unnamed keyword token (`if`, `case`,
         # `switch`) sits inside the very node that already matched, and in Ruby it

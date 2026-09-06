@@ -54,7 +54,7 @@ _SWALLOWED = '''def go(path):
 
 
 def _found(source: str, lang: str = "python") -> list[dict]:
-    return [f for f in (edges.swallowed_exceptions(read.read_tree(source, lang)) or [])
+    return [f for f in (edges.swallowed_exceptions(read.read_tree(source, lang, "")) or [])
             if f["withheld_by"] == ""]
 
 

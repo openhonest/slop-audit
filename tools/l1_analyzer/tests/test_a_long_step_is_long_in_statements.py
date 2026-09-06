@@ -31,7 +31,7 @@ _BOUND = 'from pytest_bdd import scenarios, then\n\nscenarios("f.feature")\n\n\n
 
 
 def _found(source: str, lang: str = "python") -> list[dict]:
-    return markers.heavy_step_definitions(read.read_tree(_BOUND + source, lang)) or []
+    return markers.heavy_step_definitions(read.read_tree(_BOUND + source, lang, "")) or []
 
 
 def _step(statements: int, prose: int) -> str:

@@ -77,7 +77,7 @@ TWO_DIFFERENT = {
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_two_functions_that_are_one_function_are_found(language):
-    found = rules.functions_of_one_shape(read.read_tree(TWO_OF_ONE[language], language))
+    found = rules.functions_of_one_shape(read.read_tree(TWO_OF_ONE[language], language, ""))
     assert len(found) == 1, found
     assert "rename" in found[0]["symbol"].lower()
 
@@ -86,14 +86,14 @@ def test_two_functions_that_are_one_function_are_found(language):
 def test_two_functions_that_do_different_things_are_quiet(language):
     """The other direction. A rule that fires on any two functions in a file measures
     nothing, and this is the fixture that catches such a rule."""
-    assert rules.functions_of_one_shape(read.read_tree(TWO_DIFFERENT[language], language)) == []
+    assert rules.functions_of_one_shape(read.read_tree(TWO_DIFFERENT[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_the_finding_names_every_function_in_the_group(language):
     """A count is not actionable. The reason the repository-wide duplicate measure did not
     stop this is that it reported a percentage and named nothing."""
-    found = rules.functions_of_one_shape(read.read_tree(TWO_OF_ONE[language], language))
+    found = rules.functions_of_one_shape(read.read_tree(TWO_OF_ONE[language], language, ""))
     named = found[0]["symbol"] + found[0]["detail"]
     assert named.count("rename") >= 2 or named.lower().count("rename") >= 2
 
@@ -104,7 +104,7 @@ def test_the_finding_states_the_opinion_rather_than_hedging_it(language):
     general audit, which grades anyone's code. L1.21 is opt-in and states the Honest
     position, so a reader who disagrees on one group declares it with the allow marker
     instead of reading a hedge on every group."""
-    found = rules.functions_of_one_shape(read.read_tree(TWO_OF_ONE[language], language))
+    found = rules.functions_of_one_shape(read.read_tree(TWO_OF_ONE[language], language, ""))
     assert found[0]["undecided"] == ""
 
 
@@ -121,13 +121,13 @@ def test_even_two_one_line_wrappers_are_a_table_with_two_rows(language):
     source = {"python": "def a(x):\n    return go(x)\n\n\ndef b(x):\n    return stop(x)\n",
               "javascript": ("function a(x) {\n  return go(x);\n}\n\n"
                              "function b(x) {\n  return stop(x);\n}\n")}
-    assert rules.functions_of_one_shape(read.read_tree(source[language], language))
+    assert rules.functions_of_one_shape(read.read_tree(source[language], language, ""))
 
 
 def test_the_clause_reports_this_beside_its_dispatch_chains():
     """One principle, two ways of breaking it. A chain that should be a table, and a table
     filled with code that should be rows."""
-    source = read.read_tree(TWO_OF_ONE["python"], "python")
+    source = read.read_tree(TWO_OF_ONE["python"], "python", "")
     found = rules.dispatch_chains(source)
     assert any(f["clause"] == "L1.21.1" for f in found), found
 
@@ -139,7 +139,7 @@ def test_the_group_is_reported_at_its_first_function_in_the_file():
     which for one fixture was the second function in the file. The number a reader is given
     is where they put the allow marker, so an anchor that can move between runs is an allow
     marker that stops working for a reason nobody can see."""
-    source = read.read_tree(TWO_OF_ONE["python"], "python")
+    source = read.read_tree(TWO_OF_ONE["python"], "python", "")
     found = rules.functions_of_one_shape(source)
     assert found[0]["line"] == 1, found
     assert found[0]["symbol"] == "rename_table, rename_column", found
@@ -169,7 +169,7 @@ def test_two_functions_a_table_names_are_that_table_s_rows(language):
               "javascript": ("function sendEmail(data) {\n  return post('/email', data);\n}\n\n"
                              "function sendSms(data) {\n  return post('/sms', data);\n}\n\n"
                              "const handlers = {email: sendEmail, sms: sendSms};\n")}
-    assert rules.functions_of_one_shape(read.read_tree(source[language], language)) == []
+    assert rules.functions_of_one_shape(read.read_tree(source[language], language, "")) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
@@ -180,7 +180,7 @@ def test_the_same_two_functions_with_no_table_are_still_reported(language):
                          "def send_sms(data):\n    return post('/sms', data)\n"),
               "javascript": ("function sendEmail(data) {\n  return post('/email', data);\n}\n\n"
                              "function sendSms(data) {\n  return post('/sms', data);\n}\n")}
-    assert rules.functions_of_one_shape(read.read_tree(source[language], language))
+    assert rules.functions_of_one_shape(read.read_tree(source[language], language, ""))
 
 
 def test_a_table_naming_only_one_of_the_pair_still_reports_the_pair():
@@ -189,7 +189,7 @@ def test_a_table_naming_only_one_of_the_pair_still_reports_the_pair():
     source = ("def send_email(data):\n    return post('/email', data)\n\n\n"
               "def send_sms(data):\n    return post('/sms', data)\n\n\n"
               "HANDLERS = {'email': send_email}\n")
-    assert rules.functions_of_one_shape(read.read_tree(source, "python"))
+    assert rules.functions_of_one_shape(read.read_tree(source, "python", ""))
 
 
 def test_method_declarations_on_a_protocol_are_signatures_rather_than_a_table():
@@ -199,7 +199,7 @@ def test_method_declarations_on_a_protocol_are_signatures_rather_than_a_table():
     source = ("class Reader(Protocol):\n"
               "    def read_one(self, path: str) -> bytes:\n        ...\n\n"
               "    def read_all(self, path: str) -> bytes:\n        ...\n")
-    assert rules.functions_of_one_shape(read.read_tree(source, "python")) == []
+    assert rules.functions_of_one_shape(read.read_tree(source, "python", "")) == []
 
 
 def test_methods_on_an_ordinary_class_are_still_reported():
@@ -208,4 +208,4 @@ def test_methods_on_an_ordinary_class_are_still_reported():
     source = ("class Sender:\n"
               "    def send_email(self, data):\n        return post('/email', data)\n\n"
               "    def send_sms(self, data):\n        return post('/sms', data)\n")
-    assert rules.functions_of_one_shape(read.read_tree(source, "python"))
+    assert rules.functions_of_one_shape(read.read_tree(source, "python", ""))

@@ -21,7 +21,7 @@ from l1_analyzer import honest_code_read as read
 
 
 def _found(source: str, lang: str = "python") -> list[dict]:
-    return contracts.copied_constraints(read.read_tree(source, lang)) or []
+    return contracts.copied_constraints(read.read_tree(source, lang, "")) or []
 
 
 _COPIED = '''from typing import Annotated
@@ -91,7 +91,7 @@ def test_a_language_with_no_declared_bound_here_is_not_decided(lang):
     sources = {"javascript": "function go(x) { if (x.length > 255) { throw new Error() } }\n",
                "ruby": "def go(x)\n  raise if x.length > 255\nend\n",
                "c": "int go(char *x) { return 0; }\n"}
-    assert contracts.copied_constraints(read.read_tree(sources[lang], lang)) is None, lang
+    assert contracts.copied_constraints(read.read_tree(sources[lang], lang, "")) is None, lang
 
 
 def test_two_checks_of_one_declared_bound_are_two_findings():

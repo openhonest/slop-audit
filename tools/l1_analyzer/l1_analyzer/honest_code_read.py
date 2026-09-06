@@ -90,7 +90,7 @@ class Source(TypedDict, total=False):
     repository_shapes: frozenset[str]
 
 
-def read_tree(text: str, language: str) -> Source:
+def read_tree(text: str, language: str, extension: str) -> Source:
     """One source, parsed by the grammar for its language, with that language's vocabulary.
 
     A clause reads node types from the spec rather than naming them, which is what lets one
@@ -98,13 +98,19 @@ def read_tree(text: str, language: str) -> Source:
     would be a value with two owners and nothing checking they agree.
 
     An unknown language is refused rather than parsed as something else: a tree read with
-    the wrong grammar produces findings about a file nobody read."""
-    from l1_analyzer.indicators import _get_parser
+    the wrong grammar produces findings about a file nobody read.
+
+    `extension` is required and is the empty string for text that came from no file: a
+    fenced block in a document has a language and no extension. It is here because one
+    language can have two grammars, and TypeScript does: plain TypeScript cannot parse JSX,
+    so a .tsx file read as .ts collapses into ERROR nodes and every clause then reads
+    wreckage without saying so."""
+    from l1_analyzer.indicators import parser_for
 
     spec = LANG_SPEC[language]
     raw = text.encode()
     return {"language": language, "spec": spec, "text": text, "raw": raw,
-            "root": _get_parser(language).parse(raw).root_node}
+            "root": parser_for(extension, language).parse(raw).root_node}
 
 
 def called_spelling(call, spec: LangSpec, raw: bytes) -> str:

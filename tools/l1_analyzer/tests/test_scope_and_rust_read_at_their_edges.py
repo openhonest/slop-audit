@@ -42,5 +42,5 @@ def test_no_clause_four_finding_survives_in_either():
 
     for module in (scope, rust_trace):
         source = pathlib.Path(module.__file__).read_text()
-        found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
+        found = edges.io_below_the_boundary(read.read_tree(source, "python", "")) or []
         assert [f["symbol"] for f in found if f["withheld_by"] == ""] == [], module.__name__

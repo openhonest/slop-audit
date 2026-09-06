@@ -69,6 +69,14 @@ Feature: state_census — the second, independent count of declaration sites, th
     Then it returns the module bindings and the class-body bindings as separate kinds, both being state whose lifetime is the process
     But it reads only the statements sitting directly at those two levels, so a binding made under a conditional or any other wrapper at module scope is never a site
 
+  Scenario: _js_declarations finds every module-level declaration, exported or not
+    Given a parsed JavaScript or TypeScript file
+    When _js_declarations reads the file's own top-level children and looks inside each export statement as well
+    Then an exported declaration is found, which is how almost all module state in these two languages is written
+    And a module that keeps a binding without exporting it is found the same way, which was the only shape this reader could see until 2026-09-06
+    And the classifier reads through this same function, so the two meters over one file cannot meet different shapes
+    But a default export of a binding declared elsewhere is not followed, because it hands out a slot rather than declaring one and following it would count that slot twice
+
   Scenario: _js_toplevel counts every top-level declarator, constants included
     Given a parsed JavaScript or TypeScript file
     When _js_toplevel reads the top-level declarations and takes each declarator's name

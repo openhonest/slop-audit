@@ -348,7 +348,8 @@ def _findings_in(block: Block, text: str) -> list[Finding]:
     # read it through, which is exactly what the empty name records.
     if block["language"] not in _VOCABULARY:
         return []
-    source = read_tree(text, block["language"])
+    # No extension: a fenced block in a document came from no file.
+    source = read_tree(text, block["language"], "")
     source.update({"path": "", "language": block["language"], "text": text,
                    "readable": True, "unreadable_reason": ""})
     found: list[Finding] = []
@@ -387,7 +388,7 @@ def read_source_text(text: str, path: str) -> Source:
     # built for any language the vocabulary covers, which is what lets a ported clause see
     # a JavaScript file that Python's own parser cannot.
     if language in _VOCABULARY:
-        source.update(read_tree(text, language))
+        source.update(read_tree(text, language, suffix))
         source["unreadable_reason"] = ""
     if language not in _PARSED:
         # No Python tree, and that is not a failure to read: the clauses that apply here

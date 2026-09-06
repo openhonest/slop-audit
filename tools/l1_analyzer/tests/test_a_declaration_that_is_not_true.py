@@ -19,7 +19,7 @@ from l1_analyzer import honest_code_read as read
 
 
 def _findings(source: str) -> list[dict]:
-    return edges.io_below_the_boundary(read.read_tree(source, "python")) or []
+    return edges.io_below_the_boundary(read.read_tree(source, "python", "")) or []
 
 
 DECORATOR = "from l1_analyzer.boundary import boundary\n\n\n"

@@ -45,7 +45,7 @@ def _when_replicate(ctx):
 
 
 def _found(source: str, lang: str = "python") -> list[dict]:
-    return markers.heavy_step_definitions(read.read_tree(source, lang)) or []
+    return markers.heavy_step_definitions(read.read_tree(source, lang, "")) or []
 
 
 def test_an_async_step_is_reported():

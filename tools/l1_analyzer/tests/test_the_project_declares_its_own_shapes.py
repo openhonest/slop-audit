@@ -50,7 +50,7 @@ def _tree(text: str) -> dict:
     Clause 5 moved off the Python ast so one clause could mean the same thing in every
     language. These cases stayed here rather than moving to the cross-language file because
     they are about a root this project declares for itself, and only Python spells it."""
-    return read.read_tree(text, "python")
+    return read.read_tree(text, "python", "")
 
 
 def _module(text: str) -> dict:

@@ -15,8 +15,8 @@ Real source, real grammars, no mocks.
 
 import pytest
 from l1_analyzer import indicators
+from l1_analyzer.indicators import _get_parser
 from l1_analyzer.lang_spec import DECISION_NODE_TYPES
-from l1_analyzer.state_bounds import _get_parser
 
 # Production-scope file names, one per grammar. Nothing here may look like a test file,
 # because _compute_decision_space reads PRODUCTION scope only.

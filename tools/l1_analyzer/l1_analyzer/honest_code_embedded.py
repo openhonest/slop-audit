@@ -283,6 +283,6 @@ def _grammar_root(text: str, language: str) -> Node:
     The clause vocabulary is asked first. Markup and stylesheets are not in it, because
     that table is what tells a clause it can read a language and no clause reads these."""
     if language in _VOCABULARY:
-        return read_tree(text, language)["root"]
+        return read_tree(text, language, "")["root"]
 
     return Parser(GRAMMARS[language]).parse(text.encode()).root_node

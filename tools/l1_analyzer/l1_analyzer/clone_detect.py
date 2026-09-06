@@ -227,7 +227,7 @@ def duplicated_lines(streams: dict[str, list[tuple[str, int]]],
 
 def analyze(repo: Path, lang: str, min_tokens: int = MIN_TOKENS) -> L1Result:
     """L1.13 for one repository: the share of production lines inside a repeated window."""
-    from l1_analyzer.indicators import LANG_CFG, _get_parser, _read_source_bytes, band
+    from l1_analyzer.indicators import LANG_CFG, _read_source_bytes, band, parser_for
     from l1_analyzer.scope import PRODUCTION
 
     if lang not in LANG_CFG:
@@ -240,12 +240,11 @@ def analyze(repo: Path, lang: str, min_tokens: int = MIN_TOKENS) -> L1Result:
         return {"value": "n/a", "band": "n/a",
                 "details": f"no production {lang} source in scope, so duplication was not measured"}
 
-    parser = _get_parser(lang)
     streams: dict[str, list[tuple[str, int]]] = {}
     total_lines = 0
     for path, src in files:
         relpath = str(path.relative_to(repo)) if repo in path.parents else path.name
-        streams[relpath] = normalized_tokens(parser.parse(src).root_node, lang)
+        streams[relpath] = normalized_tokens(parser_for(path.suffix, lang).parse(src).root_node, lang)
         # Lines that carry a code token, which is what "production LOC" means and what the
         # numerator now counts. It was every line in the file, blanks and docstrings
         # included, while the numerator marked whole line ranges: both halves generous, and

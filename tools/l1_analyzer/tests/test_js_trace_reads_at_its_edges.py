@@ -51,5 +51,5 @@ def test_the_readers_are_declared_and_the_clause_reads_the_declaration():
     from l1_analyzer import honest_code_read as read
 
     source = pathlib.Path(js_trace.__file__).read_text()
-    found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
+    found = edges.io_below_the_boundary(read.read_tree(source, "python", "")) or []
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == []

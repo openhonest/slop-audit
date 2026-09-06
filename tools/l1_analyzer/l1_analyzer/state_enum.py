@@ -36,6 +36,7 @@ from l1_analyzer import record_state, state_sites
 from l1_analyzer.indicators import LangCfg, _find_module_mutable_names
 from l1_analyzer.lang_spec import LangSpec
 from l1_analyzer.mutable_state import shallow_candidates
+from l1_analyzer.state_census import _js_declarations
 from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import c_declarator_name as _c_declarator_name
 from l1_analyzer.ts_nodes import field as _field
@@ -102,11 +103,19 @@ def _py_module(root: Node, cfg: LangCfg) -> Cands:
 
 
 def _js_module(root: Node, cfg: LangCfg) -> Cands:
-    """Top-level `let` / `var` / `const` declarators. A `const` binding is declined, not
-    skipped: the walk read the declaration and ruled it out because the binding cannot be
-    reassigned. (It can still hold a mutable object, which is why the census counts it.)"""
+    """Top-level `let` / `var` / `const` declarators, exported or not. A `const` binding is
+    declined, not skipped: the walk read the declaration and ruled it out because the binding
+    cannot be reassigned. (It can still hold a mutable object, which is why the census counts
+    it.)
+
+    Through the export statement, for the reason `state_census._js_declarations` gives: an
+    exported declaration sits inside an export statement, almost all module state in these
+    two languages is exported, and a reader walking the file's own children met none of it.
+    The census reported the declarations and this walk visited none of them, which is the
+    honest half of the same defect: it said the state was there and unread rather than
+    absent."""
     cands: Cands = {}
-    for decl in root.children:
+    for decl in _js_declarations(root):
         if decl.type == "lexical_declaration":
             immutable = bool(decl.children) and _text(decl.children[0]) == "const"
         elif decl.type == "variable_declaration":

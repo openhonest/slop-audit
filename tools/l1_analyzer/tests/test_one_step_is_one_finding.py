@@ -21,7 +21,7 @@ _BODY = "\n".join(f"    step_{i}()" for i in range(35))
 
 
 def _found(source: str, lang: str = "python") -> list[dict]:
-    return markers.heavy_step_definitions(read.read_tree(source, lang)) or []
+    return markers.heavy_step_definitions(read.read_tree(source, lang, "")) or []
 
 
 def test_a_step_bound_to_three_scenarios_is_reported_once():
@@ -82,7 +82,7 @@ import pytest
      "@lru_cache\n@cached\ndef price(sku):\n    return look_up(sku)\n", "price"),
 ])
 def test_a_declaration_carrying_two_markers_is_reported_once(checker, source, symbol):
-    found = checker(read.read_tree(source, "python")) or []
+    found = checker(read.read_tree(source, "python", "")) or []
     assert [f["symbol"] for f in found] == [symbol], found
 
 
@@ -94,7 +94,7 @@ def test_a_declaration_carrying_two_markers_is_reported_once(checker, source, sy
 ])
 def test_two_declarations_are_still_two_findings(checker, source, count):
     """Deduplicating by declaration must not collapse two declarations into one."""
-    assert len(checker(read.read_tree(source, "python")) or []) == count
+    assert len(checker(read.read_tree(source, "python", "")) or []) == count
 
 
 def test_a_cache_dependency_is_not_deduplicated_against_a_marker():
@@ -102,5 +102,5 @@ def test_a_cache_dependency_is_not_deduplicated_against_a_marker():
     the same line number are not the same finding."""
     found = markers.unmeasured_caches(read.read_tree(
         "import redis\n\n\n@lru_cache\ndef price(sku):\n    return look_up(sku)\n",
-        "python")) or []
+        "python", "")) or []
     assert len(found) == 2, found

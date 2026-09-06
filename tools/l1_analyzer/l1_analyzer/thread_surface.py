@@ -69,9 +69,9 @@ from tree_sitter import Node
 
 from l1_analyzer.indicators import (
     LANG_CFG,
-    _get_parser,
     _read_source_bytes,
     bucketed_paths,
+    parser_for,
 )
 from l1_analyzer.lang_spec import LANG_SPEC, LangSpec
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE, BucketedPaths
@@ -827,7 +827,6 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
     scanner = _SCANNERS[lang]
     spec = LANG_SPEC[lang]
     cfg = LANG_CFG[lang]
-    parser = _get_parser(lang)
     files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
     bucketed = bucketed_paths(repo, cfg["extensions"], PRODUCTION_WITHOUT_CONFORMANCE)
 
@@ -835,7 +834,7 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
     parsed = 0
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
-        root = parser.parse(src).root_node
+        root = parser_for(path.suffix, lang).parse(src).root_node
         # Counted, then scanned regardless. The error flag is a denominator, never a filter:
         # tree-sitter recovers usefully from most errors, and a hazard it did recover is a
         # hazard whatever else in the file defeated it.

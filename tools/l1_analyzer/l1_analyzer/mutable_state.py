@@ -62,6 +62,7 @@ from l1_analyzer.indicators import (
     _read_source_bytes,
     _with_skipped,
     band,
+    parser_for,
 )
 from l1_analyzer.lang_spec import LANG_SPEC
 from l1_analyzer.scope import PRODUCTION
@@ -626,12 +627,11 @@ def _parsed_roots(repo: Path, lang: str, cfg: LangCfg) -> tuple[list[tuple[Node,
     """Every production file of this language, parsed once, with its repo-relative
     path. One reader for the ratio and the two name-listing helpers, so the three
     cannot drift into scanning different file sets."""
-    parser = _get_parser(lang)
     files, skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
     roots: list[tuple[Node, str]] = []
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
-        roots.append((parser.parse(src).root_node, rel))
+        roots.append((parser_for(path.suffix, lang).parse(src).root_node, rel))
     return roots, skipped
 
 

@@ -52,9 +52,9 @@ from l1_analyzer import (
 from l1_analyzer.indicators import (
     LANG_CFG,
     LangCfg,
-    _get_parser,
     _read_source_bytes,
     bucketed_paths,
+    parser_for,
 )
 from l1_analyzer.lang_spec import LANG_SPEC, LangSpec
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE
@@ -354,7 +354,6 @@ def classify(repo: Path, lang: str) -> StateReading:
         return _na(lang)
     sp = LANG_SPEC[lang]
     cfg = LANG_CFG[lang]
-    parser = _get_parser(lang)
     # conformance/ holds law/spec scaffolding and test doubles (fault-injection
     # markers, failing connections), not production state; skip it like tests. docs,
     # tooling, and loose entry-point scripts are scoped out by _read_source_bytes and
@@ -368,7 +367,7 @@ def classify(repo: Path, lang: str) -> StateReading:
     roots: list[tuple[Node, str]] = []
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
-        roots.append((parser.parse(src).root_node, rel))
+        roots.append((parser_for(path.suffix, lang).parse(src).root_node, rel))
     immutable_ctors: set[str] = set()
     if sp is LANG_SPEC["python"]:
         for root, _rel in roots:

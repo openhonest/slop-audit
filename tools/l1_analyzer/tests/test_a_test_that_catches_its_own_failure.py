@@ -41,7 +41,7 @@ from l1_analyzer import honest_code_read as read
 
 
 def _found(source: str, lang: str = "python") -> list[dict]:
-    return [f for f in (edges.self_caught_failures(read.read_tree(source, lang)) or [])]
+    return [f for f in (edges.self_caught_failures(read.read_tree(source, lang, "")) or [])]
 
 
 _CATCHES_ITSELF = '''def test_the_constraint_holds(conn):

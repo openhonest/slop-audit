@@ -89,7 +89,7 @@ _DECORATOR = "from l1_analyzer.boundary import boundary\n\n\n"
 
 def _read(call: str):
     source = _DECORATOR + f"@boundary\ndef edge(name, TABLE):\n    return {call}\n"
-    return read.read_tree(source, "python")
+    return read.read_tree(source, "python", "")
 
 
 # The document asks two questions about a name and this reader answers each with its own

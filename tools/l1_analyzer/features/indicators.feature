@@ -44,6 +44,14 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     Then it returns a fresh parser on every call, so no caller shares parse state with another
     But a name with no configured grammar raises, rather than falling back to a grammar nobody chose
 
+  Scenario: parser_for builds the parser that can read a file with one extension
+    Given a file's extension and the language the audit is reading
+    When parser_for checks whether that extension has a grammar of its own
+    Then a .tsx file gets the TSX grammar and every other TypeScript file gets the plain one, which is the split tsc itself makes on the same extension
+    And an extension with no entry gets its language's own grammar, so nothing else moves
+    And per extension rather than per language, because the two grammars disagree deliberately: an angle-bracketed name is a type assertion in a .ts file and a JSX element in a .tsx one
+    But every reader took the plain TypeScript grammar until 2026-09-06, so a React file came back not as a file with a few odd nodes in it but as wreckage, with the component's own name, parameters, body and return statement hoisted to module scope as loose siblings, and nothing said so
+
   Scenario: detect_primary_language picks the language the repository is mostly written in
     Given a repository
     When detect_primary_language counts the files carrying each configured language's extensions

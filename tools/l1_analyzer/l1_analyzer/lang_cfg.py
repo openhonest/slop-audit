@@ -344,6 +344,16 @@ LANG_CFG: dict[str, LangCfg] = {
 _TYPESCRIPT_CFG: LangCfg = {**LANG_CFG["javascript"]}
 
 _TYPESCRIPT_CFG["language"] = Language(tree_sitter_typescript.language_typescript())
+# The second TypeScript grammar, and not a language of its own.
+#
+# tree-sitter-typescript ships two, because the two disagree on purpose: `<T>x` is a type
+# assertion in a .ts file and a JSX element in a .tsx one, and no single grammar can be right
+# about both. tsc makes the same split on the same extension.
+#
+# It is here rather than in LANG_CFG because a row there is a LANGUAGE: it would be counted
+# separately when the audit decides what a repository is written in, and `--lang tsx` would
+# become a thing to type. TSX is TypeScript. Only the reading of one extension differs.
+TSX_LANGUAGE = Language(tree_sitter_typescript.language_tsx())
 _TYPESCRIPT_CFG["extensions"] = (".ts", ".tsx")
 # TypeScript has types to escape from; JavaScript has none, so its patterns are empty.
 _TYPESCRIPT_CFG["type_escape_patterns"] = ("any", "unknown")  # plus // @ts-ignore

@@ -43,7 +43,7 @@ def _findings(module) -> list[dict]:
     """The findings that survive as violations. A declared boundary is emitted and marked
     withheld rather than dropped, so a consumer can count real suppressions."""
     source = pathlib.Path(module.__file__).read_text()
-    found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
+    found = edges.io_below_the_boundary(read.read_tree(source, "python", "")) or []
     return [f for f in found if f["withheld_by"] == ""]
 
 
@@ -67,7 +67,7 @@ def test_an_undeclared_reader_is_still_reported():
               "@boundary\ndef declared(path):\n    return path.read_text()\n\n\n"
               "def undeclared(path):\n    return path.read_text()\n\n\n"
               "def run(path):\n    return declared(path), undeclared(path)\n")
-    found = edges.io_below_the_boundary(read.read_tree(source, "python")) or []
+    found = edges.io_below_the_boundary(read.read_tree(source, "python", "")) or []
     assert [f["symbol"] for f in found if f["withheld_by"] == ""] == ["undeclared"]
     assert [f["symbol"] for f in found if f["withheld_by"] == "declaration"] == ["declared"]
 
@@ -127,7 +127,7 @@ def test_every_declared_boundary_actually_obtains_something():
         # No guard around the parse. tree-sitter accepts anything and reports the trouble
         # as error nodes rather than raising, so the guard here caught nothing and cost a
         # second parse of every file that has a declaration.
-        found = edges.io_below_the_boundary(read.read_tree(text, "python")) or []
+        found = edges.io_below_the_boundary(read.read_tree(text, "python", "")) or []
         stamps += [f"{path.name}:{f['symbol']}" for f in found
                    if "states an edge that is not there" in f["detail"]]
     assert stamps == [], f"declared as edges and reach nothing outside the process: {stamps}"
@@ -205,7 +205,7 @@ def test_the_call_is_followed_one_step_and_not_transitively():
 def _findings_of(source: str) -> list[dict]:
 
 
-    return edges.io_below_the_boundary(read.read_tree(source, "python")) or []
+    return edges.io_below_the_boundary(read.read_tree(source, "python", "")) or []
 
 
 # ---------------------------------------------------------------------------
