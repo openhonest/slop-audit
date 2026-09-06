@@ -80,6 +80,16 @@ _OUTCOME = re.compile(r"^(?:FAILED|ERROR)\s+\S*::proof_0\s*-\s*(\w+)", re.MULTIL
 # does not truncate. Anchored to the proof file's own name so another file's traceback
 # (a conftest raising while the proof fails to import) cannot claim the verdict.
 _TB_LINE = re.compile(r"test_l1_coverage_proof\.py:\d+:\s*(\w+)")
+# The traceback's own last line, which `--tb=native` prints and the other modes prefix with
+# `E `. Python writes it, not pytest, so it is the one spelling that does not move between
+# pytest versions. Third pattern rather than a replacement for the two above, because each
+# is the only one present in some run this reader has met.
+_RAISED = re.compile(r"^E?\s*(\w*(?:Error|Exception))(?::|$)", re.MULTILINE)
+# The proof did not run at all: pytest collected or imported it and gave up. Read before any
+# exception name, because a proof that never ran asserted nothing, and a conftest raising
+# AssertionError while the proof fails to import would otherwise read as the proof's own
+# assert firing.
+_ERRORED = re.compile(r"^ERROR\s+\S*test_l1_coverage_proof\.py", re.MULTILINE)
 
 
 # Directories that hold packages without being part of the import path. `src` is the
@@ -214,17 +224,31 @@ def render_test(body: str) -> str:
 
 
 def _classify(output: str, returncode: int) -> str:
-    """pass | divergence | incidental | error from one pytest run of a single proof. A failure
-    whose exception is AssertionError is the test's own assert firing (a proven divergence); any
-    other exception, or a collection ERROR, is a setup failure (incidental noise)."""
+    """pass | divergence | incidental | unreadable | error, from one pytest run of a proof.
+
+    A failure whose exception is AssertionError is the test's own assert firing, which is a
+    proven divergence. Any other exception is a setup failure and proves nothing about the
+    branch, so it is incidental noise.
+
+    THE VERDICT COMES OUT OF PROSE AND PROSE IS NOT A CONTRACT. Three patterns, because
+    pytest has printed the exception's name in three different places across the versions
+    this reader has met, and on pytest 9 the short-summary line carries no name at all.
+
+    An unreadable transcript is its own answer and used to be filed as incidental. That put
+    a fired assertion in a noise bucket, so the proof was discarded and the loop reported
+    clean. Reported on 2026-09-06 from a box whose pytest prints a shape neither of the
+    first two patterns matched. The two answers send a reader to different places:
+    incidental is the generated test's fault and unreadable is ours."""
     if returncode == 124:
         return "error"
-    match = _OUTCOME.search(output) or _TB_LINE.search(output)
-    if match:
-        return "divergence" if match.group(1) == "AssertionError" else "incidental"
     if returncode == 0 and "1 passed" in output:
         return "pass"
-    return "incidental"  # collection/usage error, or the file did not import
+    if _ERRORED.search(output):
+        return "incidental"
+    match = _OUTCOME.search(output) or _TB_LINE.search(output) or _RAISED.search(output)
+    if match:
+        return "divergence" if match.group(1) == "AssertionError" else "incidental"
+    return "unreadable"
 
 
 @boundary
@@ -243,7 +267,12 @@ def _run(repo: Path, interpreter: str, test_source: str, timeout_seconds: float)
     return run.returncode, (run.stdout or "") + (run.stderr or "")
 
 
-EMPTY_OUTCOMES = {"divergence": 0, "incidental": 0, "pass": 0, "error": 0, "declined": 0}
+# `unreadable` is a transcript this reader could not get a verdict out of, which is a fact
+# about the reader rather than about the generated test. It has a bucket because a verdict
+# with nowhere to be tallied is dropped on the way to the report, which is the same silence
+# one step along.
+EMPTY_OUTCOMES = {"divergence": 0, "incidental": 0, "pass": 0, "error": 0, "declined": 0,
+                  "unreadable": 0}
 
 
 def _prove_one(repo: Path, interpreter: str, gap: CoverageGap, import_path: str,

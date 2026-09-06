@@ -25,7 +25,7 @@ def test_the_baseline_is_committed_and_names_todays_slop_signals():
     job that silently passes because it found no baseline is worse than no job."""
     assert BASELINE.is_file(), "no baseline; the CI job would have nothing to ratchet against"
     d = json.loads(BASELINE.read_text())
-    assert set(d) == {"slop", "bands", "vacuity"}
+    assert set(d) == {"slop", "bands", "vacuity", "vacuity_checker"}
     assert d["slop"], "a baseline claiming zero slop signals for this repository is wrong"
     assert all(d["bands"][k] == "Slop" for k in d["slop"]), "baseline disagrees with itself"
 

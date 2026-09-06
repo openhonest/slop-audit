@@ -1,6 +1,6 @@
 {
  "bands": {
-  "L1.1": "Healthy",
+  "L1.1": "Not Healthy",
   "L1.10": "Healthy",
   "L1.11": "Healthy",
   "L1.12": "Healthy",
@@ -26,5 +26,6 @@
   "L1.5",
   "L1.6"
  ],
- "vacuity": 6
+ "vacuity": 7,
+ "vacuity_checker": "12988918acd5"
 }

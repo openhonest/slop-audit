@@ -26,6 +26,7 @@ import pathlib
 import sys
 
 from l1_analyzer import git_indicators, indicators, vacuity
+from l1_analyzer.boundary import boundary
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 BASELINE = pathlib.Path(__file__).resolve().parent / "self-audit-baseline.json"
@@ -64,6 +65,55 @@ def vacuous_paths() -> int:
     return len(vacuity.check(REPO / "tools" / "l1_analyzer" / "l1_analyzer")["findings"])
 
 
+def vacuity_checker() -> str:
+    """Which checker produced a vacuous-path count, as a short hash of its own source.
+
+    A count is only comparable to a count the same instrument produced. This ratchet stored
+    a bare number, so when the checker improved, the stored figure and the fresh one came
+    from two different instruments and the comparison meant nothing.
+
+    Measured on 2026-09-06: the baseline said 6, today's checker found 7 in today's code and
+    8 in the code the baseline was recorded against. By one instrument the codebase had
+    improved by one, and the ratchet called it a regression. The finding it named was
+    `_sweep_verdict`, which is the function written to take a vacuous affirmative off the
+    sweep's own summary line.
+
+    Both rule files, because `vacuity_size` holds rules the same check applies and a change
+    there moves the count exactly as a change to the other one does."""
+    import hashlib
+
+    return hashlib.sha256(b"".join(_checker_sources())).hexdigest()[:12]
+
+
+@boundary
+def _checker_sources() -> list[bytes]:
+    """The bytes of the rule files, read from disk. The one edge this identity needs."""
+    from l1_analyzer import vacuity_size
+
+    return [pathlib.Path(m.__file__).read_bytes() for m in (vacuity, vacuity_size)]
+
+
+def vacuity_verdict(count: int, recorded: dict[str, object], checker: str) -> str:
+    """What this run may say about the count, given what produced the recorded one.
+
+    Four answers, and the fourth is the one that was missing. Two counts from one checker
+    compare as they always did. Two counts from different checkers are incomparable, and
+    saying so beats a verdict nothing supports: a ratchet that cannot tell "the code got
+    worse" from "the checker got better" teaches whoever meets it to run --record, which
+    discards whichever of the two it actually was.
+
+    A baseline recorded before this rule carries no checker at all. That is the same
+    situation and must not be read as agreement."""
+    was = recorded.get("vacuity")
+    if not isinstance(was, int) or recorded.get("vacuity_checker") != checker:
+        return "incomparable"
+    if count > was:
+        return "regressed"
+    if count < was:
+        return "improved"
+    return "unchanged"
+
+
 def main(argv: list[str]) -> int:
     bands = panel(REPO)
     slop = slop_keys(bands)
@@ -73,8 +123,9 @@ def main(argv: list[str]) -> int:
     print(f"vacuous paths: {vacuous}")
 
     if "--record" in argv:
-        BASELINE.write_text(json.dumps({"slop": slop, "bands": bands, "vacuity": vacuous},
-                                       indent=1, sort_keys=True) + "\n")
+        BASELINE.write_text(json.dumps(
+            {"slop": slop, "bands": bands, "vacuity": vacuous,
+             "vacuity_checker": vacuity_checker()}, indent=1, sort_keys=True) + "\n")
         print(f"recorded {BASELINE.name}")
         return 0
 
@@ -90,12 +141,17 @@ def main(argv: list[str]) -> int:
     for k in new:
         print(f"  REGRESSED: {k} is now Slop (was {was['bands'].get(k)})", file=sys.stderr)
     was_vacuous = was.get("vacuity")
-    if was_vacuous is not None and vacuous > was_vacuous:
+    verdict = vacuity_verdict(vacuous, was, vacuity_checker())
+    if verdict == "regressed":
         print(f"  REGRESSED: {vacuous} vacuous paths, was {was_vacuous}", file=sys.stderr)
         new = new + ["vacuity"]
-    elif was_vacuous is not None and vacuous < was_vacuous:
+    elif verdict == "improved":
         print(f"  improved: {vacuous} vacuous paths, was {was_vacuous}")
         gone = gone + ["vacuity"]
+    elif verdict == "incomparable" and was_vacuous is not None:
+        print(f"  vacuous paths: {vacuous} now, {was_vacuous} recorded, and the two counts "
+              "came from different checkers, so neither is a verdict about the other. Run "
+              "--record to read this checker's answer as the new baseline.")
     if new:
         print("\nThe panel got worse. Fix it, or run --record in the same commit that "
               "explains why the new reading is the honest one.", file=sys.stderr)
