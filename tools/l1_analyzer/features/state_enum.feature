@@ -62,10 +62,19 @@ Feature: state_enum — which declarations the classifier's reader walks, and wh
     And the declined one was read and ruled out rather than skipped, which is what lets the census and this walk agree on what was visited
     But every constant was declined until 2026-09-06, so two files that behave identically at run time read differently off a keyword, and since const is the default in these languages that took nearly all the real module state out of every reading as a clean pass rather than as silence
 
-  Scenario: _rust_module admits only a mutable static
+  Scenario: _rust_static_is_writable decides whether the program can change what a static holds
+    Given one static item
+    When _rust_static_is_writable checks the mutability keyword and then the declared type
+    Then the old spelling with the keyword is writable, and so is a static whose type carries an atomic, a lock or a cell anywhere inside it
+    And the type is not a hint but the answer, because those types exist to be mutated through a shared reference and a static of one is mutable state by construction
+    And the name is matched anywhere in the type, since the wrapping varies and a mutex inside an arc inside an option is reached through the same door
+    But a static carrying none of them cannot be written through and is declined, which is a reading rather than a gap
+
+  Scenario: _rust_module admits a static the program can change
     Given a parsed Rust file
-    When _rust_module reads the file's own static items and checks each for the mutability keyword
-    Then it returns one site per static, keyed when it is mutable and declined when it is not
+    When _rust_module reads the file's own static items and asks whether each can be written
+    Then it returns one site per static, keyed when the program can change it and declined when it cannot
+    And it admitted only the keyword spelling until 2026-09-06, which is nearly extinct because it requires unsafe at every access, so the two shapes that are how Rust actually holds global state both read as nothing
     But a constant is not a static item, so it never enters the candidate list and this walk cannot report having read it
 
   Scenario: _go_module admits every package-level variable

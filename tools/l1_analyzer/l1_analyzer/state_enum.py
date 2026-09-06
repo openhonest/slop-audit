@@ -39,6 +39,7 @@ from l1_analyzer.mutable_state import shallow_candidates
 from l1_analyzer.state_census import _js_declarations
 from l1_analyzer.state_sites import Site
 from l1_analyzer.ts_nodes import c_declarator_name as _c_declarator_name
+from l1_analyzer.ts_nodes import descendants
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import local_refs as _local_refs
 from l1_analyzer.ts_nodes import refs as _refs
@@ -173,9 +174,53 @@ def _js_module(root: Node, cfg: LangCfg) -> Cands:
     return cands
 
 
+# The types Rust hands out to be written through a shared reference. A static of one of
+# these is mutable state by construction: that is what they are for, and there is nothing to
+# infer from the rest of the declaration.
+#
+# Named as bare identifiers and matched anywhere in the type, because the wrapping varies and
+# the wrapper does not change the answer: `Mutex<HashMap<..>>`, `Arc<RwLock<T>>` and
+# `OnceLock<String>` are all reached through the same door.
+_RUST_INTERIOR_MUTABILITY = frozenset({
+    "AtomicBool", "AtomicI8", "AtomicI16", "AtomicI32", "AtomicI64", "AtomicIsize",
+    "AtomicPtr", "AtomicU8", "AtomicU16", "AtomicU32", "AtomicU64", "AtomicUsize",
+    "Cell", "LazyCell", "LazyLock", "Mutex", "OnceCell", "OnceLock", "RefCell", "RwLock",
+    "UnsafeCell",
+})
+
+
+def _rust_static_is_writable(item: Node) -> bool:
+    """Whether this static holds something the program can change.
+
+    `static mut` was the only shape this reader admitted, and `static mut` is nearly extinct:
+    it requires `unsafe` at every access, so modern Rust holds global state through interior
+    mutability instead. The two shapes that are how it is actually done both read as nothing
+    until 2026-09-06:
+
+        pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        pub static CACHE: Mutex<Option<HashMap<String, u64>>> = Mutex::new(None);
+
+    The same defect as JavaScript's declined `const`, found the same day, and worse here.
+    There the keyword described the binding rather than the object and the object had to be
+    read. Here the type is not a hint at all: an atomic and a lock exist to be mutated
+    through a shared reference, so a static of that type is mutable state by construction.
+
+    A static that carries none of them is still declined, and that is a reading. A
+    `static NAMES: [&str; 3]` cannot be written through and nothing in the program can
+    change it."""
+    if any(c.type == "mutable_specifier" for c in item.children):
+        return True
+    declared = _field(item, "type")
+    if declared is None:
+        return False
+    return any(_text(node) in _RUST_INTERIOR_MUTABILITY
+               for node in descendants(declared, "named"))
+
+
 def _rust_module(root: Node, cfg: LangCfg) -> Cands:
-    """`static` items. Only `static mut` is state; a plain static is immutable and declined on
-    the merits, which is a reading of it, not a gap in the reader."""
+    """`static` items. A static is state when the program can change what it holds, which
+    `_rust_static_is_writable` decides; anything else is declined on the merits, which is a
+    reading of it and not a gap in the reader."""
     cands: Cands = {}
     for st in root.children:
         if st.type != "static_item":
@@ -183,8 +228,8 @@ def _rust_module(root: Node, cfg: LangCfg) -> Cands:
         name = _field(st, "name")
         if name is None:
             continue
-        mutable = any(c.type == "mutable_specifier" for c in st.children)
-        _put(cands, (state_sites.MODULE_BINDING, "", _text(name)), _text(name) if mutable else "")
+        writable = _rust_static_is_writable(st)
+        _put(cands, (state_sites.MODULE_BINDING, "", _text(name)), _text(name) if writable else "")
     return cands
 
 

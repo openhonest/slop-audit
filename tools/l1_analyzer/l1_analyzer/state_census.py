@@ -393,9 +393,13 @@ def _js_toplevel(root: Node) -> list[Site]:
 
 
 def _rust_toplevel(root: Node) -> list[Site]:
-    """`static` items. A plain `static` is immutable and the classifier skips it; the
-    census counts it, because immutability is a verdict about the state and the census
-    issues none."""
+    """`static` items, all of them. Whether the program can change what one holds is a
+    verdict about the state, which the classifier issues and the census does not.
+
+    The classifier declined every static without the `mut` keyword until 2026-09-06, and
+    this count is what said so: it reported the declarations while the classifier visited
+    them and returned nothing, which is how the blindness was measurable rather than
+    invisible."""
     return [(MODULE_BINDING, "", _named_field(st, ("name",)))
             for st in root.children if st.type == "static_item" and _named_field(st, ("name",))]
 
