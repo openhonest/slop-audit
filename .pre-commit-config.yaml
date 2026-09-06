@@ -46,7 +46,12 @@ repos:
         files: \.py$
 
       - id: slop-audit-self
-        name: slop audit (dogfood - god-files + finite-testability + type-escape and Honest Code ratchets)
+        # The name says four and means four. It read "and Honest Code ratchets", which a
+        # reader takes as the ratchets, and the vacuity one is not here: it lives in
+        # scripts/self_audit.py and runs in CI. A commit whose vacuity count regressed
+        # passed this hook on 2026-09-06 and the committer had every reason to think their
+        # ratchets had been checked.
+        name: "slop audit (dogfood - four checks: god-files, finite-testability, type escapes, Honest Code; the rest run in scripts/self_audit.py)"
         # --max-type-escapes is the Any / # type: ignore baseline: a new escape fails
         # the commit. Lower it as escapes are typed away; raising it is a deliberate,
         # reviewable change here in the config.

@@ -90,3 +90,44 @@ def test_a_proof_that_never_ran_asserted_nothing():
     out = ("/repo/conftest.py:9: AssertionError: fixture broke\n"
            "ERROR /t/test_l1_coverage_proof.py::proof_0\n1 error in 0.01s\n")
     assert pcp._classify(out, 1) == "incidental"
+
+
+# The transcript from the box where this was found, verbatim, at the width every unattended
+# run gets. pytest cuts the summary reason to fit the terminal and at eighty columns this
+# path lands mid-word.
+_TRUNCATED_AT_EIGHTY = (
+    "F                                                                        [100%]\n"
+    "=================================== FAILURES ===================================\n"
+    "E   AssertionError: a discount must lower the total\n"
+    "    assert 1100.0 < (10.0 * 100)\n"
+    "/tmp/l1-pyproof-22j4ilag/test_l1_coverage_proof.py:5: AssertionError: a discount"
+    " must lower the total\n"
+    "=========================== short test summary info ============================\n"
+    "FAILED ../l1-pyproof-22j4ilag/test_l1_coverage_proof.py::proof_0 - AssertionE...\n"
+    "1 failed in 0.04s\n"
+)
+
+
+def test_a_reason_pytest_cut_to_fit_the_terminal_is_not_read_as_another_exception():
+    """The fourth shape, and the one that caught the first version of this fix.
+
+    The summary reason is truncated to the terminal width. At eighty columns, which is what
+    every run without a tty gets, this line reads `- AssertionE...`, and taking a word off
+    it yields `AssertionE`, which is not `AssertionError`, so a fired assertion was filed as
+    somebody else's exception. A partial match is worse than no match: the failure needs the
+    string to be nearly right.
+
+    Bisected on terminal width rather than on pytest version by the session auditing turso:
+    70 reads right, 76 through 80 read wrong, 84 reads right. The band is narrow because the
+    word has to be present and incomplete, and it moves with the length of the temporary
+    directory's name."""
+    assert pcp._classify(_TRUNCATED_AT_EIGHTY, 1) == "divergence"
+
+
+def test_the_same_run_reads_the_same_at_any_width():
+    """The property, rather than one width's symptom. A verdict that depends on how wide
+    somebody's window was is not a verdict."""
+    whole = _TRUNCATED_AT_EIGHTY.replace(
+        "- AssertionE...", "- AssertionError: a discount must lower the total")
+    cut_early = _TRUNCATED_AT_EIGHTY.replace(" - AssertionE...", "")
+    assert {pcp._classify(t, 1) for t in (_TRUNCATED_AT_EIGHTY, whole, cut_early)} == {"divergence"}

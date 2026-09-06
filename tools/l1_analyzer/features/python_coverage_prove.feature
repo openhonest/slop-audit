@@ -63,6 +63,14 @@ Feature: python_coverage_prove — the pytest coverage-gap prove loop, where an 
     Then a failing AssertionError is attributable to the test's own assertion and to nothing else
     But pytest collects the function only because the run overrides its function-name pattern, since the name does not begin with test
 
+  Scenario: _summary_reason reads the short-summary line, or refuses a reason pytest cut short
+    Given one pytest transcript
+    When _summary_reason looks at the FAILED line for the proof
+    Then a reason that survived whole is handed back
+    And a reason pytest truncated to fit the terminal is refused, because taking a word off "- AssertionE..." yields a name that is not AssertionError and files a fired assertion as somebody else's exception
+    And the readings below it take the traceback, which pytest writes at column zero and does not truncate, so one transcript reads the same at any width
+    But a partial match is worse than no match, and this one needed the string to be nearly right: at seventy columns it read correctly and at eighty, which every run without a terminal gets, it did not
+
   Scenario: _classify reads one pytest run as pass, divergence, incidental or error
     Given the output of one pytest run and its exit code
     When _classify reads the short-summary line for the proof

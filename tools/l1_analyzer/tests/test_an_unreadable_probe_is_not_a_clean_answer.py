@@ -24,6 +24,7 @@ under the refusal is true, and a refusal that names the wrong cause sends a read
 the wrong thing.
 """
 
+import shutil
 import subprocess
 
 import pytest
@@ -57,9 +58,15 @@ def test_a_malformed_version_is_unknown_rather_than_zero(tmp_path):
     assert reason.strip()
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not on PATH")
 def test_determinism_refuses_rather_than_driving_a_jest_it_could_not_identify(tmp_path):
     """The behaviour the guard was hiding. `jest --seed` needs jest 30, and running it
-    against an unknown version produces a determinism figure nobody can stand behind."""
+    against an unknown version produces a determinism figure nobody can stand behind.
+
+    Skipped without node. Both refusals are right and this asks for the one about a version
+    it could not identify; a machine with no node gives the one about node, and asserting
+    either against the other reports the machine as a defect. Found on a clean box on
+    2026-09-06, which is what a clean box is for."""
     (tmp_path / "package.json").write_text(
         '{"scripts": {"test": "jest"}, "devDependencies": {"jest": "^29.0.0"}}')
     (tmp_path / "node_modules").mkdir()

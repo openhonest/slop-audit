@@ -75,7 +75,18 @@ _REPAIR_INSTRUCTION = (
 # never survived, every fired assertion was binned "incidental", and the repair loop then
 # rewrote the test until it agreed with the buggy code. Found on 2026-08-20 by a planted
 # positive control whose two correct assertions both came back "passed (branch correct)".
-_OUTCOME = re.compile(r"^(?:FAILED|ERROR)\s+\S*::proof_0\s*-\s*(\w+)", re.MULTILINE)
+# The short-summary line, whose reason pytest CUTS TO FIT THE TERMINAL. The rest of the
+# line is captured so a cut one can be refused: at eighty columns, which is what every
+# unattended run gets, this path lands mid-word and the line reads `- AssertionE...`. A
+# reader taking `\w+` off it gets `AssertionE`, decides that is not `AssertionError`, and
+# files a fired assertion as somebody else's exception. A partial match is worse than no
+# match, and the failure needs the string to be nearly right.
+#
+# Found on 2026-09-06 by the session auditing turso, who bisected it on terminal width
+# rather than on pytest version: 70 reads right, 76 through 80 read wrong, 84 reads right.
+# The band is narrow because the word has to be present and incomplete, and it moves with
+# the length of the temporary directory's name.
+_OUTCOME = re.compile(r"^(?:FAILED|ERROR)\s+\S*::proof_0\s*-\s*(\w+)([^\n]*)$", re.MULTILINE)
 # The `--tb=line` row, `.../test_l1_coverage_proof.py:N: ExceptionName: msg`, which pytest
 # does not truncate. Anchored to the proof file's own name so another file's traceback
 # (a conftest raising while the proof fails to import) cannot claim the verdict.
@@ -245,10 +256,23 @@ def _classify(output: str, returncode: int) -> str:
         return "pass"
     if _ERRORED.search(output):
         return "incidental"
-    match = _OUTCOME.search(output) or _TB_LINE.search(output) or _RAISED.search(output)
+    match = _summary_reason(output) or _TB_LINE.search(output) or _RAISED.search(output)
     if match:
         return "divergence" if match.group(1) == "AssertionError" else "incidental"
     return "unreadable"
+
+
+def _summary_reason(output: str) -> re.Match[str] | None:
+    """The short-summary line's reason, or nothing when pytest cut it to fit the terminal.
+
+    A cut reason is refused rather than read. The two readings below it look at the
+    traceback, which pytest writes at column zero and does not truncate, so falling through
+    reaches the same verdict by a line whose shape does not depend on how wide somebody's
+    window was."""
+    match = _OUTCOME.search(output)
+    if match is None or match.group(0).rstrip().endswith("..."):
+        return None
+    return match
 
 
 @boundary

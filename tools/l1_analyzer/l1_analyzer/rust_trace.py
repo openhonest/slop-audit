@@ -258,7 +258,7 @@ def _region_totals(report: Report) -> tuple[int, int] | None:
 
 
 def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
-                      toolchain: str, timeout_seconds: float) -> L1Result:
+                      toolchain: str, timeout_seconds: float, output: str) -> L1Result:
     """L1.19 from a finished run and cargo-llvm-cov's region totals. No I/O, so it can be
     asserted.
 
@@ -282,7 +282,21 @@ def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
         return _na("coverage report had no region totals")
     count, covered = totals
     if count == 0:
-        return _na("no coverage regions found (did the suite run any tests?)")
+        return _na("no coverage regions found, so nothing this reader can measure compiled")
+    # Whether a test RAN, which is a different question from whether a region exists.
+    # Regions come from compiled code, so a crate that compiles and has no tests has regions
+    # and no measurement: it was banded Slop at 0.0 with the details line saying "suite
+    # passed", which is true, because cargo test passes when there is nothing to run.
+    # Reported on 2026-09-06 by the session auditing turso.
+    #
+    # Cargo says how many tests ran in its own words and `_tests_run` already reads them for
+    # L1.20, so this asks rather than infers. A build that failed before any test could run
+    # prints no result line at all and lands here too, which is the right answer for a
+    # different reason: nothing ran, so there is nothing to report.
+    ran, _failed = _tests_run(output)
+    if ran == 0:
+        return _na("no test ran, so a share of the regions they exercised is a share of "
+                   "nothing; region coverage needs a suite that executes")
     pct = covered / count * 100
     suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
     return {
@@ -327,7 +341,8 @@ def decision_space_coverage(repo: Path, timeout_seconds: float,
             return _na("coverage report was unreadable")
 
     return _coverage_verdict(_region_totals(report), run.returncode,
-                             _toolchain(repo, timeout_seconds), timeout_seconds)
+                             _toolchain(repo, timeout_seconds), timeout_seconds,
+                             (run.stdout or "") + (run.stderr or ""))
 
 
 # ---------------------------------------------------------------------------
