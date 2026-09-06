@@ -34,7 +34,7 @@ from tree_sitter import Node
 
 from l1_analyzer import record_state, state_sites
 from l1_analyzer.indicators import LangCfg, _find_module_mutable_names
-from l1_analyzer.lang_spec import LangSpec
+from l1_analyzer.lang_spec import LANG_SPEC, LangSpec
 from l1_analyzer.mutable_state import shallow_candidates
 from l1_analyzer.state_census import _js_declarations
 from l1_analyzer.state_sites import Site
@@ -102,11 +102,53 @@ def _py_module(root: Node, cfg: LangCfg) -> Cands:
     return cands
 
 
+# The container vocabulary L1.18b already reads, taken rather than retyped, so the two
+# cannot drift. JavaScript and TypeScript declare the same pair.
+_JS_CONTAINERS = LANG_SPEC["javascript"]["container_literal_types"]
+# The one call that makes a value genuinely immutable, and the idiomatic way to write a
+# constant table in these languages. Everything else `new` produces is a fresh object nobody
+# has frozen.
+_JS_FREEZE = "Object.freeze"
+
+
+def _js_binds_something_writable(declarator: Node) -> bool:
+    """Whether a declarator binds a value that can be written even though the name cannot.
+
+    `const` says the NAME cannot be rebound. It says nothing about the object, and an object
+    literal bound to a const and then written through is exactly unbounded state. This walk
+    declined every const until 2026-09-06, so two files that behave identically at run time
+    got opposite readings off a keyword:
+
+        export let   CACHE = {};  export function put(k, v) { CACHE[k] = v; }   promiscuous
+        export const CACHE = {};  export function put(k, v) { CACHE[k] = v; }   nothing
+
+    The second is the one people write. `const` is the default in these languages and `let`
+    is the exception, so the decline took nearly all the real module state out of every
+    JavaScript and TypeScript reading, and took it out as a clean pass rather than as
+    silence. The census had it right in its own words the whole time: a const binding to a
+    mutable object is state, and the census counts it.
+
+    An over-approximation, deliberately, and in the safe direction. `new Date()` is rarely
+    state anybody cares about and is counted anyway, because the direction that under-counts
+    is the direction that reports clean."""
+    value = _field(declarator, "value")
+    if value is None:
+        return False
+    if value.type in _JS_CONTAINERS:
+        return True
+    if value.type == "new_expression":
+        return True
+    if value.type == "call_expression":
+        return _text(_field(value, "function")) != _JS_FREEZE
+    return False
+
+
 def _js_module(root: Node, cfg: LangCfg) -> Cands:
-    """Top-level `let` / `var` / `const` declarators, exported or not. A `const` binding is
-    declined, not skipped: the walk read the declaration and ruled it out because the binding
-    cannot be reassigned. (It can still hold a mutable object, which is why the census counts
-    it.)
+    """Top-level `let` / `var` / `const` declarators, exported or not.
+
+    A const bound to a scalar is declined, not skipped: the walk read the declaration and
+    ruled it out, because a name bound once to a number holds nothing that can be written. A
+    const bound to something writable is state, and `_js_binds_something_writable` says why.
 
     Through the export statement, for the reason `state_census._js_declarations` gives: an
     exported declaration sits inside an export statement, almost all module state in these
@@ -117,16 +159,17 @@ def _js_module(root: Node, cfg: LangCfg) -> Cands:
     cands: Cands = {}
     for decl in _js_declarations(root):
         if decl.type == "lexical_declaration":
-            immutable = bool(decl.children) and _text(decl.children[0]) == "const"
+            rebindable = not (bool(decl.children) and _text(decl.children[0]) == "const")
         elif decl.type == "variable_declaration":
-            immutable = False
+            rebindable = True
         else:
             continue
         for vd in _refs(decl, lambda n: n.type == "variable_declarator"):
             name = _field(vd, "name")
             if name is not None and name.type == "identifier":
+                state = rebindable or _js_binds_something_writable(vd)
                 _put(cands, (state_sites.MODULE_BINDING, "", _text(name)),
-                     "" if immutable else _text(name))
+                     _text(name) if state else "")
     return cands
 
 

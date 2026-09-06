@@ -47,12 +47,20 @@ Feature: state_enum — which declarations the classifier's reader walks, and wh
     And this is the only place that can still say a type alias, an upper-case constant or a metadata name was read and ruled out rather than missed
     But a binding whose target is not a plain identifier, such as a subscript or a tuple, is skipped outright and reads as though nothing looked at it
 
-  Scenario: _js_module declines a constant on the merits and admits the rest
+  Scenario: _js_binds_something_writable decides whether a constant name still holds state
+    Given one declarator from a top-level declaration
+    When _js_binds_something_writable reads the value the name is bound to
+    Then an object or array literal is writable, and so is anything a new expression or an ordinary call produced, because the name being fixed says nothing about the object
+    And Object.freeze is the exception, being the one call in these languages that makes a value genuinely immutable and the idiomatic way to write a constant table
+    And it over-approximates deliberately: a date object is rarely state anybody cares about and is counted anyway, because the direction that under-counts is the direction that reports clean
+    But a name bound once to a number holds nothing that can be written, and declining that is a reading rather than a gap
+
+  Scenario: _js_module declines a constant scalar on the merits and admits the rest
     Given a parsed JavaScript or TypeScript file
     When _js_module reads each top-level declaration and its declarators
-    Then it returns one site per declarator, keyed for a reassignable binding and declined for a constant
-    And the constant is declined rather than skipped, having been read and ruled out because the binding cannot be reassigned
-    But it can still hold a mutable object, which is why the census counts it and this walk does not
+    Then a reassignable binding is keyed, a constant holding something writable is keyed too, and a constant holding a scalar is declined
+    And the declined one was read and ruled out rather than skipped, which is what lets the census and this walk agree on what was visited
+    But every constant was declined until 2026-09-06, so two files that behave identically at run time read differently off a keyword, and since const is the default in these languages that took nearly all the real module state out of every reading as a clean pass rather than as silence
 
   Scenario: _rust_module admits only a mutable static
     Given a parsed Rust file
