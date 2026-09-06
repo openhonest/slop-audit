@@ -111,6 +111,14 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
     And only an entry that actually carries test source is listed, capped at twenty
     But a gap that was located and never proven appears here not at all, because this surface is for what execution settled
 
+  Scenario: _coverage_pair puts the coverage figure where a reader meets the state reading
+    Given the analyzer results and whether this run executed the repository's test suite
+    When _coverage_pair reads the decision-space coverage row
+    Then a measured figure comes back for printing directly under the state counts, with the sentence saying the two answer different questions and that a high one does not buy the other
+    And a run that measured no coverage comes back saying so and carrying the row's own reason, because a missing figure printed as nothing reads as a figure of nothing
+    And a run that executed no suite pairs nothing at all, which is every card the site publishes, since a blank set beside a real number is read as a number
+    But the two figures were already both on the card and sat pages apart, so a reader with ninety per cent coverage read the grade above as a contradiction rather than as the finding
+
   Scenario: _prove_loops says what each prove loop that was asked for did, whether or not it kept anything
     Given the analyzer results, where the presence of a loop's key is the record that the loop was asked for
     When _prove_loops reads each loop's own account

@@ -181,6 +181,8 @@ CARD_COPY: dict[str, str] = {
     "thread.blurb.na": "Not analyzed for {lang} yet.",
     "thread.blurb.unread": "Not measured, and no claim either way. We can read this language, but we got no source to read it in: {read} file(s) were in scope and we could parse {parsed} of them. \"Nothing overrides your thread-safety guarantee\" would be counted over no code at all, so we will not say it. What was set aside is listed above; if it should have been read, send us the repository.",
     "thread.note": "This measures audit surface, not races. It shows where a language's thread-safety guarantee is overridden or missing, so a human or a runtime tool knows where to look. It does not detect data races: that needs [ThreadSanitizer](https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html#threadsanitizer) or an equivalent at runtime. A site here means \"verify this\", never \"a race exists\".",
+    "pair.note": "These two answer different questions and a high one does not buy the other. Coverage is how much of the code your suite ran. Finite testability is how much of the state could ever be checked exhaustively, however long you ran it for. A suite can exercise every line of a value that fans out past enumeration, and that is the case this instrument was built to name.",
+    "pair.unmeasured": "Coverage was not measured on this run, so there is no figure to set beside the state reading",
     "loops.heading": "Prove loops asked for",
     "loops.note": "One line per prove loop this run was told to do, whether or not it kept anything. A loop that could not start says why here. The card used to show only what a loop retained, so a sweep whose build failed produced the same page as a run that never asked for one.",
     "proofs.heading": "Adoptable proofs",
@@ -664,6 +666,36 @@ class ProofRow(TypedDict):
     test_source: str
 
 
+class CoveragePair(TypedDict):
+    """The coverage figure that stands beside the testability figure, or why there is none."""
+    measured: bool
+    value: float | None
+    reason: str
+
+
+def _coverage_pair(results: Panel, ran_tests: bool) -> CoveragePair | None:
+    """L1.19's figure, for printing next to the state reading.
+
+    Both numbers were already on the card and they sat pages apart: the grade sentence at
+    the top, the coverage figure down in the runtime table, and nothing anywhere saying they
+    were different questions. A reader with ninety per cent coverage read the grade as a
+    contradiction rather than as the finding.
+
+    None where the suite was never run, which is every card the site publishes. Inventing
+    the pairing there would put a blank next to a real number and let a reader take the
+    blank for a figure."""
+    if not ran_tests:
+        return None
+    row = results.get("L1.19")
+    if not isinstance(row, dict):
+        return {"measured": False, "value": None,
+                "reason": "the coverage reading did not run"}
+    value = row["value"]
+    if not isinstance(value, (int, float)):
+        return {"measured": False, "value": None, "reason": str(row["details"])}
+    return {"measured": True, "value": float(value), "reason": ""}
+
+
 class ProveLoopRow(TypedDict):
     """What one prove loop reports about its own run, whether or not it kept anything."""
     layer: str
@@ -722,6 +754,7 @@ class CardModel(TypedDict):
     interleaving_robustness: InterleavingRow | None
     honest_code: ConformityCard | None
     analyzer_version: str
+    coverage_pair: CoveragePair | None
     proofs: list[ProofRow]
     prove_loops: list[ProveLoopRow]
     share_text: str
@@ -802,6 +835,7 @@ def build_card(slug: str, lang: str, results: Panel, ran_tests: bool,
         "interleaving_robustness": _interleaving_robustness(results),
         "honest_code": _honest_code(results),
         "analyzer_version": analyzer_version,
+        "coverage_pair": _coverage_pair(results, ran_tests),
         "proofs": _proofs(results),
         "prove_loops": _prove_loops(results),
         "share_text": _t(f"share.{status}", slug=slug),
@@ -876,6 +910,17 @@ def _verdict_lines(card: CardModel, strip: re.Pattern) -> list[str]:
               f"- Finitely testable: {card['neutral_count']}",
               f"- Provably unbounded: {card['promiscuous_count']}",
               f"- Undecided by the analyzer (silence): {card['unresolved_count']}"]
+    # Directly under the state counts, where a reader meets the two figures together. They
+    # were pages apart, and a reader with a high coverage number read the grade above as a
+    # contradiction rather than as the finding.
+    pair = card.get("coverage_pair")
+    if isinstance(pair, dict):
+        if pair["measured"]:
+            measured = f"- Decision-space coverage: {pair['value']}% of decisions exercised by the suite"
+            lines += ["", measured, "", "> " + strip.sub("", _t("pair.note"))]
+        else:
+            lines += ["", f"- Decision-space coverage: not measured ({pair['reason']})",
+                      "", "> " + strip.sub("", _t("pair.unmeasured")) + "."]
     if card["status"] == "can" and card["paths"]:
         lines.append(f"- {_t('label.practical').split('.')[0]}: {card['paths']:,}")
     # Directly under the counts, because it qualifies those counts. A reader who meets it
