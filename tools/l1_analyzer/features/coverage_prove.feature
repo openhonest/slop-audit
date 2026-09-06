@@ -54,6 +54,36 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
     Then a non-blank string body comes back trimmed, with the explanation coerced to text
     But no reply, a body that is not a string, and a blank body are all rejected outright
 
+  Scenario: pack_gaps groups a sweep's gaps into the requests that will carry them
+    Given every gap the sweep will attempt and the characters one request may carry
+    When pack_gaps fills a request until the next gap would run it over, then starts another
+    Then the gaps come back in source order, greedily packed, every one of them in exactly one request
+    And a gap whose own source is over the budget travels alone rather than being dropped, since a sweep that quietly skipped its largest functions would report the same number over a smaller question
+    And the budget is in characters rather than tokens, because counting tokens needs the model's own tokenizer and a token budget here would be a guess wearing a measurement's name
+    But a budget of nothing raises, since zero would put every gap in its own request, which is the shape packing replaces arrived at silently
+
+  Scenario: propose_many asks for a test for every gap in one pack, in one request
+    Given a pack of gaps, each with its function source, its signature and the branch nothing exercised
+    When propose_many sends them together, keyed by index, and allows the reply room for one answer per gap
+    Then it returns one answer per gap in the order they were sent
+    And the room allowed scales with the pack, because one answer needed two thousand tokens and twenty need twenty times that or the reply is cut off mid-list
+    But it was one request per gap until 2026-09-06, which is four hundred and twenty-five round trips for a hundred and seventy-six modules before a single line was compiled
+
+  Scenario: answers_for puts each answer of a packed reply on the gap it answers
+    Given the gaps that were sent and the model's reply
+    When answers_for reads each entry's index and validates its body
+    Then each answer lands on the gap whose index it names, and a gap the model did not answer gets nothing rather than a neighbour's answer
+    And an index outside the pack, or one already spoken for, is dropped rather than guessed at, because an answer filed under the wrong gap would be a finding about a function nobody read
+    And every body goes through the same reachable-assertion gate as a single answer, so a body that runs and asserts nothing is refused here too
+    But a reply cut off mid-list is not valid JSON at all, so the whole pack goes unanswered rather than half of it landing on the wrong gaps
+
+  Scenario: _proposals_for asks for every gap in the sweep before any module is compiled
+    Given the whole work list, already settled deterministically by the ceiling
+    When _proposals_for packs every gap across every module and asks for each pack in turn
+    Then it returns one answer per gap, keyed by the gap's own identity
+    And the ceiling is spent before a single request goes out, so no amount of packing can overspend it
+    But identity is the key rather than contents, because a gap is a plain mapping and two gaps in one function can carry equal contents
+
   Scenario: propose asks for the first calling test that exercises one uncovered branch
     Given one located gap
     When propose sends the function source, the signature and the branch that was never exercised

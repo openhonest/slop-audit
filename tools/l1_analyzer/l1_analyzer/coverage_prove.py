@@ -234,6 +234,152 @@ def _valid(data: Answer | None, asserts: Callable[[str], bool]) -> Answer | None
     return {"body": body, "explanation": str(data.get("explanation", ""))}
 
 
+# How much source one request may carry, in characters.
+#
+# Characters rather than tokens, because counting tokens needs the model's own tokenizer and
+# this package does not have one. A token budget here would be a guess wearing a
+# measurement's name. In the corpus this was derived from, the ratio was about 3.5
+# characters per token.
+#
+# Derived rather than picked. The session auditing turso measured every proof-ready function
+# in turso/core with this package's own reader on 2026-09-06: 6,136 functions across 257
+# modules, median 376 characters, p90 2,750, p99 12,955, largest 145,605. Every module at
+# once is 3.5 million characters, about five times what fits, so packing is the shape rather
+# than a compromise on the way to one request. 200,000 characters is roughly 57,000 tokens,
+# which leaves a 200,000-token context most of its room for the instruction and for the N
+# answers coming back.
+PACK_BUDGET_CHARS = 200_000
+
+
+def pack_gaps(gaps: list[CoverageGap], budget: int) -> list[list[CoverageGap]]:
+    """The gaps of one sweep, grouped into the requests that will carry them.
+
+    One gap per request was the shape until 2026-09-06, which is 425 requests for a
+    176-module sweep before a single line is compiled. The compile was batched long before
+    the ask was, and `render_batch`'s docstring says why: N tests, one build. This is the
+    same move one step earlier.
+
+    In source order and greedy, which is deliberate on both counts. Order, because a reader
+    following the run's progress should see it move through the codebase rather than through
+    a sort nobody asked for. Greedy, because a packing that reordered gaps to fill requests
+    more tightly would buy a few per cent and cost the ability to say which request a gap was
+    in.
+
+    A gap whose own source is over the budget travels alone rather than being dropped. It is
+    the case that matters: turso's largest proof-ready function is 145,605 characters, and a
+    sweep that quietly skipped its largest functions would report the same number over a
+    smaller question. Whether the model can answer about it is the model's to say, and it
+    says so by answering or not.
+
+    A budget of nothing raises. Zero would put every gap in its own request, which is exactly
+    the shape this replaces, arrived at silently."""
+    if budget <= 0:
+        raise ValueError(f"a pack budget of {budget} would send every gap on its own, "
+                         "which is the shape packing replaces")
+    packs: list[list[CoverageGap]] = []
+    current: list[CoverageGap] = []
+    used = 0
+    for gap in gaps:
+        size = len(gap["function_source"])
+        if current and used + size > budget:
+            packs.append(current)
+            current, used = [], 0
+        current.append(gap)
+        used += size
+    if current:
+        packs.append(current)
+    return packs
+
+
+_PROPOSE_MANY_INSTRUCTION = (
+    "You are given SEVERAL Rust functions, each with one decision branch that no test ever "
+    "reached. Answer for every one of them. For each, infer the caller-facing behavior the "
+    "branch SHOULD have from the function name, its signature, and the branch condition - do "
+    "not just echo what the code visibly does. Write the BODY of a Rust test that exercises "
+    "exactly that branch: construct the argument values (bindings are fine), call the "
+    "function into a binding named `result`, then `assert!(<property>, <message>)` on "
+    "`result`. Each proof is kept only if execution contradicts your assertion, so assert "
+    "the behavior a correct implementation MUST have, not a prediction of the current "
+    "output. `use super::*;` is already in scope in each case. Return ONLY a JSON object "
+    'with one key, "proofs", holding a list of objects with keys: "index" (the integer index '
+    'you were given for that function), "body" (the Rust statements, no fn/mod wrapper) and '
+    '"explanation" (one plain sentence stating the behavior you assert). Answer every index '
+    "you were given, and use each index exactly once."
+)
+
+# What one answer is allowed to cost, in output tokens. The single ask has always allowed
+# 2,048 for one answer; a pack of twenty needs twenty times the room or its reply is cut off
+# mid-list. A truncated reply is not valid JSON, so the whole pack goes unanswered rather
+# than half of it landing on the wrong gaps, which is the safe way to fail and still a
+# failure worth not having.
+_TOKENS_PER_ANSWER = 2048
+# The API's own ceiling on one reply. A pack whose answers would not fit under it is still
+# sent: the model decides what it can answer, and the validation below drops whatever did not
+# arrive rather than guessing at it.
+_MAX_OUTPUT_TOKENS = 64_000
+
+
+def answers_for(gaps: list[CoverageGap], reply: llm.ModelReply) -> list[Answer | None]:
+    """One answer per gap, in the order the gaps were sent, or None where there is none.
+
+    A batched ask has one failure the single ask cannot have: the answers arrive together and
+    something has to say which is which. An answer compiled against the wrong function would
+    either fail to build or, worse, build and assert the wrong thing about code nobody read.
+
+    So the model keys each answer by the index it was given, and an index that is missing,
+    repeated or outside the pack is dropped rather than guessed at. A dropped answer is a gap
+    nobody proposed for, which the sweep already counts; a misplaced one would be a finding
+    about a function nobody read.
+
+    The first answer for an index wins. Two answers for one gap is the model contradicting
+    itself, something has to be kept, and letting the second overwrite the first would be a
+    silent choice rather than a stated one."""
+    if reply["text"] is None:
+        LAST_REFUSAL["reason"] = reply["reason"]
+        LAST_REFUSAL["cause"] = reply["cause"]
+        return [None] * len(gaps)
+    try:
+        proofs = json.loads(reply["text"])["proofs"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return [None] * len(gaps)
+    out: list[Answer | None] = [None] * len(gaps)
+    # Which indices the reply has already spoken for, valid or not. Tracked apart from the
+    # answers themselves so that a second entry for one index is always dropped: an index
+    # answered badly and then answered again is the model contradicting itself, and quietly
+    # taking the second reading would be a choice made rather than stated.
+    spoken: set[int] = set()
+    for entry in proofs if isinstance(proofs, list) else ():
+        if not isinstance(entry, dict) or not isinstance(entry.get("index"), int):
+            continue
+        at = entry["index"]
+        if not 0 <= at < len(gaps) or at in spoken:
+            continue
+        spoken.add(at)
+        body = entry.get("body")
+        if not isinstance(body, str):
+            continue
+        # Rebuilt field by field rather than handed on whole, so the index the model was
+        # keying by cannot travel any further than this loop.
+        out[at] = _valid({"body": body, "explanation": str(entry.get("explanation", ""))},
+                         body_asserts)
+    return out
+
+
+def propose_many(gaps: list[CoverageGap]) -> list[Answer | None]:
+    """First calling test for every gap in one pack, in one request.
+
+    One request per gap was the shape until 2026-09-06: 425 requests for a 176-module sweep,
+    every one of them a round trip taken before any code was compiled. The compile had been
+    batched long before the ask was."""
+    payload = json.dumps([
+        {"index": i, "function_source": gap["function_source"], "signature": _signature(gap),
+         "uncovered_branch": f"the `{gap['kind']}` branch at line {gap['line']} is never exercised"}
+        for i, gap in enumerate(gaps)
+    ])
+    room = min(_TOKENS_PER_ANSWER * max(1, len(gaps)), _MAX_OUTPUT_TOKENS)
+    return answers_for(gaps, llm.call(_PROPOSE_MANY_INSTRUCTION, payload, room, llm.anthropic_sdk))
+
+
 def propose(gap: CoverageGap) -> Answer | None:
     """First calling test for the located gap: {body, explanation} or None."""
     payload = json.dumps({
@@ -490,6 +636,32 @@ def _prove_one(repo: Path, module_relpath: str, gap: CoverageGap, repair_rounds:
     )
 
 
+def _proposals_for(work: list[tuple[str, list[CoverageGap]]],
+                   propose_pack: Callable[[list[CoverageGap]], list[Answer | None]],
+                   ) -> dict[int, Answer | None]:
+    """Every gap's first proposal, keyed by the gap's own identity.
+
+    `propose_pack` is required and named by the caller, like every other collaborator here.
+    Reaching for this module's own `propose_many` would make the only way to ask this
+    function how it packs be to replace a name inside the module under test, which this
+    package forbids and has a test for. Fifth appearance of one lesson.
+
+    Asked for in packs across the whole sweep rather than one gap at a time inside each
+    module, which is where the wall-clock went: 425 requests for a 176-module sweep, every
+    one a round trip taken before a single line was compiled, and every one of them pure
+    waiting.
+
+    Keyed by `id`, because a gap is a plain mapping with no identifier of its own and two
+    gaps in one function can carry equal contents. Identity is what the caller has and what
+    the caller will look up with, and the map lives only as long as the sweep."""
+    everything = [gap for _relpath, gaps in work for gap in gaps]
+    answers: dict[int, Answer | None] = {}
+    for pack in pack_gaps(everything, PACK_BUDGET_CHARS):
+        for gap, answer in zip(pack, propose_pack(pack)):
+            answers[id(gap)] = answer
+    return answers
+
+
 def _prove_module(repo: Path, module_relpath: str, gaps: list[CoverageGap], repair_rounds: int,
                   timeout_seconds: float, propose_fn: Callable[..., Answer | None],
                   repair_fn: Callable[..., Answer | None], batch_run_fn: Callable[..., tuple[int, str]],
@@ -498,7 +670,13 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[CoverageGap], repa
     """Prove all of one module's gaps. Fast path: batch every proposal into one compile and
     run once, then gate each failing test. If the batch does not compile (one bad test
     poisons it), fall back to per-gap with compiler-feedback repair. Returns (retained,
-    outcomes). Only a `divergence` is retained; the noise buckets are counted, never hidden."""
+    outcomes). Only a `divergence` is retained; the noise buckets are counted, never hidden.
+
+    `propose_fn` answers for one gap and says nothing about where the answer came from. The
+    whole-repository sweep hands in a lookup over proposals it asked for in packs before any
+    module was compiled; the single-module entry point hands in the model. Both satisfy the
+    same one-line contract, which is why this function did not have to change when the ask
+    was batched."""
     outcomes = {k: 0 for k in _OUTCOMES}
     ready = [(g, p) for g in gaps for p in (propose_fn(g),) if p is not None]
     if not ready:
@@ -607,6 +785,11 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
 
     work, located, attempted_gaps = budget.gaps_to_attempt(
         cov["files"], _rust_sources(repo, cov["files"]), gaps_of, cap_per_module, max_attempts)
+    # Every gap's first proposal, asked for before any of them is compiled, packed into as
+    # few requests as the budget allows. The whole work list is known here and was already
+    # settled deterministically by `gaps_to_attempt`, so the ceiling is spent before a single
+    # request goes out and no amount of packing can overspend it.
+    answers = _proposals_for(work, propose_many)
     retained: list[CoverageProof] = []
     outcomes = {k: 0 for k in _OUTCOMES}
     modules = 0
@@ -614,10 +797,12 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
         modules += 1
         if progress:
             progress(relpath, len(gaps), len(retained))
-        # The real four, named at the one place that knows which they are.
+        # The real four, named at the one place that knows which they are. The first is a
+        # lookup rather than a request: the proposals were asked for above, in packs.
         module_retained, module_outcomes = _prove_module(
             repo, relpath, gaps, repair_rounds, timeout_seconds,
-            propose, repair, _append_and_run, _run_in_crate, _refine_incidental)
+            lambda gap: answers.get(id(gap)), repair, _append_and_run, _run_in_crate,
+            _refine_incidental)
         retained.extend(module_retained)
         for k in outcomes:
             outcomes[k] += module_outcomes[k]
