@@ -940,6 +940,7 @@ def main(argv: list[str] | None) -> int:
         source_results = indicators.compute_source_indicators(
             args.repo, lang=args.lang, exec_tests=not args.no_exec, timeout_seconds=args.timeout,
             classify_state_bounds=not args.no_state_bounds, python_executable=args.python,
+            build_args=tuple(args.cargo_arg)
         )
         results.update(source_results)
         # Interleaving robustness (static, cheap): of the flagged concurrency surface,

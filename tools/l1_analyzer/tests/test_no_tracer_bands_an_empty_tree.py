@@ -58,8 +58,9 @@ def _coverage(tracer, repo: pathlib.Path) -> dict:
     if tracer is pytest_trace:
         return tracer.decision_space_coverage(repo, "python", 120.0, python_executable=None)
     if tracer is rust_trace:
-        # Rust selects its toolchain from the crate, so this harness takes neither hint.
-        return tracer.decision_space_coverage(repo, 120.0)
+        # Rust selects its toolchain from the crate, so this harness takes neither hint. It
+        # does take the build arguments, and an unscoped run passes none.
+        return tracer.decision_space_coverage(repo, 120.0, ())
     return tracer.decision_space_coverage(repo, 120.0, runtime_override=None)
 
 

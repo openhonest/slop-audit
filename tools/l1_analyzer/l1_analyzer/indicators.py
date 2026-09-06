@@ -267,6 +267,7 @@ def compute_source_indicators(
     timeout_seconds: float,
     classify_state_bounds: bool,
     python_executable: str | None,
+    build_args: tuple[str, ...],
 ) -> Panel:
     """L1.12-L1.20. `lang` may be "auto" (resolved here) or a concrete key.
     `exec_tests` gates the two runtime indicators (L1.19 coverage, L1.20);
@@ -293,7 +294,8 @@ def compute_source_indicators(
     results["L1.17"] = _measure(_god_files, repo)
     results["L1.18"] = _measure(analyze_mutable_state, repo, lang)
     results["L1.15"] = _compute_type_escapes(repo, lang)
-    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds, python_executable)
+    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds,
+                                           python_executable, build_args)
     # L1.12 and L1.14, native on tree-sitter. Both were external-tool delegations that
     # reported n/a on any machine without vulture or gitleaks, and reported a fabricated
     # zero on any machine that had gitleaks and a real leak (see ExternalRun).
@@ -488,22 +490,22 @@ _COVERAGE_HARNESS = {
     # interpreter, the rest take a runtime hint, and Rust reads its toolchain from the crate
     # so it takes neither. Forwarding it positionally would break the moment one of them
     # grows a parameter, which is what happened here.
-    "python": lambda repo, timeout, override: pytest_trace.decision_space_coverage(
+    "python": lambda repo, timeout, override, build_args: pytest_trace.decision_space_coverage(
         repo, "python", timeout, python_executable=override),
-    "rust": lambda repo, timeout, override: rust_trace.decision_space_coverage(repo, timeout),
-    "go": lambda repo, timeout, override: go_trace.decision_space_coverage(
+    "rust": lambda repo, timeout, override, build_args: rust_trace.decision_space_coverage(repo, timeout, build_args),
+    "go": lambda repo, timeout, override, build_args: go_trace.decision_space_coverage(
         repo, timeout, runtime_override=override),
-    "ruby": lambda repo, timeout, override: ruby_trace.decision_space_coverage(
+    "ruby": lambda repo, timeout, override, build_args: ruby_trace.decision_space_coverage(
         repo, timeout, runtime_override=override),
-    "javascript": lambda repo, timeout, override: js_trace.decision_space_coverage(
+    "javascript": lambda repo, timeout, override, build_args: js_trace.decision_space_coverage(
         repo, timeout, runtime_override=override),
-    "typescript": lambda repo, timeout, override: js_trace.decision_space_coverage(
+    "typescript": lambda repo, timeout, override, build_args: js_trace.decision_space_coverage(
         repo, timeout, runtime_override=override),
-    "java": lambda repo, timeout, override: java_trace.decision_space_coverage(
+    "java": lambda repo, timeout, override, build_args: java_trace.decision_space_coverage(
         repo, timeout, runtime_override=override),
-    "csharp": lambda repo, timeout, override: csharp_trace.decision_space_coverage(
+    "csharp": lambda repo, timeout, override, build_args: csharp_trace.decision_space_coverage(
         repo, timeout, runtime_override=override),
-    "c": lambda repo, timeout, override: c_trace.decision_space_coverage(
+    "c": lambda repo, timeout, override, build_args: c_trace.decision_space_coverage(
         repo, timeout, runtime_override=override),
 }
 _DETERMINISM_HARNESS = {
@@ -528,16 +530,57 @@ _DETERMINISM_HARNESS = {
 
 
 # honest-code-allow: L1.21.1 - _runtime_coverage and _runtime_determinism each look up a different harness table and refuse differently when the language has none. Two tables, two refusals, and the shape they share is the lookup rather than the work
-def _runtime_coverage(repo: Path, lang: str, timeout_seconds: float, python_executable: str | None) -> L1Result:
-    """Dispatch to the language's runtime coverage harness (the seam above), or n/a."""
-    harness = _COVERAGE_HARNESS.get(lang)
-    if harness is None:
+# Which languages' harnesses read the build arguments. Every harness takes the parameter,
+# because every language has a build tool and any of them may one day need arguments; only
+# Rust reads them today. Named here so the one place that dispatches can say the words were
+# handed over and not used, rather than nine harnesses each deciding to stay quiet.
+_READS_BUILD_ARGS = frozenset({"rust"})
+
+
+def _runtime_coverage(repo: Path, lang: str, timeout_seconds: float,
+                      python_executable: str | None, build_args: tuple[str, ...],
+                      harness: dict[str, Callable[..., L1Result]]) -> L1Result:
+    """Dispatch to the language's runtime coverage harness (the seam above), or n/a.
+
+    `build_args` are the caller's own words for the build tool, from --cargo-arg. A
+    workspace can hold a target that will not build and one that will not build fails the
+    whole build, so scoping is the only way to read the rest of it.
+
+    Two disclosures, both here rather than in nine harnesses. A figure over part of a
+    workspace is a different number from one over all of it, so the scope prints beside the
+    figure. And a language whose harness reads no arguments says they were given and not
+    applied: measuring as though nothing had been asked is a reading that quietly narrowed,
+    which is worse than one that refuses.
+
+    `harness` is required and has no default. It was `None` meaning the module's own table
+    for about a minute, and this repository's own clause 14 named it: a default absorbs the
+    caller's omission, so a caller that meant the real table cannot be told from one that
+    forgot to say. The place that knows a run is meant to execute somebody's test suite is
+    the place that names the harness, which is one level up."""
+    run = harness.get(lang)
+    if run is None:
         return {"value": "n/a", "band": "n/a", "details": f"runtime decision-coverage harness not implemented for {lang}"}
     # Routed through _measure, like every other measure. These two were the only ones that
     # were not, so a raise from a runtime harness escaped compute_source_indicators entirely
     # and aborted the audit. Three separate extractions of the seven harnesses each wanted to
     # refuse here and each had to return _na instead, which is how the gap was found.
-    return _measure(harness, repo, timeout_seconds, python_executable)
+    result = _measure(run, repo, timeout_seconds, python_executable, build_args)
+    return _with_build_args(result, lang, build_args)
+
+
+def _with_build_args(result: L1Result, lang: str, build_args: tuple[str, ...]) -> L1Result:
+    """The coverage reading, with what the run was scoped by said out loud.
+
+    Nothing is added when nothing was asked: a line about scoping on a run that scoped
+    nothing is noise, and a reader who meets it once stops reading the ones that mean
+    something."""
+    if not build_args:
+        return result
+    said = " ".join(build_args)
+    note = (f"scoped by {said}" if lang in _READS_BUILD_ARGS
+            else f"{len(build_args)} build argument(s) were given and the {lang} harness "
+                 f"reads none, so they were not applied: {said}")
+    return {**result, "details": f"{result['details']} ({note})"}
 
 def _runtime_determinism(repo: Path, lang: str, timeout_seconds: float, python_executable: str | None) -> L1Result:
     """Dispatch to the language's runtime determinism harness (the seam above), or n/a."""
@@ -551,14 +594,15 @@ def _runtime_determinism(repo: Path, lang: str, timeout_seconds: float, python_e
     return _measure(harness, repo, timeout_seconds, python_executable)
 
 def _decision_space_l19(repo: Path, lang: str, exec_tests: bool, timeout_seconds: float,
-                        python_executable: str | None) -> L1Result:
+                        python_executable: str | None, build_args: tuple[str, ...]) -> L1Result:
     """Real coverage when the suite can run; otherwise the static decision-point
     enumeration with coverage clearly marked not-measured."""
     static = _compute_decision_space(repo, lang)
     if not exec_tests:
         static["details"] += "; coverage not measured (test execution disabled)"
         return static
-    cov = _runtime_coverage(repo, lang, timeout_seconds, python_executable)
+    cov = _runtime_coverage(repo, lang, timeout_seconds, python_executable, build_args,
+                            _COVERAGE_HARNESS)
     if cov.get("band") != "n/a":
         return cov
     static["details"] += f"; coverage not measured: {cov.get('details', 'unavailable')}"

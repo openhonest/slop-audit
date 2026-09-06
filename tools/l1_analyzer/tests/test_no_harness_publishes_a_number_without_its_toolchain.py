@@ -34,7 +34,7 @@ def no_toolchain(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("lang", _LANGUAGES)
 def test_coverage_refuses_rather_than_publishing_a_share(lang, no_toolchain):
-    result = _COVERAGE_HARNESS[lang](no_toolchain, 5.0, None)
+    result = _COVERAGE_HARNESS[lang](no_toolchain, 5.0, None, ())
     assert result["band"] == "n/a", lang
     assert result["value"] == "n/a", lang
 
@@ -55,7 +55,7 @@ def test_every_refusal_carries_a_reason_and_no_score(lang, no_toolchain):
     whose refusal reads "pytest collected no tests". That is a perfectly good reason and the
     test was measuring prose. What can be checked is that a reason is there and that no
     number went out beside it."""
-    for result in (_COVERAGE_HARNESS[lang](no_toolchain, 5.0, None),
+    for result in (_COVERAGE_HARNESS[lang](no_toolchain, 5.0, None, ()),
                    _DETERMINISM_HARNESS[lang](no_toolchain, 5.0, None)):
         assert len(result["details"].strip()) > 15, (lang, result["details"])
         assert "%" not in result["details"], (lang, result["details"])
@@ -68,7 +68,7 @@ def test_the_python_harness_measures_with_its_own_interpreter_rather_than_one_on
     It runs under the interpreter the analyzer is already running under, so an empty PATH
     takes nothing away from it. It refuses for the next reason instead, that the directory
     holds no tests, which is a fact about the repository rather than about the machine."""
-    result = _COVERAGE_HARNESS["python"](no_toolchain, 5.0, None)
+    result = _COVERAGE_HARNESS["python"](no_toolchain, 5.0, None, ())
     assert result["band"] == "n/a"
     assert "no tests" in result["details"]
 

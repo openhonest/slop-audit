@@ -293,7 +293,8 @@ def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
     }
 
 
-def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:
+def decision_space_coverage(repo: Path, timeout_seconds: float,
+                            build_args: tuple[str, ...]) -> L1Result:
     """L1.19 for Rust: region coverage from cargo-llvm-cov. Bands match the spec:
     >90% Healthy, 60-90% Not Healthy, <60% Slop."""
     cargo = _cargo()
@@ -305,15 +306,16 @@ def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:
     with tempfile.TemporaryDirectory(prefix="l1-rustcov-") as directory:
         report_file = Path(directory) / "cov.json"
         run = _run_untrusted(
-            # No arguments: this row goes through a nine-language dispatch whose signature
-            # is (repo, timeout, runtime_override), so there is nowhere for a Rust-only
-            # argument to travel. The prove path takes them; L1.19 does not yet, and a
-            # workspace that will not build fails this row the same way.
-            llvm_cov_command(cargo, report_file, ()),
+            llvm_cov_command(cargo, report_file, build_args),
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
         if run.returncode == 124:
-            return _na("test suite timed out before coverage could be measured")
+            # The note, like every other timeout refusal. This one was missed, and it is the
+            # path a Rust workspace actually takes: the instrumented build's own stopwatch,
+            # not the suite's. Without the number "the test suite timed out" reads as a fact
+            # about the repository when the fact is that nobody asked for long enough.
+            return _na("test suite timed out before coverage could be measured"
+                       + disclosure.timeout_note(timeout_seconds))
         if "llvm-tools" in (run.stderr or "") and not report_file.exists():
             return _na("cargo-llvm-cov could not find the LLVM coverage tools; install the "
                        "llvm-tools-preview rustup component, or set LLVM_COV / LLVM_PROFDATA")

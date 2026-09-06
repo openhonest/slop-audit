@@ -41,7 +41,7 @@ def panel(repo: pathlib.Path) -> dict[str, str]:
         # No suite runs with exec_tests False, so there is no interpreter for this call to
         # choose. Stated rather than defaulted: the default is what let the gate's own call
         # site be missed when every other one was updated.
-        python_executable=None))
+        python_executable=None, build_args=()))
     return {k: str(v.get("band")) for k, v in sorted(results.items())
             if k.startswith("L1.") and isinstance(v, dict)}
 

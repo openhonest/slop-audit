@@ -113,10 +113,18 @@ Feature: indicators — the Layer-1 indicator computations, L1.1 through L1.20
     But a repository with no in-scope production file publishes zero percent and the healthy band, which is an empty denominator reported as cleanliness
 
   Scenario: _runtime_coverage hands the coverage question to the language's own harness
-    Given a repository, a language, the timeout and the optional interpreter
+    Given a repository, a language, the timeout, the optional interpreter and the caller's build arguments
     When _runtime_coverage looks up that language's coverage harness and runs the target repository's own suite
-    Then it returns whatever the harness measured, unchanged
+    Then it returns whatever the harness measured, with what the run was scoped by said beside it
+    And every harness in the table takes the build arguments, because every language has a build tool and any of them may one day need them, while Rust is the only one that reads them today
     But a language with no harness registered returns n/a naming itself, never a zero
+
+  Scenario: _with_build_args says what a coverage figure was scoped by, or that the scope was not applied
+    Given a coverage reading, the language it was measured for, and the build arguments the run was given
+    When _with_build_args prepares the reading for a reader
+    Then a language that reads the arguments has them named beside the figure, because a figure over part of a workspace is a different number from one over all of it
+    And a language whose harness reads none says the arguments were given and not applied, rather than measuring as though nothing had been asked
+    But a run that passed no arguments gets no line at all, since a note about scoping on a run that scoped nothing is noise and a reader who meets it once stops reading the ones that mean something
 
   Scenario: _runtime_determinism hands the repeatability question to the language's own harness
     Given a repository, a language, the timeout and the optional interpreter

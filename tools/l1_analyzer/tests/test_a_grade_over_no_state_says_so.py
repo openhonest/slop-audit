@@ -51,7 +51,7 @@ def test_the_card_says_there_is_no_state_rather_than_a_share_of_none():
     here = pathlib.Path(__file__).resolve().parents[1]
     results = indicators.compute_source_indicators(
         here, lang="python", exec_tests=False, timeout_seconds=5.0,
-        classify_state_bounds=True, python_executable=None)
+        classify_state_bounds=True, python_executable=None, build_args=())
     model = card.build_card("o/r", "python", results, ran_tests=False, analyzer_version="test")
     rendered = card.card_markdown(model)
     assert "% of its state is finitely testable" not in rendered, rendered[:400]

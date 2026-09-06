@@ -118,7 +118,7 @@ def _run_gate(repo: Path, lang: str, max_type_escapes: int | None,
         # no suite runs, so there is no interpreter for this call to choose. The signature
         # used to supply the None itself, which is what let this call site be missed when
         # every other one was updated.
-        python_executable=None,
+        python_executable=None, build_args=()
     )
     audited_lang = _audited_language(results, lang, repo)
     problems: list[str] = []

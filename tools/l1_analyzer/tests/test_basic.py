@@ -78,7 +78,7 @@ def test_every_language_config_has_required_keys():
 def test_compute_source_indicators_rejects_unexpected_kwargs(tmp_path):
     (tmp_path / "acc.py").write_text("x = 1\n")
     with pytest.raises(TypeError):
-        indicators.compute_source_indicators(tmp_path, lang="python", exec_tests=False, timeout_seconds=5.0, bogus=1, python_executable=None)
+        indicators.compute_source_indicators(tmp_path, lang="python", exec_tests=False, timeout_seconds=5.0, bogus=1, python_executable=None, build_args=())
 
 
 # --- skipped files are surfaced, never silently dropped ---------------------
@@ -177,7 +177,7 @@ def test_l1_19_l1_20_non_python_is_na(tmp_path):
 
 def test_l1_19_static_fallback_when_exec_disabled(tmp_path):
     (tmp_path / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
-    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=False, timeout_seconds=30.0, python_executable=None)
+    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=False, timeout_seconds=30.0, python_executable=None, build_args=())
     assert res["band"] == "n/a"
     assert "coverage not measured" in res["details"]
     assert isinstance(res["value"], int) and res["value"] >= 1
@@ -621,7 +621,8 @@ def test_l1_12_and_l1_14_are_native_and_need_no_tool_on_path(tmp_path, monkeypat
     (tmp_path / "app.py").write_text(
         'AWS = "' + "AKIA" + "2E0RTQ4KJ7X9WZ1P" + '"\n\n\ndef orphan():\n    return 1\n')
     res = indicators.compute_source_indicators(
-        tmp_path, lang="auto", exec_tests=False, timeout_seconds=5, classify_state_bounds=False, python_executable=None)
+        tmp_path, lang="auto", exec_tests=False, timeout_seconds=5, classify_state_bounds=False,
+        python_executable=None, build_args=())
     assert res["L1.12"]["band"] != "n/a" and res["L1.12"]["value"] > 0
     assert res["L1.14"]["value"] == 1 and res["L1.14"]["band"] == "Not Healthy"
 
@@ -641,7 +642,7 @@ def test_l1_15_density_over_a_kloc_is_slop(tmp_path):
 
 def test_l1_19_falls_back_to_static_when_no_tests(tmp_path):
     (tmp_path / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
-    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=True, timeout_seconds=60.0, python_executable=None)
+    res = indicators._decision_space_l19(tmp_path, "python", exec_tests=True, timeout_seconds=60.0, python_executable=None, build_args=())
     assert res["band"] == "n/a" and "coverage not measured" in res["details"]
     assert isinstance(res["value"], int) and res["value"] >= 1
 

@@ -235,13 +235,13 @@ def test_rust_determinism_counts_its_seeds(rust_project):
 def test_rust_coverage_is_measured_when_llvm_cov_is_present(rust_project, monkeypatch):
     for name, value in (_llvm_tools() or {}).items():
         monkeypatch.setenv(name, value)      # environment, which is what the tool reads
-    result = rust_trace.decision_space_coverage(rust_project, 900.0)
+    result = rust_trace.decision_space_coverage(rust_project, 900.0, ())
     assert result["band"] != "n/a", result["details"]
     assert 0 < float(result["value"]) <= 100
 
 
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo is not on PATH")
 def test_rust_refuses_a_directory_with_no_crate(tmp_path):
-    result = rust_trace.decision_space_coverage(tmp_path, 60.0)
+    result = rust_trace.decision_space_coverage(tmp_path, 60.0, ())
     assert result["band"] == "n/a"
     assert result["details"].strip()
