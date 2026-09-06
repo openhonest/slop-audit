@@ -19,6 +19,7 @@ import pytest
 from l1_analyzer import thread_surface
 from l1_analyzer.indicators import _get_parser
 from l1_analyzer.lang_spec import LANG_SPEC
+from l1_analyzer.ts_nodes import descendants
 
 _CALLS = {
     "rust": ("fn go(&self) {\n    if self.count.load() { self.count.store(1); }\n}\n",
@@ -37,7 +38,7 @@ def test_the_receiver_of_a_method_call_is_read_in_every_language(lang):
     source, expected = _CALLS[lang]
     root = _root(source, lang)
     found = set()
-    for node in thread_surface._walk(root):
+    for node in descendants(root, "all"):
         pair = thread_surface.method_receiver(node, LANG_SPEC[lang])
         if pair is not None:
             found.add(pair[1])

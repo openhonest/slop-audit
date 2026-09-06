@@ -117,12 +117,20 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
     tables = frozenset(_LITERAL_NODES.get(lang, ()))
     out: list[tuple[str, int]] = []
 
-    def walk(node: Node) -> None:
+    # An explicit stack, because this walk stops at a table, a record, an import and a
+    # literal rather than reading every node, which is the one thing `ts_nodes.descendants`
+    # cannot be asked for. It recursed until 2026-09-05, and parse-tree depth is set by the
+    # file being audited: a generated expression two thousand deep took the interpreter's
+    # stack and the whole panel with it. Children go on reversed so they come off in source
+    # order, which is the order the line numbers below are appended in.
+    stack = [root]
+    while stack:
+        node = stack.pop()
         if "comment" in node.type:
-            return
+            continue
         if (data_tables.is_table(node, tables, literals)
                 or data_tables.declares_a_table(node, tables, literals)):
-            return
+            continue
         # A record declaration, for the same reason as a data table. This check erases
         # identifiers so that two functions doing one thing with different names read alike,
         # and that is exactly what makes it wrong here: a record IS its field names, and
@@ -136,7 +144,7 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
         # A declaration only. A class carrying methods is code, and skipping that would hide
         # duplication behind a keyword.
         if _declares_only_fields(node, lang):
-            return
+            continue
         # An import statement, for the third time the same argument. A data table is not a
         # pile of logic, a record declaration is a list of field names, and an import block
         # is a list of imported names. There is no logic in any of them for this check to
@@ -151,14 +159,14 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
         # The STATEMENT only. `importlib.import_module(name)` is a call that does work, and
         # treating it as a declaration would hide a real repeated block.
         if node.type in _IMPORT_STATEMENTS:
-            return
+            continue
         # The literal test comes BEFORE the descent, because a literal is not always a
         # leaf. Python spells a string as a node with string_start, string_content and
         # string_end beneath it, so a leaf-only test emitted three tokens carrying the
         # text itself and `a = "text"` failed to match `a = 1`.
         if node.type in literals:
             out.append((LITERAL, node.start_point[0] + 1))
-            return
+            continue
         if not node.children:
             line = node.start_point[0] + 1
             if node.type == "identifier" or node.type.endswith("_identifier"):
@@ -167,11 +175,8 @@ def normalized_tokens(root: Node, lang: str) -> list[tuple[str, int]]:
                 text = node.text.decode("utf8", errors="ignore") if node.text else ""
                 if text.strip():
                     out.append((text, line))
-            return
-        for child in node.children:
-            walk(child)
-
-    walk(root)
+            continue
+        stack.extend(reversed(node.children))
     return out
 
 

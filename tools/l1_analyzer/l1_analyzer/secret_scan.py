@@ -305,16 +305,17 @@ def _string_spans(raw: bytes, suffix: str) -> list[tuple[int, int]] | None:
     entry = _EXT_LANG.get(suffix)
     if entry is None:
         return None
+    # An explicit stack, because this one stops at a string rather than reading every node,
+    # which is the one thing `ts_nodes.descendants` cannot be asked for. It recursed until
+    # 2026-09-05, and parse-tree depth is set by the file being scanned.
     spans: list[tuple[int, int]] = []
-
-    def walk(node) -> None:
+    stack = [parser(entry[0]).parse(raw).root_node]
+    while stack:
+        node = stack.pop()
         if "string" in node.type or node.type in ("heredoc_body", "raw_string_literal"):
             spans.append((node.start_byte, node.end_byte))
-            return
-        for child in node.children:
-            walk(child)
-
-    walk(parser(entry[0]).parse(raw).root_node)
+            continue
+        stack.extend(reversed(node.children))
     return spans
 
 

@@ -343,13 +343,19 @@ def literal_size(node: Node | None) -> int | None:
     argument, so `frozenset(("a", "b"))` is two; `frozenset(config.load())` is closed and
     of unknown size, which is a count we do not have rather than a size of zero. The
     difference decides whether the state can ever be D, so it is never guessed."""
-    if node is None:
+    # A loop rather than a call to itself, because the wrapper case is unbounded: nothing
+    # stops a generated file writing `tuple(tuple(tuple(...)))` deeper than the interpreter's
+    # stack, and a reader that dies on its input is not a reader.
+    while node is not None:
+        if node.type in ("set", "tuple", "list"):
+            return len([c for c in node.children if c.is_named])
+        if node.type == "call" and _text(_field(node, "function")) in ("frozenset", "set", "tuple"):
+            args = _field(node, "arguments")
+            if args is None:
+                return 0
+            node = _first_named(args)
+            continue
         return None
-    if node.type in ("set", "tuple", "list"):
-        return len([c for c in node.children if c.is_named])
-    if node.type == "call" and _text(_field(node, "function")) in ("frozenset", "set", "tuple"):
-        args = _field(node, "arguments")
-        return literal_size(_first_named(args)) if args is not None else 0
     return None
 
 

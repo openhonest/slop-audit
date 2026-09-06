@@ -19,12 +19,6 @@ Feature: thread_surface — the concurrency audit surface, every site where a la
     But nothing leaves the machine when the operator declines, and the run says nothing further about it
 
 
-  Scenario: _walk lists a node and everything under it
-    Given the root of any subtree
-    When _walk descends into every child in turn
-    Then it returns the node first and then its descendants in source order
-    But it rebuilds the whole list on every call, so a scanner that walks a function once per rule pays for the walk once per rule
-
   Scenario: _mk builds one finding about one site
     Given the kind of site, the symbol, the severity, the file it sits in, and the node
     When _mk assembles the finding

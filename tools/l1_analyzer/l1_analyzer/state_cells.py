@@ -17,6 +17,7 @@ from tree_sitter import Node
 from l1_analyzer import state_partition
 from l1_analyzer.lang_spec import LangSpec
 from l1_analyzer.state_partition import Reach
+from l1_analyzer.ts_nodes import descendants
 from l1_analyzer.ts_nodes import field as _field
 from l1_analyzer.ts_nodes import is_write_target as _is_write_target
 from l1_analyzer.ts_nodes import same as _same
@@ -161,21 +162,18 @@ def is_closed_set(node: Node | None, closed_sets: dict[str, int | None]) -> bool
 
 def collect_closed_sets(root: Node) -> dict[str, int | None]:
     names: dict[str, int | None] = {}
-
-    def walk(n: Node) -> None:
-        if n.type == "assignment":
-            left, rhs = _field(n, "left"), _field(n, "right")
-            if left is not None and is_immutable_collection(rhs):
-                if left.type == "identifier":
-                    names[_text(left)] = state_partition.literal_size(rhs)
-                elif left.type == "attribute":
-                    attr = _field(left, "attribute")
-                    if attr is not None:
-                        names[_text(attr)] = state_partition.literal_size(rhs)
-        for c in n.children:
-            walk(c)
-
-    walk(root)
+    for n in descendants(root, "all"):
+        if n.type != "assignment":
+            continue
+        left, rhs = _field(n, "left"), _field(n, "right")
+        if left is None or not is_immutable_collection(rhs):
+            continue
+        if left.type == "identifier":
+            names[_text(left)] = state_partition.literal_size(rhs)
+        elif left.type == "attribute":
+            attr = _field(left, "attribute")
+            if attr is not None:
+                names[_text(attr)] = state_partition.literal_size(rhs)
     return names
 
 

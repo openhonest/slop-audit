@@ -175,14 +175,16 @@ _DECLARATOR_WRAPPERS = ("array_declarator", "pointer_declarator", "function_decl
 
 def _bound_name(node: Node | None) -> str:
     """The identifier a name-ish declaration node binds, past any declarator wrappers."""
-    if node is None:
-        return ""
-    if node.type not in _DECLARATOR_WRAPPERS:
-        return _text(node)
-    inner = _field(node, "declarator")
-    if inner is None:
-        inner = next((c for c in node.children if c.is_named), None)
-    return _bound_name(inner)
+    # A loop rather than a call to itself, for the reason `record_state._c_field_name`
+    # gives: one wrapper per star, and nothing bounds how many a generated header writes.
+    while node is not None:
+        if node.type not in _DECLARATOR_WRAPPERS:
+            return _text(node)
+        inner = _field(node, "declarator")
+        if inner is None:
+            inner = next((c for c in node.children if c.is_named), None)
+        node = inner
+    return ""
 
 
 def _named_field(node: Node, names: tuple[str, ...]) -> str:

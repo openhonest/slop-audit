@@ -24,6 +24,7 @@ from l1_analyzer.boundary import boundary
 from l1_analyzer.dead_code_defs import RepoFacts
 from l1_analyzer.dead_code_grammars import _EXT_LANG, parser
 from l1_analyzer.scope import _in_ignored_dir, _rglob_files
+from l1_analyzer.ts_nodes import descendants
 
 _IDENT_EXTRA = frozenset({"identifier", "constant"})
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -115,7 +116,7 @@ def dotted_path_in(text: str) -> str:
 
 
 def _harvest_source(root: Node, relpath: str, corpus: Corpus) -> None:
-    def walk(node: Node) -> None:
+    for node in descendants(root, "all"):
         if _is_identifier_leaf(node):
             name = node.text.decode("utf8", errors="ignore") if node.text else ""
             corpus["hard"].setdefault(name, []).append((relpath, node.start_byte))
@@ -125,10 +126,6 @@ def _harvest_source(root: Node, relpath: str, corpus: Corpus) -> None:
             dotted = dotted_path_in(text.strip("\"'"))
             if dotted:
                 corpus["words"]["dotted"].add(dotted)
-        for child in node.children:
-            walk(child)
-
-    walk(root)
 
 
 Manifest = dict[str, object]

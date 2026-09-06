@@ -33,6 +33,7 @@ from l1_analyzer.indicators import (
     _read_source_bytes,
 )
 from l1_analyzer.scope import PRODUCTION
+from l1_analyzer.ts_nodes import descendants
 
 # A control-flow node: an integer basic-block id (from the counter), or the "entry"/
 # "exit" string sentinel. Control that does not fall through is None.
@@ -294,17 +295,13 @@ def cover_paths(repo: Path, lang: str) -> PathCover:
     for _path, src in files:
         root = parser.parse(src).root_node
 
-        def walk(n: Node) -> None:
-            nonlocal total, functions
-            if n.type in cfg["function_types"]:
-                body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
-                if body is not None:
-                    functions += 1
-                    total += function_cover(body)
-            for c in n.children:
-                walk(c)
-
-        walk(root)
+        for n in descendants(root, "all"):
+            if n.type not in cfg["function_types"]:
+                continue
+            body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
+            if body is not None:
+                functions += 1
+                total += function_cover(body)
 
     return {
         "value": total,

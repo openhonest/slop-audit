@@ -171,34 +171,39 @@ def _rust_attribute_before(item: Node) -> str:
 def _rust(root: Node, src: bytes, relpath: str, facts: RepoFacts) -> list[Definition]:
     out: list[Definition] = []
 
-    def visit(container: Node) -> None:
-        for item in container.named_children:
-            if item.type == "mod_item":
-                body = item.child_by_field_name("body")
-                if body is not None and "cfg(test)" not in _rust_attribute_before(item).replace(" ", ""):
-                    visit(body)
-                continue
-            kind = _RUST_ITEMS.get(item.type)
-            if kind is None:
-                continue
-            name_node = _named_child_of_type(item, _RUST_NAME_TYPES)
-            if name_node is None:
-                continue
-            name = _text(name_node)
-            attribute = _rust_attribute_before(item)
-            is_pub = _named_child_of_type(item, ("visibility_modifier",)) is not None
-            if name == "main":
-                out.append(_mk(name_node, item, kind, EXCLUDED, "crate entry point"))
-            elif attribute:
-                out.append(_mk(name_node, item, kind, UNDECIDABLE,
-                               f"carries the attribute {attribute.splitlines()[0]}"))
-            elif is_pub and facts["rust_is_library"]:
-                out.append(_mk(name_node, item, kind, UNDECIDABLE,
-                               "public item of a library crate (may be used by a dependent crate)"))
-            else:
-                out.append(_mk(name_node, item, kind, CANDIDATE, ""))
-
-    visit(root)
+    # A worklist rather than a call to itself. A module holds a module, and how deep a crate
+    # nests them is the audited file's business rather than anyone's choice here.
+    #
+    # A module's items are spliced in where the module stood, not appended after its
+    # siblings. That is what the recursion did, and a plain stack would have quietly
+    # reordered the definitions this function hands back.
+    work = list(root.named_children)
+    while work:
+        item = work.pop(0)
+        if item.type == "mod_item":
+            body = item.child_by_field_name("body")
+            if body is not None and "cfg(test)" not in _rust_attribute_before(item).replace(" ", ""):
+                work[:0] = list(body.named_children)
+            continue
+        kind = _RUST_ITEMS.get(item.type)
+        if kind is None:
+            continue
+        name_node = _named_child_of_type(item, _RUST_NAME_TYPES)
+        if name_node is None:
+            continue
+        name = _text(name_node)
+        attribute = _rust_attribute_before(item)
+        is_pub = _named_child_of_type(item, ("visibility_modifier",)) is not None
+        if name == "main":
+            out.append(_mk(name_node, item, kind, EXCLUDED, "crate entry point"))
+        elif attribute:
+            out.append(_mk(name_node, item, kind, UNDECIDABLE,
+                           f"carries the attribute {attribute.splitlines()[0]}"))
+        elif is_pub and facts["rust_is_library"]:
+            out.append(_mk(name_node, item, kind, UNDECIDABLE,
+                           "public item of a library crate (may be used by a dependent crate)"))
+        else:
+            out.append(_mk(name_node, item, kind, CANDIDATE, ""))
     return out
 
 
@@ -340,49 +345,53 @@ def _member_language(cfg: _MemberCfg) -> Callable[[Node, bytes, str, RepoFacts],
                     return _named_child_of_type(declarator, ("identifier",)) or declarator.child_by_field_name("name")
             return node.child_by_field_name("name") or _named_child_of_type(node, ("identifier",))
 
-        def visit(node: Node, inside_type: bool) -> None:
-            for child in node.named_children:
-                if child.type in cfg["types"]:
-                    name_node = child.child_by_field_name("name")
-                    annotation = _annotation_on(child, cfg["annotation_types"])
-                    if name_node is not None:
-                        if annotation:
-                            out.append(_mk(name_node, child, "type", UNDECIDABLE,
-                                           f"annotated {annotation} (framework-reachable)"))
-                        elif _is_extension_container(child):
-                            out.append(_mk(name_node, child, "type", UNDECIDABLE,
-                                           "extension-method container (dispatched on the receiver's type, "
-                                           "so the class name never appears at a call site)"))
-                        elif "public" in _modifier_text(child):
-                            out.append(_mk(name_node, child, "type", UNDECIDABLE,
-                                           "public type (may be consumed outside the repository)"))
-                        else:
-                            out.append(_mk(name_node, child, "type", CANDIDATE, ""))
-                    visit(child, True)
-                elif child.type in cfg["members"] and inside_type:
-                    name_node = member_name(child)
-                    if name_node is None:
-                        continue
-                    kind = cfg["members"][child.type]
-                    annotation = _annotation_on(child, cfg["annotation_types"])
-                    modifiers = _modifier_text(child)
-                    if _text(name_node) in ("main", "Main"):
-                        out.append(_mk(name_node, child, kind, EXCLUDED, "program entry point"))
-                    elif _text(name_node) in _JVM_RUNTIME_MEMBERS:
-                        out.append(_mk(name_node, child, kind, EXCLUDED,
-                                       "read by the serialization runtime through reflection"))
-                    elif annotation:
-                        out.append(_mk(name_node, child, kind, UNDECIDABLE,
+        # A worklist rather than a call to itself. A type holds a type, and how deep a file
+        # nests them is its own business rather than anyone's choice here. Each item carries
+        # whether it sits inside a type, which is the one thing the recursion passed down,
+        # and a container's children are spliced in where the container stood so the
+        # definitions come back in the order they were written.
+        work: list[tuple[Node, bool]] = [(c, False) for c in root.named_children]
+        while work:
+            child, inside_type = work.pop(0)
+            if child.type in cfg["types"]:
+                name_node = child.child_by_field_name("name")
+                annotation = _annotation_on(child, cfg["annotation_types"])
+                if name_node is not None:
+                    if annotation:
+                        out.append(_mk(name_node, child, "type", UNDECIDABLE,
                                        f"annotated {annotation} (framework-reachable)"))
-                    elif "private" in modifiers:
-                        out.append(_mk(name_node, child, kind, CANDIDATE, ""))
+                    elif _is_extension_container(child):
+                        out.append(_mk(name_node, child, "type", UNDECIDABLE,
+                                       "extension-method container (dispatched on the receiver's type, "
+                                       "so the class name never appears at a call site)"))
+                    elif "public" in _modifier_text(child):
+                        out.append(_mk(name_node, child, "type", UNDECIDABLE,
+                                       "public type (may be consumed outside the repository)"))
                     else:
-                        out.append(_mk(name_node, child, kind, UNDECIDABLE,
-                                       "non-private member (may be overridden or dispatched through an interface)"))
+                        out.append(_mk(name_node, child, "type", CANDIDATE, ""))
+                work[:0] = [(c, True) for c in child.named_children]
+            elif child.type in cfg["members"] and inside_type:
+                name_node = member_name(child)
+                if name_node is None:
+                    continue
+                kind = cfg["members"][child.type]
+                annotation = _annotation_on(child, cfg["annotation_types"])
+                modifiers = _modifier_text(child)
+                if _text(name_node) in ("main", "Main"):
+                    out.append(_mk(name_node, child, kind, EXCLUDED, "program entry point"))
+                elif _text(name_node) in _JVM_RUNTIME_MEMBERS:
+                    out.append(_mk(name_node, child, kind, EXCLUDED,
+                                   "read by the serialization runtime through reflection"))
+                elif annotation:
+                    out.append(_mk(name_node, child, kind, UNDECIDABLE,
+                                   f"annotated {annotation} (framework-reachable)"))
+                elif "private" in modifiers:
+                    out.append(_mk(name_node, child, kind, CANDIDATE, ""))
                 else:
-                    visit(child, inside_type)
-
-        visit(root, False)
+                    out.append(_mk(name_node, child, kind, UNDECIDABLE,
+                                   "non-private member (may be overridden or dispatched through an interface)"))
+            else:
+                work[:0] = [(c, inside_type) for c in child.named_children]
         return out
 
     return collect

@@ -96,17 +96,32 @@ def _builds_a_table(node: Node, containers: frozenset[str], literals: frozenset[
 
 
 def _all_data(node: Node, containers: frozenset[str], literals: frozenset[str]) -> bool:
-    elements = [child for child in node.named_children if "comment" not in child.type]
-    if not elements:
-        return False
-    return all(child.type in literals
-               or (child.type in containers and _all_data(child, containers, literals))
-               or (child.type in _PAIRS and _pair_of_data(child, containers, literals))
-               for child in elements)
+    """Whether every element under this container is data, all the way down.
 
+    Over an explicit stack, because it used to call itself once per level of nesting and a
+    generated file is nested as deep as its generator felt like. One vocabulary written as
+    two thousand nested lists exhausted the interpreter's stack, and what reached the person
+    running it was not a repository it could not read: it was a traceback, and the whole
+    panel died with it. Five repositories went missing from a corpus of two hundred that
+    way.
 
-def _pair_of_data(pair: Node, containers: frozenset[str], literals: frozenset[str]) -> bool:
-    parts = [child for child in pair.named_children if "comment" not in child.type]
-    return bool(parts) and all(
-        part.type in literals or (part.type in containers and _all_data(part, containers, literals))
-        for part in parts)
+    The flag on each work item is which nodes that item may hold. A container may hold a
+    pair; a pair may not hold another pair, only literals and containers. That was the one
+    difference between the two functions this replaces, and it is now the one bit of state
+    the loop carries."""
+    stack = [(node, True)]
+    while stack:
+        current, pairs_allowed = stack.pop()
+        elements = [child for child in current.named_children if "comment" not in child.type]
+        if not elements:
+            return False
+        for child in elements:
+            if child.type in literals:
+                continue
+            if child.type in containers:
+                stack.append((child, True))
+            elif pairs_allowed and child.type in _PAIRS:
+                stack.append((child, False))
+            else:
+                return False
+    return True

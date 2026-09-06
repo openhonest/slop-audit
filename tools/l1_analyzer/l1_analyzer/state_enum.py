@@ -274,12 +274,15 @@ def instance_keys(cls: Node, sp: LangSpec) -> list[str]:
 
 def _go_type_name(typ: Node | None) -> str:
     """The struct type a Go receiver binds to, unwrapping `*T` to `T`."""
-    if typ is None:
+    # A loop rather than a call to itself: `**T` is one wrapper per star, and the depth is
+    # the audited file's business rather than anyone's choice here.
+    while typ is not None:
+        if typ.type == "pointer_type":
+            typ = next((c for c in typ.children if c.is_named), None)
+            continue
+        if typ.type == "type_identifier":
+            return _text(typ)
         return ""
-    if typ.type == "pointer_type":
-        return _go_type_name(next((c for c in typ.children if c.is_named), None))
-    if typ.type == "type_identifier":
-        return _text(typ)
     return ""
 
 

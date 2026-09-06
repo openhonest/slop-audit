@@ -12,29 +12,49 @@ Nothing here knows what a state is or what a partition is. These read a parse tr
 from __future__ import annotations
 
 from collections.abc import Callable
+from operator import attrgetter
 
 from tree_sitter import Node
 
 from l1_analyzer.lang_spec import LangSpec
 
+_CHILD_LISTS: dict[str, Callable[[Node], list[Node]]] = {
+    "all": attrgetter("children"),
+    "named": attrgetter("named_children"),
+}
 
-def descendants(scope: Node) -> list[Node]:
+
+def descendants(scope: Node, children: str) -> list[Node]:
     """Every node under `scope`, `scope` included, in source order.
 
     The walk this package writes over and over. Twenty-two functions across fourteen modules
     each held their own copy on 2026-09-05, every one of them recursive, and every one of
     them therefore had a depth ceiling set by the file being audited rather than by anyone
     who chose it. Python's is a thousand frames, and five of the two hundred largest
-    repositories in the corpus crashed on it.
+    repositories in the corpus crashed on it. What reached the person running it was not a
+    repository the tool could not read: it was a traceback, and the whole panel died with
+    it.
+
+    `children` says which child list to walk. "all" reaches punctuation and every other
+    anonymous token; "named" reaches only the nodes the grammar gives a name, which is what
+    a rule about syntax asks for and what a rule about text does not. Written as two
+    functions for about ten minutes, until this repository's own clause 1 said they were one
+    shape with one name erased, which they were.
+
+    Subscripted rather than defaulted, twice over. A caller has to say which walk it wants,
+    because the two answer differently and the quiet choice would be whichever the last
+    author needed. And an unknown word raises here rather than falling back, so a typo is a
+    stack trace at the call rather than a silently narrower reading.
 
     Children go on reversed so they come off in source order, because a stack pops last in
     first out and callers read the first match as the declaration."""
+    take = _CHILD_LISTS[children]
     out: list[Node] = []
     stack = [scope]
     while stack:
         node = stack.pop()
         out.append(node)
-        stack.extend(reversed(node.children))
+        stack.extend(reversed(take(node)))
     return out
 
 

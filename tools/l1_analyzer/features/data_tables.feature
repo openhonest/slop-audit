@@ -30,15 +30,12 @@ Feature: data_tables — what a container has to be for its contents to be data 
 
   Scenario: _all_data reads a container's elements down to the bottom
     Given a container and the two vocabularies
-    When _all_data walks its elements
+    When _all_data walks its elements over an explicit stack
     Then a literal, a pair of literals, or another container of the same all count, at any depth
+    And a pair reached inside a container is read the same way, except that a pair may not hold another pair, which is the one difference the stack carries as a flag
+    And an empty container or an empty pair is not data, at whatever depth it is met
+    And a generated file nested two thousand deep is answered rather than crashing, which it did not do until 2026-09-05
     But an element that is none of those makes the whole container logic
-
-  Scenario: _pair_of_data reads one entry of a mapping
-    Given a pair node
-    When _pair_of_data reads its two halves
-    Then a name bound to a name carries no logic, any more than either half does alone
-    But a half that is neither a literal nor a table makes the pair logic
 
   # The undecidable case. Every feature carries exactly one, and the gate requires it, because
   # a measure that meets a construct it has no rule for must say so rather than return a verdict.

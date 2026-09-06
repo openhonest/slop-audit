@@ -219,16 +219,19 @@ _C_DECLARATORS = ("array_declarator", "pointer_declarator", "function_declarator
 def _c_field_name(node: Node | None) -> str:
     """The identifier a C field declarator binds. `int cache[256]`, `char *name` and
     `void (*cb)(int)` each declare one slot, behind one to three wrappers."""
-    if node is None:
-        return ""
-    if node.type == "field_identifier":
-        return _text(node)
-    if node.type not in _C_DECLARATORS:
-        return ""
-    inner = _field(node, "declarator")
-    if inner is None:
-        inner = next((c for c in node.children if c.is_named), None)
-    return _c_field_name(inner)
+    # A loop rather than a call to itself. `int ****x` is one wrapper per star and nothing
+    # bounds how many a generated header writes, so recursing here has a ceiling set by the
+    # file being read.
+    while node is not None:
+        if node.type == "field_identifier":
+            return _text(node)
+        if node.type not in _C_DECLARATORS:
+            return ""
+        inner = _field(node, "declarator")
+        if inner is None:
+            inner = next((c for c in node.children if c.is_named), None)
+        node = inner
+    return ""
 
 
 def _c_struct_field(root: Node, sp: LangSpec, already: Callable[[Node], list[str]]) -> RecordRead:

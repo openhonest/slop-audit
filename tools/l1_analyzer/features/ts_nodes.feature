@@ -4,9 +4,11 @@ Feature: ts_nodes — the shared parse-tree accessors every analysis module read
   function-point size (honest-gherkin section 9).
 
   Scenario: descendants gives every node under one, in source order
-    Given a node of a parse tree
+    Given a node of a parse tree and the word for which child list to walk
     When descendants walks it
     Then every node beneath it comes back, itself included, with children in the order they were written
+    And "all" reaches punctuation and every other anonymous token, while "named" reaches only the nodes the grammar gives a name
+    And a word the table does not hold raises here, so a typo is a stack trace at the call rather than a quietly narrower reading
     And the walk holds its own stack rather than recursing, because parse-tree depth is set by the file being audited and a recursive walk has a ceiling nobody chose
     But children go onto that stack reversed, since a stack pops last in first out and a caller reading the first reference as the declaration would otherwise get the last one
 

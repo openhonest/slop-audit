@@ -270,7 +270,12 @@ def body_asserts(body: str) -> bool:
 
     root = _get_parser("rust").parse(body.encode()).root_node
 
-    def reachable(node) -> bool:
+    # An explicit stack, because this walk refuses to enter a nested function rather than
+    # reading every node, which is the one thing `ts_nodes.descendants` cannot be asked for.
+    # It recursed until 2026-09-05, and parse-tree depth is set by the body being read.
+    stack = [root]
+    while stack:
+        node = stack.pop()
         for child in node.children:
             if child.type == "function_item":
                 continue
@@ -279,11 +284,8 @@ def body_asserts(body: str) -> bool:
                 text = name.text.decode("utf8", errors="ignore") if name is not None and name.text else ""
                 if text in _ASSERT_MACROS:
                     return True
-            if reachable(child):
-                return True
-        return False
-
-    return reachable(root)
+            stack.append(child)
+    return False
 
 
 _ASSERT_MACROS = frozenset({

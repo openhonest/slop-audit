@@ -65,7 +65,7 @@ from l1_analyzer.indicators import (
 )
 from l1_analyzer.lang_spec import LANG_SPEC
 from l1_analyzer.scope import PRODUCTION
-from l1_analyzer.ts_nodes import refs
+from l1_analyzer.ts_nodes import descendants, refs
 from l1_analyzer.ts_nodes import text as _text
 
 # ---------------------------------------------------------------------------
@@ -418,8 +418,7 @@ def _count_mutable_refs(
     instance_field_types = cfg["instance_field_types"]
     raw_mut_patterns = cfg["raw_mut_patterns"]
 
-    def walk(n: Node):
-        nonlocal count
+    for n in descendants(body, "all"):
         text = _text(n)
         if (n.type == member_type and receiver_names
                 and any(text.startswith(r + member_op) for r in receiver_names) and text not in bounded):
@@ -432,9 +431,6 @@ def _count_mutable_refs(
         # for every language flagged any source that merely contained the strings.
         if raw_mut_patterns and any(p in text for p in raw_mut_patterns):
             count += 1
-        for c in n.children:
-            walk(c)
-    walk(body)
     return count
 
 
@@ -611,21 +607,19 @@ def _count_file_functions(
     """Pure per-file walk: return (total functions, functions touching unbounded
     external mutable state). Module-level (not a loop closure) so it binds no caller
     state. No function is excluded from the denominator; see the boundary note above."""
-    totals = [0, 0]  # [total, mutable]
-
-    def find_functions(n: Node):
-        if n.type in cfg["function_types"]:
-            totals[0] += 1
-            body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
-            if body is not None:
-                receivers = _receiver_names(n, cfg)
-                if _count_mutable_refs(body, cfg, module_mutables, receivers, bounded) > 0:
-                    totals[1] += 1
-        for c in n.children:
-            find_functions(c)
-
-    find_functions(root)
-    return totals[0], totals[1]
+    total = 0
+    touching = 0
+    for n in descendants(root, "all"):
+        if n.type not in cfg["function_types"]:
+            continue
+        total += 1
+        body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
+        if body is None:
+            continue
+        receivers = _receiver_names(n, cfg)
+        if _count_mutable_refs(body, cfg, module_mutables, receivers, bounded) > 0:
+            touching += 1
+    return total, touching
 
 
 def _parsed_roots(repo: Path, lang: str, cfg: LangCfg) -> tuple[list[tuple[Node, str]], int]:
@@ -691,20 +685,17 @@ def _file_mutable_names(
     external mutable state. Same predicate as _count_file_functions (module-level so it
     binds no caller state), only it keeps the names instead of a tally."""
     names: list[str] = []
-
-    def find(n: Node) -> None:
-        if n.type in cfg["function_types"]:
-            body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
-            if body is not None:
-                receivers = _receiver_names(n, cfg)
-                if _count_mutable_refs(body, cfg, module_mutables, receivers, bounded) > 0:
-                    nm = _function_name(n)
-                    if nm:
-                        names.append(nm)
-        for c in n.children:
-            find(c)
-
-    find(root)
+    for n in descendants(root, "all"):
+        if n.type not in cfg["function_types"]:
+            continue
+        body = next((c for c in n.children if c.type in _BODY_NODE_TYPES), None)
+        if body is None:
+            continue
+        receivers = _receiver_names(n, cfg)
+        if _count_mutable_refs(body, cfg, module_mutables, receivers, bounded) > 0:
+            nm = _function_name(n)
+            if nm:
+                names.append(nm)
     return names
 
 

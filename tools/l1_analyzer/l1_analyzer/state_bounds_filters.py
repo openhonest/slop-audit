@@ -145,7 +145,7 @@ def _member_writes(cls: Node, attr: str, sp: LangSpec) -> list[Node]:
     self-only scan is blind to it; over-approximating writes is the safe direction."""
     writes: list[Node] = []
 
-    for n in descendants(cls):
+    for n in descendants(cls, "all"):
         if n.type in sp["assign_types"]:
             left = _field(n, sp["assign_left"])
             # Every attribute IN the target, not the target itself. `self.a, self.b = m, m`
@@ -345,21 +345,6 @@ def _writes_are_plain_stores(cls: Node, attr: str, refs: list[Node], sp: LangSpe
     return True
 
 
-def _descendants(node: Node) -> list[Node]:
-    """Every named node under this one, not including it.
-
-    Iterative, and named children only, which is what separates it from `ts_nodes.
-    descendants`: punctuation is not a node any rule here asks about. It recursed until
-    2026-09-05, when a Java tree deep enough to exhaust the stack crashed the audit."""
-    out: list[Node] = []
-    stack = list(reversed(node.named_children))
-    while stack:
-        current = stack.pop()
-        out.append(current)
-        stack.extend(reversed(current.named_children))
-    return out
-
-
 def _result_invariant(attr: str, refs: list[Node], sp: LangSpec) -> bool | None:
     """The presence of a key does not change the answer. Scoped to the ACCESSOR methods -
     those that contain a presence test on the attribute - every return is the keyed value
@@ -384,7 +369,7 @@ def _result_invariant(attr: str, refs: list[Node], sp: LangSpec) -> bool | None:
     for fn in gated:
         if fn is None:
             continue
-        for ret in (n for n in _descendants(fn) if n.type in sp["return_types"]):
+        for ret in (n for n in descendants(fn, "named") if n.type in sp["return_types"]):
             val = ret.named_children[0] if ret.named_children else None
             if val is not None and not reads.is_keyed_read_of(val, attr, sp):
                 return False
@@ -823,15 +808,28 @@ def _gate_guarded_statements(gate: Node, sp: LangSpec) -> list[Node]:
     are declared per language and expanded, so Java's constructor_body, Ruby's `then` and
     `else`, Go's statement_list and Python's else_clause all yield their statements instead
     of reading as one unrecognised node."""
-    tests = [_field(gate, f) for f in sp["gate_fields"]]
+    # An explicit stack rather than a call to itself. A body container may hold another, and
+    # how deep the nesting goes is the audited file's business.
+    #
+    # Two things the obvious loop gets wrong, and both changed the answer. The gate's own
+    # test is recomputed for each container rather than carried down from the outermost one,
+    # which is what the recursion did. And a container's statements have to land where the
+    # container stood, not after its siblings, so the work goes on the stack as expand-or-
+    # emit items and the items go on reversed.
     out: list[Node] = []
-    for child in gate.named_children:
-        if any(_same(t, child) for t in tests):
+    stack: list[tuple[str, Node]] = [("expand", gate)]
+    while stack:
+        kind, node = stack.pop()
+        if kind == "emit":
+            out.append(node)
             continue
-        if child.type in sp["gate_body_types"]:
-            out.extend(_gate_guarded_statements(child, sp))
-        else:
-            out.append(child)
+        tests = [_field(node, f) for f in sp["gate_fields"]]
+        pending: list[tuple[str, Node]] = []
+        for child in node.named_children:
+            if any(_same(t, child) for t in tests):
+                continue
+            pending.append(("expand" if child.type in sp["gate_body_types"] else "emit", child))
+        stack.extend(reversed(pending))
     return out
 
 

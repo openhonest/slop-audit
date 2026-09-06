@@ -39,9 +39,6 @@ from typing import TypedDict
 from tree_sitter import Node
 
 from l1_analyzer.boundary import boundary, text_or_empty
-from l1_analyzer.dead_code_grammars import _EXT_LANG, parser
-
-_TOKEN_PASTING = b"##"
 from l1_analyzer.dead_code_corpus import (
     Corpus,
     _read_corpus,
@@ -53,6 +50,7 @@ from l1_analyzer.dead_code_defs import (
     UNDECIDABLE,
     Definition,
 )
+from l1_analyzer.dead_code_grammars import _EXT_LANG, parser
 from l1_analyzer.disclosure import listed_note
 from l1_analyzer.scope import (
     PRODUCTION,
@@ -62,6 +60,9 @@ from l1_analyzer.scope import (
     _repo_has_packages,
     _rglob_files,
 )
+from l1_analyzer.ts_nodes import descendants
+
+_TOKEN_PASTING = b"##"
 
 
 # One dead or undecidable definition, and the refusal this module returns when it cannot
@@ -253,23 +254,20 @@ def _unreachable_statements(root: Node, lang: str) -> list[Unreachable]:
     reachable_after = _REACHABLE_AFTER[lang]
     found: list[Unreachable] = []
 
-    def walk(node: Node) -> None:
-        if node.type in blocks and not _conditionally_compiled(node):
-            seen_terminator = False
-            for child in node.named_children:
-                if _skip_in_unreachable_scan(child.type):
-                    continue
-                if seen_terminator:
-                    if child.type in reachable_after:
-                        break
-                    found.append({"line": child.start_point[0] + 1,
-                                  "end_line": child.end_point[0] + 1})
-                elif _is_terminator(child, terminators):
-                    seen_terminator = True
-        for child in node.children:
-            walk(child)
-
-    walk(root)
+    for node in descendants(root, "all"):
+        if node.type not in blocks or _conditionally_compiled(node):
+            continue
+        seen_terminator = False
+        for child in node.named_children:
+            if _skip_in_unreachable_scan(child.type):
+                continue
+            if seen_terminator:
+                if child.type in reachable_after:
+                    break
+                found.append({"line": child.start_point[0] + 1,
+                              "end_line": child.end_point[0] + 1})
+            elif _is_terminator(child, terminators):
+                seen_terminator = True
     return found
 
 

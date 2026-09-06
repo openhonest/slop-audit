@@ -32,6 +32,7 @@ import re
 from typing import TypedDict
 
 from l1_analyzer.indicators import _get_parser
+from l1_analyzer.ts_nodes import descendants
 
 # --- attribution: is the panic the test's own assertion? -------------------
 
@@ -52,17 +53,9 @@ def _string_literals(body: str) -> list[str]:
     end, and any string inside <cond> precedes the message."""
     src = f"fn _f() {{\n{body}\n}}".encode()
     root = _get_parser("rust").parse(src).root_node
-    out: list[str] = []
-
-    def walk(node) -> None:
-        if node.type in ("string_literal", "raw_string_literal"):
-            text = src[node.start_byte:node.end_byte].decode("utf8", errors="ignore")
-            out.append(_string_content(text))
-        for child in node.named_children:
-            walk(child)
-
-    walk(root)
-    return out
+    return [_string_content(src[node.start_byte:node.end_byte].decode("utf8", errors="ignore"))
+            for node in descendants(root, "named")
+            if node.type in ("string_literal", "raw_string_literal")]
 
 
 def _string_content(literal: str) -> str:

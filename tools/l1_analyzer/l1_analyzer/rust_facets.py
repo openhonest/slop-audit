@@ -18,6 +18,7 @@ from typing import TypedDict
 from tree_sitter import Node
 
 from l1_analyzer.indicators import _get_parser
+from l1_analyzer.ts_nodes import descendants
 from l1_analyzer.ts_nodes import slice_text as _text
 
 _BRANCH_BODY = {
@@ -118,9 +119,14 @@ def _first_executable_line(body: Node | None) -> int | None:
 def _branches(src: bytes, fn_body: Node) -> list[RustBranch]:
     out: list[RustBranch] = []
 
-    def walk(n: Node) -> None:
+    # An explicit stack, because this walk refuses to enter a nested function rather than
+    # reading every node, which is the one thing `ts_nodes.descendants` cannot be asked for.
+    # It recursed until 2026-09-05, and parse-tree depth is set by the function being read.
+    stack = list(reversed(fn_body.named_children))
+    while stack:
+        n = stack.pop()
         if n.type == "function_item":
-            return  # nested fn: its branches belong to it, not to us
+            continue  # nested fn: its branches belong to it, not to us
         if n.type == "if_expression":
             cons = n.child_by_field_name("consequence")
             out.append({"kind": "if", "line": n.start_point[0] + 1,
@@ -141,11 +147,7 @@ def _branches(src: bytes, fn_body: Node) -> list[RustBranch]:
             body = n.child_by_field_name(_BRANCH_BODY[n.type][0])
             out.append({"kind": n.type.split("_")[0], "line": n.start_point[0] + 1,
                         "body_line": _first_executable_line(body), "cfg": _enclosing_cfg(src, n)})
-        for c in n.named_children:
-            walk(c)
-
-    for c in fn_body.named_children:
-        walk(c)
+        stack.extend(reversed(n.named_children))
     return out
 
 
@@ -161,22 +163,19 @@ def module_functions(source: str) -> list[RustFunction]:
     root = _get_parser("rust").parse(src).root_node
     out: list[RustFunction] = []
 
-    def walk(n: Node) -> None:
-        if n.type == "function_item" and not _is_test_scoped(src, n):
-            name = _text(src, n.child_by_field_name("name"))
-            body = n.child_by_field_name("body")
-            if name is not None and body is not None:
-                out.append({
-                    "name": name,
-                    "source": _text(src, n) or "",
-                    "parameters": _parameters(src, n.child_by_field_name("parameters")),
-                    "return_type": _text(src, n.child_by_field_name("return_type")),
-                    "branches": _branches(src, body),
-                })
-        for c in n.named_children:
-            walk(c)
-
-    walk(root)
+    for n in descendants(root, "named"):
+        if n.type != "function_item" or _is_test_scoped(src, n):
+            continue
+        name = _text(src, n.child_by_field_name("name"))
+        body = n.child_by_field_name("body")
+        if name is not None and body is not None:
+            out.append({
+                "name": name,
+                "source": _text(src, n) or "",
+                "parameters": _parameters(src, n.child_by_field_name("parameters")),
+                "return_type": _text(src, n.child_by_field_name("return_type")),
+                "branches": _branches(src, body),
+            })
     return out
 
 

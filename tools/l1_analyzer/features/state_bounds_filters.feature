@@ -100,12 +100,6 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     And an augmented store fails, because inspecting and rewriting a stored value is what a counter does, not what a cache does
     But an attribute with no references and no rebinds passes, having offered nothing to reject
 
-  Scenario: _descendants yields every named node beneath a node
-    Given any node
-    When _descendants walks its named children and their children in turn
-    Then it yields each one, parents before their own children
-    But unnamed nodes such as operator and keyword tokens are never yielded
-
   Scenario: _enclosing_function finds the function a reference sits in
     Given a reference node and the language spec
     When _enclosing_function walks up looking for one of the function types this language declares

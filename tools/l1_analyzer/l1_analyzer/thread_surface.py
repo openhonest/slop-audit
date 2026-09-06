@@ -75,6 +75,7 @@ from l1_analyzer.indicators import (
 )
 from l1_analyzer.lang_spec import LANG_SPEC, LangSpec
 from l1_analyzer.scope import PRODUCTION_WITHOUT_CONFORMANCE, BucketedPaths
+from l1_analyzer.ts_nodes import descendants
 from l1_analyzer.ts_nodes import text as _text
 
 # conformance/ and tests hold scaffolding and doubles, not production surface. The scope
@@ -134,18 +135,6 @@ class SurfaceResult(TypedDict):
 
 
 
-def _walk(node: Node) -> list[Node]:
-    out: list[Node] = []
-
-    def go(n: Node) -> None:
-        out.append(n)
-        for c in n.children:
-            go(c)
-
-    go(node)
-    return out
-
-
 def method_receiver(call: Node, spec: LangSpec) -> tuple[str, str] | None:
     """(method, receiver) for a `receiver.method(...)` call, else None.
 
@@ -180,7 +169,7 @@ def receivers_by_method(scope: Node | None, methods: frozenset[str],
     if scope is None:
         return out
     roots = tuple(f"{word}." for word in spec["this_idents"])
-    for node in _walk(scope):
+    for node in descendants(scope, "all"):
         pair = method_receiver(node, spec)
         if pair is not None and pair[0] in methods and pair[1].startswith(roots):
             out.add(pair[1])
@@ -235,7 +224,7 @@ def _rust_takes_shared_self(func: Node) -> bool:
     params = func.child_by_field_name("parameters")
     if params is None:
         return False
-    sp = next((c for c in _walk(params) if c.type == "self_parameter"), None)
+    sp = next((c for c in descendants(params, "all") if c.type == "self_parameter"), None)
     if sp is None:
         return False
     return any(c.type == "&" for c in sp.children) and not any(c.type == "mutable_specifier" for c in sp.children)
@@ -251,7 +240,7 @@ def _rust_nonatomic_rmw(func: Node, rel: str, spec: LangSpec) -> list[Finding]:
     loads: dict[str, Node] = {}
     stores: set[str] = set()
     atomic_protocol: set[str] = set()
-    for n in _walk(func):
+    for n in descendants(func, "all"):
         mr = method_receiver(n, spec)
         if mr is None or not mr[1].startswith("self."):
             continue
@@ -279,7 +268,7 @@ def _call_uses_relaxed(call: Node) -> bool:
     args = call.child_by_field_name("arguments")
     return args is not None and any(
         n.type == "scoped_identifier" and _text(n).replace(" ", "").endswith("Ordering::Relaxed")
-        for n in _walk(args)
+        for n in descendants(args, "all")
     )
 
 
@@ -308,7 +297,7 @@ def _rust_check_then_act(func: Node, rel: str, spec: LangSpec) -> list[Finding]:
     """B2: an `if` whose condition checks a self.-rooted collection and whose body
     mutates the same one - a check-then-act (TOCTOU) window."""
     findings: list[Finding] = []
-    for n in _walk(func):
+    for n in descendants(func, "all"):
         if n.type != "if_expression":
             continue
         checked = receivers_by_method(n.child_by_field_name("condition"), _CHECK_METHODS, spec)
@@ -321,7 +310,7 @@ def _rust_check_then_act(func: Node, rel: str, spec: LangSpec) -> list[Finding]:
 
 def _scan_rust(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
-    for n in _walk(root):
+    for n in descendants(root, "all"):
         # unsafe impl Send/Sync for T : the Send/Sync guarantee is hand-asserted.
         if n.type == "impl_item" and any(c.type == "unsafe" for c in n.children):
             trait = _text(n.child_by_field_name("trait"))
@@ -444,7 +433,7 @@ def _py_condition_containers(cond: Node | None, containers: set[str]) -> set[str
     out: set[str] = set()
     if cond is None:
         return out
-    for n in _walk(cond):
+    for n in descendants(cond, "all"):
         if n.type == "comparison_operator" and any(c.type in ("in", "not in") for c in n.children):
             named = [c for c in n.children if c.is_named]
             if named and named[-1].type == "identifier" and _text(named[-1]) in containers:
@@ -457,7 +446,7 @@ def _py_body_mutated(body: Node | None, containers: set[str]) -> set[str]:
     out: set[str] = set()
     if body is None:
         return out
-    for n in _walk(body):
+    for n in descendants(body, "all"):
         if n.type == "assignment":
             left = n.child_by_field_name("left")
             if left is not None and left.type == "subscript":
@@ -476,7 +465,7 @@ def _py_body_mutated(body: Node | None, containers: set[str]) -> set[str]:
 
 def _py_check_then_act(root: Node, containers: set[str], rel: str) -> list[Finding]:
     findings: list[Finding] = []
-    for n in _walk(root):
+    for n in descendants(root, "all"):
         if n.type != "if_statement":
             continue
         checked = _py_condition_containers(n.child_by_field_name("condition"), containers)
@@ -490,7 +479,7 @@ def _py_check_then_act(root: Node, containers: set[str], rel: str) -> list[Findi
 def _py_global_names(func: Node) -> set[str]:
     """Names a function declares `global` - the shared module state it writes."""
     names: set[str] = set()
-    for n in _walk(func):
+    for n in descendants(func, "all"):
         if n.type == "global_statement":
             names.update(_text(c) for c in n.children if c.type == "identifier")
     return names
@@ -502,13 +491,13 @@ def _py_nonatomic_rmw(root: Node, rel: str, guarded: bool) -> list[Finding]:
     update. Review unless a lock exists in the file (then candidate - unproven guard)."""
     severity = CANDIDATE if guarded else REVIEW
     findings: list[Finding] = []
-    for fn in _walk(root):
+    for fn in descendants(root, "all"):
         if fn.type != "function_definition":
             continue
         globals_ = _py_global_names(fn)
         if not globals_:
             continue
-        for n in _walk(fn):
+        for n in descendants(fn, "all"):
             if n.type == "augmented_assignment":
                 left = n.child_by_field_name("left")
                 if left is not None and left.type == "identifier" and _text(left) in globals_:
@@ -530,7 +519,7 @@ def _py_has_lock(nodes: list[Node]) -> bool:
 
 def _scan_python(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
-    nodes = _walk(root)
+    nodes = descendants(root, "all")
 
     # Mutable default arguments: shared across calls, always decidable, race under
     # free-threading. A REVIEW-level footgun regardless of concurrency imports.
@@ -579,11 +568,11 @@ _JS_MUTATE = frozenset({"set", "add", "push", "delete", "unshift", "pop", "splic
 
 def _scan_jsts(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
-    for n in _walk(root):
+    for n in descendants(root, "all"):
         if n.type != "if_statement":
             continue
         cons = n.child_by_field_name("consequence")
-        if cons is None or not any(x.type == "await_expression" for x in _walk(cons)):
+        if cons is None or not any(x.type == "await_expression" for x in descendants(cons, "all")):
             continue  # no awaited yield in the body -> not an async TOCTOU
         checked = receivers_by_method(n.child_by_field_name("condition"), _JS_CHECK, spec)
         mutated = receivers_by_method(cons, _JS_MUTATE, spec)
@@ -605,27 +594,32 @@ _GO_SYNC_METHODS = frozenset({"Lock", "Unlock", "RLock", "RUnlock", "Store", "Ad
 
 def _go_assign_base(node: Node | None) -> str | None:
     """The base variable a write targets: `x` -> x, `m[k]` -> m, `obj.f` -> obj."""
-    if node is None:
+    # A loop rather than a call to itself: `a.b.c[i][j].d` is one wrapper per step, and the
+    # depth is the audited file's business rather than anyone's choice here.
+    while node is not None:
+        if node.type == "identifier":
+            return _text(node)
+        if node.type in ("index_expression", "selector_expression"):
+            node = next((c for c in node.children if c.is_named), None)
+            continue
         return None
-    if node.type == "identifier":
-        return _text(node)
-    if node.type in ("index_expression", "selector_expression"):
-        inner = next((c for c in node.children if c.is_named), None)
-        return _go_assign_base(inner)
     return None
 
 
 def _go_assign_bases(left: Node | None) -> set[str]:
-    if left is None:
-        return set()
-    if left.type == "expression_list":
-        out: set[str] = set()
-        for c in left.children:
-            if c.is_named:
-                out |= _go_assign_bases(c)
-        return out
-    base = _go_assign_base(left)
-    return {base} if base else set()
+    # An explicit stack, for the reason `_go_assign_base` gives above: an expression list
+    # may hold another, and how deep is the audited file's business.
+    out: set[str] = set()
+    stack = [left] if left is not None else []
+    while stack:
+        node = stack.pop()
+        if node.type == "expression_list":
+            stack.extend(c for c in node.children if c.is_named)
+            continue
+        base = _go_assign_base(node)
+        if base:
+            out.add(base)
+    return out
 
 
 def _go_declared_inside(fl: Node, body: Node) -> set[str]:
@@ -633,15 +627,15 @@ def _go_declared_inside(fl: Node, body: Node) -> set[str]:
     names: set[str] = set()
     params = fl.child_by_field_name("parameters")
     if params is not None:
-        names.update(_text(c) for c in _walk(params) if c.type == "identifier")
-    for n in _walk(body):
+        names.update(_text(c) for c in descendants(params, "all") if c.type == "identifier")
+    for n in descendants(body, "all"):
         if n.type == "short_var_declaration":
             names |= _go_assign_bases(n.child_by_field_name("left"))
     return names
 
 
 def _go_has_sync(body: Node) -> bool:
-    for n in _walk(body):
+    for n in descendants(body, "all"):
         if n.type == "send_statement":
             return True
         if n.type == "call_expression":
@@ -653,10 +647,10 @@ def _go_has_sync(body: Node) -> bool:
 
 def _scan_go(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
-    for go in _walk(root):
+    for go in descendants(root, "all"):
         if go.type != "go_statement":
             continue
-        fl = next((x for x in _walk(go) if x.type == "func_literal"), None)
+        fl = next((x for x in descendants(go, "all") if x.type == "func_literal"), None)
         if fl is None:
             continue
         body = fl.child_by_field_name("body")
@@ -665,7 +659,7 @@ def _scan_go(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
         declared = _go_declared_inside(fl, body)
         severity = CANDIDATE if _go_has_sync(body) else REVIEW
         seen: set[str] = set()
-        for n in _walk(body):
+        for n in descendants(body, "all"):
             targets: set[str] = set()
             if n.type == "assignment_statement":
                 targets = _go_assign_bases(n.child_by_field_name("left"))
@@ -708,7 +702,7 @@ def _java_base_type(typ: Node | None) -> str | None:
 
 def _scan_java(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     findings: list[Finding] = []
-    for fd in _walk(root):
+    for fd in descendants(root, "all"):
         if fd.type != "field_declaration":
             continue
         mods = next((c for c in fd.children if c.type == "modifiers"), None)
@@ -730,7 +724,7 @@ def _scan_java(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
 # --------------------------------------------------------------------------
 
 def _ruby_uses_threads(root: Node) -> bool:
-    for n in _walk(root):
+    for n in descendants(root, "all"):
         if n.type == "constant" and _text(n) == "Thread":
             return True
         if n.type == "call":
@@ -744,7 +738,7 @@ def _scan_ruby(root: Node, rel: str, spec: LangSpec) -> list[Finding]:
     if not _ruby_uses_threads(root):
         return []
     findings: list[Finding] = []
-    for n in _walk(root):
+    for n in descendants(root, "all"):
         if n.type == "operator_assignment":
             left = n.child_by_field_name("left")
             if left is not None and left.type == "class_variable":

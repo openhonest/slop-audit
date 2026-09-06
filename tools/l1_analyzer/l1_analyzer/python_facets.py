@@ -21,6 +21,7 @@ from typing import TypedDict
 from tree_sitter import Node
 
 from l1_analyzer.indicators import _get_parser
+from l1_analyzer.ts_nodes import descendants
 from l1_analyzer.ts_nodes import slice_text as _text
 
 
@@ -70,9 +71,15 @@ def _branches(fn_body: Node) -> list[PyBranch]:
     def add(kind: str, construct: Node, block: Node | None) -> None:
         out.append({"kind": kind, "line": construct.start_point[0] + 1, "body_line": _first_executable_line(block)})
 
-    def walk(n: Node) -> None:
+    # An explicit stack, because this walk refuses to enter a nested function rather than
+    # reading every node, which is the one thing `ts_nodes.descendants` cannot be asked for.
+    # It recursed until 2026-09-05, and parse-tree depth is set by the function being read.
+    # Children go on reversed so branches come back in source order.
+    stack = list(reversed(fn_body.named_children))
+    while stack:
+        n = stack.pop()
         if n.type == "function_definition":
-            return  # nested function: its branches belong to it, not to us
+            continue  # nested function: its branches belong to it, not to us
         if n.type == "if_statement":
             add("if", n, _first_block(n))
             alt = n.child_by_field_name("alternative")
@@ -87,11 +94,7 @@ def _branches(fn_body: Node) -> list[PyBranch]:
             body = n.child_by_field_name("body")
             for case in (c for c in body.named_children if c.type == "case_clause") if body else ():
                 add("case", case, _first_block(case))
-        for c in n.named_children:
-            walk(c)
-
-    for c in fn_body.named_children:
-        walk(c)
+        stack.extend(reversed(n.named_children))
     return out
 
 
@@ -117,23 +120,20 @@ def module_functions(source: str) -> list[PyFunction]:
     root = _get_parser("python").parse(src).root_node
     out: list[PyFunction] = []
 
-    def walk(n: Node) -> None:
-        if n.type == "function_definition":
-            name = _text(src, n.child_by_field_name("name"))
-            body = n.child_by_field_name("body")
-            if name is not None and body is not None and not name.startswith("test"):
-                params = _parameters(src, n.child_by_field_name("parameters"))
-                out.append({
-                    "name": name,
-                    "source": _text(src, n) or "",
-                    "parameters": params,
-                    "is_method": bool(params) and params[0]["name"] in ("self", "cls"),
-                    "branches": _branches(body),
-                })
-        for c in n.named_children:
-            walk(c)
-
-    walk(root)
+    for n in descendants(root, "named"):
+        if n.type != "function_definition":
+            continue
+        name = _text(src, n.child_by_field_name("name"))
+        body = n.child_by_field_name("body")
+        if name is not None and body is not None and not name.startswith("test"):
+            params = _parameters(src, n.child_by_field_name("parameters"))
+            out.append({
+                "name": name,
+                "source": _text(src, n) or "",
+                "parameters": params,
+                "is_method": bool(params) and params[0]["name"] in ("self", "cls"),
+                "branches": _branches(body),
+            })
     return out
 
 

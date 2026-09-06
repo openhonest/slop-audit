@@ -75,6 +75,7 @@ from l1_analyzer.scope import (  # noqa: F401
     _test_file_by_name,
     bucketed_paths,
 )
+from l1_analyzer.ts_nodes import descendants
 
 # ---------------------------------------------------------------------------
 # Data shape + pure scoring
@@ -345,9 +346,20 @@ def _data_literal_lines(node: Node, containers: frozenset[str], literals: frozen
     people's code."""
     from l1_analyzer import data_tables
 
-    if data_tables.is_table(node, containers, literals):
-        return node.end_point[0] - node.start_point[0] + 1
-    return sum(_data_literal_lines(c, containers, literals) for c in node.children)
+    # An explicit stack, because this one stops at a table rather than reading every node,
+    # which is the one thing `ts_nodes.descendants` cannot be asked for. It recursed until
+    # 2026-09-05: a two-thousand-deep expression in Rust, Go, Java, C# or C took the
+    # interpreter's stack, and the panel died rather than reporting a file it could not
+    # read. Order does not matter to a sum, so the children go on as they come.
+    total = 0
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if data_tables.is_table(current, containers, literals):
+            total += current.end_point[0] - current.start_point[0] + 1
+            continue
+        stack.extend(current.children)
+    return total
 
 
 def god_file_language(ext: str) -> str | None:
@@ -633,8 +645,7 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
             parent = parent.parent
         return False
 
-    def walk(n: Node):
-        nonlocal count
+    for n in descendants(root, "all"):
         if not n.children:  # leaf token
             text = n.text.decode("utf8", errors="ignore") if n.text else ""
             if text in escape_tokens and not in_string(n) and not _in_non_type_position(n, nonpositions) or _is_a_bare_generic(n, cfg, text) and not in_string(n):
@@ -645,10 +656,7 @@ def _count_type_escapes_in_tree(root: Node, cfg: LangCfg) -> int:
                 count += 1
         if n.type in annotation_nodes and _annotation_name(n) in annotation_names:
             count += 1
-        for c in n.children:
-            walk(c)
 
-    walk(root)
     for named in _cast_type_strings(root, cast_calls):
         count += sum(1 for tok in escape_tokens if re.search(rf"\b{re.escape(tok)}\b", named))
     return count
@@ -692,16 +700,7 @@ def _cast_type_strings(root: Node, cast_calls: frozenset[str]) -> list[str]:
 
 def _refs_of_type(root: Node, node_type: str) -> list[Node]:
     """Every node of one type in a tree, in document order."""
-    found: list[Node] = []
-
-    def walk(n: Node) -> None:
-        if n.type == node_type:
-            found.append(n)
-        for c in n.children:
-            walk(c)
-
-    walk(root)
-    return found
+    return [n for n in descendants(root, "all") if n.type == node_type]
 
 
 def _node_text(n: Node) -> str:
@@ -791,13 +790,8 @@ def _compute_decision_space(repo: Path, lang: str) -> L1Result:
         # carries the SAME type string as the node, so walking every child counted
         # every `if` twice in all nine languages. Anonymous tokens are leaves, so
         # skipping them loses no descendant.
-        def walk(n: Node):
-            nonlocal decision_points
-            if n.type in decision_types:
-                decision_points += 1
-            for c in n.named_children:
-                walk(c)
-        walk(root)
+        decision_points += sum(1 for n in descendants(root, "named")
+                               if n.type in decision_types)
 
     # What it counted, and the bound on that count. NOT whether a trace ran: this function
     # serves the website, which runs nothing, and the CLI, which runs the suite, and it used
