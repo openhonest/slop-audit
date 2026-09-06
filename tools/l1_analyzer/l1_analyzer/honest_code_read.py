@@ -654,11 +654,58 @@ def io_calls_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:
         receiver = called.child_by_field_name("object") or called.child_by_field_name("value")
         if receiver is None:
             continue
-        name = node_text(receiver, raw).rsplit(".", 1)[-1].strip()
-        if (name in spec["io_modules"] or f"{name}.{bare}" in spec["io_dotted"]
+        # The receiver as written and its last segment, and a module matches on either.
+        # Only the last segment was read until 2026-09-05, which left no way to name
+        # `urllib.request` or `http.client` without also naming every `self.request` and
+        # every `self.client` in every codebase. The full text is the precise entry; the
+        # last segment is what a module imported by its own name gives.
+        written = node_text(receiver, raw).strip()
+        name = written.rsplit(".", 1)[-1]
+        if (name in spec["io_modules"] or written in spec["io_modules"]
+                or f"{name}.{bare}" in spec["io_dotted"]
+                or f"{written}.{bare}" in spec["io_dotted"]
                 or (bare in spec["io_ambiguous"] and name in spec["io_receivers"])):
             touched.add(f"{name}.{bare}")
     return touched
+
+
+def non_deterministic_in(node: Node, spec: LangSpec, raw: bytes) -> bool:
+    """Whether this node calls anything that can answer differently between two runs.
+
+    Three readings, for the same reason `io_calls_in` needs four. A bare name counts on its
+    own: `uuid4()` is `uuid4()` however it was imported. A module counts whatever the call
+    is called, because `random`, `secrets` and `platform` are open-ended and naming their
+    members one at a time means missing whichever one an author reaches for. And four of
+    the shared document's names are never called at all: `os.environ`, `sys.argv`,
+    `sys.path` and `sys.version` are read, so they are matched on the dotted text as
+    written. Their last segments are `environ`, `argv`, `path` and `version`, and naming
+    those bare would count every `self.path` in every codebase.
+
+    Not I/O, and this is not becoming a rule about non-determinism. It exists so that a
+    boundary declaration on a function reading one of these is not reported FALSE: another
+    checker in this family requires the marker exactly there, and an author told to delete
+    it would satisfy one gate by failing the other."""
+    for inner in walk(node):
+        if inner.type in spec["member_types"]:
+            written = node_text(inner, raw).strip()
+            if (written in spec["non_deterministic_reads"]
+                    or written.rsplit(".", 1)[0] in spec["non_deterministic_reads"]):
+                return True
+        if inner.type not in spec["call_types"]:
+            continue
+        called = inner.child_by_field_name(spec["call_fn"])
+        if called is None:
+            continue
+        written = node_text(called, raw).strip()
+        if written.rsplit(".", 1)[-1] in spec["non_deterministic_calls"]:
+            return True
+        if "." not in written:
+            continue
+        receiver = written.rsplit(".", 1)[0]
+        if (receiver in spec["non_deterministic_modules"]
+                or receiver.rsplit(".", 1)[-1] in spec["non_deterministic_modules"]):
+            return True
+    return False
 
 
 def called_names_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]:

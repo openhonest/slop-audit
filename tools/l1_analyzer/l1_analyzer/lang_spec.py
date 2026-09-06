@@ -257,6 +257,14 @@ class LangSpec(TypedDict, total=False):
     # Calls reaching something non-deterministic. Named only so a boundary declaration on a
     # function doing one is not reported as false; they are not counted as input or output.
     non_deterministic_calls: frozenset[str]
+    # Receivers whose every call answers differently between runs, for the same reason
+    # `io_modules` exists beside `io_calls`: random, secrets and platform are open-ended, and
+    # naming their members one at a time means missing whichever one an author reaches for.
+    non_deterministic_modules: frozenset[str]
+    # Names that are READ rather than called, matched on the dotted text as written. Their
+    # last segments are too common to name bare: `path` and `version` would count every
+    # `self.path` and every `obj.version` there is.
+    non_deterministic_reads: frozenset[str]
     # How a test says it should not have got this far, and what a handler catches when it
     # says every exception. A deliberate failure raises, so a handler for everything catches
     # it alongside the failure the test was watching for, and the two can then only be told
@@ -639,20 +647,39 @@ LANG_SPEC: dict[str, LangSpec] = {
                           "makedirs", "mkdir", "open", "print", "read_bytes", "read_text",
                           "remove", "rename", "replace_file", "rmdir", "symlink_to", "touch",
                           "unlink", "urlopen", "write_bytes", "write_text"}),
+        # A module matches on its full dotted text as written, or on its last segment. That
+        # is what lets `urllib.request` and `http.client` be named without also naming every
+        # `self.request` and every `self.client` in every codebase.
         "io_modules": frozenset({
-                          "aiosqlite", "asyncpg", "ftplib", "imaplib", "poplib", "psycopg",
-                          "psycopg2", "pymongo", "redis", "smtplib", "sqlite3", "stderr",
-                          "stdin", "stdout"}),
+                          "aiohttp", "aiosqlite", "asyncpg", "ftplib", "http.client",
+                          "httpx", "imaplib", "poplib", "psycopg", "psycopg2", "pymongo",
+                          "redis", "requests", "smtplib", "sqlite3", "ssl", "stderr",
+                          "stdin", "stdout", "telnetlib", "urllib.request", "urllib3"}),
+        # `os.spawn*` in the shared document, written out. The wildcard covers eight names
+        # and this table has no wildcard, so the eight are here; the document's own note
+        # says a whole module is named only where every call in it reaches outside, and
+        # most of `os` does not.
+        #
+        # `environ.get` and `environ.setdefault` are NOT here any more. The shared document
+        # puts os.environ under non-determinism and its sixteenth vector says so in as many
+        # words: reading an environment variable reads process state, which is inside the
+        # process. We had it as I/O and reported a boundary declaration on a function that
+        # reads configuration as true when the other checker in this family calls it
+        # required.
         "io_dotted": frozenset({
-                          "environ.get", "environ.setdefault", "loader.exec_module",
-                          "mmap.mmap", "os.execvp", "os.fork", "os.mkdir", "os.popen",
-                          "os.read", "os.remove", "os.rename", "os.rmdir", "os.system",
-                          "os.walk", "os.write", "shutil.copy", "shutil.copyfile",
-                          "shutil.move", "shutil.rmtree", "socket.create_connection",
-                          "socket.create_server", "socket.getaddrinfo", "socket.getfqdn",
-                          "socket.gethostbyaddr", "socket.gethostbyname", "socket.socket",
-                          "spec.loader", "tempfile.NamedTemporaryFile",
-                          "tempfile.TemporaryDirectory", "tempfile.mkdtemp",
+                          "loader.exec_module", "logging.log", "mmap.mmap", "os.execvp",
+                          "os.fork", "os.mkdir", "os.popen", "os.read", "os.remove",
+                          "os.rename", "os.rmdir", "os.spawnl", "os.spawnle", "os.spawnlp",
+                          "os.spawnlpe", "os.spawnv", "os.spawnve", "os.spawnvp",
+                          "os.spawnvpe", "os.system", "os.walk", "os.write", "shutil.copy",
+                          "shutil.copyfile", "shutil.move", "shutil.rmtree",
+                          "socket.create_connection", "socket.create_server",
+                          "socket.getaddrinfo", "socket.getfqdn", "socket.gethostbyaddr",
+                          "socket.gethostbyname", "socket.gethostname", "socket.socket",
+                          "spec.loader", "subprocess.call",
+                          "tempfile.NamedTemporaryFile", "tempfile.SpooledTemporaryFile",
+                          "tempfile.TemporaryDirectory", "tempfile.TemporaryFile",
+                          "tempfile.mkdtemp", "tempfile.mkstemp", "tempfile.mktemp",
                           "util.spec_from_file_location"}),
         # An adopter read all fifteen of our false positives and seven were this: verbs a
         # database actually uses that we had never named. We knew `execute` and `commit` and
@@ -683,10 +710,24 @@ LANG_SPEC: dict[str, LangSpec] = {
         # the process, so a function taking a random identifier could satisfy one tool only
         # by failing the other, and the author was told to delete a marker another gate
         # needs.
+        #
+        # Thirty of the thirty-nine names the shared document carries were missing on
+        # 2026-09-05 and each was a true declaration this reader would have called false.
         "non_deterministic_calls": frozenset({
-                          "monotonic", "now", "perf_counter", "random", "randrange",
-                          "randint", "sample", "shuffle", "signal", "time", "token_bytes",
-                          "token_hex", "token_urlsafe", "uuid1", "uuid3", "uuid4", "uuid5"}),
+                          "active_count", "cpu_count", "current_process", "current_task",
+                          "current_thread", "get_event_loop", "get_ident", "getcwd",
+                          "getenv", "getlogin", "getpass", "getpid", "getppid", "getuser",
+                          "id", "monotonic", "now", "perf_counter", "process_time",
+                          "random", "randrange", "randint", "sample", "shuffle", "signal",
+                          "sleep", "time", "time_ns", "today", "token_bytes", "token_hex",
+                          "token_urlsafe", "uname", "urandom", "utcnow", "uuid1", "uuid3",
+                          "uuid4", "uuid5"}),
+        # The document writes these three with a wildcard, and a wildcard is the point: a
+        # module whose every member answers differently cannot be listed member by member
+        # without missing the next one.
+        "non_deterministic_modules": frozenset({"platform", "random", "secrets"}),
+        "non_deterministic_reads": frozenset({"os.environ", "sys.argv", "sys.path",
+                                              "sys.version"}),
         "assertion_types": ("assert_statement", "raise_statement"),
         "silencing_calls": frozenset({"suppress"}),
         "container_literal_types": frozenset({"list", "dictionary", "set", "tuple"}),
@@ -760,6 +801,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "catch_all_types": frozenset({"Error"}),
         "exception_text_calls": frozenset({"String"}),
         "non_deterministic_calls": frozenset(),
+        "non_deterministic_modules": frozenset(),
+        "non_deterministic_reads": frozenset(),
         # No declared return type, so nothing here can be declared absent.
         "return_type_field": "",
         "absent_markers": (),
@@ -917,6 +960,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "catch_all_types": frozenset({"Exception", "Throwable", "RuntimeException"}),
         "exception_text_calls": frozenset({"getMessage", "toString"}),
         "non_deterministic_calls": frozenset(),
+        "non_deterministic_modules": frozenset(),
+        "non_deterministic_reads": frozenset(),
         "return_type_field": "type",
         "absent_markers": ("Optional",),
         "absent_values": ("null",),
@@ -1063,6 +1108,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "catch_all_types": frozenset({"Exception", "SystemException"}),
         "exception_text_calls": frozenset({"ToString"}),
         "non_deterministic_calls": frozenset(),
+        "non_deterministic_modules": frozenset(),
+        "non_deterministic_reads": frozenset(),
         "return_type_field": "type",
         "absent_markers": ("?", "Nullable"),
         "absent_values": ("null",),
@@ -1226,6 +1273,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "catch_all_types": frozenset(),
         "exception_text_calls": frozenset(),
         "non_deterministic_calls": frozenset(),
+        "non_deterministic_modules": frozenset(),
+        "non_deterministic_reads": frozenset(),
         "return_type_field": "return_type",
         "absent_markers": ("Option",),
         "absent_values": ("None",),
@@ -1393,6 +1442,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "catch_all_types": frozenset({"StandardError", "Exception"}),
         "exception_text_calls": frozenset({"message", "to_s"}),
         "non_deterministic_calls": frozenset(),
+        "non_deterministic_modules": frozenset(),
+        "non_deterministic_reads": frozenset(),
         "return_type_field": "",
         "absent_markers": (),
         "absent_values": ("nil",),
@@ -1552,6 +1603,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "catch_all_types": frozenset(),
         "exception_text_calls": frozenset(),
         "non_deterministic_calls": frozenset(),
+        "non_deterministic_modules": frozenset(),
+        "non_deterministic_reads": frozenset(),
         "return_type_field": "type",
         "absent_markers": (),
         "absent_values": ("NULL",),
@@ -1709,6 +1762,8 @@ LANG_SPEC: dict[str, LangSpec] = {
         "catch_all_types": frozenset(),
         "exception_text_calls": frozenset(),
         "non_deterministic_calls": frozenset(),
+        "non_deterministic_modules": frozenset(),
+        "non_deterministic_reads": frozenset(),
         "return_type_field": "result",
         "absent_markers": (),
         "absent_values": ("nil",),

@@ -198,7 +198,15 @@ Feature: honest_code_read — how L1.21 reads one source, and what it reads it t
     Given a call by an unambiguous name, one on a receiver that only reaches outside, and one named a call at a time
     When io_calls_in reads all three through the language's vocabulary
     Then each is I/O and reports the name it was reached by
+    And a module matches on the dotted text as written as well as on its last segment, which is what lets urllib.request and http.client be named without also naming every self.request and every self.client
     But a call on a module whose other calls are pure is read one at a time, or os.getenv and os.path.join count too
+
+  Scenario: non_deterministic_in says whether one node reads something that can change between runs
+    Given a call by a bare name, a call on a module whose every member answers differently, and a read of a dotted name that is never called
+    When non_deterministic_in reads all three through the language's vocabulary
+    Then each is non-deterministic: uuid4 by its bare name, random and secrets and platform by their receiver, and os.environ and sys.argv by the dotted text as written
+    And the dotted reads are matched on the whole text because their last segments are environ, argv, path and version, and naming those bare would count every self.path there is
+    But none of it is I/O and this is not a rule about non-determinism: it exists so a boundary declaration on a function reading one of these is not reported false, since the other checker in this family requires the marker exactly there
 
   Scenario: called_names_in names every function one node calls
     Given a function calling two others by name

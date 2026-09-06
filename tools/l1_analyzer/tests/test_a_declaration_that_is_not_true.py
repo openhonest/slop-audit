@@ -165,16 +165,21 @@ def test_the_calls_on_those_modules_that_do_reach_something_still_fire(call):
 
 
 @pytest.mark.parametrize("call", [
-    "os.environ.get('HOME')",
     "loader.exec_module(module)",
     "importlib.util.spec_from_file_location('m', path)",
 ])
-def test_reading_the_environment_or_loading_a_module_reaches_outside(call):
-    """An adopter named six calls this reader did not count. Three of them reach outside.
+def test_loading_a_module_reaches_outside(call):
+    """An adopter named six calls this reader did not count. Two of them reach outside.
 
-    The environment is ambient input a caller cannot see, which is what rule 4 is about.
     Loading a module reads a Python file off disk and executes it, which is as much an edge
-    as opening a socket."""
+    as opening a socket.
+
+    It was three until 2026-09-05, and the third was `os.environ.get`. This file argued that
+    the environment is ambient input a caller cannot see, which is true and is not the same
+    claim. The shared document settled it the other way and gives the reason in its
+    sixteenth vector: reading an environment variable reads process state, and process state
+    is inside the process. It is on the non-determinism list instead, so the adopter's
+    complaint is still answered, by the other route: their declaration is not called false."""
     module = call.split(".")[0]
     found = _findings(f"import {module}\n\n\ndef edge(path, loader, module):\n"
                       f"    return {call}\n\n\ndef run(p, l, m):\n    return edge(p, l, m)\n")
@@ -186,6 +191,7 @@ def test_reading_the_environment_or_loading_a_module_reaches_outside(call):
     "asyncio.create_task(go())",
     "asyncio.get_running_loop()",
     "uuid.uuid4()",
+    "os.environ.get('HOME')",
 ])
 def test_scheduling_and_randomness_are_not_io(call):
     """The other three of the six, and one this clause must keep refusing.

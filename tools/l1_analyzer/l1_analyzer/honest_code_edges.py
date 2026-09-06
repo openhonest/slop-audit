@@ -32,6 +32,7 @@ from l1_analyzer.honest_code_read import (
     names_a_table_holds,
     names_handed_on,
     node_text,
+    non_deterministic_in,
     sends_failure_onward,
     subscript_keys_called_in,
     walk,
@@ -169,7 +170,7 @@ def io_below_the_boundary(source: Source) -> list[Finding] | None:
         # to delete what a second gate needs. Non-determinism is still not counted as I/O:
         # this half of the clause goes quiet, and the half that reports I/O below a boundary
         # is untouched.
-        uncertain = bool(called_names_in(fn, spec, raw) & spec["non_deterministic_calls"])
+        uncertain = non_deterministic_in(fn, spec, raw)
         # A record can carry a function as a field, which is how some code names its edges:
         # `loader["disable_fk_checks"](conn)` reaches a database and there is no attribute
         # access to read. Reported by an adopter with three such sites, and it is their
