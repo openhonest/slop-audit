@@ -582,7 +582,7 @@ def _rust_sources(repo: Path, measured: dict[str, frozenset[int]]) -> dict[str, 
 # honest-code-allow: L1.21.13 - the writer and both readers are one unit. `_call_model` writes LAST_REFUSAL and it is the single model boundary BOTH sweeps import, so there is no second source and no cross-module surprise. Threading the reason back would change the injected propose_fn signature, its repair counterpart and every test fake, to reach one reader at the end of one sweep. The sweeps are sequential, so the value is never stale by more than one call.
 def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
                         timeout_seconds: float, progress: SweepProgress | None,
-                        max_attempts: int) -> Sweep:
+                        max_attempts: int, cargo_args: tuple[str, ...]) -> Sweep:
     """Sweep the WHOLE crate: one coverage build, then every module with uncovered branches is
     proven (batched, with per-gap repair fallback). Retained proofs are aggregated across the
     codebase. `progress(relpath, n_gaps, running_retained)` is called before each module."""
@@ -596,7 +596,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     if not model_available():
         return {"retained": [], "attempted": 0,
                 "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason(llm.anthropic_sdk)]}"}
-    cov = rust_trace.repo_uncovered_lines(repo, timeout_seconds)
+    cov = rust_trace.repo_uncovered_lines(repo, timeout_seconds, cargo_args)
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 
@@ -629,6 +629,11 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     if attempted - outcomes["declined"]:
         detail += _outcome_detail(outcomes)
     detail += ceiling_detail(attempted_gaps, located, max_attempts)
+    # The scope, where one was given. A coverage figure over part of a workspace is a
+    # different number from one over all of it, and a reader cannot tell them apart from
+    # the figure.
+    if cargo_args:
+        detail += f" (cargo scoped by {' '.join(cargo_args)})"
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 
@@ -681,7 +686,7 @@ def _outcome_detail(outcomes: Outcomes) -> str:
 
 
 def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: float,
-                   repair_rounds: int) -> Sweep:
+                   repair_rounds: int, cargo_args: tuple[str, ...]) -> Sweep:
     """Locate uncovered decision branches in one Rust module, prove each (propose -> run,
     then compiler-feedback repair up to repair_rounds), and retain the ones that fail.
     Returns the coverage_proofs shape the card consumes. Every not-run path carries a reason."""
@@ -691,7 +696,7 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: f
         return {"retained": [], "attempted": 0,
                 "detail": f"no coverage proofs generated: {llm.WHY[llm.unavailable_reason(llm.anthropic_sdk)]}"}
 
-    cov = rust_trace.module_uncovered_lines(repo, module_relpath, timeout_seconds)
+    cov = rust_trace.module_uncovered_lines(repo, module_relpath, timeout_seconds, cargo_args)
     if not cov["measured"]:
         return {"retained": [], "attempted": 0, "detail": f"coverage not measured: {cov['reason']}"}
 

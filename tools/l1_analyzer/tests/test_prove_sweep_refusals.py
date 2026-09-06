@@ -43,6 +43,8 @@ def _sweep(module, repo):
              "progress": None, "max_attempts": 5}
     if module is python_coverage_prove:
         knobs["python_executable"] = None
+    else:
+        knobs["cargo_args"] = ()
     return module.prove_coverage_repo(repo, **knobs)
 
 

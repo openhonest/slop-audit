@@ -47,11 +47,20 @@ Feature: rust_trace — running a Rust crate's own test suite to measure coverag
     And several summary lines are summed, because a crate reports one per test binary
     But a total of zero means the suite collected no tests at all, which the caller treats as a reason to refuse a measurement
 
+  Scenario: llvm_cov_command is the one command this module runs to measure Rust coverage
+    Given the cargo binary, where the report is to be written, and any arguments the caller wants cargo to see
+    When llvm_cov_command assembles the invocation
+    Then the caller's arguments are handed to cargo untouched, after the output path, so a workspace can be scoped with cargo's own words rather than a second vocabulary invented here
+    And passing no arguments produces exactly the command this module ran before there was a way to pass any, so no existing measurement moves
+    And a workspace holding one target that will not build is the reason: one target that will not link fails the whole build, and the only scoping lever used to be which directory you pointed at
+    But two functions built this command character for character until 2026-09-06, and only one of them could ever have grown an argument
+
   Scenario: _llvm_cov_report runs one instrumented coverage build and parses its output
-    Given a repository and a time limit
+    Given a repository, a time limit, and any arguments cargo is to be given
     When _llvm_cov_report builds and runs the crate under coverage instrumentation, writing a report to a temporary file
     Then it returns the parsed report, whose file table carries every file's coverage from that one expensive build
     And a whole-repository sweep therefore pays for the instrumented build only once
+    And L1.19's own coverage row passes no arguments, because that row goes through a nine-language dispatch whose signature has nowhere for a Rust-only argument to travel
     But a missing build tool, a missing coverage plugin, a timed-out run, a report that was never written or a report that will not parse returns no report at all together with the specific reason, which the caller must pass on rather than treat as zero coverage
 
   Scenario: _uncovered_lines picks the never-executed decision points out of one file's coverage entry

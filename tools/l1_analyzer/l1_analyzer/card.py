@@ -181,6 +181,8 @@ CARD_COPY: dict[str, str] = {
     "thread.blurb.na": "Not analyzed for {lang} yet.",
     "thread.blurb.unread": "Not measured, and no claim either way. We can read this language, but we got no source to read it in: {read} file(s) were in scope and we could parse {parsed} of them. \"Nothing overrides your thread-safety guarantee\" would be counted over no code at all, so we will not say it. What was set aside is listed above; if it should have been read, send us the repository.",
     "thread.note": "This measures audit surface, not races. It shows where a language's thread-safety guarantee is overridden or missing, so a human or a runtime tool knows where to look. It does not detect data races: that needs [ThreadSanitizer](https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html#threadsanitizer) or an equivalent at runtime. A site here means \"verify this\", never \"a race exists\".",
+    "loops.heading": "Prove loops asked for",
+    "loops.note": "One line per prove loop this run was told to do, whether or not it kept anything. A loop that could not start says why here. The card used to show only what a loop retained, so a sweep whose build failed produced the same page as a run that never asked for one.",
     "proofs.heading": "Adoptable proofs",
     "proofs.note": "Each proof below is a runnable test slop-audit generated for one located gap and then executed. It is shown only because running it settled the matter: the coverage proof genuinely failed (so it pins a decision your suite never reached), or the concurrency proof fired a data race (so it reproduces the hazard). slop-audit proves the gap; it never writes into your test file. Adopting a surviving proof is your choice. Following Umbra's discipline, an unproven gap is reported but never dressed up as a test.",
     "proofs.blurb.coverage": "Coverage gap: the suite never exercised this decision. The test drives it and asserts the caller-facing behavior; it fails against the current code, so adopting it both closes the gap and documents the expectation.",
@@ -470,10 +472,16 @@ def _proofs(results: Panel) -> list[ProofRow]:
 
     concurrency = results.get("proofs")
     if isinstance(concurrency, dict):
-        # ProofOutcome is declared, so every field but generated_test is guaranteed. That
-        # one is None when the model produced nothing, which is a real case and the reason
-        # this loop tests it before exposing anything.
-        for o in concurrency["outcomes"]:
+        # `.get`, because ProofRun is total=False and a run that REFUSED carries a sentence
+        # and no records at all: its own docstring says `detail` is present only on a run
+        # that refused and `attempted` only on one that ran. Subscripting the records raised
+        # KeyError on any run without a key in the environment, so the card did not merely
+        # go quiet about a loop that could not start, it fell over rendering one.
+        #
+        # Within a record, ProofOutcome is declared and every field but generated_test is
+        # guaranteed. That one is None when the model produced nothing, which is a real case
+        # and the reason this loop tests it before exposing anything.
+        for o in concurrency.get("outcomes") or ():
             if o["verdict"] == "demonstrated" and o["generated_test"]:
                 out.append({
                     "layer": "concurrency", "language": "rust",
@@ -486,7 +494,9 @@ def _proofs(results: Panel) -> list[ProofRow]:
 
     coverage = results.get("coverage_proofs")
     if isinstance(coverage, dict):
-        for p in coverage["retained"]:
+        # `.get` for the same reason: Sweep is total=False and says so, because a sweep
+        # that refuses early carries nothing to count.
+        for p in coverage.get("retained") or ():
             if p["test_source"]:
                 out.append({
                     "layer": "coverage", "language": p["language"],
@@ -497,6 +507,45 @@ def _proofs(results: Panel) -> list[ProofRow]:
                     "test_source": p["test_source"].rstrip(),
                 })
     return out[:_PROOF_CAP]
+
+
+# Where each prove loop leaves its account, and the count of what it kept. One row rather
+# than two readers, because both loops grew a refusal path and neither refusal reached a
+# reader; a third loop written tomorrow gets the same treatment by adding a row here.
+_PROVE_LOOPS = (("coverage_proofs", "coverage", "retained"),
+                ("proofs", "concurrency", "demonstrated"))
+
+
+def _prove_loops(results: Panel) -> list[ProveLoopRow]:
+    """What each prove loop that was ASKED FOR says about its own run.
+
+    The card read the proofs a loop RETAINED and nothing else, so a loop whose precondition
+    failed produced a card byte-identical to a run that never asked for one. A reader could
+    not tell a suite with no gaps from a sweep that never happened, which is the reading
+    this instrument exists to refuse, on its own output for the third time this week.
+
+    Reported on 2026-09-06 by the session auditing turso: two hours under
+    --prove-coverage-repo, exit 0, a report matching the static panel to the byte, and no
+    model ever called. The whole trace was one clause inside the L1.19 footnote.
+
+    Presence is the request. Neither key is in the panel unless the CLI was told to run that
+    loop, so a static run says nothing about a sweep nobody asked for."""
+    out: list[ProveLoopRow] = []
+    for key, layer, kept in _PROVE_LOOPS:
+        loop = results.get(key)
+        if not isinstance(loop, dict):
+            continue
+        held = loop.get(kept)
+        # Not `.get("detail", "")`. Both loop records are total=False and each says which of
+        # its fields survive which path, so an absent sentence is a real state rather than a
+        # blank to fill in. A loop that came back with no account of itself is a defect in
+        # that loop, and saying so is the whole point of this function.
+        detail = (str(loop["detail"]) if "detail" in loop
+                  else "this loop returned no account of its own run")
+        out.append({"layer": layer,
+                    "retained": len(held) if isinstance(held, list) else int(held or 0),
+                    "detail": detail})
+    return out
 
 
 def footer_for(card: CardModel) -> str:
@@ -615,6 +664,13 @@ class ProofRow(TypedDict):
     test_source: str
 
 
+class ProveLoopRow(TypedDict):
+    """What one prove loop reports about its own run, whether or not it kept anything."""
+    layer: str
+    retained: int
+    detail: str
+
+
 class CardModel(TypedDict):
     """The published scorecard, as the two renderers read it.
 
@@ -667,6 +723,7 @@ class CardModel(TypedDict):
     honest_code: ConformityCard | None
     analyzer_version: str
     proofs: list[ProofRow]
+    prove_loops: list[ProveLoopRow]
     share_text: str
 
 
@@ -746,6 +803,7 @@ def build_card(slug: str, lang: str, results: Panel, ran_tests: bool,
         "honest_code": _honest_code(results),
         "analyzer_version": analyzer_version,
         "proofs": _proofs(results),
+        "prove_loops": _prove_loops(results),
         "share_text": _t(f"share.{status}", slug=slug),
     }
 
@@ -891,7 +949,15 @@ def card_markdown(card: CardModel) -> str:
         lines += ["", ("> The share is over the clauses that were DECIDED. A clause nobody "
                        "could check is outside it, numerator and denominator both, and is "
                        "named above rather than counted as a pass.")]
+    loops = card.get("prove_loops") or []
     proofs = card.get("proofs") or []
+    if loops:
+        lines += ["", f"## {_t('loops.heading')}", "", strip.sub("", _t("loops.note"))]
+        for loop in cast(list[ProveLoopRow], loops):
+            kept = (f"{loop['retained']} proof(s) retained" if loop["retained"]
+                    else "nothing retained")
+            said = f": {loop['detail']}" if loop["detail"] else ""
+            lines.append(f"- **{loop['layer']}** — {kept}{said}")
     if proofs:
         lines += ["", f"## {_t('proofs.heading')}", "", strip.sub("", _t("proofs.note"))]
         for p in proofs:

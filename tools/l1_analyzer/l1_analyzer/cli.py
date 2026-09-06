@@ -689,6 +689,17 @@ FLAGS: tuple[tuple[list[str], Flag], ...] = (
              "no per-type knowledge), but each round is another in-crate compile - "
              "set 0 to skip repair and take only the first attempt.",
      }),
+    (["--cargo-arg"], {
+        "action": "append",
+        "default": [],
+        "metavar": "ARG",
+        "help": "One argument to hand cargo llvm-cov, repeatable. Use it to scope a "
+                "workspace sweep: --cargo-arg --workspace --cargo-arg --exclude "
+                "--cargo-arg <package>. A workspace with one target that will not build "
+                "fails the whole build, and cargo already has the words for saying which "
+                "packages to sweep, so this passes yours through untouched. What was "
+                "passed is named in the report, because a coverage figure over part of a "
+                "workspace is a different number from one over all of it."}),
     (["--prove-coverage-repo"], {
      "action": "store_true",
      "help": "Prove coverage gaps across the ENTIRE Rust crate: one coverage build, "
@@ -988,12 +999,12 @@ def main(argv: list[str] | None) -> int:
             results["coverage_proofs"] = coverage_prove.prove_coverage_repo(
                 args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
                 timeout_seconds=args.timeout, progress=_cov_progress,
-                max_attempts=args.prove_max_total)
+                max_attempts=args.prove_max_total, cargo_args=tuple(args.cargo_arg))
     elif args.prove_coverage:
         from l1_analyzer import coverage_prove
         results["coverage_proofs"] = coverage_prove.prove_coverage(
             args.repo, args.prove_coverage, cap=args.prove_max, timeout_seconds=args.timeout,
-            repair_rounds=args.coverage_repair_rounds)
+            repair_rounds=args.coverage_repair_rounds, cargo_args=tuple(args.cargo_arg))
 
     # The full Slop Audit scorecard - the SAME card try.slopaudit.org renders, from the
     # same engine module (l1_analyzer.card). The one difference is the runtime layer: the

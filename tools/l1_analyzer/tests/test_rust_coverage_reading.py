@@ -84,7 +84,7 @@ def _tools(monkeypatch):
 
 
 def test_the_repo_reader_measures_and_names_its_files(crate):
-    result = rust_trace.repo_uncovered_lines(crate, 900.0)
+    result = rust_trace.repo_uncovered_lines(crate, 900.0, ())
     assert result["measured"] is True, result.get("reason")
     assert any(rel.endswith("lib.rs") for rel in result["files"]), sorted(result["files"])
 
@@ -92,7 +92,7 @@ def test_the_repo_reader_measures_and_names_its_files(crate):
 def test_the_repo_reader_finds_the_arm_the_test_never_reaches(crate):
     """The fixture's `mid` arm. Its line is known by reading the source, so this asserts a
     fact about the crate rather than whatever the reader happened to return."""
-    result = rust_trace.repo_uncovered_lines(crate, 900.0)
+    result = rust_trace.repo_uncovered_lines(crate, 900.0, ())
     lines = next(v for k, v in result["files"].items() if k.endswith("lib.rs"))
     source = (crate / "src" / "lib.rs").read_text().split("\n")
     uncovered_text = " ".join(source[n - 1] for n in sorted(lines) if n <= len(source))
@@ -100,22 +100,22 @@ def test_the_repo_reader_finds_the_arm_the_test_never_reaches(crate):
 
 
 def test_the_module_reader_answers_for_one_file(crate):
-    result = rust_trace.module_uncovered_lines(crate, "src/lib.rs", 900.0)
+    result = rust_trace.module_uncovered_lines(crate, "src/lib.rs", 900.0, ())
     assert result["measured"] is True, result.get("reason")
     assert result["uncovered_lines"], "a crate with an unreached arm reported none"
 
 
 def test_the_module_reader_refuses_a_path_the_crate_does_not_hold(crate):
     """A module nobody has is not a module with full coverage."""
-    result = rust_trace.module_uncovered_lines(crate, "src/absent.rs", 900.0)
+    result = rust_trace.module_uncovered_lines(crate, "src/absent.rs", 900.0, ())
     assert result["measured"] is False
     assert result["reason"].strip()
 
 
 def test_the_readers_refuse_a_directory_that_is_not_a_crate(tmp_path):
-    repo = rust_trace.repo_uncovered_lines(tmp_path, 120.0)
+    repo = rust_trace.repo_uncovered_lines(tmp_path, 120.0, ())
     assert repo["measured"] is False
     assert repo["reason"].strip()
-    module = rust_trace.module_uncovered_lines(tmp_path, "src/lib.rs", 120.0)
+    module = rust_trace.module_uncovered_lines(tmp_path, "src/lib.rs", 120.0, ())
     assert module["measured"] is False
     assert module["reason"].strip()

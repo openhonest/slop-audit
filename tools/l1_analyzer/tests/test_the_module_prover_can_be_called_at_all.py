@@ -40,6 +40,6 @@ def test_the_module_prover_refuses_before_it_reaches_the_loop_without_cargo(tmp_
     """The refusal paths run, which is what the type checker could see and a caller could
     not: every one of them returns before the broken call, so the crash needed a repository
     with cargo, a key and a real uncovered branch to show itself."""
-    result = coverage_prove.prove_coverage(tmp_path, "src/m.rs", 3, 1.0, 1)
+    result = coverage_prove.prove_coverage(tmp_path, "src/m.rs", 3, 1.0, 1, ())
     assert result["retained"] == []
     assert result["detail"]

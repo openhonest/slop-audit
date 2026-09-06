@@ -111,6 +111,14 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
     And only an entry that actually carries test source is listed, capped at twenty
     But a gap that was located and never proven appears here not at all, because this surface is for what execution settled
 
+  Scenario: _prove_loops says what each prove loop that was asked for did, whether or not it kept anything
+    Given the analyzer results, where the presence of a loop's key is the record that the loop was asked for
+    When _prove_loops reads each loop's own account
+    Then every loop that was asked for gets a line carrying how many proofs it kept and the sentence it returned
+    And a loop that could not start therefore names its reason on the card, where before it produced a page byte-identical to a run that never asked for a sweep
+    And a run that asked for no loop says nothing about one, because a card announcing that a sweep nobody requested produced nothing is noise wearing a finding's clothes
+    But how many gaps a loop located is its own sentence's business, not a field here, since each loop already writes that sentence and two owners of one fact is the shape this instrument reports in other people's code
+
   Scenario: build_card assembles the whole scorecard model, and withholds the figures an ungraded card has not earned
     Given a slug, a language, the analyzer results and whether the test suite was run
     When build_card grades the state and assembles every section

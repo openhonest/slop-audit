@@ -25,8 +25,11 @@ def _sweep_with(sweep, repo, max_attempts):
     """One sweep with every knob stated. None of them carry a default any more."""
     knobs = {"cap_per_module": 5, "repair_rounds": 3, "timeout_seconds": 600.0,
              "progress": None, "max_attempts": max_attempts}
-    if "python_executable" in inspect.signature(sweep).parameters:
+    parameters = inspect.signature(sweep).parameters
+    if "python_executable" in parameters:
         knobs["python_executable"] = None
+    if "cargo_args" in parameters:
+        knobs["cargo_args"] = ()
     return sweep(repo, **knobs)
 
 

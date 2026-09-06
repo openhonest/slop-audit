@@ -125,8 +125,29 @@ def _tests_run(output: str) -> tuple[int, int]:
 # L1.19 decision-space coverage (region coverage via cargo-llvm-cov)
 # ---------------------------------------------------------------------------
 
+def llvm_cov_command(cargo: str, report_file: Path, cargo_args: tuple[str, ...]) -> list[str]:
+    """The one command this module runs to measure Rust coverage.
+
+    Two functions built it, character for character, and only one of them could ever have
+    grown an argument. `cargo_args` is the caller's own words, handed to cargo untouched.
+
+    It exists because a workspace can hold a target that will not build, and one that will
+    not build fails the whole build. The session auditing turso met it on 2026-09-06: one
+    test target links a library by a relative path that cargo-llvm-cov's redirected target
+    directory breaks, and there was no way to say "sweep this workspace but not that
+    package". The only scoping lever was which directory you pointed at.
+
+    Cargo already has the vocabulary for this, `-p` and `--exclude` and `--workspace`, so
+    this passes the words through rather than inventing a second one. The alternative
+    considered was degrading per package, and it is worse: the tool would decide on its own
+    which packages to drop and report a share of a denominator nobody named."""
+    return [cargo, "llvm-cov", "--json", "--quiet", "--output-path", str(report_file),
+            *cargo_args]
+
+
 @boundary
-def _llvm_cov_report(repo: Path, timeout_seconds: float) -> tuple[dict | None, str]:
+def _llvm_cov_report(repo: Path, timeout_seconds: float,
+                     cargo_args: tuple[str, ...]) -> tuple[dict | None, str]:
     """Run cargo-llvm-cov on the real crate once and return (parsed export JSON, reason).
     The JSON's data[0].files carries every file's coverage in one build, so a whole-repo
     sweep pays the (expensive) instrumented build a single time."""
@@ -137,7 +158,7 @@ def _llvm_cov_report(repo: Path, timeout_seconds: float) -> tuple[dict | None, s
         return None, "needs cargo-llvm-cov"
     with tempfile.TemporaryDirectory(prefix="l1-rustcov-") as directory:
         report_file = Path(directory) / "cov.json"
-        run = _run_untrusted([cargo, "llvm-cov", "--json", "--quiet", "--output-path", str(report_file)],
+        run = _run_untrusted(llvm_cov_command(cargo, report_file, cargo_args),
                              cwd=repo, env={}, timeout_seconds=timeout_seconds)
         if run.returncode == 124:
             return None, "coverage run timed out"
@@ -157,10 +178,11 @@ def _uncovered_lines(entry: Entry) -> frozenset[int]:
                      if len(seg) >= 5 and seg[3] and seg[4] and int(seg[2]) == 0)
 
 
-def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: float) -> ModuleUncovered:
+def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: float,
+                           cargo_args: tuple[str, ...]) -> ModuleUncovered:
     """Uncovered lines for ONE module file, measured against the module in its crate (so it
     works for a deeply-integrated module). {measured, uncovered_lines, reason}."""
-    report, reason = _llvm_cov_report(repo, timeout_seconds)
+    report, reason = _llvm_cov_report(repo, timeout_seconds, cargo_args)
     if report is None:
         return {"measured": False, "uncovered_lines": frozenset(), "reason": reason}
     target = str((repo / module_relpath).resolve())
@@ -173,11 +195,12 @@ def module_uncovered_lines(repo: Path, module_relpath: str, timeout_seconds: flo
     return {"measured": True, "uncovered_lines": _uncovered_lines(entry), "reason": ""}
 
 
-def repo_uncovered_lines(repo: Path, timeout_seconds: float) -> RepoUncovered:
+def repo_uncovered_lines(repo: Path, timeout_seconds: float,
+                         cargo_args: tuple[str, ...]) -> RepoUncovered:
     """Uncovered lines for EVERY file under the repo, from a single coverage build. Returns
     {measured, files: {relpath: frozenset(lines)}, reason}. Only files inside `repo` with at
     least one uncovered line are included, keyed by their path relative to repo."""
-    report, reason = _llvm_cov_report(repo, timeout_seconds)
+    report, reason = _llvm_cov_report(repo, timeout_seconds, cargo_args)
     if report is None:
         return {"measured": False, "files": {}, "reason": reason}
     root = repo.resolve()
@@ -282,7 +305,11 @@ def decision_space_coverage(repo: Path, timeout_seconds: float) -> L1Result:
     with tempfile.TemporaryDirectory(prefix="l1-rustcov-") as directory:
         report_file = Path(directory) / "cov.json"
         run = _run_untrusted(
-            [cargo, "llvm-cov", "--json", "--quiet", "--output-path", str(report_file)],
+            # No arguments: this row goes through a nine-language dispatch whose signature
+            # is (repo, timeout, runtime_override), so there is nowhere for a Rust-only
+            # argument to travel. The prove path takes them; L1.19 does not yet, and a
+            # workspace that will not build fails this row the same way.
+            llvm_cov_command(cargo, report_file, ()),
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
         if run.returncode == 124:
