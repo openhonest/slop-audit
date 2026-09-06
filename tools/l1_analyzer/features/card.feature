@@ -111,6 +111,14 @@ Feature: card — the Slop Audit scorecard a reader actually sees, built once fo
     And only an entry that actually carries test source is listed, capped at twenty
     But a gap that was located and never proven appears here not at all, because this surface is for what execution settled
 
+  Scenario: _over_what says what the graded share was computed over, in the sentence that carries it
+    Given the three state counts on a card that graded
+    When _over_what compares the state that reached a verdict against all the state there was
+    Then the grade sentence names both numbers, so the denominator travels with the figure a reader quotes
+    And the arithmetic is unchanged, because state nobody read is not evidence about the code and folding it into the denominator would charge a repository for this instrument's own blindness
+    And two readings of one codebase that differ by half of it no longer produce the same line, which they did on 2026-09-06 when 708 locations moved out of silence and the quoted figure held at ninety-five per cent
+    But nothing is added where nothing was undecided, since a clause that is always there stops being read
+
   Scenario: _coverage_pair puts the coverage figure where a reader meets the state reading
     Given the analyzer results and whether this run executed the repository's test suite
     When _coverage_pair reads the decision-space coverage row

@@ -28,13 +28,30 @@ class _Block:
             self.text = text
 
 
+class _Stream:
+    """Stands in for the SDK's streamed message. The boundary streams every request, because
+    the SDK refuses a non-streaming one whose allowance suggests it may run long."""
+
+    def __init__(self, blocks):
+        self._blocks = blocks
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def get_final_message(self):
+        return type("Response", (), {"content": self._blocks})()
+
+
 def _client_returning(blocks):
     class _Client:
         def __init__(self, **kwargs):
             self.messages = self
 
-        def create(self, **kwargs):
-            return type("Response", (), {"content": blocks})()
+        def stream(self, **kwargs):
+            return _Stream(blocks)
     return _Client
 
 

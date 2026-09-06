@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Iterable
-from typing import Protocol, TypedDict
+from typing import Protocol, TypedDict, cast
 
 MODEL = "claude-sonnet-5"
 
@@ -78,9 +78,30 @@ class Block(Protocol):
 
 
 class Messages(Protocol):
-    """The one call this module makes on a client."""
+    """The one call this module makes on a client.
 
-    def create(self, **arguments: object) -> Reply: ...
+    It was `create` until 2026-09-06. The SDK refuses a non-streaming request whose
+    allowance suggests it may run longer than ten minutes, so every request is streamed and
+    `create` is no longer reached for at all."""
+
+    def stream(self, **arguments: object) -> Streamed: ...
+
+
+class Streamed(Protocol):
+    """What `stream` hands back: a context manager over a reply still arriving."""
+
+    def __enter__(self) -> Assembling: ...
+    def __exit__(self, *details: object) -> None: ...
+
+
+class Assembling(Protocol):
+    """The reply while it arrives, read once at the end.
+
+    Nothing here consumes the stream event by event. The whole message is assembled before
+    anything reads it, so every caller sees one reply and knows nothing about how it
+    arrived."""
+
+    def get_final_message(self) -> Reply: ...
 
 
 class Reply(Protocol):
@@ -120,7 +141,13 @@ def anthropic_sdk() -> Constructor | None:
         from anthropic import Anthropic
     except ImportError:
         return None
-    return Anthropic
+    # Cast, and it is the honest word for what is happening. The Protocol above says what
+    # this module requires of a client and the checker cannot prove the SDK meets it: the
+    # SDK's `stream` is a stack of typed overloads rather than a method taking arbitrary
+    # keywords, so nothing structural can match it without describing every overload here.
+    # What is asserted is exactly the four lines above, and the three test doubles satisfy
+    # them without a cast, which is where the requirement is actually checked.
+    return cast(Constructor, Anthropic)
 
 
 def model_available(sdk: SdkMaker) -> bool:
@@ -173,10 +200,24 @@ def call(system: str, user: str, max_tokens: int, sdk: SdkMaker) -> ModelReply:
     if client is None:
         return {"text": None, "reason": NO_SDK, "cause": ""}
     try:
-        response = client(api_key=os.environ["ANTHROPIC_API_KEY"]).messages.create(
+        # Streamed, always. The SDK refuses a non-streaming request whose expected duration
+        # crosses ten minutes and decides that from `max_tokens` rather than from what
+        # actually happens, so a request that would have returned in seconds is refused
+        # before it is sent: "Streaming is required for operations that may take longer than
+        # 10 minutes." Met on 2026-09-06, three hours after the ask was batched: a pack asks
+        # for room for one answer per gap and that allowance alone trips the guard.
+        #
+        # One way of asking rather than two. A second path taken only above a threshold is a
+        # second thing to keep working, and the threshold is the SDK's to move rather than
+        # ours to track.
+        #
+        # The whole message is assembled before anything reads it, so every caller sees one
+        # string and knows nothing about how it arrived.
+        with client(api_key=os.environ["ANTHROPIC_API_KEY"]).messages.stream(
             model=MODEL, max_tokens=max_tokens,
             system=system, messages=[{"role": "user", "content": user}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
         text = _first_text(response.content)
         if text is None:
             # It arrived and held nothing sayable. That is the model declining, not a

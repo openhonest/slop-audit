@@ -30,13 +30,30 @@ class _Block:
             self.text = text
 
 
+class _Stream:
+    """The SDK's streamed message. Every request is streamed, because the SDK refuses a
+    non-streaming one whose allowance suggests it may run longer than ten minutes."""
+
+    def __init__(self, blocks):
+        self._blocks = blocks
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def get_final_message(self):
+        return type("Response", (), {"content": self._blocks})()
+
+
 def _sdk_returning(blocks):
     class _Client:
         def __init__(self, **kwargs):
             self.messages = self
 
-        def create(self, **kwargs):
-            return type("Response", (), {"content": blocks})()
+        def stream(self, **kwargs):
+            return _Stream(blocks)
     return lambda: _Client
 
 

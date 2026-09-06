@@ -874,6 +874,30 @@ def _silence_sites(l18b: StateReading | None) -> list[SilenceSite]:
              "why": _t("silence.reason." + s["reason"])} for s in (sil.get("sites") or [])]
 
 
+def _over_what(card: CardModel) -> str:
+    """What the graded share was computed over, said in the sentence that carries the share.
+
+    The arithmetic is right and stays: state nobody read is not evidence about this code, so
+    folding it into the denominator would charge a repository for this instrument's own
+    blindness. What was wrong is that the denominator sat three paragraphs below the number,
+    where a quotation leaves it behind.
+
+    Shown on 2026-09-06 on one codebase read by two builds of this tool. 708 locations moved
+    out of silence, the testable count rose seventy per cent, the unbounded count rose from
+    53 to 88, and the quoted figure did not move to the percentage point: 973 over 1,026 is
+    94.83 and 1,659 over 1,747 is 94.96. Two readings that differ by half the codebase and
+    read alike in the only line most people see.
+
+    Nothing is added where nothing was undecided. A clause that is always there stops being
+    read, and a repository this reader got all the way through has one number and no
+    denominator worth printing."""
+    decided = card["neutral_count"] + card["promiscuous_count"]
+    total = decided + card["unresolved_count"]
+    if decided == total:
+        return ""
+    return f", over the {decided:,} of {total:,} pieces that reached a verdict"
+
+
 def _silence_lines(card: CardModel) -> list[str]:
     """Every site the analyzer stopped at. On the `na` card this is the whole content: the
     repository was refused a grade because of silence, so the sites ARE the report."""
@@ -897,7 +921,9 @@ def _verdict_lines(card: CardModel, strip: re.Pattern) -> list[str]:
         # sat underneath it as the only thing saying otherwise.
         lines += [f"**Grade: {card['grade']}** — this code keeps no state between calls", ""]
     elif card["grade"] is not None:
-        lines += [f"**Grade: {card['grade']}** — {card['grade_pct']}% of its state is finitely testable", ""]
+        graded = (f"**Grade: {card['grade']}** — {card['grade_pct']}% of its state is "
+                  f"finitely testable{_over_what(card)}")
+        lines += [graded, ""]
     lines += [card["headline"], "", strip.sub("", card["detail"])]
     if card["grade"] is None:
         # Withheld, which is what the paragraph above says and what the code did not do:
