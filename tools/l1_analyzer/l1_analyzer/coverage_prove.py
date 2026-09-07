@@ -41,6 +41,11 @@ from typing import TypedDict
 from l1_analyzer import budget, coverage_gates, prove_gap, rust_facets, rust_trace
 from l1_analyzer import model_call as llm
 from l1_analyzer.boundary import boundary
+from l1_analyzer.coverage_words import (
+    PROPOSE_INSTRUCTION,
+    PROPOSE_MANY_INSTRUCTION,
+    REPAIR_INSTRUCTION,
+)
 from l1_analyzer.rust_facets import CoverageGap
 from l1_analyzer.sweep_pool import (
     checkouts_for,
@@ -60,28 +65,6 @@ _FAIL_BUCKETS = ("divergence", "wrong_channel", "invalid_fixture", "incidental_p
 _OUTCOMES = (*_FAIL_BUCKETS, "pass", "error", "unreported", "declined")
 # The empty tally, named once so a reader and a test can ask what buckets exist.
 EMPTY_OUTCOMES = {k: 0 for k in _OUTCOMES}
-
-_PROPOSE_INSTRUCTION = (
-    "You are given ONE Rust function and one of its decision branches that no test ever reached. "
-    "Infer the caller-facing behavior the branch SHOULD have from the function name, its signature, and "
-    "the branch condition - do not just echo what the code visibly does. Write the BODY of a Rust test "
-    "that exercises exactly that branch: construct the argument values (bindings are fine), call the "
-    "function into a binding named `result`, then `assert!(<property>, <message>)` on `result`. The proof "
-    "is kept only if execution contradicts your assertion, so assert the behavior a correct implementation "
-    "MUST have, not a prediction of the current output. `use super::*;` is already in scope, so the "
-    "function and its module's types are directly nameable. Return ONLY a JSON object with keys: "
-    '"body" (the Rust statements, no fn/mod wrapper) and '
-    '"explanation" (one plain sentence stating the behavior you assert).'
-)
-
-_REPAIR_INSTRUCTION = (
-    "The Rust test below does not compile. Here is the exact rustc error. Rewrite the test BODY so it "
-    "compiles and still asserts the same intended behavior. Fix the arrange step: build the real argument "
-    "values the signature requires (call constructors, `::new`, `Default::default()`, enum variants - "
-    "anything in scope via `use super::*;`), not bare literals of the wrong type. Keep the final "
-    "`let result = ...;` and the `assert!` on `result`. Return ONLY a JSON object with keys "
-    '"body" (the corrected Rust statements, no fn/mod wrapper) and "explanation".'
-)
 
 _PROOF_MOD = "l1_coverage_proof"
 
@@ -176,6 +159,34 @@ def _live_gaps(gaps: list[CoverageGap], host: frozenset[str]) -> list[CoverageGa
     return [g for g in gaps if not coverage_gates.cfg_excluded(g.get("cfg"), host)]
 
 
+def read_json_object(text: str) -> dict[str, object] | None:
+    """The JSON object a reply carries, or nothing when it carries none.
+
+    Models wrap JSON in a markdown fence routinely, so the fence comes off before the reader
+    sees it. This existed for the single-gap path and NOT for the packed one, which handed
+    the fenced text straight to the JSON reader. Every answer in every pack was refused, and
+    nothing recorded it, because a refusal is written down when the model says nothing and
+    this model said 300 KB. Eighty-seven minutes of asking produced a run that reported the
+    model had replied with nothing usable for zero gaps.
+
+    The record is written here either way. A reply nobody can read is a fact about the reply
+    rather than about the model's willingness, and a sweep that cannot tell them apart
+    reports a refusal that did not happen."""
+    try:
+        data = json.loads(re.sub(r"^```(?:json)?\n|```$", "", text.strip(), flags=re.MULTILINE))
+    except Exception as failure:  # noqa: BLE001 - an unreadable reply never becomes a proof
+        LAST_REFUSAL["reason"] = llm.DECLINED
+        LAST_REFUSAL["cause"] = f"the reply is not JSON: {type(failure).__name__}"
+        return None
+    if not isinstance(data, dict):
+        LAST_REFUSAL["reason"] = llm.DECLINED
+        LAST_REFUSAL["cause"] = f"the reply parsed as {type(data).__name__} and not an object"
+        return None
+    LAST_REFUSAL["reason"] = llm.ANSWERED
+    LAST_REFUSAL["cause"] = ""
+    return data
+
+
 def _call_model(instruction: str, payload: str) -> Answer | None:
     """One structured model call. Returns the parsed JSON object, or None on any failure -
     an unusable reply never becomes a false proof."""
@@ -190,32 +201,29 @@ def _call_model(instruction: str, payload: str) -> Answer | None:
         LAST_REFUSAL["reason"] = reply["reason"]
         LAST_REFUSAL["cause"] = reply["cause"]
         return None
-    try:
-        data = json.loads(re.sub(r"^```(?:json)?\n|```$", "", reply["text"].strip(), flags=re.MULTILINE))
-    except Exception:  # noqa: BLE001 - a malformed reply yields no proposal, never a false claim
-        LAST_REFUSAL["reason"] = llm.DECLINED
-        LAST_REFUSAL["cause"] = ""
+    data = read_json_object(reply["text"])
+    if data is None:
         return None
-    if not isinstance(data, dict):
-        LAST_REFUSAL["reason"] = llm.DECLINED
-        return None
-    LAST_REFUSAL["reason"] = llm.ANSWERED
     # Built field by field from what parsed, rather than handed back whole. The record says
     # it holds "as much of it as arrived", and returning the parse made that a hope: a reply
     # carrying a number where a body belongs went straight to a caller that renders it.
     # Each field is taken only when it is the string this record says it is, so a partial
     # answer is a partial record rather than a wrong one, which is what "not total" means.
+    # Each read bound to a name first, then narrowed, then assigned. Read twice and the
+    # checker asks about the second read rather than the first.
     answer: Answer = {}
-    if isinstance(data.get("function"), str):
-        answer["function"] = data["function"]
-    if isinstance(data.get("explanation"), str):
-        answer["explanation"] = data["explanation"]
-    if isinstance(data.get("test_source"), str):
-        answer["test_source"] = data["test_source"]
-    if isinstance(data.get("module"), str):
-        answer["module"] = data["module"]
-    if isinstance(data.get("body"), str):
-        answer["body"] = data["body"]
+    function, explanation = data.get("function"), data.get("explanation")
+    source, module, body = data.get("test_source"), data.get("module"), data.get("body")
+    if isinstance(function, str):
+        answer["function"] = function
+    if isinstance(explanation, str):
+        answer["explanation"] = explanation
+    if isinstance(source, str):
+        answer["test_source"] = source
+    if isinstance(module, str):
+        answer["module"] = module
+    if isinstance(body, str):
+        answer["body"] = body
     return answer
 
 
@@ -301,22 +309,6 @@ def pack_gaps(gaps: list[CoverageGap], budget: int) -> list[list[CoverageGap]]:
     return packs
 
 
-_PROPOSE_MANY_INSTRUCTION = (
-    "You are given SEVERAL Rust functions, each with one decision branch that no test ever "
-    "reached. Answer for every one of them. For each, infer the caller-facing behavior the "
-    "branch SHOULD have from the function name, its signature, and the branch condition - do "
-    "not just echo what the code visibly does. Write the BODY of a Rust test that exercises "
-    "exactly that branch: construct the argument values (bindings are fine), call the "
-    "function into a binding named `result`, then `assert!(<property>, <message>)` on "
-    "`result`. Each proof is kept only if execution contradicts your assertion, so assert "
-    "the behavior a correct implementation MUST have, not a prediction of the current "
-    "output. `use super::*;` is already in scope in each case. Return ONLY a JSON object "
-    'with one key, "proofs", holding a list of objects with keys: "index" (the integer index '
-    'you were given for that function), "body" (the Rust statements, no fn/mod wrapper) and '
-    '"explanation" (one plain sentence stating the behavior you assert). Answer every index '
-    "you were given, and use each index exactly once."
-)
-
 # What one answer is allowed to cost, in output tokens. The single ask has always allowed
 # 2,048 for one answer; a pack of twenty needs twenty times the room or its reply is cut off
 # mid-list. A truncated reply is not valid JSON, so the whole pack goes unanswered rather
@@ -348,9 +340,16 @@ def answers_for(gaps: list[CoverageGap], reply: llm.ModelReply) -> list[Answer |
         LAST_REFUSAL["reason"] = reply["reason"]
         LAST_REFUSAL["cause"] = reply["cause"]
         return [None] * len(gaps)
-    try:
-        proofs = json.loads(reply["text"])["proofs"]
-    except (json.JSONDecodeError, KeyError, TypeError):
+    data = read_json_object(reply["text"])
+    if data is None:
+        return [None] * len(gaps)
+    proofs = data.get("proofs")
+    if not isinstance(proofs, list):
+        # A model that answered in a shape nobody asked for is not a model that declined,
+        # and the sweep has to be able to say which it met.
+        LAST_REFUSAL["reason"] = llm.DECLINED
+        LAST_REFUSAL["cause"] = ("the reply carries no proofs list; its keys are "
+                                 f"{sorted(data)[:5]}")
         return [None] * len(gaps)
     out: list[Answer | None] = [None] * len(gaps)
     # Which indices the reply has already spoken for, valid or not. Tracked apart from the
@@ -358,7 +357,7 @@ def answers_for(gaps: list[CoverageGap], reply: llm.ModelReply) -> list[Answer |
     # answered badly and then answered again is the model contradicting itself, and quietly
     # taking the second reading would be a choice made rather than stated.
     spoken: set[int] = set()
-    for entry in proofs if isinstance(proofs, list) else ():
+    for entry in proofs:
         if not isinstance(entry, dict) or not isinstance(entry.get("index"), int):
             continue
         at = entry["index"]
@@ -387,7 +386,7 @@ def propose_many(gaps: list[CoverageGap]) -> list[Answer | None]:
         for i, gap in enumerate(gaps)
     ])
     room = min(_TOKENS_PER_ANSWER * max(1, len(gaps)), _MAX_OUTPUT_TOKENS)
-    return answers_for(gaps, llm.call(_PROPOSE_MANY_INSTRUCTION, payload, room, llm.anthropic_sdk))
+    return answers_for(gaps, llm.call(PROPOSE_MANY_INSTRUCTION, payload, room, llm.anthropic_sdk))
 
 
 def propose(gap: CoverageGap) -> Answer | None:
@@ -396,7 +395,7 @@ def propose(gap: CoverageGap) -> Answer | None:
         "function_source": gap["function_source"], "signature": _signature(gap),
         "uncovered_branch": f"the `{gap['kind']}` branch at line {gap['line']} is never exercised",
     })
-    return _valid(_call_model(_PROPOSE_INSTRUCTION, payload), body_asserts)
+    return _valid(_call_model(PROPOSE_INSTRUCTION, payload), body_asserts)
 
 
 def repair(gap: CoverageGap, test_source: str, compiler_error: str) -> Answer | None:
@@ -405,7 +404,7 @@ def repair(gap: CoverageGap, test_source: str, compiler_error: str) -> Answer | 
         "signature": _signature(gap), "function_source": gap["function_source"],
         "test_that_failed_to_compile": test_source, "rustc_error": compiler_error[-4000:],
     })
-    return _valid(_call_model(_REPAIR_INSTRUCTION, payload), body_asserts)
+    return _valid(_call_model(REPAIR_INSTRUCTION, payload), body_asserts)
 
 
 
@@ -902,8 +901,18 @@ def sweep_detail(retained: int, modules: int, located: int, outcomes: Outcomes, 
         # Only the decline carries a count: it is the one reason where HOW MANY the model
         # was asked is a fact about the model. A missing SDK declined nothing; it was never
         # asked, and printing a number beside it would invent an interaction.
-        why = (f"the model replied with nothing usable for {declined} of them"
-               if reason in (llm.DECLINED, "") else llm.WHY[reason])
+        # Three ways to locate gaps and prove none, and this said two of them. A sweep that
+        # bought answers, received them, and lost every one between the reply and the
+        # proposal printed "nothing usable for 0 of them", which is a count of declines that
+        # never happened. Zero declines beside zero proven is arithmetic on an empty set and
+        # a reader given it has nowhere to go. Met on 2026-09-07 after 87 minutes of asking.
+        if reason in (llm.DECLINED, "") and not declined:
+            why = ("every answer was bought and none reached a module, so no proposal was "
+                   "ever compiled: the gaps were located and the replies arrived")
+        elif reason in (llm.DECLINED, ""):
+            why = f"the model replied with nothing usable for {declined} of them"
+        else:
+            why = llm.WHY[reason]
         if cause:
             why += f" [{cause}]"
         return (f"{located} uncovered branches located across {modules} modules and none was proven: "

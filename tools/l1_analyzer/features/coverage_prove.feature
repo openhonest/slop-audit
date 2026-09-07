@@ -54,6 +54,14 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
     Then a non-blank string body comes back trimmed, with the explanation coerced to text
     But no reply, a body that is not a string, and a blank body are all rejected outright
 
+  Scenario: read_json_object takes the JSON object out of a reply, fence and all
+    Given the text of a model's reply
+    When read_json_object strips any markdown fence and parses what is left
+    Then a fenced object is read like any other, because models wrap JSON in a fence routinely
+    And a reply that will not parse, or parses as something other than an object, answers with nothing and the reason is written down naming which of the two it was
+    And a reply that reads is recorded as answered, so the sweep can tell a model that refused from one whose words nobody could use
+    But this existed for the single-gap ask and not for the packed one until 2026-09-07, so every answer in every pack was refused silently and a run reported that the model had replied with nothing usable for zero gaps after eighty-seven minutes of asking
+
   Scenario: pack_gaps groups a sweep's gaps into the requests that will carry them
     Given every gap the sweep will attempt and the characters one request may carry
     When pack_gaps fills a request until the next gap would run it over, then starts another
