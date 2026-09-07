@@ -64,6 +64,9 @@ class Checkouts(TypedDict):
     paths: list[Path]
     copies: int
     how: str
+    # How many were asked for. A sweep that wanted eight and got two must not read like one
+    # that asked for two.
+    asked: int
 
 
 @boundary
@@ -92,34 +95,68 @@ def checkouts_for(repo: Path, workers: int, root: Path) -> Checkouts:
     the first and a quarter of a terabyte on the second, and a reader told only the number
     cannot tell them apart."""
     if workers <= 1:
-        return {"paths": [repo], "copies": 0, "how": "no copy needed"}
+        return {"paths": [repo], "copies": 0, "how": "no copy needed", "asked": workers}
     paths: list[Path] = []
     root.mkdir(parents=True, exist_ok=True)
-    how = "by reference"
+    how = ""
     for n in range(workers):
-        destination = root / f"worker-{n}"
-        if destination.exists():
-            shutil.rmtree(destination, ignore_errors=True)
-        # `cp -c` on macOS and `cp --reflink=auto` on Linux ask the filesystem to share the
-        # blocks. Either flag is refused outright by the other platform's cp, and a
-        # filesystem without the feature refuses it too, so the fallback is a real copy and
-        # is named rather than assumed.
-        for command, name in ((["cp", "-Rc", str(repo), str(destination)], "by reference"),
-                              (["cp", "-R", str(repo), str(destination)], "byte for byte")):
-            # check=False: a refused flag is the answer this loop is asking for, and the
-            # next command in the pair is the fallback.
-            run = subprocess.run(command, capture_output=True, check=False)
-            if run.returncode == 0:
-                how = name if how == "by reference" else how
-                break
-        else:
-            shutil.copytree(repo, destination)
-            how = "byte for byte"
-        paths.append(destination)
-    # Every path is a copy now, so the count is the length. It was length minus one while the
-    # first worker proved in the repository itself, and it stayed that way for about ten
-    # minutes after that stopped being true.
-    return {"paths": paths, "copies": len(paths), "how": how}
+        made = copy_checkout(repo, root / f"worker-{n}")
+        if not made:
+            # A copy that will not be made costs a worker, not the run. On a filesystem
+            # without reflink, eight copies of a 6 GB checkout is 48 GB of real bytes, and
+            # that fails in ways the free copy does not: disk pressure, no space left half
+            # way through the sixth worker. This used to raise, and by the time the pool is
+            # made the sweep has already asked a model for every proposal, so the traceback
+            # threw away the expensive half.
+            break
+        how = made
+        paths.append(root / f"worker-{n}")
+    if not paths:
+        # No workers would be a sweep that proved nothing and reported it as one that found
+        # nothing. The floor is the repository itself, proven in place as a serial sweep
+        # always was.
+        return {"paths": [repo], "copies": 0, "how": "no copy could be made", "asked": workers}
+    return {"paths": paths, "copies": len(paths), "how": how, "asked": workers}
+
+
+@boundary
+def copy_checkout(repo: Path, destination: Path) -> str:
+    """One copy of the repository, and how it was made, or nothing when it could not be.
+
+    `cp -c` on macOS and `cp --reflink=auto` on Linux ask the filesystem to share the
+    blocks. Either flag is refused outright by the other platform's cp, and a filesystem
+    without the feature refuses it too, so the fallback is a real copy and is named rather
+    than assumed.
+
+    The destination is cleared first, every time. A copy that died part way leaves a
+    directory behind, and the next thing tried against it fails because the directory
+    exists, which reports that instead of the real cause and sends the reader to the wrong
+    problem."""
+    shutil.rmtree(destination, ignore_errors=True)
+    for command, name in ((["cp", "-Rc", str(repo), str(destination)], "by reference"),
+                          (["cp", "-R", "--reflink=auto", str(repo), str(destination)],
+                           "by reference"),
+                          (["cp", "-R", str(repo), str(destination)], "byte for byte")):
+        # check=False: a refused flag is the answer this loop is asking for, and the next
+        # command is the fallback.
+        if subprocess.run(command, capture_output=True, check=False).returncode == 0:
+            return name
+        shutil.rmtree(destination, ignore_errors=True)
+    return _copy_tree(repo, destination)
+
+
+@boundary
+def _copy_tree(repo: Path, destination: Path) -> str:
+    """The last resort, where no cp on this machine would do it.
+
+    Nothing rather than a raise, for the reason the caller gives: a sweep that has already
+    bought every proposal must not be thrown away because one directory would not copy."""
+    try:
+        shutil.copytree(repo, destination)
+    except OSError:
+        shutil.rmtree(destination, ignore_errors=True)
+        return ""
+    return "byte for byte"
 
 
 @boundary
@@ -135,14 +172,16 @@ def discard_checkouts(made: Checkouts) -> None:
         shutil.rmtree(path, ignore_errors=True)
 
 
-def pool_detail(workers: int, copies: int, how: str) -> str:
+def pool_detail(workers: int, copies: int, how: str, asked: int) -> str:
     """What the run says about the pool it used.
 
     Said whether or not it is one, because a sweep that wanted eight workers and got one
     must not read like a sweep that asked for one."""
     hands = "1 worker" if workers == 1 else f"{workers} workers"
+    short = (f" {asked} were asked for and the rest could not be made." if asked > workers
+             else "")
     if not copies:
-        return f" Proven by {hands}, in the repository itself."
+        return f" Proven by {hands}, in the repository itself.{short}"
     made = "1 checkout" if copies == 1 else f"{copies} checkouts"
     return (f" Proven by {hands}, each in its own checkout: {made} copied {how}, and the "
-            "repository itself was never edited.")
+            f"repository itself was never edited.{short}")

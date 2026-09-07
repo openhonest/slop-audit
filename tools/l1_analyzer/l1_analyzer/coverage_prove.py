@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import tempfile
 from collections.abc import Callable
 from concurrent import futures
@@ -821,7 +822,12 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     outcomes = {k: 0 for k in _OUTCOMES}
     modules = len(work)
     hands = workers_for(workers, modules)
-    checkouts = checkouts_for(repo, hands, Path(tempfile.mkdtemp(prefix="l1-workers-")))
+    # Named for the run, so a directory left behind after a crash says which sweep made it.
+    # Three empty ones were found on a box on 2026-09-07 and cost somebody a minute working
+    # out they were not worker copies.
+    work_root = Path(tempfile.mkdtemp(prefix=f"l1-sweep-{os.getpid()}-"))
+    checkouts = checkouts_for(repo, hands, work_root)
+    hands = len(checkouts["paths"])
 
     def prove_share(where: Path, share: list[tuple[str, list[CoverageGap]]]) -> tuple[
             list[CoverageProof], Outcomes]:
@@ -856,6 +862,9 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
             for k in outcomes:
                 outcomes[k] += tally[k]
     _discard_checkouts(checkouts)
+    # The root as well as the copies inside it. Removing only the copies left an empty
+    # directory per run, which leaks nothing and still sends the next person looking.
+    shutil.rmtree(work_root, ignore_errors=True)
     # `attempted` is every gap handed to a model, declines included: that is the unit that
     # cost money, and a budget that did not count the declines could not be reconciled.
     attempted = sum(outcomes.values())
@@ -869,7 +878,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     # the figure.
     if cargo_args:
         detail += f" (cargo scoped by {' '.join(cargo_args)})"
-    detail += pool_detail(hands, checkouts["copies"], checkouts["how"])
+    detail += pool_detail(hands, checkouts["copies"], checkouts["how"], checkouts["asked"])
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 

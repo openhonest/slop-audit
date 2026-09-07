@@ -84,7 +84,7 @@ def test_the_run_says_how_the_copies_were_made(tmp_path):
 
 
 def test_the_sentence_a_reader_gets_names_the_pool_and_the_cost():
-    said = sweep_pool.pool_detail(8, 8, "by reference")
+    said = sweep_pool.pool_detail(8, 8, "by reference", 8)
     assert "8" in said and "by reference" in said
     assert "repository" in said, "a reader is not told their own checkout was left alone"
 
@@ -92,4 +92,4 @@ def test_the_sentence_a_reader_gets_names_the_pool_and_the_cost():
 def test_a_single_worker_sweep_says_so_rather_than_saying_nothing():
     """A sweep that wanted eight workers and got one must not read like a sweep that asked
     for one."""
-    assert "1 worker" in sweep_pool.pool_detail(1, 0, "by reference")
+    assert "1 worker" in sweep_pool.pool_detail(1, 0, "by reference", 1)

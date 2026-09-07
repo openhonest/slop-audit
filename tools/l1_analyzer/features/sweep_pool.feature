@@ -47,6 +47,19 @@ Feature: sweep_pool — how a whole-repository sweep runs on more than one core
     And that is what makes an interrupt harmless: a module is proven by editing its own source file and putting it back, a hard kill skips the putting back, and a copy is disposable by construction while a repository is not
     But how the copies were made is recorded, because eight workers is nearly free on a filesystem that copies by reference and the full size of the checkout on one that does not, and a reader told only the number cannot tell them apart
 
+  Scenario: copy_checkout makes one copy of the repository and says how it was made
+    Given the repository and where the copy is to go
+    When copy_checkout asks the filesystem to share the blocks, then to copy them
+    Then a filesystem that copies by reference says so, and one that does not is copied byte for byte and says that instead
+    And the destination is cleared first every time, because a copy that died part way leaves a directory behind and the next thing tried against it fails on the directory existing, which reports the wrong cause
+    But a copy that cannot be made at all answers with nothing rather than raising, since by the time the pool is built the sweep has bought every proposal and a traceback would throw that away
+
+  Scenario: _copy_tree is the last resort where no cp on this machine would do it
+    Given the repository and a destination no cp could produce
+    When _copy_tree copies the tree itself
+    Then a copy that succeeds is byte for byte, which is what a fallback with no filesystem help can be
+    But a copy that fails leaves nothing behind and answers with nothing, for the reason copy_checkout gives: one directory that will not copy must cost a worker rather than the run
+
   Scenario: discard_checkouts removes what the sweep copied and never the repository
     Given the checkouts a sweep was given
     When discard_checkouts clears up
