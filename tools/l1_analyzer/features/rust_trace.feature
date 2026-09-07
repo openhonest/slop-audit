@@ -105,9 +105,17 @@ Feature: rust_trace — running a Rust crate's own test suite to measure coverag
     And a tree with no regions at all comes back as zero of zero, which the verdict below tells apart from a run that covered none of forty
     But an export this reader cannot find totals in hands back nothing, because that is a schema it does not know and reading it as zero would grade coverage nobody measured
 
+  Scenario: _files_measured says how many files the coverage report covered
+    Given a parsed coverage report
+    When _files_measured counts the files in it
+    Then it answers with what the run measured rather than with what the repository holds
+    But a report whose shape it cannot read answers nothing rather than a count nobody took
+
   Scenario: _coverage_verdict turns finished region totals into the published reading
-    Given the region totals, how the run exited, and the toolchain that measured it
+    Given the region totals, how the run exited, the toolchain that measured it, what cargo said about the tests, and how many files the report covered
     When _coverage_verdict applies the published band table
     Then above ninety per cent is Healthy, sixty to ninety is Not Healthy, and below sixty is Slop
     And the sentence says region coverage and names the toolchain, because branch coverage needs a nightly toolchain and a reader comparing this against another language has to know which they are looking at
+    And it says how many files the figure is a share of, because one repository has several honest coverage figures depending on where the run started: a two-member workspace reports twenty-six regions across two files at its root and thirteen across one inside a member
+    And a crate whose suite ran nothing is refused, since regions come from compiled code and a share of the regions no test exercised is a share of nothing
     But a run that timed out, and a tree that exercised no region, are refused with the reason rather than graded, since neither is a coverage of zero

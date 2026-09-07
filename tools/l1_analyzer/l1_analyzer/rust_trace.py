@@ -257,8 +257,24 @@ def _region_totals(report: Report) -> tuple[int, int] | None:
         return None
 
 
+def _files_measured(report: Report) -> int | None:
+    """How many files the coverage report covered, or nothing when it cannot be read.
+
+    Read off the report rather than counted from the repository, because the question is
+    what the run measured and not what is there.
+
+    Nothing rather than zero. A zero here would be a real answer to a different question,
+    and this repository's own clause 8 said so on the first run after it returned one: a
+    file table nobody could read reported as a measurement of no files."""
+    try:
+        return len(report["data"][0]["files"])
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
 def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
-                      toolchain: str, timeout_seconds: float, output: str) -> L1Result:
+                      toolchain: str, timeout_seconds: float, output: str,
+                      files: int | None) -> L1Result:
     """L1.19 from a finished run and cargo-llvm-cov's region totals. No I/O, so it can be
     asserted.
 
@@ -299,11 +315,22 @@ def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
                    "nothing; region coverage needs a suite that executes")
     pct = covered / count * 100
     suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
+    # How much of the repository the figure is a share of. Two runs of one commit on one
+    # compiler reported 66.9 and 65.1, the numerators agreeing within four regions and the
+    # denominators 7,137 apart, and nothing in either line said how much each had read.
+    #
+    # Measured rather than guessed: a warm target directory does not move the denominator,
+    # and a dependency's regions never enter the report. What moves it is where cargo was
+    # pointed. In a two-member workspace the root reports 26 regions across two files and
+    # one member reports 13 across one, which is cargo behaving as documented and means one
+    # repository has several honest coverage figures depending on where the run started.
+    scope = ("a file table this reader could not count" if files is None
+             else f"{files} file" if files == 1 else f"{files} files")
     return {
         "value": round(pct, 1),
         "band": coverage_band(pct),
-        "details": f"{covered}/{count} llvm-cov regions exercised by tests, region coverage "
-                   f"({suite}; ran under {toolchain})",
+        "details": f"{covered}/{count} llvm-cov regions exercised by tests across {scope}, "
+                   f"region coverage ({suite}; ran under {toolchain})",
     }
 
 
@@ -342,7 +369,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float,
 
     return _coverage_verdict(_region_totals(report), run.returncode,
                              _toolchain(repo, timeout_seconds), timeout_seconds,
-                             (run.stdout or "") + (run.stderr or ""))
+                             (run.stdout or "") + (run.stderr or ""), _files_measured(report))
 
 
 # ---------------------------------------------------------------------------
