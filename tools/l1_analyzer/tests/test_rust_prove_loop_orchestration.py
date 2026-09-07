@@ -28,7 +28,7 @@ def _proposal(body="assert!(false);"):
 
 
 def test_a_proposal_nobody_returns_is_declined():
-    bucket, proposal, source = cp._prove_one(
+    bucket, proposal, source, _failure = cp._prove_one(
         pathlib.Path("."), "src/m.rs", _GAP, 3, 1.0,
         propose_fn=lambda gap: None,
         repair_fn=lambda *a: None,
@@ -42,7 +42,7 @@ def test_a_compile_error_is_repaired_and_then_gated():
     and the SECOND run is what gets gated."""
     runs = iter([("error", "error[E0308]: mismatched types"),
                  ("fail", "assertion `left == right` failed")])
-    bucket, _got, _src = cp._prove_one(
+    bucket, _got, _src, _failure = cp._prove_one(
         pathlib.Path("."), "src/m.rs", _GAP, 3, 1.0,
         propose_fn=lambda gap: _proposal(),
         repair_fn=lambda *a: _proposal("assert_eq!(1, 2);"),
@@ -56,7 +56,7 @@ def test_a_compile_error_is_repaired_and_then_gated():
 
 def test_repair_rounds_zero_never_repairs():
     calls = []
-    bucket, _got, _src = cp._prove_one(
+    bucket, _got, _src, _failure = cp._prove_one(
         pathlib.Path("."), "src/m.rs", _GAP, 0, 1.0,
         propose_fn=lambda gap: _proposal(),
         repair_fn=lambda *a: calls.append(1) or _proposal(),
@@ -68,7 +68,7 @@ def test_repair_rounds_zero_never_repairs():
 
 def test_the_repair_round_cap_is_honoured():
     calls = []
-    bucket, _got, _src = cp._prove_one(
+    bucket, _got, _src, _failure = cp._prove_one(
         pathlib.Path("."), "src/m.rs", _GAP, 2, 1.0,
         propose_fn=lambda gap: _proposal(),
         repair_fn=lambda *a: calls.append(1) or _proposal(),

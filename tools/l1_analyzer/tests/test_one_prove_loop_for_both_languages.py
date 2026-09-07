@@ -62,7 +62,7 @@ def test_a_model_that_declined_is_a_named_outcome_and_nothing_is_run():
     """Counted, not passed over. A call that produced nothing still cost money, and a
     prover that dropped it would report a hit rate over calls it did not admit making."""
     runs = _Runs(["divergence"])
-    status, explanation, source = _prove(_gap("band"), runs, propose=lambda g: None)
+    status, explanation, source, _failure = _prove(_gap("band"), runs, propose=lambda g: None)
     assert status == "declined"
     assert (explanation, source) == ("", "")
     assert runs.sources == []
@@ -70,14 +70,14 @@ def test_a_model_that_declined_is_a_named_outcome_and_nothing_is_run():
 
 def test_a_test_that_fired_first_time_is_not_repaired():
     runs = _Runs(["divergence"])
-    status, _explanation, _source = _prove(_gap("band"), runs)
+    status, _explanation, _source, _failure = _prove(_gap("band"), runs)
     assert status == "divergence"
     assert len(runs.sources) == 1
 
 
 def test_a_test_that_would_not_build_is_repaired_and_run_again():
     runs = _Runs(["error", "divergence"])
-    status, _explanation, _source = _prove(_gap("band"), runs)
+    status, _explanation, _source, _failure = _prove(_gap("band"), runs)
     assert status == "divergence"
     assert runs.sources == ["test(band)", "test(repaired)"]
 
@@ -86,7 +86,7 @@ def test_repair_stops_at_the_number_of_rounds_the_caller_allowed():
     """A budget rule, and the second one this package has had two copies of. Without it a
     model that keeps producing code that will not build spends without a ceiling."""
     runs = _Runs(["error"])
-    status, _explanation, _source = _prove(_gap("band"), runs, rounds=2)
+    status, _explanation, _source, _failure = _prove(_gap("band"), runs, rounds=2)
     assert status == "error"
     assert len(runs.sources) == 3, "the first attempt and two repairs"
 
@@ -94,7 +94,7 @@ def test_repair_stops_at_the_number_of_rounds_the_caller_allowed():
 def test_a_model_that_declines_to_repair_stops_the_loop():
     """Asking again after a refusal spends a call to be told no twice."""
     runs = _Runs(["error"])
-    status, _explanation, _source = _prove(_gap("band"), runs,
+    status, _explanation, _source, _failure = _prove(_gap("band"), runs,
                                            repair=lambda g, s, o: None, rounds=5)
     assert status == "error"
     assert len(runs.sources) == 1
@@ -104,9 +104,12 @@ def test_the_explanation_comes_from_the_proposal_that_was_last_run():
     """A repaired proposal explains the test that actually ran. Reporting the first
     proposal's words beside the last proposal's verdict describes a test nobody ran."""
     runs = _Runs(["error", "divergence"])
-    _status, explanation, source = _prove(_gap("band"), runs)
+    _status, explanation, source, failure = _prove(_gap("band"), runs)
     assert "repaired" in explanation
     assert source == "test(repaired)"
+    # And the failure is the last run's too, for the same reason: a transcript from the run
+    # before the repair would describe a test nobody kept.
+    assert failure == "output"
 
 
 # --------------------------------------------------------------------------
@@ -119,8 +122,8 @@ def test_every_outcome_is_counted_and_only_a_divergence_is_kept():
     verdicts = {"a": "divergence", "b": "pass", "c": "declined", "d": "incidental"}
     retained, outcomes = prove_gap.prove_each(
         [_gap(name) for name in "abcd"],
-        lambda gap: (verdicts[gap["function"]], "why", "source"),
-        lambda gap, explanation, source: {"function": gap["function"]},
+        lambda gap: (verdicts[gap["function"]], "why", "source", "it failed like this"),
+        lambda gap, explanation, source, failure: {"function": gap["function"]},
         outcomes=dict.fromkeys(["divergence", "pass", "declined", "incidental"], 0))
     assert [r["function"] for r in retained] == ["a"]
     assert outcomes == {"divergence": 1, "pass": 1, "declined": 1, "incidental": 1}
@@ -128,7 +131,7 @@ def test_every_outcome_is_counted_and_only_a_divergence_is_kept():
 
 def test_a_module_with_no_gaps_retains_nothing_and_counts_nothing():
     retained, outcomes = prove_gap.prove_each(
-        [], lambda gap: ("divergence", "", ""), lambda gap, e, s: {},
+        [], lambda gap: ("divergence", "", "", ""), lambda gap, e, s, f: {},
         outcomes={"divergence": 0})
     assert retained == []
     assert outcomes == {"divergence": 0}
@@ -139,5 +142,5 @@ def test_an_outcome_the_caller_did_not_name_is_refused_rather_than_dropped():
     prover and a report that disagree about what can happen. Counting it under a key nobody
     declared would file an unknown answer under a name written for a different one."""
     with pytest.raises(KeyError):
-        prove_gap.prove_each([_gap("a")], lambda gap: ("surprise", "", ""),
-                             lambda gap, e, s: {}, outcomes={"divergence": 0})
+        prove_gap.prove_each([_gap("a")], lambda gap: ("surprise", "", "", ""),
+                             lambda gap, e, s, f: {}, outcomes={"divergence": 0})

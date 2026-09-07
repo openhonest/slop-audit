@@ -548,9 +548,14 @@ class CoverageProof(TypedDict):
     location: str
     explanation: str
     test_source: str
+    # What happened when the proof ran. Without it a reader met a test, a sentence saying
+    # what it asserts, and a claim that it failed, with nothing saying how, so checking one
+    # meant re-running it by hand against the checkout the run was still using.
+    failure: str
 
 
-def _retained_entry(module_relpath: str, gap: CoverageGap, explanation: str, source: str) -> CoverageProof:
+def _retained_entry(module_relpath: str, gap: CoverageGap, explanation: str, source: str,
+                    failure: str) -> CoverageProof:
     """One retained proof, built here for both loops. The batch loop called this and the
     per-module loop wrote the same six keys inline, so a field added to one was missing from
     the other and the report showed it on some proofs and not others."""
@@ -558,6 +563,7 @@ def _retained_entry(module_relpath: str, gap: CoverageGap, explanation: str, sou
         "function": gap["function"], "language": "rust",
         "location": f"{module_relpath}:{gap['line']}",
         "explanation": explanation, "test_source": source.strip(),
+        "failure": failure.strip(),
     }
 
 
@@ -599,7 +605,7 @@ def _refine_incidental(repo: Path, module_relpath: str, gap: CoverageGap, body: 
 def _prove_one(repo: Path, module_relpath: str, gap: CoverageGap, repair_rounds: int, timeout_seconds: float,
                propose_fn: Callable[..., Answer | None], repair_fn: Callable[..., Answer | None],
                run_fn: Callable[..., tuple[str, str]],
-               refine_fn: Callable[..., str]) -> tuple[str, str, str]:
+               refine_fn: Callable[..., str]) -> tuple[str, str, str, str]:
     """One gap, proven or not. The loop is `prove_gap.prove_one`, shared with the Python
     prover since 2026-09-02; what is here is Rust's own steps and its gate.
 
@@ -694,8 +700,11 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[CoverageGap], repa
             bucket = _fail_bucket(output, f"proof_{i}", proposal["body"], gap["return_type"])
             outcomes[bucket] += 1
             if bucket == "divergence":
+                # The batch's own output, which is what this proof failed with. One build
+                # carried every test, so the whole transcript is handed over rather than a
+                # slice of it somebody would have to trust was cut in the right place.
                 retained.append(_retained_entry(module_relpath, gap, proposal["explanation"],
-                                                render_module(proposal["body"])))
+                                                render_module(proposal["body"]), output))
         return retained, outcomes
     # The batch did not compile: isolate, repair, and gate each gap individually. This
     # fallback is the Python prover's whole loop, which is why both now ask for it.
@@ -703,7 +712,8 @@ def _prove_module(repo: Path, module_relpath: str, gaps: list[CoverageGap], repa
         gaps,
         lambda gap: _prove_one(repo, module_relpath, gap, repair_rounds, timeout_seconds,
                                propose_fn, repair_fn, run_fn, refine_fn),
-        lambda gap, explanation, source: _retained_entry(module_relpath, gap, explanation, source),
+        lambda gap, explanation, source, failure: _retained_entry(
+            module_relpath, gap, explanation, source, failure),
         outcomes=outcomes,
     )
 
@@ -900,12 +910,12 @@ def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: f
         # This call site was never updated when they became required, so the whole
         # per-module path raised before it proved anything, and every test of the loop
         # passes its own collaborators, which is what left this one call unexercised.
-        bucket, explanation, source = _prove_one(repo, module_relpath, gap, repair_rounds,
-                                                 timeout_seconds, propose, repair,
-                                                 _run_in_crate, _refine_incidental)
+        bucket, explanation, source, failure = _prove_one(
+            repo, module_relpath, gap, repair_rounds, timeout_seconds, propose, repair,
+            _run_in_crate, _refine_incidental)
         outcomes[bucket] += 1
         if bucket == "divergence":
-            retained.append(_retained_entry(module_relpath, gap, explanation, source))
+            retained.append(_retained_entry(module_relpath, gap, explanation, source, failure))
     attempted = sum(outcomes.values())
     # The breakdown is the honest part: 0 retained means nothing without it. Each generated
     # test lands in a named bucket; only a behavioural divergence is a proven bug and retained.

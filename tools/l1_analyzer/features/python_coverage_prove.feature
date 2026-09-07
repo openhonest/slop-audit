@@ -63,6 +63,21 @@ Feature: python_coverage_prove — the pytest coverage-gap prove loop, where an 
     Then a failing AssertionError is attributable to the test's own assertion and to nothing else
     But pytest collects the function only because the run overrides its function-name pattern, since the name does not begin with test
 
+  Scenario: verdict_from_junit reads the verdict pytest recorded rather than the paragraph it printed
+    Given the JUnit XML pytest writes about one proof
+    When verdict_from_junit reads the case it holds
+    Then a failure whose exception is AssertionError is the proof's own assert firing, and any other exception is a setup failure that proves nothing about the branch
+    And the name comes out of an attribute, so no terminal width and no summary wording applies to it
+    And a document that will not parse, or holds no case, is no answer at all, and the prose readings are asked next rather than a verdict being invented
+    But this exists because the verdict used to come out of prose alone, and that parser was repaired three times in one day: a version moved the name, an unparsable transcript was filed as noise, and a reason cut to the terminal width read as a different exception
+
+  Scenario: _retained_entry records one Python proof the way Rust records one
+    Given the module, the gap, what the proposal asserted, the test source and what happened when it ran
+    When _retained_entry assembles the record
+    Then it carries the same fields Rust's does, including the failure the run produced
+    And the failure is there because a proof a reader cannot check is a claim rather than a proof: the source says what was asserted and this says what happened
+    But the two producers wrote these fields separately until 2026-09-06, which is how the report came to show a field on some proofs and not others
+
   Scenario: _summary_reason reads the short-summary line, or refuses a reason pytest cut short
     Given one pytest transcript
     When _summary_reason looks at the FAILED line for the proof

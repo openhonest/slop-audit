@@ -492,6 +492,9 @@ def _proofs(results: Panel) -> list[ProofRow]:
                     "blurb": _t("proofs.blurb.concurrency"),
                     "detail": o["detail"],
                     "test_source": o["generated_test"].rstrip(),
+                    # The concurrency loop's record keeps no transcript, and saying so
+                    # beats an empty string a reader would take for a clean run.
+                    "failure": "",
                 })
 
     coverage = results.get("coverage_proofs")
@@ -507,6 +510,7 @@ def _proofs(results: Panel) -> list[ProofRow]:
                     "blurb": _t("proofs.blurb.coverage"),
                     "detail": p["explanation"],
                     "test_source": p["test_source"].rstrip(),
+                    "failure": str(p.get("failure") or "").rstrip(),
                 })
     return out[:_PROOF_CAP]
 
@@ -664,6 +668,9 @@ class ProofRow(TypedDict):
     blurb: str
     detail: str
     test_source: str
+    # What happened when it ran. The source says what was asserted and this says what
+    # happened, and one without the other is a claim rather than a proof.
+    failure: str
 
 
 class CoveragePair(TypedDict):
@@ -1037,5 +1044,7 @@ def card_markdown(card: CardModel) -> str:
             if p.get("detail"):
                 lines.append(f"\n_{p['detail']}_")
             lines += ["", f"```{p['language']}", p["test_source"], "```"]
+            if p.get("failure"):
+                lines += ["", "It failed like this:", "", "```", p["failure"], "```"]
     lines += ["", "---", "", strip.sub("", footer_for(card))]
     return "\n".join(lines)

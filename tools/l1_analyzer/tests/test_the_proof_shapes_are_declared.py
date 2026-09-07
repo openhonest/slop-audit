@@ -37,7 +37,7 @@ def test_the_record_and_the_outcome_are_two_names():
 
 def test_the_coverage_proof_shape_is_declared():
     assert set(coverage_prove.CoverageProof.__required_keys__) == {
-        "function", "language", "location", "explanation", "test_source"}
+        "function", "language", "location", "explanation", "test_source", "failure"}
 
 
 def test_both_coverage_producers_build_the_declared_shape():

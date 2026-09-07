@@ -45,20 +45,20 @@ FAILED ../../../var/folders/qr/T/l1-pyproof-x/test_l1_coverage_proof.py::proof_0
 
 
 def test_a_fired_assertion_is_a_divergence_when_the_summary_is_truncated():
-    assert pcp._classify(_TRUNCATED_DIVERGENCE, 1) == "divergence"
+    assert pcp._classify(_TRUNCATED_DIVERGENCE, 1, "") == "divergence"
 
 
 def test_a_setup_exception_is_still_incidental_when_the_summary_is_truncated():
     """The half that keeps the fix honest: a TypeError in the arrange step is noise, and
     reading every truncated failure as a divergence would fabricate proofs from typos."""
-    assert pcp._classify(_TRUNCATED_INCIDENTAL, 1) == "incidental"
+    assert pcp._classify(_TRUNCATED_INCIDENTAL, 1, "") == "incidental"
 
 
 def test_the_untruncated_summary_still_classifies():
     out = "FAILED test_l1_coverage_proof.py::proof_0 - AssertionError: expected 900\n1 failed\n"
-    assert pcp._classify(out, 1) == "divergence"
+    assert pcp._classify(out, 1, "") == "divergence"
     out2 = "FAILED test_l1_coverage_proof.py::proof_0 - TypeError: bad operand\n1 failed\n"
-    assert pcp._classify(out2, 1) == "incidental"
+    assert pcp._classify(out2, 1, "") == "incidental"
 
 
 def test_another_files_traceback_cannot_claim_the_verdict():
@@ -66,11 +66,11 @@ def test_another_files_traceback_cannot_claim_the_verdict():
     the proof errors on import must not read as a proven divergence."""
     out = ("/repo/conftest.py:9: AssertionError: fixture broke\n"
            "ERROR ../../t/test_l1_coverage_proof.py::proof_0\n1 error in 0.01s\n")
-    assert pcp._classify(out, 1) == "incidental"
+    assert pcp._classify(out, 1, "") == "incidental"
 
 
 def test_a_passing_run_is_still_a_pass():
-    assert pcp._classify(".\n1 passed in 0.01s\n", 0) == "pass"
+    assert pcp._classify(".\n1 passed in 0.01s\n", 0, "") == "pass"
 
 
 def test_a_namespace_package_module_gets_its_full_dotted_path(tmp_path):

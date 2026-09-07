@@ -1,7 +1,7 @@
 """The retention gate, exercised against a real interpreter and real source.
 
 Every existing test of this loop injects BOTH the proposer and the runner:
-`run_fn=lambda *a: (1, _FAILED_ASSERT)` hands back a canned pytest transcript. That proves
+`run_fn=lambda *a: (1, _FAILED_ASSERT, '')` hands back a canned pytest transcript. That proves
 the classifier can read a string. It does not prove that running a real test against real
 code produces a transcript the classifier reads as a divergence, and that is the whole
 claim the loop makes.
@@ -73,7 +73,8 @@ def planted(tmp_path_factory) -> pathlib.Path:
 def _run_for_real(repo: pathlib.Path, source: str) -> tuple[int, str]:
     """The real runner, against the real interpreter running these tests.
 
-    Two arguments, because these tests call it directly. The LOOP calls `_run` itself with
+    Three values back: the exit code, the output a reader is shown, and the record pytest
+    wrote for a machine, which is what the verdict is settled from. The LOOP calls `_run` itself with
     all four, so nothing is wrapped on that path: `run_fn=pcp._run` is the production
     function, unaltered."""
     return pcp._run(repo, sys.executable, pcp.render_test(source), timeout_seconds=60.0)
@@ -82,30 +83,31 @@ def _run_for_real(repo: pathlib.Path, source: str) -> tuple[int, str]:
 def test_a_correct_assertion_against_planted_code_really_fails(planted):
     """The premise everything else rests on, asserted without the loop: the defect is real
     and a correct assertion about it does not pass."""
-    returncode, output = _run_for_real(planted, CORRECT_ASSERTION)
+    returncode, output, record = _run_for_real(planted, CORRECT_ASSERTION)
     assert returncode != 0
     assert "AssertionError" in output
+    assert "AssertionError" in record, "pytest wrote no record of what it decided"
 
 
 def test_a_real_failing_run_is_classified_as_a_divergence(planted):
     """Real transcript, real classifier. The canned transcripts every other test uses were
     written by hand and could drift from what pytest actually prints."""
-    returncode, output = _run_for_real(planted, CORRECT_ASSERTION)
-    assert pcp._classify(output, returncode) == "divergence"
+    returncode, output, record = _run_for_real(planted, CORRECT_ASSERTION)
+    assert pcp._classify(output, returncode, record) == "divergence"
 
 
 def test_a_real_passing_run_is_not_retained(planted):
-    returncode, output = _run_for_real(planted, WRONG_ASSERTION)
+    returncode, output, record = _run_for_real(planted, WRONG_ASSERTION)
     assert returncode == 0
-    assert pcp._classify(output, returncode) == "pass"
+    assert pcp._classify(output, returncode, record) == "pass"
 
 
 def test_a_real_setup_failure_is_noise_and_not_a_proof(planted):
     """The distinction that keeps the loop honest: a test that could not run is not
     evidence of a bug. Any exception but AssertionError is the tool's own noise."""
-    returncode, output = _run_for_real(planted, BROKEN_SETUP)
+    returncode, output, record = _run_for_real(planted, BROKEN_SETUP)
     assert returncode != 0
-    assert pcp._classify(output, returncode) == "incidental"
+    assert pcp._classify(output, returncode, record) == "incidental"
 
 
 def test_the_loop_retains_a_proof_when_the_run_is_real(planted):

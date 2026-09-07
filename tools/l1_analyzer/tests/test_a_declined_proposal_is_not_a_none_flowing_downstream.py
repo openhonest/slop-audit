@@ -25,29 +25,29 @@ def _proposal():
 
 
 def test_a_declined_python_proposal_explains_nothing():
-    bucket, explanation, source = pcp._prove_one(
+    bucket, explanation, source, failure = pcp._prove_one(
         pathlib.Path("."), "python3", _GAP, "m", 3, 1.0,
         propose_fn=lambda gap, path: None,
         repair_fn=lambda *a: None,
-        run_fn=lambda *a: (0, ""))
-    assert (bucket, explanation, source) == ("declined", "", "")
+        run_fn=lambda *a: (0, "", ''))
+    assert (bucket, explanation, source, failure) == ("declined", "", "", "")
 
 
 def test_a_declined_rust_proposal_explains_nothing():
-    bucket, explanation, source = cp._prove_one(
+    bucket, explanation, source, failure = cp._prove_one(
         pathlib.Path("."), "src/m.rs", _GAP, 3, 1.0,
         propose_fn=lambda gap: None,
         repair_fn=lambda *a: None,
-        run_fn=lambda *a: ("pass", ""),
+        run_fn=lambda *a: ("pass", "", ''),
         refine_fn=lambda *a: "divergence")
-    assert (bucket, explanation, source) == ("declined", "", "")
+    assert (bucket, explanation, source, failure) == ("declined", "", "", "")
 
 
 def test_a_retained_python_divergence_carries_the_model_s_own_words():
-    bucket, explanation, _source = pcp._prove_one(
+    bucket, explanation, _source, _failure = pcp._prove_one(
         pathlib.Path("."), "python3", _GAP, "m", 3, 1.0,
         propose_fn=lambda gap, path: _proposal(),
         repair_fn=lambda *a: None,
-        run_fn=lambda *a: (1, "FAILED t.py::proof_0 - AssertionError: boom"))
+        run_fn=lambda *a: (1, "FAILED t.py::proof_0 - AssertionError: boom", ''))
     assert bucket == "divergence"
     assert explanation == "f returns 1 where the doc says 2"

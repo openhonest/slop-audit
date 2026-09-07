@@ -79,15 +79,15 @@ def test_render_test_wraps_and_indents_the_body():
 
 def test_classify_assertion_failure_is_a_divergence():
     out = "F\n=== short test summary info ===\nFAILED test_l1_coverage_proof.py::proof_0 - AssertionError: must be 2\n"
-    assert pcp._classify(out, 1) == "divergence"
+    assert pcp._classify(out, 1, "") == "divergence"
 
 
 def test_classify_other_exception_is_incidental_not_a_bug():
     out = "E\nFAILED test_l1_coverage_proof.py::proof_0 - TypeError: missing 1 required positional argument\n"
-    assert pcp._classify(out, 1) == "incidental"
+    assert pcp._classify(out, 1, "") == "incidental"
 
 
 def test_classify_pass_and_collection_error_and_timeout():
-    assert pcp._classify("1 passed in 0.01s", 0) == "pass"
-    assert pcp._classify("ERROR test_l1_coverage_proof.py - ImportError: no module\n", 2) == "incidental"
-    assert pcp._classify("", 124) == "error"
+    assert pcp._classify("1 passed in 0.01s", 0, "") == "pass"
+    assert pcp._classify("ERROR test_l1_coverage_proof.py - ImportError: no module\n", 2, "") == "incidental"
+    assert pcp._classify("", 124, "") == "error"

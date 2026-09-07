@@ -234,14 +234,52 @@ def render_test(body: str) -> str:
     return f"def proof_0():\n{_indent(body)}\n"
 
 
-def _classify(output: str, returncode: int) -> str:
+def verdict_from_junit(report: str) -> str | None:
+    """The verdict pytest recorded about one proof, or nothing when it recorded none.
+
+    pytest writes this without being asked twice: `--junit-xml` is built in, needs no
+    plugin, and puts the exception's name in an attribute, so no terminal width and no
+    summary-line wording applies to it.
+
+    It exists because the verdict used to come out of pytest's prose, and that parser was
+    repaired three times in one day: a version moved the name off the summary line, an
+    unparsable transcript was filed as noise, and the summary reason is cut to the terminal
+    width so a partial match read as a different exception. Three repairs to one parser is
+    the architecture rather than the bug.
+
+    A failure whose exception is AssertionError is the proof's own assert firing. Any other
+    exception is a setup failure and proves nothing about the branch. An error is pytest
+    failing to run the case at all, which is the same.
+
+    Nothing at all where pytest wrote no usable record. That is not a verdict, and the
+    caller asks the prose readings next rather than inventing one here."""
+    from xml.etree import ElementTree
+
+    try:
+        root = ElementTree.fromstring(report)
+    except ElementTree.ParseError:
+        return None
+    case = root.find(".//testcase")
+    if case is None:
+        return None
+    if case.find("error") is not None:
+        return "incidental"
+    failure = case.find("failure")
+    if failure is None:
+        return "pass"
+    named = (failure.get("message") or "").split(":", 1)[0].strip()
+    return "divergence" if named == "AssertionError" else "incidental"
+
+
+def _classify(output: str, returncode: int, record: str) -> str:
     """pass | divergence | incidental | unreadable | error, from one pytest run of a proof.
 
     A failure whose exception is AssertionError is the test's own assert firing, which is a
     proven divergence. Any other exception is a setup failure and proves nothing about the
     branch, so it is incidental noise.
 
-    THE VERDICT COMES OUT OF PROSE AND PROSE IS NOT A CONTRACT. Three patterns, because
+    THE RECORD IS ASKED FIRST AND PROSE IS THE FALLBACK, NAMED RATHER THAN SILENT. The
+    prose readings are three patterns, because
     pytest has printed the exception's name in three different places across the versions
     this reader has met, and on pytest 9 the short-summary line carries no name at all.
 
@@ -252,6 +290,13 @@ def _classify(output: str, returncode: int) -> str:
     incidental is the generated test's fault and unreadable is ours."""
     if returncode == 124:
         return "error"
+    # The record first, because pytest wrote it for a machine. The readings below take
+    # pytest's prose, which is what this parser did alone until 2026-09-06 and what needed
+    # repairing three times that day. They answer when no record was written, which happens
+    # when pytest cannot start at all.
+    recorded = verdict_from_junit(record)
+    if recorded is not None:
+        return recorded
     if returncode == 0 and "1 passed" in output:
         return "pass"
     if _ERRORED.search(output):
@@ -276,7 +321,8 @@ def _summary_reason(output: str) -> re.Match[str] | None:
 
 
 @boundary
-def _run(repo: Path, interpreter: str, test_source: str, timeout_seconds: float) -> tuple[int, str]:
+def _run(repo: Path, interpreter: str, test_source: str,
+         timeout_seconds: float) -> tuple[int, str, str]:
     """Write one generated test into a temporary directory and run it.
 
     An edge. What the run MEANS is decided by the caller; this obtains an exit code and the
@@ -284,11 +330,15 @@ def _run(repo: Path, interpreter: str, test_source: str, timeout_seconds: float)
     with tempfile.TemporaryDirectory(prefix="l1-pyproof-") as directory:
         test_file = Path(directory) / "test_l1_coverage_proof.py"
         test_file.write_text(test_source)
+        report = Path(directory) / "junit.xml"
         run = pytest_trace._run_untrusted(
             [interpreter, "-m", "pytest", str(test_file), "-q", "-p", "no:cacheprovider",
-             "--tb=line", "-o", "python_functions=proof_*"],
+             "--tb=line", "-o", "python_functions=proof_*", f"--junit-xml={report}"],
             cwd=repo, env={}, timeout_seconds=timeout_seconds)
-    return run.returncode, (run.stdout or "") + (run.stderr or "")
+        # Read inside the directory, which is removed on the way out. The record is what the
+        # caller settles the verdict from; the output is what a reader is shown.
+        recorded = report.read_text() if report.is_file() else ""
+    return run.returncode, (run.stdout or "") + (run.stderr or ""), recorded
 
 
 # `unreadable` is a transcript this reader could not get a verdict out of, which is a fact
@@ -303,7 +353,7 @@ def _prove_one(repo: Path, interpreter: str, gap: CoverageGap, import_path: str,
                repair_rounds: int, timeout_seconds: float,
                propose_fn: Callable[..., Answer | None],
                repair_fn: Callable[..., Answer | None],
-               run_fn: Callable[..., tuple[int, str]]) -> tuple[str, str, str]:
+               run_fn: Callable[..., tuple[int, str, str]]) -> tuple[str, str, str, str]:
     """One gap, proven or not. The loop is `prove_gap.prove_one`, shared with the Rust
     prover since 2026-09-02; what is here is Python's own three steps.
 
@@ -320,8 +370,8 @@ def _prove_one(repo: Path, interpreter: str, gap: CoverageGap, import_path: str,
     out of a second pass over the output while Rust's runner returns one. Doing that here
     keeps the shared loop's parameters to what genuinely differs."""
     def run(_gap: CoverageGap, _proposal: prove_gap.Answer, source: str) -> tuple[str, str]:
-        rc, output = run_fn(repo, interpreter, source, timeout_seconds)
-        return _classify(output, rc), output
+        rc, output, record = run_fn(repo, interpreter, source, timeout_seconds)
+        return _classify(output, rc, record), output
 
     return prove_gap.prove_one(
         gap,
@@ -340,15 +390,13 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Coverag
                   repair_rounds: int, timeout_seconds: float,
                   propose_fn: Callable[..., Answer | None],
                   repair_fn: Callable[..., Answer | None],
-                  run_fn: Callable[..., tuple[int, str]]) -> tuple[list[CoverageProof], Outcomes]:
+                  run_fn: Callable[..., tuple[int, str, str]]) -> tuple[list[CoverageProof], Outcomes]:
     """Every gap in one module. Threads the three collaborators through rather than
     reaching for the module's globals, for the reason `_prove_one` gives."""
     import_path = _import_path(repo, repo / relpath)
 
-    def retain(gap: CoverageGap, explanation: str, source: str) -> CoverageProof:
-        return {"function": gap["function"], "language": "python",
-                "location": f"{relpath}:{gap['line']}",
-                "explanation": explanation, "test_source": source.strip()}
+    def retain(gap: CoverageGap, explanation: str, source: str, failure: str) -> CoverageProof:
+        return _retained_entry(relpath, gap, explanation, source, failure)
 
     return prove_gap.prove_each(
         gaps,
@@ -357,6 +405,17 @@ def _prove_module(repo: Path, relpath: str, interpreter: str, gaps: list[Coverag
         retain,
         outcomes=dict(EMPTY_OUTCOMES),
     )
+
+
+def _retained_entry(relpath: str, gap: CoverageGap, explanation: str, source: str,
+                    failure: str) -> CoverageProof:
+    """One retained Python proof. Named beside Rust's so a test can hold the two records to
+    one shape: a field on one and not the other is how this report came to show a location
+    on some proofs and not others."""
+    return {"function": gap["function"], "language": "python",
+            "location": f"{relpath}:{gap['line']}",
+            "explanation": explanation, "test_source": source.strip(),
+            "failure": failure.strip()}
 
 
 @boundary

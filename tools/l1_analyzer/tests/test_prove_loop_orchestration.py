@@ -45,20 +45,20 @@ def test_a_proposal_nobody_returns_is_declined_and_counted():
     that returned nothing usable, both were dropped before the tally, and the run reported
     "no proof-ready uncovered branches located" over a module with 154 of them. A model
     call that produced nothing still cost money, so it lands in a bucket."""
-    bucket, proposal, source = pcp._prove_one(
+    bucket, proposal, source, _failure = pcp._prove_one(
         pathlib.Path("."), "python3", _GAP, "m", 3, 1.0,
         propose_fn=lambda gap, path: None,
         repair_fn=lambda *a: None,
-        run_fn=lambda *a: (0, ""))
+        run_fn=lambda *a: (0, "", ''))
     assert (bucket, proposal, source) == ("declined", "", "")
 
 
 def test_a_divergence_is_retained_on_the_first_run():
-    bucket, explanation, source = pcp._prove_one(
+    bucket, explanation, source, _failure = pcp._prove_one(
         pathlib.Path("."), "python3", _GAP, "m", 3, 1.0,
         propose_fn=lambda gap, path: _proposal(),
         repair_fn=lambda *a: None,
-        run_fn=lambda *a: (1, _FAILED_ASSERT))
+        run_fn=lambda *a: (1, _FAILED_ASSERT, ''))
     assert bucket == "divergence"
     assert explanation == "why"
     assert "assert False" in source
@@ -67,8 +67,8 @@ def test_a_divergence_is_retained_on_the_first_run():
 def test_a_setup_error_is_repaired_then_reclassified():
     """The path that carries the whole point of a repair round: the first run is noise,
     the repair fixes it, and the SECOND run is what gets counted."""
-    runs = iter([(1, _FAILED_IMPORT), (1, _FAILED_ASSERT)])
-    bucket, _got, _src = pcp._prove_one(
+    runs = iter([(1, _FAILED_IMPORT, ""), (1, _FAILED_ASSERT, "")])
+    bucket, _got, _src, _failure = pcp._prove_one(
         pathlib.Path("."), "python3", _GAP, "m", 3, 1.0,
         propose_fn=lambda gap, path: _proposal(),
         repair_fn=lambda *a: _proposal("assert False  # repaired"),
@@ -84,11 +84,11 @@ def test_the_repair_round_cap_is_honoured():
         calls.append(1)
         return _proposal("assert False  # again")
 
-    bucket, _got, _src = pcp._prove_one(
+    bucket, _got, _src, _failure = pcp._prove_one(
         pathlib.Path("."), "python3", _GAP, "m", 2, 1.0,
         propose_fn=lambda gap, path: _proposal(),
         repair_fn=repair,
-        run_fn=lambda *a: (1, _FAILED_IMPORT))
+        run_fn=lambda *a: (1, _FAILED_IMPORT, ''))
     assert bucket == "incidental"
     assert len(calls) == 2, f"repaired {len(calls)} times against a cap of 2"
 
@@ -98,7 +98,7 @@ def test_a_pass_is_not_retained():
         pathlib.Path("."), "m.py", "python3", [_GAP], 3, 1.0,
         propose_fn=lambda gap, path: _proposal(),
         repair_fn=lambda *a: None,
-        run_fn=lambda *a: (0, "1 passed"))
+        run_fn=lambda *a: (0, "1 passed", ''))
     assert retained == []
     assert outcomes["pass"] == 1
     assert outcomes["divergence"] == 0
@@ -109,7 +109,7 @@ def test_a_divergence_reaches_the_retained_list_with_its_location():
         pathlib.Path("."), "pkg/m.py", "python3", [_GAP], 3, 1.0,
         propose_fn=lambda gap, path: _proposal(),
         repair_fn=lambda *a: None,
-        run_fn=lambda *a: (1, _FAILED_ASSERT))
+        run_fn=lambda *a: (1, _FAILED_ASSERT, ''))
     assert outcomes["divergence"] == 1
     assert len(retained) == 1
     assert retained[0]["location"] == "pkg/m.py:3"

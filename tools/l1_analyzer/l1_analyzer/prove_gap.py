@@ -50,10 +50,16 @@ def prove_one(gap: Gap, *,
               run: Callable[[Gap, Answer, str], tuple[str, str]],
               repair: Callable[[Gap, str, str], Answer | None],
               repairable: str,
-              rounds: int) -> tuple[str, str, str]:
+              rounds: int) -> tuple[str, str, str, str]:
     """Propose, run, repair while it is repairable, and report what happened.
 
-    Returns the verdict, the explanation of the proposal that actually ran, and its source.
+    Returns the verdict, the explanation of the proposal that actually ran, its source, and
+    what happened when it ran.
+
+    The last of those was dropped until 2026-09-06, so a retained proof reached a reader as
+    a test, a sentence saying what it asserts, and a claim that it failed, with nothing
+    saying how. Checking one meant re-running it by hand. A proof a reader cannot check is a
+    claim rather than a proof, which is the whole reason to publish one.
 
     A model that declined is a named outcome and nothing is run: the call still cost money,
     and a prover that passed over it would report a hit rate over calls it did not admit
@@ -73,7 +79,7 @@ def prove_one(gap: Gap, *,
     verdict spends a call to be told the same thing."""
     proposal = propose(gap)
     if proposal is None:
-        return "declined", "", ""
+        return "declined", "", "", ""
     source = render(proposal["body"])
     status, output = run(gap, proposal, source)
     for _ in range(rounds):
@@ -85,12 +91,12 @@ def prove_one(gap: Gap, *,
         proposal = fixed
         source = render(fixed["body"])
         status, output = run(gap, proposal, source)
-    return status, proposal["explanation"], source
+    return status, proposal["explanation"], source, output
 
 
 def prove_each(gaps: list[Gap],
-               attempt: Callable[[Gap], tuple[str, str, str]],
-               retain: Callable[[Gap, str, str], Proof],
+               attempt: Callable[[Gap], tuple[str, str, str, str]],
+               retain: Callable[[Gap, str, str, str], Proof],
                *, outcomes: dict[str, int]) -> tuple[list[Proof], dict[str, int]]:
     """Every gap in one module: each outcome counted, only a divergence retained.
 
@@ -103,8 +109,8 @@ def prove_each(gaps: list[Gap],
     exists to name."""
     retained: list[Proof] = []
     for gap in gaps:
-        bucket, explanation, source = attempt(gap)
+        bucket, explanation, source, failure = attempt(gap)
         outcomes[bucket] += 1
         if bucket == "divergence":
-            retained.append(retain(gap, explanation, source))
+            retained.append(retain(gap, explanation, source, failure))
     return retained, outcomes

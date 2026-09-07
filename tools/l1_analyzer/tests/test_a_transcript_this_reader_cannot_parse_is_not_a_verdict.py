@@ -51,17 +51,17 @@ _SETUP_FAILED = (
                          ids=["summary", "tb-line", "tb-native"])
 def test_a_fired_assertion_is_a_divergence_however_pytest_spelled_it(output):
     """The retention gate's whole job. It read one shape and pytest has printed three."""
-    assert pcp._classify(output, 1) == "divergence"
+    assert pcp._classify(output, 1, "") == "divergence"
 
 
 def test_another_exception_is_still_incidental():
     """The distinction the gate exists to make. A proof that could not even call the
     function has proven nothing about it."""
-    assert pcp._classify(_SETUP_FAILED, 1) == "incidental"
+    assert pcp._classify(_SETUP_FAILED, 1, "") == "incidental"
 
 
 def test_a_clean_run_is_still_a_pass():
-    assert pcp._classify("1 passed in 0.01s\n", 0) == "pass"
+    assert pcp._classify("1 passed in 0.01s\n", 0, "") == "pass"
 
 
 def test_a_transcript_with_no_verdict_in_it_says_so():
@@ -70,7 +70,7 @@ def test_a_transcript_with_no_verdict_in_it_says_so():
 
     Unreadable is its own answer because it sends a reader somewhere else: incidental is the
     generated test's fault, and this is ours."""
-    assert pcp._classify("FAILED nothing::useful\n1 failed in 0.01s\n", 1) == "unreadable"
+    assert pcp._classify("FAILED nothing::useful\n1 failed in 0.01s\n", 1, "") == "unreadable"
 
 
 def test_the_unreadable_answer_has_a_bucket_to_be_counted_in():
@@ -80,7 +80,7 @@ def test_the_unreadable_answer_has_a_bucket_to_be_counted_in():
 
 
 def test_a_timeout_is_still_its_own_answer():
-    assert pcp._classify("", 124) == "error"
+    assert pcp._classify("", 124, "") == "error"
 
 
 def test_a_proof_that_never_ran_asserted_nothing():
@@ -89,7 +89,7 @@ def test_a_proof_that_never_ran_asserted_nothing():
     finding about a branch nothing exercised."""
     out = ("/repo/conftest.py:9: AssertionError: fixture broke\n"
            "ERROR /t/test_l1_coverage_proof.py::proof_0\n1 error in 0.01s\n")
-    assert pcp._classify(out, 1) == "incidental"
+    assert pcp._classify(out, 1, "") == "incidental"
 
 
 # The transcript from the box where this was found, verbatim, at the width every unattended
@@ -121,7 +121,7 @@ def test_a_reason_pytest_cut_to_fit_the_terminal_is_not_read_as_another_exceptio
     70 reads right, 76 through 80 read wrong, 84 reads right. The band is narrow because the
     word has to be present and incomplete, and it moves with the length of the temporary
     directory's name."""
-    assert pcp._classify(_TRUNCATED_AT_EIGHTY, 1) == "divergence"
+    assert pcp._classify(_TRUNCATED_AT_EIGHTY, 1, "") == "divergence"
 
 
 def test_the_same_run_reads_the_same_at_any_width():
@@ -130,4 +130,4 @@ def test_the_same_run_reads_the_same_at_any_width():
     whole = _TRUNCATED_AT_EIGHTY.replace(
         "- AssertionE...", "- AssertionError: a discount must lower the total")
     cut_early = _TRUNCATED_AT_EIGHTY.replace(" - AssertionE...", "")
-    assert {pcp._classify(t, 1) for t in (_TRUNCATED_AT_EIGHTY, whole, cut_early)} == {"divergence"}
+    assert {pcp._classify(t, 1, "") for t in (_TRUNCATED_AT_EIGHTY, whole, cut_early)} == {"divergence"}
