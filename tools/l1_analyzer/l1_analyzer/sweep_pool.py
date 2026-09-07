@@ -1,0 +1,148 @@
+"""How a whole-repository sweep runs on more than one core.
+
+A module is proven by appending a test to that module's own source file, compiling the
+crate, running it, and putting the file back. Two workers in one checkout would restore each
+other's files mid-compile, and cargo locks the target directory besides, so parallelism here
+is a question about directories rather than about threads.
+
+Nothing here knows what a proof is or how one is judged. It decides how many workers there
+will be, which modules each takes, where each one works, and what the run says it cost.
+
+The pool is bounded by cores rather than by disk. A core-only turso checkout with a warm
+target is 6 GB, so a 270 GB volume holds about 45 of them and about 22 if a sweep doubles
+the target compiling test batches. Both are past any core count anyone is running, so disk
+is a check somebody makes rather than the number to divide by. That correction came from the
+session auditing turso on 2026-09-07, who had quoted 34 GB from a different box and went and
+measured the one the sweep would run on.
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+from pathlib import Path
+from typing import TypedDict
+
+from l1_analyzer.boundary import boundary
+from l1_analyzer.rust_facets import CoverageGap
+
+
+def workers_for(asked: int, modules: int) -> int:
+    """How many workers this sweep will actually run.
+
+    Never more than there is work for: a worker with no module still costs a checkout, so
+    asking for eight against three modules would make five copies of a repository to do
+    nothing.
+
+    A pool of nothing raises. Zero would run nothing and report it as a sweep that found
+    nothing, which is the reading this instrument exists to refuse."""
+    if asked <= 0:
+        raise ValueError(f"a pool of {asked} workers would prove nothing and report it as "
+                         "a sweep that found nothing")
+    return min(asked, modules) if modules else asked
+
+
+def share_out(work: list[tuple[str, list[CoverageGap]]],
+              workers: int) -> list[list[tuple[str, list[CoverageGap]]]]:
+    """The modules each worker will prove, dealt round robin.
+
+    Round robin rather than contiguous blocks. The work arrives in coverage order, which is
+    roughly source order, and neighbouring modules in one crate take similar times to build;
+    dealing them out keeps one worker from drawing every slow one.
+
+    Every module is dealt exactly once. A module in two shares is proven twice and counted
+    twice, and one in no share is a gap nobody attempted while the ceiling counted it as
+    spent."""
+    shares: list[list[tuple[str, list[CoverageGap]]]] = [[] for _ in range(workers)]
+    for at, module in enumerate(work):
+        shares[at % workers].append(module)
+    return [share for share in shares if share] if work else []
+
+
+class Checkouts(TypedDict):
+    """The directories a sweep's workers will prove in, and what making them cost."""
+    paths: list[Path]
+    copies: int
+    how: str
+
+
+@boundary
+def checkouts_for(repo: Path, workers: int, root: Path) -> Checkouts:
+    """One directory per worker, the first being the repository itself.
+
+    The sweep proves a module by appending a test to that module's own source file,
+    compiling, and putting the file back. Two workers in one checkout would restore each
+    other's files mid-compile, and cargo locks the target directory besides, so parallelism
+    needs isolation rather than a thread pool.
+
+    No copy for a single worker: copying a checkout to hand it back to itself would cost the
+    disk for nothing, and the restore-in-place path is the one that has always run.
+
+    Every worker gets a copy once there is more than one, the first included, so a parallel
+    sweep never edits the repository under audit. A module is proven by appending a test to
+    its own source file and putting the file back, and a hard kill skips the putting back.
+    One killed serial sweep left one modified file somebody found by hand; eight workers
+    would leave up to eight, in eight directories, and nobody would know which. A copy is
+    disposable by construction, so an interrupt leaves nothing to clean up.
+
+    The cost is disk and it depends on the filesystem. A turso checkout with a warm target
+    directory is 34 GB; APFS here and Btrfs or XFS with reflink on Linux copy by reference,
+    so the copy is nearly free until something writes to it, and any other filesystem pays
+    34 GB a worker. Which one happened is recorded, because eight workers is a good trade on
+    the first and a quarter of a terabyte on the second, and a reader told only the number
+    cannot tell them apart."""
+    if workers <= 1:
+        return {"paths": [repo], "copies": 0, "how": "no copy needed"}
+    paths: list[Path] = []
+    root.mkdir(parents=True, exist_ok=True)
+    how = "by reference"
+    for n in range(workers):
+        destination = root / f"worker-{n}"
+        if destination.exists():
+            shutil.rmtree(destination, ignore_errors=True)
+        # `cp -c` on macOS and `cp --reflink=auto` on Linux ask the filesystem to share the
+        # blocks. Either flag is refused outright by the other platform's cp, and a
+        # filesystem without the feature refuses it too, so the fallback is a real copy and
+        # is named rather than assumed.
+        for command, name in ((["cp", "-Rc", str(repo), str(destination)], "by reference"),
+                              (["cp", "-R", str(repo), str(destination)], "byte for byte")):
+            # check=False: a refused flag is the answer this loop is asking for, and the
+            # next command in the pair is the fallback.
+            run = subprocess.run(command, capture_output=True, check=False)
+            if run.returncode == 0:
+                how = name if how == "by reference" else how
+                break
+        else:
+            shutil.copytree(repo, destination)
+            how = "byte for byte"
+        paths.append(destination)
+    # Every path is a copy now, so the count is the length. It was length minus one while the
+    # first worker proved in the repository itself, and it stayed that way for about ten
+    # minutes after that stopped being true.
+    return {"paths": paths, "copies": len(paths), "how": how}
+
+
+@boundary
+def discard_checkouts(made: Checkouts) -> None:
+    """Remove every checkout this sweep copied, and never the repository.
+
+    A single-worker sweep copied nothing and its one path is the repository, which is why
+    the count is what this reads rather than the list. A worker's copy left behind after a
+    32-hour sweep is 34 GB somebody has to find."""
+    if not made["copies"]:
+        return
+    for path in made["paths"]:
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def pool_detail(workers: int, copies: int, how: str) -> str:
+    """What the run says about the pool it used.
+
+    Said whether or not it is one, because a sweep that wanted eight workers and got one
+    must not read like a sweep that asked for one."""
+    hands = "1 worker" if workers == 1 else f"{workers} workers"
+    if not copies:
+        return f" Proven by {hands}, in the repository itself."
+    made = "1 checkout" if copies == 1 else f"{copies} checkouts"
+    return (f" Proven by {hands}, each in its own checkout: {made} copied {how}, and the "
+            "repository itself was never edited.")

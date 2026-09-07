@@ -30,6 +30,8 @@ def _sweep_with(sweep, repo, max_attempts):
         knobs["python_executable"] = None
     if "cargo_args" in parameters:
         knobs["cargo_args"] = ()
+    if "workers" in parameters:
+        knobs["workers"] = 1
     return sweep(repo, **knobs)
 
 

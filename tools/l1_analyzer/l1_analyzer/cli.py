@@ -689,6 +689,19 @@ FLAGS: tuple[tuple[list[str], Flag], ...] = (
              "no per-type knowledge), but each round is another in-crate compile - "
              "set 0 to skip repair and take only the first attempt.",
      }),
+    (["--workers"], {
+        "type": int,
+        "default": 1,
+        "metavar": "N",
+        "help": "How many modules --prove-coverage-repo proves at once (default 1). A "
+                "module is proven by appending a test to its own source file, compiling, "
+                "and putting the file back, so each worker needs its own checkout of the "
+                "repository, and the repository itself is then never edited. The practical "
+                "ceiling is the core count: a core-only checkout with a warm build "
+                "directory is about 6 GB, so a 270 GB volume holds more copies than any "
+                "box has cores. On a filesystem that copies by reference, APFS or Btrfs or "
+                "XFS with reflink, a copy is nearly free anyway. The report says which "
+                "happened and how many copies it made."}),
     (["--cargo-arg"], {
         "action": "append",
         "default": [],
@@ -1000,7 +1013,8 @@ def main(argv: list[str] | None) -> int:
             results["coverage_proofs"] = coverage_prove.prove_coverage_repo(
                 args.repo, cap_per_module=args.prove_max, repair_rounds=args.coverage_repair_rounds,
                 timeout_seconds=args.timeout, progress=_cov_progress,
-                max_attempts=args.prove_max_total, cargo_args=tuple(args.cargo_arg))
+                max_attempts=args.prove_max_total, cargo_args=tuple(args.cargo_arg),
+                workers=args.workers)
     elif args.prove_coverage:
         from l1_analyzer import coverage_prove
         results["coverage_proofs"] = coverage_prove.prove_coverage(

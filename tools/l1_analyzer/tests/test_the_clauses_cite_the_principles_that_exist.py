@@ -99,7 +99,7 @@ def test_every_clause_carries_the_title_that_number_has_today(clause, principles
 
 @_canon_is_missing
 def test_the_principles_no_clause_measures_are_named_here(principles):
-    """Two principles have no clause. Naming them in a test rather than leaving the gap
+    """Four principles have no clause. Naming them in a test rather than leaving the gap
     silent, so the next person to read this knows what the instrument does not cover.
 
     It was three on 2026-08-28 and is two. References Resolve Statically and Type
@@ -123,10 +123,26 @@ def test_the_principles_no_clause_measures_are_named_here(principles):
 
     The list moves because the document moves, which is why this reads the document.
 
+    P24, A Fault Travels in the Return Value, and P25, A Fault Says What To Do Differently,
+    arrived on 2026-09-07 and this test caught them the same day, which is the third time
+    the document has moved under this file in two days and the third time reading it rather
+    than a copy of it is what said so.
+
+    P24 is partly reachable and the reachable part is already clause 8, which refuses a
+    caught exception in a function that is not an edge. What makes P24 more than clause 8 is
+    the chain: a caller's return type has to carry a fault its callee can produce, all the
+    way out to the boundary. Nothing here follows that chain, and the canon says nothing
+    anywhere does.
+
+    P25 cannot be checked by anything and the canon says so in its own words. Whether a
+    message names an action the reader can take is a judgment about the reader rather than a
+    property of the text. A rule that guessed at it would report a fault message as slop for
+    being short.
+
     A conformity share over the clauses that exist cannot see a principle nobody wrote a
     clause for, which is the same failure this instrument reports in other people's code."""
     measured = {c["principle"] for c in CLAUSES}
-    assert set(principles) - measured == {"P19", "P21"}
+    assert set(principles) - measured == {"P19", "P21", "P24", "P25"}
 
 
 @_canon_is_missing

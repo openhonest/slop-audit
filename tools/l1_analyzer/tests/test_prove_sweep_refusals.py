@@ -45,6 +45,7 @@ def _sweep(module, repo):
         knobs["python_executable"] = None
     else:
         knobs["cargo_args"] = ()
+        knobs["workers"] = 1
     return module.prove_coverage_repo(repo, **knobs)
 
 

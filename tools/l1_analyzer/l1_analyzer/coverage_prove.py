@@ -31,7 +31,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
 from collections.abc import Callable
+from concurrent import futures
 from pathlib import Path
 from typing import TypedDict
 
@@ -39,6 +41,13 @@ from l1_analyzer import budget, coverage_gates, prove_gap, rust_facets, rust_tra
 from l1_analyzer import model_call as llm
 from l1_analyzer.boundary import boundary
 from l1_analyzer.rust_facets import CoverageGap
+from l1_analyzer.sweep_pool import (
+    checkouts_for,
+    pool_detail,
+    share_out,
+    workers_for,
+)
+from l1_analyzer.sweep_pool import discard_checkouts as _discard_checkouts
 
 # The retention buckets, in report order. Only `divergence` is a proven bug and retained;
 # the rest name why a failing test is the tool's own noise, surfaced and never hidden.
@@ -770,10 +779,18 @@ def _rust_sources(repo: Path, measured: dict[str, frozenset[int]]) -> dict[str, 
 # honest-code-allow: L1.21.13 - the writer and both readers are one unit. `_call_model` writes LAST_REFUSAL and it is the single model boundary BOTH sweeps import, so there is no second source and no cross-module surprise. Threading the reason back would change the injected propose_fn signature, its repair counterpart and every test fake, to reach one reader at the end of one sweep. The sweeps are sequential, so the value is never stale by more than one call.
 def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
                         timeout_seconds: float, progress: SweepProgress | None,
-                        max_attempts: int, cargo_args: tuple[str, ...]) -> Sweep:
+                        max_attempts: int, cargo_args: tuple[str, ...],
+                        workers: int) -> Sweep:
     """Sweep the WHOLE crate: one coverage build, then every module with uncovered branches is
     proven (batched, with per-gap repair fallback). Retained proofs are aggregated across the
-    codebase. `progress(relpath, n_gaps, running_retained)` is called before each module."""
+    codebase. `progress(relpath, n_gaps, running_retained)` is called before each module.
+
+    `workers` is how many modules are proven at once, and it has no default. A module is
+    proven by appending a test to its own source file, compiling, and putting the file back,
+    so each worker needs its own checkout; a default of eight would spend eight copies of
+    somebody's disk without being asked, which is the same defect as a ratchet with a
+    default. What the pool cost is said in the report rather than left to the reader to
+    infer from the number."""
     # Read before anything else, so a ceiling of zero costs nothing: no toolchain probe, no
     # coverage build, no key, no network. A budget of nothing must be free to honour.
     if max_attempts <= 0:
@@ -802,20 +819,43 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     answers = _proposals_for(work, propose_many)
     retained: list[CoverageProof] = []
     outcomes = {k: 0 for k in _OUTCOMES}
-    modules = 0
-    for relpath, gaps in work:
-        modules += 1
-        if progress:
-            progress(relpath, len(gaps), len(retained))
-        # The real four, named at the one place that knows which they are. The first is a
-        # lookup rather than a request: the proposals were asked for above, in packs.
-        module_retained, module_outcomes = _prove_module(
-            repo, relpath, gaps, repair_rounds, timeout_seconds,
-            lambda gap: answers.get(id(gap)), repair, _append_and_run, _run_in_crate,
-            _refine_incidental)
-        retained.extend(module_retained)
-        for k in outcomes:
-            outcomes[k] += module_outcomes[k]
+    modules = len(work)
+    hands = workers_for(workers, modules)
+    checkouts = checkouts_for(repo, hands, Path(tempfile.mkdtemp(prefix="l1-workers-")))
+
+    def prove_share(where: Path, share: list[tuple[str, list[CoverageGap]]]) -> tuple[
+            list[CoverageProof], Outcomes]:
+        """One worker's modules, proven in one checkout, start to finish.
+
+        The checkout is the worker's own, so the source file it edits and puts back is
+        nobody else's. Everything else it needs was settled before the pool started: the
+        coverage build ran once, and every proposal was asked for and answered."""
+        kept: list[CoverageProof] = []
+        tally = {k: 0 for k in _OUTCOMES}
+        for relpath, gaps in share:
+            if progress:
+                progress(relpath, len(gaps), len(kept))
+            # The real four, named at the one place that knows which they are. The first is
+            # a lookup rather than a request: the proposals were asked for above, in packs.
+            module_kept, module_tally = _prove_module(
+                where, relpath, gaps, repair_rounds, timeout_seconds,
+                lambda gap: answers.get(id(gap)), repair, _append_and_run, _run_in_crate,
+                _refine_incidental)
+            kept.extend(module_kept)
+            for k in tally:
+                tally[k] += module_tally[k]
+        return kept, tally
+
+    shares = share_out(work, hands)
+    # Threads rather than processes. Every worker spends its time waiting on cargo, which is
+    # a subprocess and holds no interpreter lock, and threads let the answers come back
+    # without any of this being picklable.
+    with futures.ThreadPoolExecutor(max_workers=max(1, len(shares))) as pool:
+        for kept, tally in pool.map(prove_share, checkouts["paths"], shares):
+            retained.extend(kept)
+            for k in outcomes:
+                outcomes[k] += tally[k]
+    _discard_checkouts(checkouts)
     # `attempted` is every gap handed to a model, declines included: that is the unit that
     # cost money, and a budget that did not count the declines could not be reconciled.
     attempted = sum(outcomes.values())
@@ -829,6 +869,7 @@ def prove_coverage_repo(repo: Path, cap_per_module: int, repair_rounds: int,
     # the figure.
     if cargo_args:
         detail += f" (cargo scoped by {' '.join(cargo_args)})"
+    detail += pool_detail(hands, checkouts["copies"], checkouts["how"])
     return {"retained": retained, "attempted": attempted, "outcomes": outcomes, "modules": modules, "detail": detail}
 
 
