@@ -119,24 +119,44 @@ def checkouts_for(repo: Path, workers: int, root: Path) -> Checkouts:
     return {"paths": paths, "copies": len(paths), "how": how, "asked": workers}
 
 
+# Every way this package knows to copy a tree, each with the sentence its success earns.
+# Ordered: the ones that share blocks and refuse when they cannot, then the plain copy that
+# always works and never shares. A command that may silently fall back cannot be in this
+# list, because its success proves nothing about which of the two happened.
+COPY_COMMANDS: tuple[tuple[list[str], str], ...] = (
+    (["cp", "-Rc", "{from}", "{to}"], "by reference"),
+    (["cp", "-R", "--reflink=always", "{from}", "{to}"], "by reference"),
+    (["cp", "-R", "{from}", "{to}"], "byte for byte"),
+)
+
+
+def copy_commands(source: str, destination: str) -> list[tuple[list[str], str]]:
+    """The copy commands to try, in order, each with what its success would prove."""
+    return [([part.format(**{"from": source, "to": destination}) for part in command], how)
+            for command, how in COPY_COMMANDS]
+
+
 @boundary
 def copy_checkout(repo: Path, destination: Path) -> str:
     """One copy of the repository, and how it was made, or nothing when it could not be.
 
-    `cp -c` on macOS and `cp --reflink=auto` on Linux ask the filesystem to share the
-    blocks. Either flag is refused outright by the other platform's cp, and a filesystem
-    without the feature refuses it too, so the fallback is a real copy and is named rather
-    than assumed.
+    Each command carries the sentence its success earns, and only a command that REFUSES
+    when it cannot share blocks earns "by reference". `cp --reflink=auto` does not: it falls
+    back to a full copy and exits 0 either way, so reading its exit status as proof of
+    sharing made the report say "copied by reference" over 48 GB of real bytes on ext4.
+    Measured on 2026-09-07: a 100 MB directory, exit 0, 102,404K of disk gone. The run
+    before that spelling was added said "byte for byte" and was right.
+
+    `--reflink=always` is the spelling that refuses, and `-c` is its macOS equivalent. A
+    filesystem that says no falls through to the plain copy and is reported as the plain
+    copy.
 
     The destination is cleared first, every time. A copy that died part way leaves a
     directory behind, and the next thing tried against it fails because the directory
     exists, which reports that instead of the real cause and sends the reader to the wrong
     problem."""
     shutil.rmtree(destination, ignore_errors=True)
-    for command, name in ((["cp", "-Rc", str(repo), str(destination)], "by reference"),
-                          (["cp", "-R", "--reflink=auto", str(repo), str(destination)],
-                           "by reference"),
-                          (["cp", "-R", str(repo), str(destination)], "byte for byte")):
+    for command, name in copy_commands(str(repo), str(destination)):
         # check=False: a refused flag is the answer this loop is asking for, and the next
         # command is the fallback.
         if subprocess.run(command, capture_output=True, check=False).returncode == 0:

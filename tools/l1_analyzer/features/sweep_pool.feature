@@ -47,6 +47,14 @@ Feature: sweep_pool — how a whole-repository sweep runs on more than one core
     And that is what makes an interrupt harmless: a module is proven by editing its own source file and putting it back, a hard kill skips the putting back, and a copy is disposable by construction while a repository is not
     But how the copies were made is recorded, because eight workers is nearly free on a filesystem that copies by reference and the full size of the checkout on one that does not, and a reader told only the number cannot tell them apart
 
+  Scenario: copy_commands names each way of copying and what its success would prove
+    Given where the copy comes from and where it goes
+    When copy_commands fills in the paths
+    Then each command carries the sentence its success earns, and only one that refuses when it cannot share blocks earns "by reference"
+    And cp --reflink=auto is not among them, because it falls back to a full copy and exits zero either way, so its success proves nothing about which of the two happened
+    And that spelling was tried for one commit and made the report say eight checkouts were copied by reference on a box that paid 48 GB for them, measured at 102,404K for a 100 MB directory
+    But the plain copy is last, so a filesystem that refuses to share falls through to it and is reported as what it is
+
   Scenario: copy_checkout makes one copy of the repository and says how it was made
     Given the repository and where the copy is to go
     When copy_checkout asks the filesystem to share the blocks, then to copy them

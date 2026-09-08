@@ -62,7 +62,14 @@ _FAIL_BUCKETS = ("divergence", "wrong_channel", "invalid_fixture", "incidental_p
 # error is something the runner TOLD us; an unreported index is something it did not, so
 # the test was generated and run and the analyzer then lost track of it. Counting one as
 # the other made a run whose totals do not add up look like a run with noise in it.
-_OUTCOMES = (*_FAIL_BUCKETS, "pass", "error", "unreported", "declined")
+# `unrun` is its own bucket for the same reason `unreported` is. A compile error is
+# something the toolchain TOLD us, rustc printing error[E0308] or cargo saying it could not
+# compile; a run that printed neither and no test line either never reached a compiler at
+# all. That is a fact about this tool's ability to run rather than about the generated test,
+# and the two send a reader to different places. A sweep on 2026-09-07 filed 181 of them as
+# compile errors while sampling found zero cargo and zero rustc processes across the whole
+# module loop.
+_OUTCOMES = (*_FAIL_BUCKETS, "pass", "error", "unrun", "unreported", "declined")
 # The empty tally, named once so a reader and a test can ask what buckets exist.
 EMPTY_OUTCOMES = {k: 0 for k in _OUTCOMES}
 
@@ -475,7 +482,10 @@ def _classify_run(output: str, returncode: int) -> str:
     # build error, so it reaches the gates rather than being counted as did-not-compile.
     ran = "running " in output or "test result:" in output
     if returncode != 0:
-        return "fail" if ran else "error"
+        # Nothing ran and the compiler said nothing, so nothing we can see compiled
+        # anything. Called `error` until 2026-09-07, which named every way of failing to
+        # reach cargo after the event cargo would have reported.
+        return "fail" if ran else "unrun"
     return "pass"
 
 
@@ -492,7 +502,10 @@ def _append_and_run(repo: Path, module_relpath: str, test_source: str, test_filt
     byte-for-byte. Returns (returncode, combined output). The file is always restored."""
     cargo = rust_trace._cargo()
     if cargo is None:
-        return 1, "no cargo"
+        # Said in cargo's own vocabulary of nothing: no test line and no compiler error, so
+        # the classifier reads it as a run that never happened rather than as a test the
+        # compiler rejected.
+        return 1, "cargo is not on PATH, so nothing was compiled and nothing was run"
     module = repo / module_relpath
     original = module.read_bytes()
     try:
@@ -936,7 +949,10 @@ def _outcome_detail(outcomes: Outcomes) -> str:
             f"{outcomes['wrong_channel']} inspected the wrong output channel, "
             f"{outcomes['invalid_fixture']} were invalid fixtures (construction the code rejects), "
             f"{outcomes['incidental_panic']} panicked outside the assertion (kept for review), "
-            f"{outcomes['error']} did not compile.")
+            f"{outcomes['error']} did not compile."
+            + (f" {outcomes['unrun']} never ran: no compiler output at all, which is this "
+               "tool failing to reach cargo rather than cargo rejecting a test."
+               if outcomes.get("unrun") else ""))
 
 
 def prove_coverage(repo: Path, module_relpath: str, cap: int, timeout_seconds: float,
