@@ -54,6 +54,44 @@ def _bare_type(text: str) -> str:
     return text.lstrip(":").strip().split("|")[0].strip()
 
 
+def _arguments_of(inside: str) -> list[str]:
+    """The arguments of one generic, split at its own level only.
+
+    `Mapping[str, Mapping[str, str]]` has two arguments, not three. Splitting on
+    every comma cut the nested one in half and handed back `Mapping[str`, an
+    opening bracket with no closing one, and the reader above then asked that
+    fragment for its last `]` and raised. Any function declaring itself a
+    boundary with a nested generic parameter crashed the run, so the file could
+    not be measured at all.
+    """
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for character in inside:
+        if character in "[(":
+            depth += 1
+        elif character in "])":
+            depth -= 1
+        if character == "," and depth == 0:
+            parts.append("".join(current).strip())
+            current = []
+            continue
+        current.append(character)
+    parts.append("".join(current).strip())
+    return [part for part in parts if part]
+
+
+def _unqualified(declared: str) -> str:
+    """One declared type with its module dropped.
+
+    `psycopg.Connection` and `Connection` are the same type to the question
+    this asks, and a language that spells the module in the annotation would
+    otherwise never match a vocabulary written in bare names. Only the last
+    segment: a type is named by its last segment in every language here.
+    """
+    return declared.rsplit(".", 1)[-1]
+
+
 def carries_domain_data(declared: str, spec: LangSpec, plain: frozenset[str]) -> bool:
     """Whether one declared type carries the domain's own data.
 
@@ -67,12 +105,12 @@ def carries_domain_data(declared: str, spec: LangSpec, plain: frozenset[str]) ->
     were exactly that, and the third was a status spelled as a tuple."""
     if not declared:
         return False
-    if declared in plain:
+    if declared in plain or _unqualified(declared) in plain:
         return False
-    if "[" not in declared:
+    if "[" not in declared or "]" not in declared:
         return True
     inside = declared[declared.index("[") + 1:declared.rindex("]")]
-    parts = [p.strip().rstrip(".") for p in inside.split(",") if p.strip().strip(".")]
+    parts = [p.rstrip(".") for p in _arguments_of(inside) if p.strip(".")]
     return not parts or any(carries_domain_data(_bare_type(p), spec, plain) for p in parts)
 
 

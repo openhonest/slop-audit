@@ -263,3 +263,82 @@ def test_a_table_holding_a_string_names_no_function():
     source = ("def _deliver(db, now):\n    logger.info('x')\n    return db\n\n\n"
               "LABELS = {True: '_deliver'}\n\n\ndef shutdown(db, now):\n    return LABELS\n")
     assert [f for f in _findings_of(source) if f["withheld_by"] == ""] == []
+
+
+# ---------------------------------------------------------------------------
+# A declared boundary whose parameter is a nested generic
+#
+# Reading the declaration means reading its parameter types, and that reader
+# split a generic's arguments on every comma. `Mapping[str, Mapping[str, str]]`
+# came apart into three pieces, the first of them `Mapping[str`, an opening
+# bracket with no closing one. Asking that fragment for its last `]` raised, and
+# the whole run died, so a file carrying such a function could not be measured
+# at all rather than measured wrongly.
+# ---------------------------------------------------------------------------
+
+
+def test_a_nested_generic_splits_at_its_own_level_only():
+    assert edges._arguments_of("str, Mapping[str, str]") == ["str", "Mapping[str, str]"]
+
+
+def test_a_flat_generic_still_splits_into_its_arguments():
+    assert edges._arguments_of("str, int") == ["str", "int"]
+
+
+def test_a_single_argument_is_one_part():
+    assert edges._arguments_of("Path") == ["Path"]
+
+
+def test_a_nested_generic_parameter_is_read_rather_than_raising():
+    """The crash this replaces: any function declaring itself a boundary with a
+    nested generic parameter took the whole analysis down with it."""
+    plain = frozenset({"str", "int", "Path"})
+    assert edges.carries_domain_data("Mapping[str, Mapping[str, str]]", None, plain) is False
+
+
+def test_a_nested_generic_carrying_the_domain_is_still_seen() -> None:
+    plain = frozenset({"str", "int", "Path"})
+    assert edges.carries_domain_data("Mapping[str, list[Order]]", None, plain) is True
+
+
+def test_an_unclosed_generic_is_not_asked_for_a_bracket_it_lacks() -> None:
+    """Defence against the same shape arriving from a grammar that hands back a
+    truncated annotation, rather than from this reader cutting one in half."""
+    assert edges.carries_domain_data("Mapping[str", None, frozenset({"str"})) is True
+
+
+# ---------------------------------------------------------------------------
+# A handle is a locator
+#
+# A function taking a database connection and a query plainly obtains, and was
+# reported as a transform because a connection was not in the vocabulary of
+# things that say WHERE to look. Two things were wrong: the name was absent,
+# and a qualified spelling could not have matched it anyway.
+# ---------------------------------------------------------------------------
+
+
+def test_a_module_qualified_type_matches_the_bare_name() -> None:
+    assert edges._unqualified("psycopg.Connection") == "Connection"
+
+
+def test_an_unqualified_type_is_left_alone() -> None:
+    assert edges._unqualified("Connection") == "Connection"
+
+
+def test_a_connection_is_a_locator_not_the_domain() -> None:
+    """It says where to look, which is what locator_types is for."""
+    from l1_analyzer.lang_spec import LANG_SPEC
+
+    plain = LANG_SPEC["python"]["locator_types"] | LANG_SPEC["python"]["status_types"]
+    assert edges.carries_domain_data("psycopg.Connection", None, plain) is False
+    assert edges.carries_domain_data("Cursor", None, plain) is False
+
+
+def test_a_domain_noun_is_still_the_domain() -> None:
+    """Client and Session are kept out on purpose: both are ordinary domain
+    nouns, and a wrong entry here withholds an accusation silently."""
+    from l1_analyzer.lang_spec import LANG_SPEC
+
+    plain = LANG_SPEC["python"]["locator_types"] | LANG_SPEC["python"]["status_types"]
+    assert edges.carries_domain_data("Client", None, plain) is True
+    assert edges.carries_domain_data("Order", None, plain) is True

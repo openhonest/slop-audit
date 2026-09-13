@@ -556,9 +556,19 @@ LANG_SPEC: dict[str, LangSpec] = {
         # edge that takes a filename. What that costs is the reverse: an edge taking the
         # domain's data AS a string is read as obtaining. That is the direction to be wrong
         # in, because this rule only ever accuses.
+        # Handles belong here beside Path: a connection, a cursor, an engine, a
+        # pool and a socket all say WHERE to look, which is what this field is
+        # for. Without them a function taking a database connection and a query
+        # reads as taking the domain's data, so an edge that plainly obtains is
+        # reported as a transform.
+        #
+        # Client and Session are deliberately absent. Both are ordinary domain
+        # nouns, a Client in a CRM is the domain's own data, and a wrong entry
+        # here is silent: it withholds an accusation rather than making one.
         "locator_types": frozenset({
             "Path", "str", "bytes", "int", "float", "bool", "None",
             "list[str]", "tuple[str, ...]", "dict[str, str]", "Environment",
+            "Connection", "Cursor", "Engine", "Pool", "Socket",
         }),
         # Whether it landed. A writer hands back one of these and nothing else; handing back
         # the domain's data is what says a function did more than write.

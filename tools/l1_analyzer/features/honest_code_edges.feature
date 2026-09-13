@@ -125,6 +125,19 @@ Feature: The three clauses about a program's edges
     Then it hands back every parameter's declared type and the declared return type
     But a language that declares neither hands back nothing at all, which is the honest answer for JavaScript and Ruby rather than a claim that the function takes nothing
 
+  Scenario: _unqualified drops the module a language spells in front of a type
+    Given one declared type, which a language may spell with its module in front of it
+    When _unqualified reduces it
+    Then psycopg.Connection and Connection are one answer, because a type is named by its last segment
+    But a type written without a module is left as it is, so nothing that matched before stops matching
+
+  Scenario: _arguments_of splits one generic at its own level
+    Given the inside of a generic, whose arguments may themselves be generics
+    When _arguments_of separates them
+    Then Mapping[str, Mapping[str, str]] has two arguments and not three, because the comma inside the nested one belongs to it
+    But a flat generic still separates on its own commas, so nothing that worked before reads differently
+    And splitting on every comma is what handed a reader the fragment Mapping[str, an opening bracket with no closing one, and took the whole run down when it asked that fragment for its last bracket
+
   Scenario: carries_domain_data decides whether one type holds the domain's own data
     Given one declared type and the language's tables of locators and statuses
     When carries_domain_data reads through it
