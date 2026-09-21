@@ -40,6 +40,7 @@ fn main() {
     let mut lang_arg: Option<String> = None;
     let mut tsv = false;
     let mut census = false;
+    let mut enumerate = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -51,6 +52,11 @@ fn main() {
             // A count that matches by luck and a count that matches by agreement look the
             // same from the outside, and this is what tells them apart.
             "--census" => census = true,
+            // Beside --census, and for the same reason: this one dumps what the
+            // CLASSIFIER'S walk reached, with the key each site yielded and the empty
+            // string where it read a declaration and declined. The declines are the half
+            // that matters: they are the only evidence the reader was there at all.
+            "--enum" => enumerate = true,
             // Before the repository check: it answers a question about the binary rather
             // than about a tree.
             "--version" => {
@@ -84,6 +90,15 @@ fn main() {
         }
         None => lang::detect_primary_language(repo).to_string(),
     };
+
+    if enumerate {
+        for (path, cands) in state::enumerate::walk(repo, &language) {
+            for (site, key) in cands {
+                println!("{path}\t{}\t{}\t{}\t{key}", site.kind, site.owner, site.name);
+            }
+        }
+        return;
+    }
 
     if census {
         for (path, sites) in state::census::walk(repo, &language) {

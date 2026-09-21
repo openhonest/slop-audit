@@ -35,7 +35,8 @@ NEEDED = """
 alias_marker alias_types arglist_types argument_wrapper_types assign_left assign_right
 assign_types bare_cond_types binding_condition_types binding_sites blank_idents branch_cond
 branch_types cache_reads call_args call_fn call_name call_recv call_types class_types
-closed_set_rule comparison_types cond_at_index decorator_types delete_stmt_types
+closed_set_rule comparison_types cond_at_index container_literal_types decorator_types
+delete_stmt_types
 destructuring_types discard_types dispatch_methods elif_types empty_map_types extra_bounded
 extra_test_positions field_decl_types flat_call func_types gate_body_types gate_fields
 immutable_ctor_rule immutable_modifiers instance_enum instance_ref_style iterate_types

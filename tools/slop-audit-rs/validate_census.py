@@ -114,6 +114,13 @@ def main(argv: list[str]) -> int:
     files = {row[0] for row in reference} | {row[0] for row in ported}
     print(f"{repo} ({lang}): {len(reference)} sites in the reference, "
           f"{len(ported)} in the port, over {len(files)} files")
+    if not reference and not ported:
+        # Nought differences out of nought sites. The two agreed about nothing, and a
+        # report that reads the same for "we agree" and "there was nothing to agree about"
+        # is the exact defect this instrument exists to name, committed by its own
+        # validator. Exit 2: not a difference, and not a pass either.
+        print("NOTHING TO COMPARE: neither side found a site here, so this run proves nothing")
+        return 2
     if not missing and not extra:
         print("EQUAL, site for site")
         return 0

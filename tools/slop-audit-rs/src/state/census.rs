@@ -326,7 +326,7 @@ const JS_DECLARATIONS: &[&str] = &["lexical_declaration", "variable_declaration"
 /// `export default CACHE` is not reached and must not be. It hands out a binding declared
 /// somewhere else and declares nothing itself, so following it would count that binding
 /// twice.
-fn js_declarations<'t>(root: Node<'t>) -> Vec<Node<'t>> {
+pub fn js_declarations<'t>(root: Node<'t>) -> Vec<Node<'t>> {
     let mut out = Vec::new();
     for child in children(root) {
         if JS_DECLARATIONS.contains(&child.kind()) {
@@ -426,7 +426,7 @@ fn c_toplevel(root: Node, src: &[u8]) -> Vec<Site> {
 /// and includes function_declarator, because `void (*cb)(int)` IS a slot; this one refuses
 /// it, because at file scope the same node is a function. Two rules, two lists, and
 /// collapsing them into one was the first thing this port got wrong.
-fn c_declarator_name(node: Option<Node>, src: &[u8]) -> String {
+pub fn c_declarator_name(node: Option<Node>, src: &[u8]) -> String {
     let Some(n) = node else { return String::new() };
     match n.kind() {
         "identifier" => text(Some(n), src),
@@ -627,7 +627,23 @@ mod tests {
 /// trees and conformance tables are excluded, and no scope may decline a vendored tree or
 /// machine output, because neither is anybody's code here whatever the question.
 pub fn walk(repo: &Path, lang: &str) -> BTreeMap<String, BTreeSet<Site>> {
-    let Some(cfg) = crate::lang::cfg(lang) else { return BTreeMap::new() };
+    parsed_files(repo, lang)
+        .into_iter()
+        .map(|(rel, tree, src)| (rel, file_sites(tree.root_node(), lang, &src)))
+        .collect()
+}
+
+/// Every file in scope, parsed, with the path the classifier reports findings against.
+///
+/// Shared by both walks. They must read the same FILES or their counts are not comparable,
+/// and a port that scoped them separately would make a scoping difference look like a
+/// reading difference, which is the one confusion the census exists to prevent.
+///
+/// The scope is production without conformance, the same the reference walks: test trees
+/// and conformance tables are excluded, and no scope may decline a vendored tree or
+/// machine output, because neither is anybody's code here whatever the question.
+pub fn parsed_files(repo: &Path, lang: &str) -> Vec<(String, tree_sitter::Tree, Vec<u8>)> {
+    let Some(cfg) = crate::lang::cfg(lang) else { return Vec::new() };
     let has_packages = crate::repo_has_packages(repo);
     // What the project itself says is not part of it. Without this the port read two
     // generated bindings in a gitignored build file as state this repository keeps, and a
@@ -635,7 +651,7 @@ pub fn walk(repo: &Path, lang: &str) -> BTreeMap<String, BTreeSet<Site>> {
     // measurement.
     let disowned = crate::ignored_paths(repo);
     let mut parser = crate::parser_for(lang);
-    let mut by_file = BTreeMap::new();
+    let mut out = Vec::new();
     for entry in crate::walk_repo(repo) {
         let path = entry.path();
         if !crate::is_file_entry(&entry) {
@@ -654,9 +670,9 @@ pub fn walk(repo: &Path, lang: &str) -> BTreeMap<String, BTreeSet<Site>> {
         let Ok(src) = std::fs::read(path) else { continue };
         let Some(tree) = parser.parse(&src, None) else { continue };
         let rel = path.strip_prefix(repo).unwrap_or(path).to_string_lossy().into_owned();
-        by_file.insert(rel, file_sites(tree.root_node(), lang, &src));
+        out.push((rel, tree, src));
     }
-    by_file
+    out
 }
 
 /// The directory names the census scope removes beyond the vendored ones, matching the
