@@ -66,16 +66,34 @@ Feature: java_trace — running a Maven project's own test suite to measure bran
     But an unsupported or unbuildable project, a missing build tool, a timed-out suite, a coverage plugin that was never wired into the build, an unreadable report or a project with no branches at all returns not-applicable with the reason, never a zero that would read as real but terrible coverage; and the runtime override is accepted only to keep the harness signature uniform, because the project's own build picks the runtime
 
   Scenario: _ran_tests tells a real determinism data point from a suite that never executed
-    Given the combined output of one build run
+    Given what the test runner recorded about one build run
     When _ran_tests looks for the test runner's own summary marker
     Then it reports that tests ran only when that marker is present
     But a compilation failure, or a module with no tests, produces no marker and reports that nothing ran, which is the difference between a failing run and a run that never happened
 
   Scenario: _surefire_summary recovers the counts line from a build run
-    Given the combined output of one build run
+    Given what the test runner recorded about one build run
     When _surefire_summary looks for the test runner's summary lines
     Then it returns the last one, which carries that run's own counts of tests, failures and errors
-    But output with no summary line yields a plain note saying so, which keeps a failing run from reaching a reader with no reason attached
+    But a record with no summary line yields a plain note saying so, which keeps a failing run from reaching a reader with no reason attached
+
+  Scenario: _reports finds every result file the test runner wrote
+    Given a repository the build has just run tests in
+    When _reports looks under each module's build directory for the test runner's result files
+    Then it returns all of them, in a settled order, so a build of many modules is counted across all of them and not only its root
+
+  Scenario: _clear_reports throws away the results of the run before this one
+    Given a repository carrying the result files of an earlier run
+    When _clear_reports deletes them
+    Then the next run starts with nothing on disk to inherit
+    But without this a run that fails to compile would be read through the results of the run before it, and scored as a suite that ran and passed
+
+  Scenario: _surefire_evidence reads what the test runner recorded, because the quiet build log does not say
+    Given a repository the build has just run tests in
+    When _surefire_evidence totals the tests, failures, errors and skips across every result file
+    Then it returns them as the same counts line the build log would have carried, which is what tells a run that happened from a run that did not
+    And the build is run quietly to keep an untrusted project's chatter out of the result, which deletes that line from the log, so the log cannot be the source and the result files are
+    But a repository with no result files, or result files totalling no tests at all, reports that the suite did not run, and a result file that cannot be read reports that instead, because a measurement we could not take is not a project with no tests
 
   Scenario: _determinism_verdict decides L1.20 from the outcome of every randomized-order run
     Given the exit status and combined output of each randomized-order run, in the order they were made, and the name of the Java runtime that ran them

@@ -21,6 +21,7 @@ below as values, with no stub anywhere in this file.
 
 import pytest
 from l1_analyzer import java_trace
+from l1_analyzer.boundary import boundary
 
 
 def _branch_xml(covered: int, missed: int) -> str:
@@ -199,3 +200,64 @@ def test_no_runs_at_all_is_absent_not_a_clean_sweep():
     # 0 of 0 satisfies "every run passed". It must not band Healthy.
     r = java_trace._determinism_verdict([], "j", 300.0)
     assert r["band"] == "n/a" and r["value"] == "n/a"
+
+
+# --- what Surefire recorded, read from its reports ----------------------------
+#
+# The console used to be the source. Both Maven commands pass `-q`, `-q` suppresses the
+# `Tests run:` summary, so the console carried no count and every Maven project was reported
+# as never having run its suite. The XML below is what Surefire writes for machines and what
+# the harness reads now.
+
+@boundary
+def _report(root, name: str, **counts: int) -> None:
+    """One Surefire result file, in the directory Maven puts them in."""
+    attrs = " ".join(f'{key}="{value}"' for key, value in counts.items())
+    folder = root / "target" / "surefire-reports"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"TEST-{name}.xml").write_text(f'<testsuite name="{name}" {attrs}/>')
+
+
+def test_the_counts_come_from_the_reports_not_from_the_console(tmp_path):
+    _report(tmp_path, "band.BandTest", tests=7, failures=2, errors=1, skipped=0)
+    evidence = java_trace._surefire_evidence(tmp_path)
+    assert java_trace._ran_tests(evidence)
+    assert java_trace._surefire_summary(evidence) == "Tests run: 7, Failures: 2, Errors: 1, Skipped: 0"
+
+
+def test_every_module_in_a_multi_module_build_is_counted(tmp_path):
+    _report(tmp_path / "core", "a.ATest", tests=3, failures=0, errors=0, skipped=1)
+    _report(tmp_path / "web", "b.BTest", tests=4, failures=1, errors=0, skipped=0)
+    evidence = java_trace._surefire_evidence(tmp_path)
+    assert evidence == "Tests run: 7, Failures: 1, Errors: 0, Skipped: 1"
+
+
+def test_a_build_that_wrote_no_report_did_not_run_its_suite(tmp_path):
+    assert not java_trace._ran_tests(java_trace._surefire_evidence(tmp_path))
+
+
+def test_a_report_of_zero_tests_did_not_run_its_suite_either(tmp_path):
+    # A module Surefire visited and found nothing in. Zero clean runs out of zero is not a
+    # determinism result, so it has to read as absence and not as a passing empty suite.
+    _report(tmp_path, "band.BandTest", tests=0, failures=0, errors=0, skipped=0)
+    assert not java_trace._ran_tests(java_trace._surefire_evidence(tmp_path))
+
+
+def test_an_unreadable_report_says_so_rather_than_counting_zero(tmp_path):
+    # Maven ran the suite and we cannot tell what happened. That is a broken measurement,
+    # and it must not read the same as a project with no tests.
+    folder = tmp_path / "target" / "surefire-reports"
+    folder.mkdir(parents=True)
+    (folder / "TEST-band.BandTest.xml").write_text("<testsuite tests=")
+    evidence = java_trace._surefire_evidence(tmp_path)
+    assert not java_trace._ran_tests(evidence)
+    assert "unreadable" in evidence
+
+
+def test_the_previous_seeds_reports_are_deleted_before_the_next_run(tmp_path):
+    # Maven leaves them on disk. A seed that fails to compile would otherwise inherit the
+    # counts of the seed before it and be scored as a suite that ran and passed.
+    _report(tmp_path, "band.BandTest", tests=7, failures=0, errors=0, skipped=0)
+    java_trace._clear_reports(tmp_path)
+    assert java_trace._reports(tmp_path) == []
+    assert not java_trace._ran_tests(java_trace._surefire_evidence(tmp_path))

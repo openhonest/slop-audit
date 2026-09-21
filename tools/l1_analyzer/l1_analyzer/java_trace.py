@@ -11,7 +11,10 @@ paths) rather than reporting n/a.
   details string says so.
 - **L1.20 test determinism**: `./mvnw -q -Dsurefire.runOrder=random test` run five times,
   counting the runs where the whole suite passes. Surefire re-randomizes execution order per
-  run, so that is the randomization source and no external plugin is needed.
+  run, so that is the randomization source and no external plugin is needed. Whether a run
+  executed any tests, and how many failed, is read from the XML files Surefire writes under
+  `target/surefire-reports/`, never from the console, because `-q` suppresses the console
+  summary.
 
 Directory-insensitive by construction: Maven is invoked with `cwd=repo`, and the project's
 own wrapper `./mvnw` (which pins the Maven version) is preferred over a system `mvn`, so the
@@ -218,18 +221,78 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     return _coverage_verdict(branches, run.returncode, jdk, timeout_seconds)
 
 
-def _ran_tests(output: str) -> bool:
-    """True when Surefire actually ran tests (it prints a `Tests run:` summary), false when
-    nothing ran - a compilation error, or a module with no tests. This is the difference
-    between a real determinism data point and the suite never executing."""
-    return "Tests run:" in output
+def _ran_tests(evidence: str) -> bool:
+    """True when Surefire actually ran tests, false when nothing ran - a compilation error,
+    or a module with no tests. This is the difference between a real determinism data point
+    and the suite never executing."""
+    return "Tests run:" in evidence
 
 
-def _surefire_summary(output: str) -> str:
-    """The last Surefire `Tests run:` line (e.g. `Tests run: 12, Failures: 2, Errors: 0`), or
+def _surefire_summary(evidence: str) -> str:
+    """The Surefire count line (e.g. `Tests run: 12, Failures: 2, Errors: 0, Skipped: 0`), or
     a generic note. This is what turns a bare 0/5 into a reason a reader can act on."""
-    matches = _SUREFIRE.findall(output)
+    matches = _SUREFIRE.findall(evidence)
     return matches[-1].strip() if matches else "no test summary line"
+
+
+_NO_REPORTS = "Surefire wrote no test report"
+_UNREADABLE_REPORT = "a Surefire test report was unreadable"
+
+# Surefire's own totals, the attributes it writes on every <testsuite> element.
+_COUNTED = ("tests", "failures", "errors", "skipped")
+
+
+@boundary
+def _reports(repo: Path) -> list[Path]:
+    """Every Surefire result file under the repo, one per test class, in each module's
+    `target/surefire-reports/`. Globbed across the whole tree so a multi-module build counts
+    all its modules and not just the root."""
+    return sorted(repo.glob("**/target/surefire-reports/TEST-*.xml"))
+
+
+@boundary
+def _clear_reports(repo: Path) -> None:
+    """Delete the previous run's Surefire results before starting the next one.
+
+    Maven leaves them on disk. Without this, a seed that fails to compile inherits the
+    reports the seed before it wrote, and the harness reads a suite that never ran this time
+    as a suite that ran and passed."""
+    for report in _reports(repo):
+        report.unlink(missing_ok=True)
+
+
+@boundary
+def _surefire_evidence(repo: Path) -> str:
+    """What Surefire recorded about the run that just finished, as the `Tests run:` line the
+    readers above expect, or a sentence saying why there is no count.
+
+    Maven's console log used to be the source, and `-q` is on every command this module runs
+    for the same reason it is on the coverage command: to keep an untrusted project's build
+    chatter out of the result. But `-q` suppresses INFO, and Surefire's `Tests run:` summary
+    is an INFO line. So the console said nothing, `_ran_tests` read nothing as no tests, and
+    EVERY Maven project on earth got "the suite did not run" from this harness. The fixture
+    at hand ran one test, passed, and was reported as having executed none.
+
+    One fact with two owners: the console log and the XML reports both claimed to say
+    whether tests ran, and the quiet flag silently retired one of them. The XML is what
+    Surefire writes for machines and `-q` does not touch it, so read that and let the console
+    go back to being chatter. Coverage already worked this way, reading jacoco.xml rather
+    than the log, which is why coverage kept measuring while determinism refused."""
+    reports = _reports(repo)
+    if not reports:
+        return _NO_REPORTS
+    totals = dict.fromkeys(_COUNTED, 0)
+    for report in reports:
+        try:
+            suite = ET.fromstring(report.read_text())
+        except (OSError, ET.ParseError):
+            return _UNREADABLE_REPORT
+        for name in _COUNTED:
+            totals[name] += int(suite.get(name) or 0)
+    if totals["tests"] == 0:
+        return _NO_REPORTS
+    return (f"Tests run: {totals['tests']}, Failures: {totals['failures']}, "
+            f"Errors: {totals['errors']}, Skipped: {totals['skipped']}")
 
 
 def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str,
@@ -245,9 +308,10 @@ def _determinism_verdict(outcomes: Iterable[tuple[int, str]], jdk: str,
          "describe": f"randomized-order runs passed cleanly (under {jdk})"},
         _ran_tests,
         _surefire_summary,
-        # Java knows the sentence before it looks: Maven either ran the suite or it did not,
-        # and there is nothing in the output a reader needs beyond that.
-        lambda _returncode, _output: f"no tests executed under {jdk}",
+        # Two ways to have no count, and they are different news. No report at all means
+        # Maven never got as far as running the suite. An unreadable one means it did and we
+        # cannot tell what happened, which is a broken measurement and not a broken project.
+        lambda _returncode, evidence: f"{evidence} under {jdk}",
         timeout_seconds=timeout_seconds,
     )
 
@@ -266,10 +330,11 @@ def test_determinism(repo: Path, runs: int, timeout_seconds: float, runtime_over
     def outcomes() -> Iterable[tuple[int, str]]:
         # Lazy, so the verdict's return on a timed-out or never-run seed stops the rest.
         for _ in range(runs):
+            _clear_reports(repo)
             run = _run_untrusted(
                 [maven, "-q", "-Dsurefire.runOrder=random", "test"],
                 cwd=repo, env=env, timeout_seconds=timeout_seconds,
             )
-            yield run.returncode, (run.stdout or "") + (run.stderr or "")
+            yield run.returncode, _surefire_evidence(repo)
 
     return _determinism_verdict(outcomes(), jdk, timeout_seconds)
