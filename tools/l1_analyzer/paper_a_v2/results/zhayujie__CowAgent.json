@@ -1,0 +1,291 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.6,
+ "v1_mutable_ratio": 55.4,
+ "v1_details": "1462/2641 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 823,
+  "promiscuous": 52,
+  "unresolved": 179
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 627,
+   "drives_decision": 196
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 52
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 179
+  }
+ },
+ "v2_resolvable": 0.83,
+ "v2_promiscuous": [
+  {
+   "state": "self._emitted_artifacts",
+   "file": "agent/protocol/agent_stream.py",
+   "line": 227
+  },
+  {
+   "state": "self._by_request",
+   "file": "agent/protocol/cancel.py",
+   "line": 43
+  },
+  {
+   "state": "self._profiles",
+   "file": "agent/registry.py",
+   "line": 99
+  },
+  {
+   "state": "self.buffer",
+   "file": "agent/tools/bash/background.py",
+   "line": 46
+  },
+  {
+   "state": "self.image_extensions",
+   "file": "agent/tools/read/read.py",
+   "line": 114
+  },
+  {
+   "state": "self.video_extensions",
+   "file": "agent/tools/read/read.py",
+   "line": 115
+  },
+  {
+   "state": "self.audio_extensions",
+   "file": "agent/tools/read/read.py",
+   "line": 116
+  },
+  {
+   "state": "self.binary_extensions",
+   "file": "agent/tools/read/read.py",
+   "line": 117
+  },
+  {
+   "state": "self.archive_extensions",
+   "file": "agent/tools/read/read.py",
+   "line": 118
+  },
+  {
+   "state": "self.pdf_extensions",
+   "file": "agent/tools/read/read.py",
+   "line": 119
+  },
+  {
+   "state": "self.office_extensions",
+   "file": "agent/tools/read/read.py",
+   "line": 120
+  },
+  {
+   "state": "self._active_task_ids",
+   "file": "agent/tools/scheduler/scheduler_service.py",
+   "line": 45
+  },
+  {
+   "state": "self.image_extensions",
+   "file": "agent/tools/send/send.py",
+   "line": 39
+  },
+  {
+   "state": "self.video_extensions",
+   "file": "agent/tools/send/send.py",
+   "line": 40
+  },
+  {
+   "state": "self.audio_extensions",
+   "file": "agent/tools/send/send.py",
+   "line": 41
+  },
+  {
+   "state": "self.document_extensions",
+   "file": "agent/tools/send/send.py",
+   "line": 42
+  },
+  {
+   "state": "self.tool_configs",
+   "file": "agent/tools/tool_manager.py",
+   "line": 270
+  },
+  {
+   "state": "self.btype",
+   "file": "bridge/bridge.py",
+   "line": 15
+  },
+  {
+   "state": "self.bots",
+   "file": "bridge/bridge.py",
+   "line": 89
+  },
+  {
+   "state": "self.futures",
+   "file": "channel/chat_channel.py",
+   "line": 38
+  },
+  {
+   "state": "self.sessions",
+   "file": "channel/chat_channel.py",
+   "line": 39
+  },
+  {
+   "state": "self._client",
+   "file": "channel/discord/discord_channel.py",
+   "line": 45
+  },
+  {
+   "state": "self.reasoning_steps",
+   "file": "channel/feishu/feishu_progress_card.py",
+   "line": 24
+  },
+  {
+   "state": "self.cache",
+   "file": "channel/file_cache.py",
+   "line": 19
+  },
+  {
+   "state": "self._tool_started_at",
+   "file": "channel/terminal/terminal_channel.py",
+   "line": 51
+  },
+  {
+   "state": "self.session_queues",
+   "file": "channel/web/web_channel.py",
+   "line": 509
+  },
+  {
+   "state": "self.sse_queues",
+   "file": "channel/web/web_channel.py",
+   "line": 512
+  },
+  {
+   "state": "self._kf_locks",
+   "file": "channel/wechat_kf/wechat_kf_channel.py",
+   "line": 103
+  },
+  {
+   "state": "self.cache_dict",
+   "file": "channel/wechatmp/wechatmp_channel.py",
+   "line": 55
+  },
+  {
+   "state": "self.sessions",
+   "file": "models/session_manager.py",
+   "line": 45
+  },
+  {
+   "state": "queue_map",
+   "file": "models/xunfei/xunfei_spark_bot.py",
+   "line": 31
+  },
+  {
+   "state": "reply_map",
+   "file": "models/xunfei/xunfei_spark_bot.py",
+   "line": 34
+  },
+  {
+   "state": "self.m_values",
+   "file": "plugins/banwords/lib/WordsSearch.py",
+   "line": 22
+  },
+  {
+   "state": "self.Results",
+   "file": "plugins/banwords/lib/WordsSearch.py",
+   "line": 43
+  },
+  {
+   "state": "self.m_values",
+   "file": "plugins/banwords/lib/WordsSearch.py",
+   "line": 44
+  },
+  {
+   "state": "self._indexs",
+   "file": "plugins/banwords/lib/WordsSearch.py",
+   "line": 76
+  },
+  {
+   "state": "self.aliases",
+   "file": "plugins/cow_cli/cow_cli.py",
+   "line": 80
+  },
+  {
+   "state": "self.games",
+   "file": "plugins/dungeon/dungeon.py",
+   "line": 60
+  },
+  {
+   "state": "self.econtext",
+   "file": "plugins/event.py",
+   "line": 39
+  },
+  {
+   "state": "self.admin_users",
+   "file": "plugins/godcmd/godcmd.py",
+   "line": 207
+  },
+  {
+   "state": "self.group_welc_fixed_msg",
+   "file": "plugins/hello/hello.py",
+   "line": 35
+  },
+  {
+   "state": "self.tasks",
+   "file": "plugins/linkai/midjourney.py",
+   "line": 76
+  },
+  {
+   "state": "self.plugins",
+   "file": "plugins/plugin_manager.py",
+   "line": 39
+  },
+  {
+   "state": "self.listening_plugins",
+   "file": "plugins/plugin_manager.py",
+   "line": 40
+  },
+  {
+   "state": "self.instances",
+   "file": "plugins/plugin_manager.py",
+   "line": 41
+  },
+  {
+   "state": "self.loaded",
+   "file": "plugins/plugin_manager.py",
+   "line": 44
+  },
+  {
+   "state": "self.tags",
+   "file": "plugins/role/role.py",
+   "line": 51
+  },
+  {
+   "state": "self.roles",
+   "file": "plugins/role/role.py",
+   "line": 52
+  },
+  {
+   "state": "self.roleplays",
+   "file": "plugins/role/role.py",
+   "line": 76
+  },
+  {
+   "state": "sil_supports",
+   "file": "voice/audio_convert.py",
+   "line": 19
+  },
+  {
+   "state": "self.config",
+   "file": "voice/azure/azure_voice.py",
+   "line": 50
+  },
+  {
+   "state": "self.api_base",
+   "file": "voice/minimax/minimax_voice.py",
+   "line": 19
+  }
+ ],
+ "repo": "zhayujie/CowAgent",
+ "stars": 43079
+}

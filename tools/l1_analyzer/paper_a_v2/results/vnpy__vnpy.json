@@ -1,0 +1,176 @@
+{
+ "status": "ok",
+ "clone_seconds": 1.5,
+ "v1_mutable_ratio": 68.5,
+ "v1_details": "507/740 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 236,
+  "promiscuous": 29,
+  "unresolved": 128
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 193,
+   "drives_decision": 43
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 29
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 128
+  }
+ },
+ "v2_resolvable": 0.674,
+ "v2_promiscuous": [
+  {
+   "state": "recording_exchanges",
+   "file": "examples/data_recorder/data_recorder.py",
+   "line": 47
+  },
+  {
+   "state": "recording_products",
+   "file": "examples/data_recorder/data_recorder.py",
+   "line": 59
+  },
+  {
+   "state": "self.data_periods",
+   "file": "vnpy/alpha/dataset/template.py",
+   "line": 44
+  },
+  {
+   "state": "self.df",
+   "file": "vnpy/alpha/dataset/utility.py",
+   "line": 25
+  },
+  {
+   "state": "self.priceticks",
+   "file": "vnpy/alpha/strategy/backtesting.py",
+   "line": 38
+  },
+  {
+   "state": "self.active_limit_orders",
+   "file": "vnpy/alpha/strategy/backtesting.py",
+   "line": 55
+  },
+  {
+   "state": "self.daily_results",
+   "file": "vnpy/alpha/strategy/backtesting.py",
+   "line": 62
+  },
+  {
+   "state": "self.pre_closes",
+   "file": "vnpy/alpha/strategy/backtesting.py",
+   "line": 65
+  },
+  {
+   "state": "self.contract_results",
+   "file": "vnpy/alpha/strategy/backtesting.py",
+   "line": 886
+  },
+  {
+   "state": "self.holding_days",
+   "file": "vnpy/alpha/strategy/strategies/equity_demo_strategy.py",
+   "line": 28
+  },
+  {
+   "state": "self.pos_data",
+   "file": "vnpy/alpha/strategy/template.py",
+   "line": 31
+  },
+  {
+   "state": "self.target_data",
+   "file": "vnpy/alpha/strategy/template.py",
+   "line": 32
+  },
+  {
+   "state": "self._views",
+   "file": "vnpy/chart/widget.py",
+   "line": 361
+  },
+  {
+   "state": "self._infos",
+   "file": "vnpy/chart/widget.py",
+   "line": 403
+  },
+  {
+   "state": "self._handlers",
+   "file": "vnpy/event/engine.py",
+   "line": 52
+  },
+  {
+   "state": "self._general_handlers",
+   "file": "vnpy/event/engine.py",
+   "line": 53
+  },
+  {
+   "state": "self._functions",
+   "file": "vnpy/rpc/server.py",
+   "line": 19
+  },
+  {
+   "state": "self.exchange",
+   "file": "vnpy/trader/converter.py",
+   "line": 23
+  },
+  {
+   "state": "self.active_orders",
+   "file": "vnpy/trader/converter.py",
+   "line": 25
+  },
+  {
+   "state": "self.active_orders",
+   "file": "vnpy/trader/engine.py",
+   "line": 377
+  },
+  {
+   "state": "self.active_quotes",
+   "file": "vnpy/trader/engine.py",
+   "line": 378
+  },
+  {
+   "state": "self.cells",
+   "file": "vnpy/trader/ui/widget.py",
+   "line": 259
+  },
+  {
+   "state": "self.open_array",
+   "file": "vnpy/trader/utility.py",
+   "line": 501
+  },
+  {
+   "state": "self.high_array",
+   "file": "vnpy/trader/utility.py",
+   "line": 502
+  },
+  {
+   "state": "self.low_array",
+   "file": "vnpy/trader/utility.py",
+   "line": 503
+  },
+  {
+   "state": "self.close_array",
+   "file": "vnpy/trader/utility.py",
+   "line": 504
+  },
+  {
+   "state": "self.volume_array",
+   "file": "vnpy/trader/utility.py",
+   "line": 505
+  },
+  {
+   "state": "self.turnover_array",
+   "file": "vnpy/trader/utility.py",
+   "line": 506
+  },
+  {
+   "state": "self.open_interest_array",
+   "file": "vnpy/trader/utility.py",
+   "line": 507
+  }
+ ],
+ "repo": "vnpy/vnpy",
+ "stars": 39309
+}

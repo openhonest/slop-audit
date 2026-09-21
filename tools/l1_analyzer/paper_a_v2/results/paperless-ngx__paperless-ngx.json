@@ -1,0 +1,76 @@
+{
+ "status": "ok",
+ "clone_seconds": 3.0,
+ "v1_mutable_ratio": 50.5,
+ "v1_details": "678/1343 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 271,
+  "promiscuous": 9,
+  "unresolved": 55
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 201,
+   "drives_decision": 70
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 9
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 55
+  }
+ },
+ "v2_resolvable": 0.836,
+ "v2_promiscuous": [
+  {
+   "state": "self._data",
+   "file": "src/documents/caching.py",
+   "line": 55
+  },
+  {
+   "state": "self._custom_fields",
+   "file": "src/documents/filters.py",
+   "line": 451
+  },
+  {
+   "state": "self._tracked",
+   "file": "src/documents/management/commands/document_consumer.py",
+   "line": 100
+  },
+  {
+   "state": "self._supported_extensions",
+   "file": "src/documents/management/commands/document_consumer.py",
+   "line": 240
+  },
+  {
+   "state": "self._files_in_export_dir",
+   "file": "src/documents/management/commands/document_exporter.py",
+   "line": 105
+  },
+  {
+   "state": "self.files_in_export_dir",
+   "file": "src/documents/management/commands/document_exporter.py",
+   "line": 317
+  },
+  {
+   "state": "self._messages",
+   "file": "src/documents/sanity_checker.py",
+   "line": 47
+  },
+  {
+   "state": "self._ordered_ids",
+   "file": "src/documents/search/_backend.py",
+   "line": 132
+  },
+  {
+   "state": "self._page_hits",
+   "file": "src/documents/search/_backend.py",
+   "line": 133
+  }
+ ],
+ "repo": "paperless-ngx/paperless-ngx",
+ "stars": 38049
+}

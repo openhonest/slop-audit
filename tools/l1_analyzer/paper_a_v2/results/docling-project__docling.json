@@ -1,0 +1,251 @@
+{
+ "status": "ok",
+ "clone_seconds": 5.8,
+ "v1_mutable_ratio": 57.4,
+ "v1_details": "1204/2098 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 707,
+  "promiscuous": 44,
+  "unresolved": 186
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 486,
+   "drives_decision": 221
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 44
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 186
+  }
+ },
+ "v2_resolvable": 0.801,
+ "v2_promiscuous": [
+  {
+   "state": "self._pdoc",
+   "file": "docling/backend/docling_parse_backend.py",
+   "line": 281
+  },
+  {
+   "state": "self.parents",
+   "file": "docling/backend/html_backend.py",
+   "line": 449
+  },
+  {
+   "state": "self.ctx",
+   "file": "docling/backend/html_backend.py",
+   "line": 450
+  },
+  {
+   "state": "self.format_tags",
+   "file": "docling/backend/html_backend.py",
+   "line": 455
+  },
+  {
+   "state": "self._tag_name_by_docling_id_cache",
+   "file": "docling/backend/html_backend.py",
+   "line": 465
+  },
+  {
+   "state": "self._render_visibility_cache",
+   "file": "docling/backend/html_backend.py",
+   "line": 467
+  },
+  {
+   "state": "self._frames",
+   "file": "docling/backend/image_backend.py",
+   "line": 156
+  },
+  {
+   "state": "self.page_map",
+   "file": "docling/backend/mets_gbs_backend.py",
+   "line": 220
+  },
+  {
+   "state": "self._anchor_spans",
+   "file": "docling/backend/msexcel_backend.py",
+   "line": 155
+  },
+  {
+   "state": "self.numbered_headers",
+   "file": "docling/backend/msword_backend.py",
+   "line": 413
+  },
+  {
+   "state": "self.list_counters",
+   "file": "docling/backend/msword_backend.py",
+   "line": 427
+  },
+  {
+   "state": "self.paragraph_to_items",
+   "file": "docling/backend/msword_backend.py",
+   "line": 449
+  },
+  {
+   "state": "self.parents",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 318
+  },
+  {
+   "state": "self.parents",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 318
+  },
+  {
+   "state": "self.property",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 320
+  },
+  {
+   "state": "self.property",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 320
+  },
+  {
+   "state": "self.parents",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 670
+  },
+  {
+   "state": "self.parents",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 670
+  },
+  {
+   "state": "self.property",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 672
+  },
+  {
+   "state": "self.property",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 672
+  },
+  {
+   "state": "self.parents",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 972
+  },
+  {
+   "state": "self.parents",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 1245
+  },
+  {
+   "state": "self.parents",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 1245
+  },
+  {
+   "state": "self.property",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 1247
+  },
+  {
+   "state": "self.property",
+   "file": "docling/backend/xml/uspto_backend.py",
+   "line": 1247
+  },
+  {
+   "state": "self._hierarchy_cell_ids",
+   "file": "docling/backend/xml/xbrl_backend.py",
+   "line": 104
+  },
+  {
+   "state": "self._fact_cell_ids",
+   "file": "docling/backend/xml/xbrl_backend.py",
+   "line": 105
+  },
+  {
+   "state": "FormatToMimeType",
+   "file": "docling/datamodel/base_models.py",
+   "line": 174
+  },
+  {
+   "state": "self.allowed_formats",
+   "file": "docling/document_converter.py",
+   "line": 358
+  },
+  {
+   "state": "self.initialized_pipelines",
+   "file": "docling/document_converter.py",
+   "line": 395
+  },
+  {
+   "state": "self.allowed_formats",
+   "file": "docling/document_extractor.py",
+   "line": 109
+  },
+  {
+   "state": "self._initialized_pipelines",
+   "file": "docling/document_extractor.py",
+   "line": 120
+  },
+  {
+   "state": "self._classes",
+   "file": "docling/models/factories/base_factory.py",
+   "line": 31
+  },
+  {
+   "state": "self.model_spec",
+   "file": "docling/models/inference_engines/vlm/auto_inline_engine.py",
+   "line": 61
+  },
+  {
+   "state": "self.script_readers",
+   "file": "docling/models/stages/ocr/tesseract_ocr_model.py",
+   "line": 48
+  },
+  {
+   "state": "self._classes",
+   "file": "docling/models/stages/picture_classifier/document_picture_classifier.py",
+   "line": 92
+  },
+  {
+   "state": "self._timed_out_run_ids",
+   "file": "docling/pipeline/standard_pdf_pipeline.py",
+   "line": 247
+  },
+  {
+   "state": "self._extension_to_format",
+   "file": "docling/service_client/client.py",
+   "line": 252
+  },
+  {
+   "state": "self._item_stack",
+   "file": "docling/utils/chandra_utils.py",
+   "line": 127
+  },
+  {
+   "state": "self.parent",
+   "file": "docling/utils/layout_postprocessor.py",
+   "line": 20
+  },
+  {
+   "state": "self.rank",
+   "file": "docling/utils/layout_postprocessor.py",
+   "line": 21
+  },
+  {
+   "state": "self.clusters_by_id",
+   "file": "docling/utils/layout_postprocessor.py",
+   "line": 58
+  },
+  {
+   "state": "self.conv_res",
+   "file": "docling/utils/profiling.py",
+   "line": 52
+  },
+  {
+   "state": "self.conv_res",
+   "file": "docling/utils/profiling.py",
+   "line": 83
+  }
+ ],
+ "repo": "docling-project/docling",
+ "stars": 57715
+}

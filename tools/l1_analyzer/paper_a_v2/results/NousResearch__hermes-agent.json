@@ -1,0 +1,856 @@
+{
+ "status": "ok",
+ "clone_seconds": 2.9,
+ "v1_mutable_ratio": 36.9,
+ "v1_details": "7655/20738 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 3015,
+  "promiscuous": 165,
+  "unresolved": 991
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 2083,
+   "drives_decision": 932
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 165
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 991
+  }
+ },
+ "v2_resolvable": 0.762,
+ "v2_promiscuous": [
+  {
+   "state": "_paid_lane_warned",
+   "file": "agent/auxiliary_client.py",
+   "line": 2427
+  },
+  {
+   "state": "_bedrock_runtime_client_cache",
+   "file": "agent/bedrock_adapter.py",
+   "line": 57
+  },
+  {
+   "state": "_bedrock_control_client_cache",
+   "file": "agent/bedrock_adapter.py",
+   "line": 58
+  },
+  {
+   "state": "self.spinner_frames",
+   "file": "agent/display.py",
+   "line": 1088
+  },
+  {
+   "state": "_install_results",
+   "file": "agent/lsp/install.py",
+   "line": 116
+  },
+  {
+   "state": "self._clients",
+   "file": "agent/lsp/manager.py",
+   "line": 175
+  },
+  {
+   "state": "self._tool_to_provider",
+   "file": "agent/memory_manager.py",
+   "line": 373
+  },
+  {
+   "state": "_FALLBACK_WARNED",
+   "file": "agent/model_metadata.py",
+   "line": 279
+  },
+  {
+   "state": "_registered",
+   "file": "agent/shell_hooks.py",
+   "line": 149
+  },
+  {
+   "state": "_ENV_DETECT_CACHE",
+   "file": "agent/skill_utils.py",
+   "line": 286
+  },
+  {
+   "state": "self._loaded_dirs",
+   "file": "agent/subdirectory_hints.py",
+   "line": 72
+  },
+  {
+   "state": "self.config",
+   "file": "agent/tool_guardrails.py",
+   "line": 277
+  },
+  {
+   "state": "self._stderr_lines",
+   "file": "agent/transports/codex_app_server.py",
+   "line": 148
+  },
+  {
+   "state": "self._thread_id",
+   "file": "agent/transports/codex_app_server_session.py",
+   "line": 301
+  },
+  {
+   "state": "_interrupted_job_ids",
+   "file": "cron/scheduler.py",
+   "line": 338
+  },
+  {
+   "state": "_Platform__bundled_plugin_names",
+   "file": "gateway/config.py",
+   "line": 269
+  },
+  {
+   "state": "self._entries",
+   "file": "gateway/platform_registry.py",
+   "line": 170
+  },
+  {
+   "state": "_TURN_PROCESS_EPOCHS",
+   "file": "gateway/platforms/api_server.py",
+   "line": 682
+  },
+  {
+   "state": "self._cors_origins",
+   "file": "gateway/platforms/api_server.py",
+   "line": 1329
+  },
+  {
+   "state": "self._run_streams",
+   "file": "gateway/platforms/api_server.py",
+   "line": 1368
+  },
+  {
+   "state": "self._stopping_run_ids",
+   "file": "gateway/platforms/api_server.py",
+   "line": 1377
+  },
+  {
+   "state": "self._active_sessions",
+   "file": "gateway/platforms/base.py",
+   "line": 2779
+  },
+  {
+   "state": "self._session_tasks",
+   "file": "gateway/platforms/base.py",
+   "line": 2781
+  },
+  {
+   "state": "self._auto_tts_enabled_chats",
+   "file": "gateway/platforms/base.py",
+   "line": 2829
+  },
+  {
+   "state": "self._auto_tts_disabled_chats",
+   "file": "gateway/platforms/base.py",
+   "line": 2830
+  },
+  {
+   "state": "self._guid_cache",
+   "file": "gateway/platforms/bluebubbles.py",
+   "line": 204
+  },
+  {
+   "state": "self._seen",
+   "file": "gateway/platforms/helpers.py",
+   "line": 44
+  },
+  {
+   "state": "self._seen_receipts",
+   "file": "gateway/platforms/msgraph_webhook.py",
+   "line": 83
+  },
+  {
+   "state": "self._chat_type_map",
+   "file": "gateway/platforms/qqbot/adapter.py",
+   "line": 257
+  },
+  {
+   "state": "self._seen_messages",
+   "file": "gateway/platforms/qqbot/adapter.py",
+   "line": 261
+  },
+  {
+   "state": "self._recent_sent_timestamps",
+   "file": "gateway/platforms/signal.py",
+   "line": 320
+  },
+  {
+   "state": "self._sent_message_timestamps",
+   "file": "gateway/platforms/signal.py",
+   "line": 330
+  },
+  {
+   "state": "self._allow_from",
+   "file": "gateway/platforms/weixin.py",
+   "line": 1238
+  },
+  {
+   "state": "self._seen_wamids",
+   "file": "gateway/platforms/whatsapp_cloud.py",
+   "line": 315
+  },
+  {
+   "state": "self._dm_allow_from",
+   "file": "gateway/platforms/yuanbao.py",
+   "line": 1280
+  },
+  {
+   "state": "self._group_allow_from",
+   "file": "gateway/platforms/yuanbao.py",
+   "line": 1282
+  },
+  {
+   "state": "self._pending_acks",
+   "file": "gateway/platforms/yuanbao.py",
+   "line": 3101
+  },
+  {
+   "state": "self._inbound_buffer",
+   "file": "gateway/platforms/yuanbao.py",
+   "line": 3107
+  },
+  {
+   "state": "_configured_cwd",
+   "file": "gateway/run.py",
+   "line": 2185
+  },
+  {
+   "state": "self._completion_deliveries_inflight",
+   "file": "gateway/run.py",
+   "line": 5884
+  },
+  {
+   "state": "self._completion_deliveries_delivered",
+   "file": "gateway/run.py",
+   "line": 5885
+  },
+  {
+   "state": "self._entries",
+   "file": "gateway/session.py",
+   "line": 1218
+  },
+  {
+   "state": "self._leases",
+   "file": "gateway/turn_lease.py",
+   "line": 124
+  },
+  {
+   "state": "SUBCOMMANDS",
+   "file": "hermes_cli/commands.py",
+   "line": 386
+  },
+  {
+   "state": "_CONFIG_PARSE_WARNED",
+   "file": "hermes_cli/config.py",
+   "line": 42
+  },
+  {
+   "state": "_HERMES_HOME_ENSURED",
+   "file": "hermes_cli/config.py",
+   "line": 864
+  },
+  {
+   "state": "_PROVIDER_NORMALIZE_WARNED",
+   "file": "hermes_cli/config.py",
+   "line": 1270
+  },
+  {
+   "state": "_warned_malformed_public_urls",
+   "file": "hermes_cli/dashboard_auth/prefix.py",
+   "line": 44
+  },
+  {
+   "state": "_warned_malformed_prefixes",
+   "file": "hermes_cli/dashboard_auth/prefix.py",
+   "line": 45
+  },
+  {
+   "state": "_providers",
+   "file": "hermes_cli/dashboard_auth/registry.py",
+   "line": 20
+  },
+  {
+   "state": "_pw_attempts",
+   "file": "hermes_cli/dashboard_auth/routes.py",
+   "line": 611
+  },
+  {
+   "state": "_token_routes",
+   "file": "hermes_cli/dashboard_auth/token_auth.py",
+   "line": 56
+  },
+  {
+   "state": "_WARNED_KEYS",
+   "file": "hermes_cli/env_loader.py",
+   "line": 25
+  },
+  {
+   "state": "_APPLIED_HOMES",
+   "file": "hermes_cli/env_loader.py",
+   "line": 51
+  },
+  {
+   "state": "_INITIALIZED_PATHS",
+   "file": "hermes_cli/kanban_db.py",
+   "line": 880
+  },
+  {
+   "state": "_retagged_workspace_roots",
+   "file": "hermes_cli/kanban_db.py",
+   "line": 8938
+  },
+  {
+   "state": "_canonical_slugs",
+   "file": "hermes_cli/models.py",
+   "line": 1157
+  },
+  {
+   "state": "_pricing_cache",
+   "file": "hermes_cli/models.py",
+   "line": 1689
+  },
+  {
+   "state": "_swr_refresh_inflight",
+   "file": "hermes_cli/models.py",
+   "line": 3101
+  },
+  {
+   "state": "_copilot_context_cache",
+   "file": "hermes_cli/models.py",
+   "line": 3506
+  },
+  {
+   "state": "_deepinfra_catalog_cache",
+   "file": "hermes_cli/models.py",
+   "line": 4364
+  },
+  {
+   "state": "self._manager",
+   "file": "hermes_cli/plugins.py",
+   "line": 344
+  },
+  {
+   "state": "self._cli_commands",
+   "file": "hermes_cli/plugins.py",
+   "line": 1276
+  },
+  {
+   "state": "self._plugin_commands",
+   "file": "hermes_cli/plugins.py",
+   "line": 1278
+  },
+  {
+   "state": "_live_connections",
+   "file": "hermes_cli/sqlite_safe_read.py",
+   "line": 83
+  },
+  {
+   "state": "self.workbook_formulas",
+   "file": "optional-skills/finance/dcf-model/scripts/validate_dcf.py",
+   "line": 27
+  },
+  {
+   "state": "self.workbook_values",
+   "file": "optional-skills/finance/dcf-model/scripts/validate_dcf.py",
+   "line": 28
+  },
+  {
+   "state": "_PROTECTED_CRON_PATHS",
+   "file": "plugins/disk-cleanup/disk_cleanup.py",
+   "line": 165
+  },
+  {
+   "state": "self._seen",
+   "file": "plugins/google_meet/meet_bot.py",
+   "line": 112
+  },
+  {
+   "state": "_SCHEMA_CACHE",
+   "file": "plugins/memory/config_schema.py",
+   "line": 109
+  },
+  {
+   "state": "_append_capability_cache",
+   "file": "plugins/memory/hindsight/__init__.py",
+   "line": 173
+  },
+  {
+   "state": "self._dialectic_depth_levels",
+   "file": "plugins/memory/honcho/__init__.py",
+   "line": 276
+  },
+  {
+   "state": "self.messages",
+   "file": "plugins/memory/honcho/session.py",
+   "line": 53
+  },
+  {
+   "state": "self._cache",
+   "file": "plugins/memory/honcho/session.py",
+   "line": 103
+  },
+  {
+   "state": "self._peers_cache",
+   "file": "plugins/memory/honcho/session.py",
+   "line": 105
+  },
+  {
+   "state": "self._sessions_cache",
+   "file": "plugins/memory/honcho/session.py",
+   "line": 106
+  },
+  {
+   "state": "self._deferred_commit_sids",
+   "file": "plugins/memory/openviking/__init__.py",
+   "line": 1894
+  },
+  {
+   "state": "self._committed_session_ids",
+   "file": "plugins/memory/openviking/__init__.py",
+   "line": 1897
+  },
+  {
+   "state": "self._pending_marked_sids",
+   "file": "plugins/memory/openviking/__init__.py",
+   "line": 1899
+  },
+  {
+   "state": "self._profile_prefetched_sessions",
+   "file": "plugins/memory/openviking/__init__.py",
+   "line": 1918
+  },
+  {
+   "state": "self._owners",
+   "file": "plugins/observability/nemo_relay/__init__.py",
+   "line": 71
+  },
+  {
+   "state": "self._done_emoji_fired",
+   "file": "plugins/platforms/dingtalk/adapter.py",
+   "line": 272
+  },
+  {
+   "state": "self._buffers",
+   "file": "plugins/platforms/discord/adapter.py",
+   "line": 518
+  },
+  {
+   "state": "self._decoders",
+   "file": "plugins/platforms/discord/adapter.py",
+   "line": 522
+  },
+  {
+   "state": "self._threads",
+   "file": "plugins/platforms/discord/adapter.py",
+   "line": 1023
+  },
+  {
+   "state": "self._typing_tasks",
+   "file": "plugins/platforms/discord/adapter.py",
+   "line": 1026
+  },
+  {
+   "state": "self._nonconversational_messages",
+   "file": "plugins/platforms/discord/adapter.py",
+   "line": 1077
+  },
+  {
+   "state": "self.admin_user_ids",
+   "file": "plugins/platforms/discord/adapter.py",
+   "line": 8339
+  },
+  {
+   "state": "self._pcm",
+   "file": "plugins/platforms/discord/voice_mixer.py",
+   "line": 113
+  },
+  {
+   "state": "self._seen_message_ids",
+   "file": "plugins/platforms/feishu/adapter.py",
+   "line": 1501
+  },
+  {
+   "state": "self._seen_message_order",
+   "file": "plugins/platforms/feishu/adapter.py",
+   "line": 1502
+  },
+  {
+   "state": "self._webhook_rate_counts",
+   "file": "plugins/platforms/feishu/adapter.py",
+   "line": 1506
+  },
+  {
+   "state": "self._card_action_tokens",
+   "file": "plugins/platforms/feishu/adapter.py",
+   "line": 1508
+  },
+  {
+   "state": "self._pending_inbound_events",
+   "file": "plugins/platforms/feishu/adapter.py",
+   "line": 1512
+  },
+  {
+   "state": "self._message_text_cache",
+   "file": "plugins/platforms/feishu/adapter.py",
+   "line": 1520
+  },
+  {
+   "state": "self._pending_processing_reactions",
+   "file": "plugins/platforms/feishu/adapter.py",
+   "line": 1537
+  },
+  {
+   "state": "_session_cache",
+   "file": "plugins/platforms/feishu/feishu_comment.py",
+   "line": 1007
+  },
+  {
+   "state": "self._typing_messages",
+   "file": "plugins/platforms/google_chat/adapter.py",
+   "line": 700
+  },
+  {
+   "state": "self._rate_limit_hits",
+   "file": "plugins/platforms/google_chat/adapter.py",
+   "line": 703
+  },
+  {
+   "state": "self._typing_card_inflight",
+   "file": "plugins/platforms/google_chat/adapter.py",
+   "line": 733
+  },
+  {
+   "state": "self._watch_domains",
+   "file": "plugins/platforms/homeassistant/adapter.py",
+   "line": 109
+  },
+  {
+   "state": "self._watch_entities",
+   "file": "plugins/platforms/homeassistant/adapter.py",
+   "line": 110
+  },
+  {
+   "state": "self._ignore_entities",
+   "file": "plugins/platforms/homeassistant/adapter.py",
+   "line": 111
+  },
+  {
+   "state": "self._entries",
+   "file": "plugins/platforms/line/adapter.py",
+   "line": 365
+  },
+  {
+   "state": "self._seen",
+   "file": "plugins/platforms/line/adapter.py",
+   "line": 430
+  },
+  {
+   "state": "self._media_tokens",
+   "file": "plugins/platforms/line/adapter.py",
+   "line": 788
+  },
+  {
+   "state": "self._pending_buttons",
+   "file": "plugins/platforms/line/adapter.py",
+   "line": 794
+  },
+  {
+   "state": "self._processed_events_set",
+   "file": "plugins/platforms/matrix/adapter.py",
+   "line": 1082
+  },
+  {
+   "state": "self._threads",
+   "file": "plugins/platforms/matrix/adapter.py",
+   "line": 1088
+  },
+  {
+   "state": "self._free_rooms",
+   "file": "plugins/platforms/matrix/adapter.py",
+   "line": 1097
+  },
+  {
+   "state": "self._pending_reactions",
+   "file": "plugins/platforms/matrix/adapter.py",
+   "line": 1142
+  },
+  {
+   "state": "self._allowed_user_ids",
+   "file": "plugins/platforms/matrix/adapter.py",
+   "line": 1195
+  },
+  {
+   "state": "self._allowed_room_ids",
+   "file": "plugins/platforms/matrix/adapter.py",
+   "line": 1198
+  },
+  {
+   "state": "self._seen_messages",
+   "file": "plugins/platforms/ntfy/adapter.py",
+   "line": 206
+  },
+  {
+   "state": "self._sent_message_ids",
+   "file": "plugins/platforms/photon/adapter.py",
+   "line": 810
+  },
+  {
+   "state": "_RAFT_SESSION_IDS",
+   "file": "plugins/platforms/raft/adapter.py",
+   "line": 95
+  },
+  {
+   "state": "_RAFT_TURN_IDS",
+   "file": "plugins/platforms/raft/adapter.py",
+   "line": 96
+  },
+  {
+   "state": "_RAFT_PROMPT_TURN_IDS",
+   "file": "plugins/platforms/raft/adapter.py",
+   "line": 97
+  },
+  {
+   "state": "self._pending_file_transfers",
+   "file": "plugins/platforms/simplex/adapter.py",
+   "line": 184
+  },
+  {
+   "state": "self._pending_responses",
+   "file": "plugins/platforms/simplex/adapter.py",
+   "line": 189
+  },
+  {
+   "state": "self._processed_message_ts",
+   "file": "plugins/platforms/slack/adapter.py",
+   "line": 946
+  },
+  {
+   "state": "self._thread_context_cache",
+   "file": "plugins/platforms/slack/adapter.py",
+   "line": 986
+  },
+  {
+   "state": "self._forum_command_registered",
+   "file": "plugins/platforms/telegram/adapter.py",
+   "line": 817
+  },
+  {
+   "state": "self._dm_topic_chat_ids",
+   "file": "plugins/platforms/telegram/adapter.py",
+   "line": 840
+  },
+  {
+   "state": "self._groups",
+   "file": "plugins/platforms/wecom/adapter.py",
+   "line": 201
+  },
+  {
+   "state": "self._pending_responses",
+   "file": "plugins/platforms/wecom/adapter.py",
+   "line": 208
+  },
+  {
+   "state": "self._seen_messages",
+   "file": "plugins/platforms/wecom/callback_adapter.py",
+   "line": 91
+  },
+  {
+   "state": "self.log_lines",
+   "file": "scripts/iso-certify.py",
+   "line": 146
+  },
+  {
+   "state": "_HISTORY",
+   "file": "scripts/keystroke_diagnostic.py",
+   "line": 43
+  },
+  {
+   "state": "_session_yolo",
+   "file": "tools/approval.py",
+   "line": 2084
+  },
+  {
+   "state": "_sessions",
+   "file": "tools/browser_camofox.py",
+   "line": 317
+  },
+  {
+   "state": "self._recent_dialogs",
+   "file": "tools/browser_supervisor.py",
+   "line": 327
+  },
+  {
+   "state": "self._console_events",
+   "file": "tools/browser_supervisor.py",
+   "line": 329
+  },
+  {
+   "state": "_recording_sessions",
+   "file": "tools/browser_tool.py",
+   "line": 1521
+  },
+  {
+   "state": "_session_last_activity",
+   "file": "tools/browser_tool.py",
+   "line": 1562
+  },
+  {
+   "state": "self._checkpointed_dirs",
+   "file": "tools/checkpoint_manager.py",
+   "line": 734
+  },
+  {
+   "state": "self.state",
+   "file": "tools/computer_use/browser_route.py",
+   "line": 192
+  },
+  {
+   "state": "self._capabilities",
+   "file": "tools/computer_use/cua_backend.py",
+   "line": 1103
+  },
+  {
+   "state": "_capability_cache",
+   "file": "tools/discord_tool.py",
+   "line": 160
+  },
+  {
+   "state": "self._container_id",
+   "file": "tools/environments/docker.py",
+   "line": 883
+  },
+  {
+   "state": "self._command_cache",
+   "file": "tools/file_operations.py",
+   "line": 834
+  },
+  {
+   "state": "self._reads",
+   "file": "tools/file_state.py",
+   "line": 63
+  },
+  {
+   "state": "_stdio_pgids",
+   "file": "tools/mcp_tool.py",
+   "line": 2506
+  },
+  {
+   "state": "_server_error_counts",
+   "file": "tools/mcp_tool.py",
+   "line": 3614
+  },
+  {
+   "state": "_parallel_safe_servers",
+   "file": "tools/mcp_tool.py",
+   "line": 4122
+  },
+  {
+   "state": "_whitespace_warned",
+   "file": "tools/mcp_tool.py",
+   "line": 4558
+  },
+  {
+   "state": "_cache",
+   "file": "tools/osv_check.py",
+   "line": 38
+  },
+  {
+   "state": "self._completion_consumed",
+   "file": "tools/process_registry.py",
+   "line": 187
+  },
+  {
+   "state": "self._poll_observed",
+   "file": "tools/process_registry.py",
+   "line": 197
+  },
+  {
+   "state": "self._tools",
+   "file": "tools/registry.py",
+   "line": 353
+  },
+  {
+   "state": "self._plugin_override_policy",
+   "file": "tools/registry.py",
+   "line": 359
+  },
+  {
+   "state": "self._tree_cache",
+   "file": "tools/skills_hub.py",
+   "line": 589
+  },
+  {
+   "state": "self._skillsh_groupings",
+   "file": "tools/skills_hub.py",
+   "line": 594
+  },
+  {
+   "state": "_active_environments",
+   "file": "tools/terminal_tool.py",
+   "line": 1082
+  },
+  {
+   "state": "_creation_locks",
+   "file": "tools/terminal_tool.py",
+   "line": 1085
+  },
+  {
+   "state": "_task_env_overrides",
+   "file": "tools/terminal_tool.py",
+   "line": 1170
+  },
+  {
+   "state": "_warned_messages",
+   "file": "tools/tirith_security.py",
+   "line": 138
+  },
+  {
+   "state": "self._items",
+   "file": "tools/todo_tool.py",
+   "line": 57
+  },
+  {
+   "state": "self._sessions",
+   "file": "tui_gateway/compute_host.py",
+   "line": 137
+  },
+  {
+   "state": "self._neg",
+   "file": "tui_gateway/git_probe.py",
+   "line": 71
+  },
+  {
+   "state": "self._stderr_tail",
+   "file": "tui_gateway/host_supervisor.py",
+   "line": 170
+  },
+  {
+   "state": "_answers",
+   "file": "tui_gateway/server.py",
+   "line": 147
+  },
+  {
+   "state": "self.stderr_tail",
+   "file": "tui_gateway/server.py",
+   "line": 329
+  },
+  {
+   "state": "_change_sigs",
+   "file": "tui_gateway/server.py",
+   "line": 3325
+  },
+  {
+   "state": "_pet_cancelled",
+   "file": "tui_gateway/server.py",
+   "line": 8140
+  }
+ ],
+ "repo": "NousResearch/hermes-agent",
+ "stars": 74603
+}

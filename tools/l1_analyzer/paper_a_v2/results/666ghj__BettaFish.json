@@ -1,0 +1,171 @@
+{
+ "status": "ok",
+ "clone_seconds": 5.4,
+ "v1_mutable_ratio": 59.1,
+ "v1_details": "822/1391 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 294,
+  "promiscuous": 28,
+  "unresolved": 142
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 217,
+   "drives_decision": 77
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 28
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 142
+  }
+ },
+ "v2_resolvable": 0.694,
+ "v2_promiscuous": [
+  {
+   "state": "self.agent_speeches_buffer",
+   "file": "ForumEngine/monitor.py",
+   "line": 49
+  },
+  {
+   "state": "self.capturing_json",
+   "file": "ForumEngine/monitor.py",
+   "line": 70
+  },
+  {
+   "state": "self.json_buffer",
+   "file": "ForumEngine/monitor.py",
+   "line": 71
+  },
+  {
+   "state": "self.in_error_block",
+   "file": "ForumEngine/monitor.py",
+   "line": 73
+  },
+  {
+   "state": "self.sentiment_map",
+   "file": "InsightEngine/tools/sentiment_analyzer.py",
+   "line": 95
+  },
+  {
+   "state": "self._seen_anchors",
+   "file": "ReportEngine/core/stitcher.py",
+   "line": 27
+  },
+  {
+   "state": "stream_subscribers",
+   "file": "ReportEngine/flask_interface.py",
+   "line": 41
+  },
+  {
+   "state": "self._skipped_placeholder_chapters",
+   "file": "ReportEngine/nodes/chapter_generation_node.py",
+   "line": 163
+  },
+  {
+   "state": "self.heading_label_map",
+   "file": "ReportEngine/renderers/html_renderer.py",
+   "line": 105
+  },
+  {
+   "state": "self._lib_cache",
+   "file": "ReportEngine/renderers/html_renderer.py",
+   "line": 111
+  },
+  {
+   "state": "self._chart_failure_notes",
+   "file": "ReportEngine/renderers/html_renderer.py",
+   "line": 128
+  },
+  {
+   "state": "self._chart_failure_recorded",
+   "file": "ReportEngine/renderers/html_renderer.py",
+   "line": 129
+  },
+  {
+   "state": "self.dataframe",
+   "file": "SentimentAnalysisModel/BertTopicDetection_Finetuned/train.py",
+   "line": 148
+  },
+  {
+   "state": "self.label_column",
+   "file": "SentimentAnalysisModel/BertTopicDetection_Finetuned/train.py",
+   "line": 151
+  },
+  {
+   "state": "self.label2id",
+   "file": "SentimentAnalysisModel/BertTopicDetection_Finetuned/train.py",
+   "line": 152
+  },
+  {
+   "state": "self.reviews",
+   "file": "SentimentAnalysisModel/WeiboSentiment_Finetuned/GPT2-AdapterTuning/train.py",
+   "line": 30
+  },
+  {
+   "state": "self.labels",
+   "file": "SentimentAnalysisModel/WeiboSentiment_Finetuned/GPT2-AdapterTuning/train.py",
+   "line": 31
+  },
+  {
+   "state": "self.reviews",
+   "file": "SentimentAnalysisModel/WeiboSentiment_Finetuned/GPT2-Lora/train.py",
+   "line": 36
+  },
+  {
+   "state": "self.labels",
+   "file": "SentimentAnalysisModel/WeiboSentiment_Finetuned/GPT2-Lora/train.py",
+   "line": 37
+  },
+  {
+   "state": "self.data",
+   "file": "SentimentAnalysisModel/WeiboSentiment_MachineLearning/bert_train.py",
+   "line": 30
+  },
+  {
+   "state": "self.labels",
+   "file": "SentimentAnalysisModel/WeiboSentiment_MachineLearning/bert_train.py",
+   "line": 31
+  },
+  {
+   "state": "self.data",
+   "file": "SentimentAnalysisModel/WeiboSentiment_MachineLearning/lstm_train.py",
+   "line": 24
+  },
+  {
+   "state": "self.label",
+   "file": "SentimentAnalysisModel/WeiboSentiment_MachineLearning/lstm_train.py",
+   "line": 25
+  },
+  {
+   "state": "self.models",
+   "file": "SentimentAnalysisModel/WeiboSentiment_MachineLearning/predict.py",
+   "line": 26
+  },
+  {
+   "state": "self.available_models",
+   "file": "SentimentAnalysisModel/WeiboSentiment_MachineLearning/predict.py",
+   "line": 27
+  },
+  {
+   "state": "self.models",
+   "file": "SentimentAnalysisModel/WeiboSentiment_SmallQwen/predict_universal.py",
+   "line": 26
+  },
+  {
+   "state": "self.texts",
+   "file": "SentimentAnalysisModel/WeiboSentiment_SmallQwen/qwen3_embedding_universal.py",
+   "line": 26
+  },
+  {
+   "state": "self.labels",
+   "file": "SentimentAnalysisModel/WeiboSentiment_SmallQwen/qwen3_embedding_universal.py",
+   "line": 27
+  }
+ ],
+ "repo": "666ghj/BettaFish",
+ "stars": 40382
+}

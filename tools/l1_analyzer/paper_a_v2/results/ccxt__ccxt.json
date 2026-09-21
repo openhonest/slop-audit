@@ -1,0 +1,471 @@
+{
+ "status": "ok",
+ "clone_seconds": 21.8,
+ "v1_mutable_ratio": 92.3,
+ "v1_details": "15397/16685 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1326,
+  "promiscuous": 88,
+  "unresolved": 471
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 884,
+   "drives_decision": 442
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 88
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 471
+  }
+ },
+ "v2_resolvable": 0.75,
+ "v2_promiscuous": [
+  {
+   "state": "proxies",
+   "file": "examples/py/arbitrage-pairs.py",
+   "line": 55
+  },
+  {
+   "state": "exchanges",
+   "file": "examples/py/async-instantiate-all-at-once.py",
+   "line": 15
+  },
+  {
+   "state": "fiat_currencies",
+   "file": "examples/py/binance-fiat.py",
+   "line": 19
+  },
+  {
+   "state": "exchange",
+   "file": "examples/py/binance-usdm-fetch-continuous-klines-ohlcv.py",
+   "line": 32
+  },
+  {
+   "state": "ohlcv5",
+   "file": "examples/py/bitmex-ohlcv-convert-5m-to-15m.py",
+   "line": 19
+  },
+  {
+   "state": "units",
+   "file": "examples/py/bitmex-order-value.py",
+   "line": 18
+  },
+  {
+   "state": "exchange",
+   "file": "examples/py/bittrex-fetch-closed-orders-history.py",
+   "line": 20
+  },
+  {
+   "state": "order_sizes",
+   "file": "examples/py/bots/bitfinex-lending-bot.py",
+   "line": 41
+  },
+  {
+   "state": "exchanges",
+   "file": "examples/py/bots/spot-arbitrage-bot.py",
+   "line": 33
+  },
+  {
+   "state": "order_sizes",
+   "file": "examples/py/bots/spot-arbitrage-bot.py",
+   "line": 57
+  },
+  {
+   "state": "exchange",
+   "file": "examples/py/fetch-okex-futures.py",
+   "line": 18
+  },
+  {
+   "state": "ms_per_candle",
+   "file": "examples/py/fetch_longer_ohlcv_through_multiple_calls_and_save_to_csv.py",
+   "line": 20
+  },
+  {
+   "state": "markets",
+   "file": "examples/py/gate-futures.py",
+   "line": 23
+  },
+  {
+   "state": "kraken",
+   "file": "examples/py/margin-leverage-order-kraken.py",
+   "line": 12
+  },
+  {
+   "state": "all_candles",
+   "file": "examples/py/poloniex-fetch-ohlcv-with-pagination.py",
+   "line": 18
+  },
+  {
+   "state": "self.socks_proxy_sessions",
+   "file": "python/ccxt/async_support/base/exchange.py",
+   "line": 101
+  },
+  {
+   "state": "self.clients",
+   "file": "python/ccxt/async_support/base/exchange.py",
+   "line": 450
+  },
+  {
+   "state": "self.events",
+   "file": "python/ccxt/async_support/base/prediction_exchange.py",
+   "line": 288
+  },
+  {
+   "state": "self.events_by_slug",
+   "file": "python/ccxt/async_support/base/prediction_exchange.py",
+   "line": 290
+  },
+  {
+   "state": "self.outcomes_by_id",
+   "file": "python/ccxt/async_support/base/prediction_exchange.py",
+   "line": 352
+  },
+  {
+   "state": "self.hashmap",
+   "file": "python/ccxt/async_support/base/ws/cache.py",
+   "line": 109
+  },
+  {
+   "state": "self.hashmap",
+   "file": "python/ccxt/async_support/base/ws/cache.py",
+   "line": 143
+  },
+  {
+   "state": "self._index",
+   "file": "python/ccxt/async_support/base/ws/cache.py",
+   "line": 144
+  },
+  {
+   "state": "self.hashmap",
+   "file": "python/ccxt/async_support/base/ws/cache.py",
+   "line": 198
+  },
+  {
+   "state": "self._index",
+   "file": "python/ccxt/async_support/base/ws/cache.py",
+   "line": 199
+  },
+  {
+   "state": "self._hashmap",
+   "file": "python/ccxt/async_support/base/ws/order_book_side.py",
+   "line": 112
+  },
+  {
+   "state": "self.orderbooks",
+   "file": "python/ccxt/base/exchange.py",
+   "line": 375
+  },
+  {
+   "state": "self.tickers",
+   "file": "python/ccxt/base/exchange.py",
+   "line": 377
+  },
+  {
+   "state": "self.bidsasks",
+   "file": "python/ccxt/base/exchange.py",
+   "line": 378
+  },
+  {
+   "state": "self.trades",
+   "file": "python/ccxt/base/exchange.py",
+   "line": 379
+  },
+  {
+   "state": "self.ohlcvs",
+   "file": "python/ccxt/base/exchange.py",
+   "line": 381
+  },
+  {
+   "state": "self.currencies_by_id",
+   "file": "python/ccxt/base/exchange.py",
+   "line": 3024
+  },
+  {
+   "state": "self.features",
+   "file": "python/ccxt/base/exchange.py",
+   "line": 3786
+  },
+  {
+   "state": "self.orders",
+   "file": "python/ccxt/pro/backpack.py",
+   "line": 133
+  },
+  {
+   "state": "self.positions",
+   "file": "python/ccxt/pro/bitget.py",
+   "line": 1339
+  },
+  {
+   "state": "self.positions",
+   "file": "python/ccxt/pro/toobit.py",
+   "line": 958
+  },
+  {
+   "state": "registry",
+   "file": "python/ccxt/static_dependencies/dydx_v4_client/registry.py",
+   "line": 16
+  },
+  {
+   "state": "self.indent_level",
+   "file": "python/ccxt/static_dependencies/lark/indenter.py",
+   "line": 34
+  },
+  {
+   "state": "self._terminals_dict",
+   "file": "python/ccxt/static_dependencies/lark/lark.py",
+   "line": 413
+  },
+  {
+   "state": "self.lexers",
+   "file": "python/ccxt/static_dependencies/lark/lexer.py",
+   "line": 643
+  },
+  {
+   "state": "self.rules_cache",
+   "file": "python/ccxt/static_dependencies/lark/load_grammar.py",
+   "line": 230
+  },
+  {
+   "state": "self.term_set",
+   "file": "python/ccxt/static_dependencies/lark/load_grammar.py",
+   "line": 445
+  },
+  {
+   "state": "self.term_reverse",
+   "file": "python/ccxt/static_dependencies/lark/load_grammar.py",
+   "line": 446
+  },
+  {
+   "state": "self.names",
+   "file": "python/ccxt/static_dependencies/lark/load_grammar.py",
+   "line": 499
+  },
+  {
+   "state": "self.ignore",
+   "file": "python/ccxt/static_dependencies/lark/load_grammar.py",
+   "line": 688
+  },
+  {
+   "state": "self.to_expand",
+   "file": "python/ccxt/static_dependencies/lark/parse_tree_builder.py",
+   "line": 198
+  },
+  {
+   "state": "self.regexps",
+   "file": "python/ccxt/static_dependencies/lark/parser_frontends.py",
+   "line": 169
+  },
+  {
+   "state": "self.callbacks",
+   "file": "python/ccxt/static_dependencies/lark/parser_frontends.py",
+   "line": 224
+  },
+  {
+   "state": "self.orig_rules",
+   "file": "python/ccxt/static_dependencies/lark/parsers/cyk.py",
+   "line": 84
+  },
+  {
+   "state": "self.terminal_rules",
+   "file": "python/ccxt/static_dependencies/lark/parsers/cyk.py",
+   "line": 194
+  },
+  {
+   "state": "self.nonterminal_rules",
+   "file": "python/ccxt/static_dependencies/lark/parsers/cyk.py",
+   "line": 195
+  },
+  {
+   "state": "self.predictions",
+   "file": "python/ccxt/static_dependencies/lark/parsers/earley.py",
+   "line": 48
+  },
+  {
+   "state": "self.TERMINALS",
+   "file": "python/ccxt/static_dependencies/lark/parsers/earley.py",
+   "line": 52
+  },
+  {
+   "state": "self.NON_TERMINALS",
+   "file": "python/ccxt/static_dependencies/lark/parsers/earley.py",
+   "line": 53
+  },
+  {
+   "state": "self.data",
+   "file": "python/ccxt/static_dependencies/lark/parsers/earley_forest.py",
+   "line": 384
+  },
+  {
+   "state": "self.node_stack",
+   "file": "python/ccxt/static_dependencies/lark/parsers/earley_forest.py",
+   "line": 386
+  },
+  {
+   "state": "self.callbacks",
+   "file": "python/ccxt/static_dependencies/lark/parsers/earley_forest.py",
+   "line": 517
+  },
+  {
+   "state": "self._cache",
+   "file": "python/ccxt/static_dependencies/lark/parsers/earley_forest.py",
+   "line": 521
+  },
+  {
+   "state": "self._successful_visits",
+   "file": "python/ccxt/static_dependencies/lark/parsers/earley_forest.py",
+   "line": 524
+  },
+  {
+   "state": "self.rules_by_origin",
+   "file": "python/ccxt/static_dependencies/lark/parsers/grammar_analysis.py",
+   "line": 149
+  },
+  {
+   "state": "self.lookback",
+   "file": "python/ccxt/static_dependencies/lark/parsers/lalr_analysis.py",
+   "line": 163
+  },
+  {
+   "state": "self.parse_table",
+   "file": "python/ccxt/static_dependencies/lark/parsers/lalr_parser_state.py",
+   "line": 23
+  },
+  {
+   "state": "self.tokens",
+   "file": "python/ccxt/static_dependencies/lark/reconstruct.py",
+   "line": 30
+  },
+  {
+   "state": "self.term_subs",
+   "file": "python/ccxt/static_dependencies/lark/reconstruct.py",
+   "line": 31
+  },
+  {
+   "state": "self.extra_rules_rev",
+   "file": "python/ccxt/static_dependencies/lark/tools/nearley.py",
+   "line": 58
+  },
+  {
+   "state": "self.rules_for_root",
+   "file": "python/ccxt/static_dependencies/lark/tree_matcher.py",
+   "line": 95
+  },
+  {
+   "state": "self._parser_cache",
+   "file": "python/ccxt/static_dependencies/lark/tree_matcher.py",
+   "line": 104
+  },
+  {
+   "state": "self._vars",
+   "file": "python/ccxt/static_dependencies/lark/tree_templates.py",
+   "line": 98
+  },
+  {
+   "state": "self.enums",
+   "file": "python/ccxt/static_dependencies/lark/utils.py",
+   "line": 196
+  },
+  {
+   "state": "_registry",
+   "file": "python/ccxt/static_dependencies/marshmallow/class_registry.py",
+   "line": 26
+  },
+  {
+   "state": "self.error_messages",
+   "file": "python/ccxt/static_dependencies/marshmallow/fields.py",
+   "line": 239
+  },
+  {
+   "state": "self.truthy",
+   "file": "python/ccxt/static_dependencies/marshmallow/fields.py",
+   "line": 1185
+  },
+  {
+   "state": "self.falsy",
+   "file": "python/ccxt/static_dependencies/marshmallow/fields.py",
+   "line": 1187
+  },
+  {
+   "state": "self.map",
+   "file": "python/ccxt/static_dependencies/marshmallow/orderedset.py",
+   "line": 30
+  },
+  {
+   "state": "self.declared_fields",
+   "file": "python/ccxt/static_dependencies/marshmallow/schema.py",
+   "line": 381
+  },
+  {
+   "state": "self.load_only",
+   "file": "python/ccxt/static_dependencies/marshmallow/schema.py",
+   "line": 388
+  },
+  {
+   "state": "self.dump_only",
+   "file": "python/ccxt/static_dependencies/marshmallow/schema.py",
+   "line": 389
+  },
+  {
+   "state": "self.fields",
+   "file": "python/ccxt/static_dependencies/marshmallow/schema.py",
+   "line": 399
+  },
+  {
+   "state": "self._memoized",
+   "file": "python/ccxt/static_dependencies/marshmallow/validate.py",
+   "line": 107
+  },
+  {
+   "state": "self._memoized",
+   "file": "python/ccxt/static_dependencies/marshmallow/validate.py",
+   "line": 107
+  },
+  {
+   "state": "self.iterable",
+   "file": "python/ccxt/static_dependencies/marshmallow/validate.py",
+   "line": 546
+  },
+  {
+   "state": "self._grouped",
+   "file": "python/ccxt/static_dependencies/starknet/abi/v0/parser.py",
+   "line": 57
+  },
+  {
+   "state": "self._grouped",
+   "file": "python/ccxt/static_dependencies/starknet/abi/v1/parser.py",
+   "line": 62
+  },
+  {
+   "state": "self.type_identifiers",
+   "file": "python/ccxt/static_dependencies/starknet/abi/v1/parser_transformer.py",
+   "line": 65
+  },
+  {
+   "state": "self._grouped",
+   "file": "python/ccxt/static_dependencies/starknet/abi/v2/parser.py",
+   "line": 64
+  },
+  {
+   "state": "self.type_identifiers",
+   "file": "python/ccxt/static_dependencies/starknet/abi/v2/parser_transformer.py",
+   "line": 69
+  },
+  {
+   "state": "self.defined_types",
+   "file": "python/ccxt/static_dependencies/starknet/cairo/type_parser.py",
+   "line": 43
+  },
+  {
+   "state": "self._data",
+   "file": "python/ccxt/static_dependencies/starknet/serialization/_calldata_reader.py",
+   "line": 21
+  }
+ ],
+ "repo": "ccxt/ccxt",
+ "stars": 41841
+}

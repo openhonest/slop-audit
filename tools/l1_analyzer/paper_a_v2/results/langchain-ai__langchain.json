@@ -1,0 +1,256 @@
+{
+ "status": "ok",
+ "clone_seconds": 1.7,
+ "v1_mutable_ratio": 56.9,
+ "v1_details": "3677/6467 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 713,
+  "promiscuous": 45,
+  "unresolved": 1017
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 467,
+   "drives_decision": 246
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 45
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 1017
+  }
+ },
+ "v2_resolvable": 0.427,
+ "v2_promiscuous": [
+  {
+   "state": "self.tags",
+   "file": "libs/core/langchain_core/callbacks/base.py",
+   "line": 1034
+  },
+  {
+   "state": "self.inheritable_tags",
+   "file": "libs/core/langchain_core/callbacks/base.py",
+   "line": 1035
+  },
+  {
+   "state": "self.usage_metadata",
+   "file": "libs/core/langchain_core/callbacks/usage.py",
+   "line": 43
+  },
+  {
+   "state": "self.example_text_lengths",
+   "file": "libs/core/langchain_core/example_selectors/length_based.py",
+   "line": 76
+  },
+  {
+   "state": "self.records",
+   "file": "libs/core/langchain_core/indexing/base.py",
+   "line": 252
+  },
+  {
+   "state": "_default_class_paths_cache",
+   "file": "libs/core/langchain_core/load/load.py",
+   "line": 184
+  },
+  {
+   "state": "self.secrets_map",
+   "file": "libs/core/langchain_core/load/load.py",
+   "line": 422
+  },
+  {
+   "state": "type_to_loader_dict",
+   "file": "libs/core/langchain_core/prompts/loading.py",
+   "line": 78
+  },
+  {
+   "state": "self.include_names",
+   "file": "libs/core/langchain_core/runnables/utils.py",
+   "line": 712
+  },
+  {
+   "state": "self.include_types",
+   "file": "libs/core/langchain_core/runnables/utils.py",
+   "line": 713
+  },
+  {
+   "state": "self.include_tags",
+   "file": "libs/core/langchain_core/runnables/utils.py",
+   "line": 714
+  },
+  {
+   "state": "self.store",
+   "file": "libs/core/langchain_core/stores.py",
+   "line": 181
+  },
+  {
+   "state": "self.run_map",
+   "file": "libs/core/langchain_core/tracers/core.py",
+   "line": 86
+  },
+  {
+   "state": "self._external_run_ids",
+   "file": "libs/core/langchain_core/tracers/core.py",
+   "line": 92
+  },
+  {
+   "state": "_LOGGED",
+   "file": "libs/core/langchain_core/tracers/langchain.py",
+   "line": 36
+  },
+  {
+   "state": "self.include_names",
+   "file": "libs/core/langchain_core/tracers/log_stream.py",
+   "line": 283
+  },
+  {
+   "state": "self.include_types",
+   "file": "libs/core/langchain_core/tracers/log_stream.py",
+   "line": 284
+  },
+  {
+   "state": "self.include_tags",
+   "file": "libs/core/langchain_core/tracers/log_stream.py",
+   "line": 285
+  },
+  {
+   "state": "self._key_map_by_run_id",
+   "file": "libs/core/langchain_core/tracers/log_stream.py",
+   "line": 298
+  },
+  {
+   "state": "self._counter_map_by_name",
+   "file": "libs/core/langchain_core/tracers/log_stream.py",
+   "line": 299
+  },
+  {
+   "state": "g_token_cache",
+   "file": "libs/core/langchain_core/utils/mustache.py",
+   "line": 463
+  },
+  {
+   "state": "self.lookup_str",
+   "file": "libs/langchain/langchain_classic/agents/react/base.py",
+   "line": 96
+  },
+  {
+   "state": "type_to_loader_dict",
+   "file": "libs/langchain/langchain_classic/chains/loading.py",
+   "line": 653
+  },
+  {
+   "state": "black_listed_elements",
+   "file": "libs/langchain/langchain_classic/chains/natbot/crawler.py",
+   "line": 15
+  },
+  {
+   "state": "self.chain_colors",
+   "file": "libs/langchain/langchain_classic/model_laboratory.py",
+   "line": 58
+  },
+  {
+   "state": "self.names",
+   "file": "libs/langchain/langchain_classic/model_laboratory.py",
+   "line": 59
+  },
+  {
+   "state": "_module_lookup",
+   "file": "libs/langchain/langchain_classic/retrievers/document_compressors/__init__.py",
+   "line": 24
+  },
+  {
+   "state": "self._handles",
+   "file": "libs/langchain_v1/langchain/agents/_subagent_transformer.py",
+   "line": 145
+  },
+  {
+   "state": "self.interrupt_on",
+   "file": "libs/langchain_v1/langchain/agents/middleware/human_in_the_loop.py",
+   "line": 260
+  },
+  {
+   "state": "self._buffers",
+   "file": "libs/langchain_v1/langchain/agents/middleware/pii.py",
+   "line": 79
+  },
+  {
+   "state": "self.tools_to_emulate",
+   "file": "libs/langchain_v1/langchain/agents/middleware/tool_emulator.py",
+   "line": 91
+  },
+  {
+   "state": "self._tool_filter",
+   "file": "libs/langchain_v1/langchain/agents/middleware/tool_error.py",
+   "line": 110
+  },
+  {
+   "state": "self._tool_filter",
+   "file": "libs/langchain_v1/langchain/agents/middleware/tool_retry.py",
+   "line": 211
+  },
+  {
+   "state": "self.always_include",
+   "file": "libs/langchain_v1/langchain/agents/middleware/tool_selection.py",
+   "line": 151
+  },
+  {
+   "state": "_CallableWithStateAndRuntime",
+   "file": "libs/langchain_v1/langchain/agents/middleware/types.py",
+   "line": 820
+  },
+  {
+   "state": "_CallableReturningSystemMessage",
+   "file": "libs/langchain_v1/langchain/agents/middleware/types.py",
+   "line": 829
+  },
+  {
+   "state": "_CallableReturningModelResponse",
+   "file": "libs/langchain_v1/langchain/agents/middleware/types.py",
+   "line": 845
+  },
+  {
+   "state": "_message_type_lookups",
+   "file": "libs/partners/anthropic/langchain_anthropic/chat_models.py",
+   "line": 71
+  },
+  {
+   "state": "self.header_mapping",
+   "file": "libs/text-splitters/langchain_text_splitters/html.py",
+   "line": 178
+  },
+  {
+   "state": "self.header_tags",
+   "file": "libs/text-splitters/langchain_text_splitters/html.py",
+   "line": 179
+  },
+  {
+   "state": "self.headers_to_split_on",
+   "file": "libs/text-splitters/langchain_text_splitters/html.py",
+   "line": 392
+  },
+  {
+   "state": "self._elements_to_preserve",
+   "file": "libs/text-splitters/langchain_text_splitters/html.py",
+   "line": 688
+  },
+  {
+   "state": "self._custom_handlers",
+   "file": "libs/text-splitters/langchain_text_splitters/html.py",
+   "line": 693
+  },
+  {
+   "state": "self.custom_header_patterns",
+   "file": "libs/text-splitters/langchain_text_splitters/markdown.py",
+   "line": 55
+  },
+  {
+   "state": "self.splittable_headers",
+   "file": "libs/text-splitters/langchain_text_splitters/markdown.py",
+   "line": 359
+  }
+ ],
+ "repo": "langchain-ai/langchain",
+ "stars": 133394
+}

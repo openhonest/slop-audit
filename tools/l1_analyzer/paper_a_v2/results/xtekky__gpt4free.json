@@ -1,0 +1,116 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.3,
+ "v1_mutable_ratio": 38.0,
+ "v1_details": "742/1954 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 472,
+  "promiscuous": 17,
+  "unresolved": 61
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 372,
+   "drives_decision": 100
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 17
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 61
+  }
+ },
+ "v2_resolvable": 0.889,
+ "v2_promiscuous": [
+  {
+   "state": "FALLBACK_MODELS",
+   "file": "etc/tool/commit.py",
+   "line": 110
+  },
+  {
+   "state": "ImagesCache",
+   "file": "g4f/Provider/Yupp.py",
+   "line": 52
+  },
+  {
+   "state": "_provider_names",
+   "file": "g4f/Provider/__init__.py",
+   "line": 178
+  },
+  {
+   "state": "_loaded_providers",
+   "file": "g4f/Provider/__init__.py",
+   "line": 278
+  },
+  {
+   "state": "locals",
+   "file": "g4f/Provider/audio/gTTS.py",
+   "line": 17
+  },
+  {
+   "state": "self.list",
+   "file": "g4f/Provider/needs_auth/OpenaiChat.py",
+   "line": 1345
+  },
+  {
+   "state": "self._cache",
+   "file": "g4f/Provider/yupp/token_extractor.py",
+   "line": 64
+  },
+  {
+   "state": "self.conversations",
+   "file": "g4f/api/__init__.py",
+   "line": 452
+  },
+  {
+   "state": "self.history",
+   "file": "g4f/cli/client.py",
+   "line": 44
+  },
+  {
+   "state": "self.data",
+   "file": "g4f/cli/client.py",
+   "line": 45
+  },
+  {
+   "state": "self.match_files",
+   "file": "g4f/gui/server/backend_api.py",
+   "line": 803
+  },
+  {
+   "state": "self.tools",
+   "file": "g4f/mcp/server.py",
+   "line": 73
+  },
+  {
+   "state": "self._pending_requests",
+   "file": "g4f/requests/cdp.py",
+   "line": 272
+  },
+  {
+   "state": "self._event_handlers",
+   "file": "g4f/requests/cdp.py",
+   "line": 273
+  },
+  {
+   "state": "self._event_queues",
+   "file": "g4f/requests/cdp.py",
+   "line": 274
+  },
+  {
+   "state": "histories",
+   "file": "projects/discord-bot/bot.py",
+   "line": 78
+  },
+  {
+   "state": "self.server",
+   "file": "projects/discord-bot/mcp_tools.py",
+   "line": 59
+  }
+ ],
+ "repo": "xtekky/gpt4free",
+ "stars": 65992
+}

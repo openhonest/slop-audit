@@ -1,0 +1,56 @@
+{
+ "status": "ok",
+ "clone_seconds": 3.1,
+ "v1_mutable_ratio": 29.8,
+ "v1_details": "317/1062 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 50,
+  "promiscuous": 5,
+  "unresolved": 14
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 29,
+   "drives_decision": 21
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 5
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 14
+  }
+ },
+ "v2_resolvable": 0.797,
+ "v2_promiscuous": [
+  {
+   "state": "OPTIONAL_DEPENDENCY_EXCEPTIONS",
+   "file": ".github/scripts/verify_cargo_workspace_manifests.py",
+   "line": 32
+  },
+  {
+   "state": "substitutions",
+   "file": "scripts/asciicheck.py",
+   "line": 23
+  },
+  {
+   "state": "self._login_notifications",
+   "file": "sdk/python/src/openai_codex/_message_router.py",
+   "line": 30
+  },
+  {
+   "state": "self._turn_notifications",
+   "file": "sdk/python/src/openai_codex/_message_router.py",
+   "line": 32
+  },
+  {
+   "state": "self._goal_operations",
+   "file": "sdk/python/src/openai_codex/_message_router.py",
+   "line": 34
+  }
+ ],
+ "repo": "openinterpreter/open-interpreter",
+ "stars": 63101
+}

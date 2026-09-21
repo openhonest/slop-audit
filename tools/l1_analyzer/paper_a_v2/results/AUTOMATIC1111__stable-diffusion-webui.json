@@ -1,0 +1,256 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.3,
+ "v1_mutable_ratio": 55.4,
+ "v1_details": "1220/2204 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1192,
+  "promiscuous": 45,
+  "unresolved": 527
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 886,
+   "drives_decision": 306
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 45
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 527
+  }
+ },
+ "v2_resolvable": 0.701,
+ "v2_promiscuous": [
+  {
+   "state": "self.cond_ids",
+   "file": "extensions-builtin/LDSR/sd_hijack_ddpm_v1.py",
+   "line": 471
+  },
+  {
+   "state": "self.hash",
+   "file": "extensions-builtin/Lora/network.py",
+   "line": 51
+  },
+  {
+   "state": "self.sd_key",
+   "file": "extensions-builtin/Lora/network.py",
+   "line": 115
+  },
+  {
+   "state": "forbidden_network_aliases",
+   "file": "extensions-builtin/Lora/networks.py",
+   "line": 296
+  },
+  {
+   "state": "available_network_aliases",
+   "file": "extensions-builtin/Lora/networks.py",
+   "line": 298
+  },
+  {
+   "state": "self.masks_for_overlay",
+   "file": "extensions-builtin/soft-inpainting/scripts/soft_inpainting.py",
+   "line": 489
+  },
+  {
+   "state": "self.overlay_images",
+   "file": "extensions-builtin/soft-inpainting/scripts/soft_inpainting.py",
+   "line": 490
+  },
+  {
+   "state": "self.credentials",
+   "file": "modules/api/api.py",
+   "line": 202
+  },
+  {
+   "state": "already_displayed",
+   "file": "modules/errors.py",
+   "line": 82
+  },
+  {
+   "state": "loaded_extensions",
+   "file": "modules/extensions.py",
+   "line": 15
+  },
+  {
+   "state": "self.commit_hash",
+   "file": "modules/extensions.py",
+   "line": 117
+  },
+  {
+   "state": "checkpoint_dict_skip_on_merge",
+   "file": "modules/extras.py",
+   "line": 65
+  },
+  {
+   "state": "optimizer_dict",
+   "file": "modules/hypernetworks/hypernetwork.py",
+   "line": 23
+  },
+  {
+   "state": "paste_fields",
+   "file": "modules/infotext_utils.py",
+   "line": 47
+  },
+  {
+   "state": "self.skip_categories",
+   "file": "modules/interrogate.py",
+   "line": 54
+  },
+  {
+   "state": "localizations",
+   "file": "modules/localization.py",
+   "line": 6
+  },
+  {
+   "state": "self.cond_ids",
+   "file": "modules/models/diffusion/ddpm_edit.py",
+   "line": 511
+  },
+  {
+   "state": "self.layer",
+   "file": "modules/models/sd3/other_impls.py",
+   "line": 465
+  },
+  {
+   "state": "self.down",
+   "file": "modules/models/sd3/sd3_impls.py",
+   "line": 259
+  },
+  {
+   "state": "self.up",
+   "file": "modules/models/sd3/sd3_impls.py",
+   "line": 320
+  },
+  {
+   "state": "options_builtin_fields",
+   "file": "modules/options.py",
+   "line": 79
+  },
+  {
+   "state": "self.data_labels",
+   "file": "modules/options.py",
+   "line": 86
+  },
+  {
+   "state": "self.restricted_opts",
+   "file": "modules/options.py",
+   "line": 88
+  },
+  {
+   "state": "self.mapping",
+   "file": "modules/options.py",
+   "line": 327
+  },
+  {
+   "state": "originals",
+   "file": "modules/patches.py",
+   "line": 21
+  },
+  {
+   "state": "self.all_hr_prompts",
+   "file": "modules/processing.py",
+   "line": 1487
+  },
+  {
+   "state": "self.all_hr_negative_prompts",
+   "file": "modules/processing.py",
+   "line": 1492
+  },
+  {
+   "state": "finished_tasks",
+   "file": "modules/progress.py",
+   "line": 18
+  },
+  {
+   "state": "self.subseeds",
+   "file": "modules/rng.py",
+   "line": 103
+  },
+  {
+   "state": "self.on_before_component_elem_id",
+   "file": "modules/scripts.py",
+   "line": 572
+  },
+  {
+   "state": "self.on_after_component_elem_id",
+   "file": "modules/scripts.py",
+   "line": 575
+  },
+  {
+   "state": "checkpoints_loaded",
+   "file": "modules/sd_models.py",
+   "line": 27
+  },
+  {
+   "state": "self.sha256",
+   "file": "modules/sd_models.py",
+   "line": 92
+  },
+  {
+   "state": "self.model_wrap",
+   "file": "modules/sd_samplers_kdiffusion.py",
+   "line": 77
+  },
+  {
+   "state": "self.alphas",
+   "file": "modules/sd_samplers_timesteps.py",
+   "line": 53
+  },
+  {
+   "state": "checkpoints_loaded",
+   "file": "modules/sd_vae.py",
+   "line": 20
+  },
+  {
+   "state": "environment_whitelist",
+   "file": "modules/sysinfo.py",
+   "line": 13
+  },
+  {
+   "state": "self.rates",
+   "file": "modules/textual_inversion/learn_schedule.py",
+   "line": 11
+  },
+  {
+   "state": "self.hash",
+   "file": "modules/textual_inversion/textual_inversion.py",
+   "line": 51
+  },
+  {
+   "state": "self.ids_lookup",
+   "file": "modules/textual_inversion/textual_inversion.py",
+   "line": 113
+  },
+  {
+   "state": "self.word_embeddings",
+   "file": "modules/textual_inversion/textual_inversion.py",
+   "line": 114
+  },
+  {
+   "state": "sort_ordering",
+   "file": "modules/ui_extensions.py",
+   "line": 433
+  },
+  {
+   "state": "self.component_dict",
+   "file": "modules/ui_settings.py",
+   "line": 107
+  },
+  {
+   "state": "ARC_SINGLE_ALLOCATION_LIMIT",
+   "file": "modules/xpu_specific.py",
+   "line": 36
+  },
+  {
+   "state": "self.current_axis_options",
+   "file": "scripts/xyz_grid.py",
+   "line": 420
+  }
+ ],
+ "repo": "AUTOMATIC1111/stable-diffusion-webui",
+ "stars": 162342
+}

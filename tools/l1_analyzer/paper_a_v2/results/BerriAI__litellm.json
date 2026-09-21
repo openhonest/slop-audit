@@ -1,0 +1,501 @@
+{
+ "status": "ok",
+ "clone_seconds": 4.1,
+ "v1_mutable_ratio": 32.8,
+ "v1_details": "6367/19433 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 3748,
+  "promiscuous": 94,
+  "unresolved": 612
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 2802,
+   "drives_decision": 946
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 94
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 612
+  }
+ },
+ "v2_resolvable": 0.863,
+ "v2_promiscuous": [
+  {
+   "state": "self.secrets",
+   "file": "cookbook/litellm_proxy_server/secret_manager/my_secret_manager.py",
+   "line": 20
+  },
+  {
+   "state": "_in_memory_os_variables",
+   "file": "cookbook/misc/migrate_proxy_config.py",
+   "line": 18
+  },
+  {
+   "state": "self.blocked_user_list",
+   "file": "enterprise/enterprise_hooks/blocked_user_list.py",
+   "line": 27
+  },
+  {
+   "state": "_token_cache",
+   "file": "litellm/a2a_protocol/providers/watsonx_orchestrate/handler.py",
+   "line": 27
+  },
+  {
+   "state": "self.chunks",
+   "file": "litellm/a2a_protocol/streaming_iterator.py",
+   "line": 40
+  },
+  {
+   "state": "self.collected_text_parts",
+   "file": "litellm/a2a_protocol/streaming_iterator.py",
+   "line": 41
+  },
+  {
+   "state": "self.last_redis_batch_access_time",
+   "file": "litellm/caching/dual_cache.py",
+   "line": 72
+  },
+  {
+   "state": "self.cache_dict",
+   "file": "litellm/caching/in_memory_cache.py",
+   "line": 47
+  },
+  {
+   "state": "self.ttl_dict",
+   "file": "litellm/caching/in_memory_cache.py",
+   "line": 48
+  },
+  {
+   "state": "self.alert_to_webhook_url",
+   "file": "litellm/integrations/SlackAlerting/slack_alerting.py",
+   "line": 83
+  },
+  {
+   "state": "self.digest_buckets",
+   "file": "litellm/integrations/SlackAlerting/slack_alerting.py",
+   "line": 96
+  },
+  {
+   "state": "self._project_providers",
+   "file": "litellm/integrations/arize/arize_phoenix.py",
+   "line": 79
+  },
+  {
+   "state": "self.prompts",
+   "file": "litellm/integrations/arize/arize_phoenix_prompt_manager.py",
+   "line": 71
+  },
+  {
+   "state": "self.prompts",
+   "file": "litellm/integrations/bitbucket/bitbucket_prompt_manager.py",
+   "line": 73
+  },
+  {
+   "state": "self._project_id_cache",
+   "file": "litellm/integrations/braintrust_logging.py",
+   "line": 51
+  },
+  {
+   "state": "self.log_queue",
+   "file": "litellm/integrations/datadog/datadog_cost_management.py",
+   "line": 81
+  },
+  {
+   "state": "self.metadata",
+   "file": "litellm/integrations/dotprompt/prompt_manager.py",
+   "line": 24
+  },
+  {
+   "state": "self.prompts",
+   "file": "litellm/integrations/dotprompt/prompt_manager.py",
+   "line": 61
+  },
+  {
+   "state": "self.config",
+   "file": "litellm/integrations/focus/destinations/s3_destination.py",
+   "line": 29
+  },
+  {
+   "state": "self.vertex_instances",
+   "file": "litellm/integrations/gcs_bucket/gcs_bucket_base.py",
+   "line": 45
+  },
+  {
+   "state": "self._prompt_cache",
+   "file": "litellm/integrations/generic_prompt_management/generic_prompt_manager.py",
+   "line": 78
+  },
+  {
+   "state": "self.prompts",
+   "file": "litellm/integrations/gitlab/gitlab_prompt_manager.py",
+   "line": 79
+  },
+  {
+   "state": "self._by_id",
+   "file": "litellm/integrations/gitlab/gitlab_prompt_manager.py",
+   "line": 663
+  },
+  {
+   "state": "self.api_base",
+   "file": "litellm/integrations/helicone.py",
+   "line": 38
+  },
+  {
+   "state": "self._stream_id_to_span",
+   "file": "litellm/integrations/mlflow.py",
+   "line": 20
+  },
+  {
+   "state": "self._tracer_provider_cache",
+   "file": "litellm/integrations/opentelemetry.py",
+   "line": 339
+  },
+  {
+   "state": "self._emitted",
+   "file": "litellm/integrations/otel/emitter.py",
+   "line": 129
+  },
+  {
+   "state": "self._open_llm_calls",
+   "file": "litellm/integrations/otel/logger.py",
+   "line": 160
+  },
+  {
+   "state": "self.label_filters",
+   "file": "litellm/integrations/prometheus.py",
+   "line": 123
+  },
+  {
+   "state": "self.payload_to_prometheus_map",
+   "file": "litellm/integrations/prometheus_services.py",
+   "line": 47
+  },
+  {
+   "state": "_request_blocked_callback_params",
+   "file": "litellm/litellm_core_utils/initialize_dynamic_callback_params.py",
+   "line": 77
+  },
+  {
+   "state": "self.logged_real_time_event_types",
+   "file": "litellm/litellm_core_utils/realtime_streaming.py",
+   "line": 76
+  },
+  {
+   "state": "self.chunks",
+   "file": "litellm/litellm_core_utils/streaming_handler.py",
+   "line": 182
+  },
+  {
+   "state": "endpoint_guardrail_translation_mappings",
+   "file": "litellm/llms/__init__.py",
+   "line": 141
+  },
+  {
+   "state": "self.tool_name_reverse_map",
+   "file": "litellm/llms/anthropic/chat/handler.py",
+   "line": 547
+  },
+  {
+   "state": "self.chunks",
+   "file": "litellm/llms/anthropic/experimental_pass_through/messages/fake_stream_iterator.py",
+   "line": 38
+  },
+  {
+   "state": "open_ai_to_bytez_content_item_map",
+   "file": "litellm/llms/bytez/chat/transformation.py",
+   "line": 370
+  },
+  {
+   "state": "self._seen_ids",
+   "file": "litellm/llms/chatgpt/chat/streaming_utils.py",
+   "line": 25
+  },
+  {
+   "state": "_ssl_context_cache",
+   "file": "litellm/llms/custom_httpx/http_handler.py",
+   "line": 190
+  },
+  {
+   "state": "self._gdch_creds_cache",
+   "file": "litellm/llms/gdc/chat/transformation.py",
+   "line": 24
+  },
+  {
+   "state": "_file_cache",
+   "file": "litellm/llms/gigachat/file_handler.py",
+   "line": 27
+  },
+  {
+   "state": "open_ai_to_generic_oci_role_map",
+   "file": "litellm/llms/oci/chat/generic.py",
+   "line": 45
+  },
+  {
+   "state": "_responses_config_cache",
+   "file": "litellm/llms/openai_like/dynamic_config.py",
+   "line": 171
+  },
+  {
+   "state": "self.text",
+   "file": "litellm/llms/vertex_ai/vertex_ai_non_gemini.py",
+   "line": 31
+  },
+  {
+   "state": "self._credentials_project_mapping",
+   "file": "litellm/llms/vertex_ai/vertex_llm_base.py",
+   "line": 46
+  },
+  {
+   "state": "vertex_multimodal_embedding",
+   "file": "litellm/main.py",
+   "line": 318
+  },
+  {
+   "state": "_byok_auth_codes",
+   "file": "litellm/proxy/_experimental/mcp_server/byok_oauth_endpoints.py",
+   "line": 43
+  },
+  {
+   "state": "self.registry",
+   "file": "litellm/proxy/_experimental/mcp_server/mcp_server_manager.py",
+   "line": 1238
+  },
+  {
+   "state": "self.tool_name_to_mcp_server_name_mapping",
+   "file": "litellm/proxy/_experimental/mcp_server/mcp_server_manager.py",
+   "line": 1263
+  },
+  {
+   "state": "last_db_access_time",
+   "file": "litellm/proxy/auth/auth_checks.py",
+   "line": 117
+  },
+  {
+   "state": "self.litellm_jwtauth",
+   "file": "litellm/proxy/auth/handle_jwt.py",
+   "line": 134
+  },
+  {
+   "state": "self._seen_tool_names",
+   "file": "litellm/proxy/db/db_transaction_queue/tool_discovery_queue.py",
+   "line": 28
+  },
+  {
+   "state": "self._other_meaning_tokens",
+   "file": "litellm/proxy/guardrails/guardrail_hooks/litellm_content_filter/competitor_intent/base.py",
+   "line": 82
+  },
+  {
+   "state": "self._ambiguous",
+   "file": "litellm/proxy/guardrails/guardrail_hooks/litellm_content_filter/competitor_intent/base.py",
+   "line": 83
+  },
+  {
+   "state": "self.conditional_categories",
+   "file": "litellm/proxy/guardrails/guardrail_hooks/litellm_content_filter/content_filter.py",
+   "line": 206
+  },
+  {
+   "state": "PATTERN_CATEGORIES",
+   "file": "litellm/proxy/guardrails/guardrail_hooks/litellm_content_filter/patterns.py",
+   "line": 90
+  },
+  {
+   "state": "self.judge_model",
+   "file": "litellm/proxy/guardrails/guardrail_hooks/llm_as_a_judge/__init__.py",
+   "line": 148
+  },
+  {
+   "state": "self.pii_entities_config",
+   "file": "litellm/proxy/guardrails/guardrail_hooks/presidio.py",
+   "line": 118
+  },
+  {
+   "state": "self._loop_sessions",
+   "file": "litellm/proxy/guardrails/guardrail_hooks/presidio.py",
+   "line": 133
+  },
+  {
+   "state": "endpoint_guardrail_translation_mappings",
+   "file": "litellm/proxy/guardrails/guardrail_hooks/unified_guardrail/unified_guardrail.py",
+   "line": 66
+  },
+  {
+   "state": "self.IN_MEMORY_GUARDRAILS",
+   "file": "litellm/proxy/guardrails/guardrail_registry.py",
+   "line": 396
+  },
+  {
+   "state": "STANDALONE_EXTRACTORS",
+   "file": "litellm/proxy/guardrails/tool_name_extraction.py",
+   "line": 16
+  },
+  {
+   "state": "self.thresholds",
+   "file": "litellm/proxy/hooks/azure_content_safety.py",
+   "line": 43
+  },
+  {
+   "state": "self.filter",
+   "file": "litellm/proxy/hooks/mcp_semantic_filter/hook.py",
+   "line": 62
+  },
+  {
+   "state": "_STALE_TEAM_ALIAS_WARNING_KEYS",
+   "file": "litellm/proxy/litellm_pre_call_utils.py",
+   "line": 108
+  },
+  {
+   "state": "_audit_log_callback_cache",
+   "file": "litellm/proxy/management_helpers/audit_logs.py",
+   "line": 24
+  },
+  {
+   "state": "self._seen",
+   "file": "litellm/proxy/pass_through_endpoints/managed_id_rewriter.py",
+   "line": 175
+  },
+  {
+   "state": "_registered_pass_through_routes",
+   "file": "litellm/proxy/pass_through_endpoints/pass_through_endpoints.py",
+   "line": 94
+  },
+  {
+   "state": "self.credentials",
+   "file": "litellm/proxy/pass_through_endpoints/passthrough_endpoint_router.py",
+   "line": 19
+  },
+  {
+   "state": "self.deployment_key_to_vertex_credentials",
+   "file": "litellm/proxy/pass_through_endpoints/passthrough_endpoint_router.py",
+   "line": 20
+  },
+  {
+   "state": "self.IN_MEMORY_PROMPTS",
+   "file": "litellm/proxy/prompts/prompt_registry.py",
+   "line": 93
+  },
+  {
+   "state": "self.prompt_id_to_custom_prompt",
+   "file": "litellm/proxy/prompts/prompt_registry.py",
+   "line": 98
+  },
+  {
+   "state": "_CALLBACK_ACCEPTS_CALL_INFO",
+   "file": "litellm/proxy/utils.py",
+   "line": 341
+  },
+  {
+   "state": "self.alert_types",
+   "file": "litellm/proxy/utils.py",
+   "line": 433
+  },
+  {
+   "state": "self.vector_store_config",
+   "file": "litellm/rag/ingestion/base_ingestion.py",
+   "line": 63
+  },
+  {
+   "state": "self._ambiguous_tool_call_indexes",
+   "file": "litellm/responses/litellm_completion_transformation/streaming_iterator.py",
+   "line": 92
+  },
+  {
+   "state": "self.collected_chunks",
+   "file": "litellm/responses/mcp/chat_completions_handler.py",
+   "line": 232
+  },
+  {
+   "state": "self.mcp_server_auth_headers",
+   "file": "litellm/responses/mcp/mcp_streaming_iterator.py",
+   "line": 342
+  },
+  {
+   "state": "self._events",
+   "file": "litellm/responses/streaming_iterator.py",
+   "line": 888
+  },
+  {
+   "state": "self._events",
+   "file": "litellm/responses/streaming_iterator.py",
+   "line": 946
+  },
+  {
+   "state": "self.team_pattern_routers",
+   "file": "litellm/router.py",
+   "line": 546
+  },
+  {
+   "state": "self.model_group_alias",
+   "file": "litellm/router.py",
+   "line": 554
+  },
+  {
+   "state": "self.model_id_to_deployment_index_map",
+   "file": "litellm/router.py",
+   "line": 559
+  },
+  {
+   "state": "self.model_name_to_deployment_indices",
+   "file": "litellm/router.py",
+   "line": 562
+  },
+  {
+   "state": "self.team_model_to_deployment_indices",
+   "file": "litellm/router.py",
+   "line": 564
+  },
+  {
+   "state": "self._override_selectors",
+   "file": "litellm/router.py",
+   "line": 691
+  },
+  {
+   "state": "self._routing_groups",
+   "file": "litellm/router.py",
+   "line": 1003
+  },
+  {
+   "state": "self._model_to_group",
+   "file": "litellm/router.py",
+   "line": 1004
+  },
+  {
+   "state": "self.model_names",
+   "file": "litellm/router.py",
+   "line": 8072
+  },
+  {
+   "state": "self._cells",
+   "file": "litellm/router_strategy/adaptive_router/adaptive_router.py",
+   "line": 101
+  },
+  {
+   "state": "self.provider_budget_config",
+   "file": "litellm/router_strategy/budget_limiter.py",
+   "line": 104
+  },
+  {
+   "state": "self._io_token_conflict_warned_ids",
+   "file": "litellm/router_utils/pre_call_checks/model_rate_limit_check.py",
+   "line": 64
+  },
+  {
+   "state": "self.cache",
+   "file": "litellm/secret_managers/google_secret_manager.py",
+   "line": 42
+  },
+  {
+   "state": "self.model_responses",
+   "file": "litellm/utils.py",
+   "line": 7183
+  }
+ ],
+ "repo": "BerriAI/litellm",
+ "stars": 43130
+}

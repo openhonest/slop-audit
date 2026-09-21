@@ -1,0 +1,491 @@
+{
+ "status": "ok",
+ "clone_seconds": 1.2,
+ "v1_mutable_ratio": 66.4,
+ "v1_details": "861/1297 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 924,
+  "promiscuous": 92,
+  "unresolved": 1004
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 740,
+   "drives_decision": 184
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 92
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 1004
+  }
+ },
+ "v2_resolvable": 0.503,
+ "v2_promiscuous": [
+  {
+   "state": "self.semantic_data",
+   "file": "GPT_SoVITS/AR/data/dataset.py",
+   "line": 57
+  },
+  {
+   "state": "self.phoneme_data",
+   "file": "GPT_SoVITS/AR/data/dataset.py",
+   "line": 74
+  },
+  {
+   "state": "self.semantic_phoneme",
+   "file": "GPT_SoVITS/AR/data/dataset.py",
+   "line": 103
+  },
+  {
+   "state": "self.item_names",
+   "file": "GPT_SoVITS/AR/data/dataset.py",
+   "line": 104
+  },
+  {
+   "state": "self.pe",
+   "file": "GPT_SoVITS/AR/models/embedding_cudagraph.py",
+   "line": 50
+  },
+  {
+   "state": "self.x_lens",
+   "file": "GPT_SoVITS/AR/models/structs_cudagraph.py",
+   "line": 54
+  },
+  {
+   "state": "self.blocks",
+   "file": "GPT_SoVITS/AR/models/t2s_model.py",
+   "line": 228
+  },
+  {
+   "state": "self.EOS",
+   "file": "GPT_SoVITS/AR/models/t2s_model.py",
+   "line": 271
+  },
+  {
+   "state": "self.pe",
+   "file": "GPT_SoVITS/AR/modules/embedding.py",
+   "line": 51
+  },
+  {
+   "state": "self.symbol_to_id",
+   "file": "GPT_SoVITS/AR/text_processing/phonemizer.py",
+   "line": 19
+  },
+  {
+   "state": "self.activations",
+   "file": "GPT_SoVITS/BigVGAN/bigvgan.py",
+   "line": 94
+  },
+  {
+   "state": "self.resblocks",
+   "file": "GPT_SoVITS/BigVGAN/bigvgan.py",
+   "line": 264
+  },
+  {
+   "state": "resample_transform_dict",
+   "file": "GPT_SoVITS/TTS_infer_pack/TTS.py",
+   "line": 39
+  },
+  {
+   "state": "self.convs",
+   "file": "GPT_SoVITS/eres2net/ERes2NetV2.py",
+   "line": 42
+  },
+  {
+   "state": "self.bns",
+   "file": "GPT_SoVITS/eres2net/ERes2NetV2.py",
+   "line": 43
+  },
+  {
+   "state": "self.convs",
+   "file": "GPT_SoVITS/eres2net/ERes2NetV2.py",
+   "line": 105
+  },
+  {
+   "state": "self.bns",
+   "file": "GPT_SoVITS/eres2net/ERes2NetV2.py",
+   "line": 106
+  },
+  {
+   "state": "self.fuse_models",
+   "file": "GPT_SoVITS/eres2net/ERes2NetV2.py",
+   "line": 107
+  },
+  {
+   "state": "cache",
+   "file": "GPT_SoVITS/eres2net/kaldi.py",
+   "line": 419
+  },
+  {
+   "state": "self.blocks",
+   "file": "GPT_SoVITS/export_torch_script.py",
+   "line": 319
+  },
+  {
+   "state": "v3v4set",
+   "file": "GPT_SoVITS/export_torch_script_v3v4.py",
+   "line": 582
+  },
+  {
+   "state": "dict_language",
+   "file": "GPT_SoVITS/inference_webui.py",
+   "line": 193
+  },
+  {
+   "state": "v3v4set",
+   "file": "GPT_SoVITS/inference_webui.py",
+   "line": 258
+  },
+  {
+   "state": "resample_transform_dict",
+   "file": "GPT_SoVITS/inference_webui.py",
+   "line": 544
+  },
+  {
+   "state": "splits",
+   "file": "GPT_SoVITS/inference_webui.py",
+   "line": 613
+  },
+  {
+   "state": "cache",
+   "file": "GPT_SoVITS/inference_webui.py",
+   "line": 786
+  },
+  {
+   "state": "dict_language",
+   "file": "GPT_SoVITS/inference_webui_fast.py",
+   "line": 104
+  },
+  {
+   "state": "cut_method",
+   "file": "GPT_SoVITS/inference_webui_fast.py",
+   "line": 106
+  },
+  {
+   "state": "v3v4set",
+   "file": "GPT_SoVITS/inference_webui_fast.py",
+   "line": 230
+  },
+  {
+   "state": "self.attn_layers",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 33
+  },
+  {
+   "state": "self.norm_layers_1",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 34
+  },
+  {
+   "state": "self.ffn_layers",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 35
+  },
+  {
+   "state": "self.norm_layers_2",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 36
+  },
+  {
+   "state": "self.self_attn_layers",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 111
+  },
+  {
+   "state": "self.norm_layers_0",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 112
+  },
+  {
+   "state": "self.encdec_attn_layers",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 113
+  },
+  {
+   "state": "self.norm_layers_1",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 114
+  },
+  {
+   "state": "self.ffn_layers",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 115
+  },
+  {
+   "state": "self.norm_layers_2",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 116
+  },
+  {
+   "state": "self.self_attn_layers",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 543
+  },
+  {
+   "state": "self.norm_layers_0",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 544
+  },
+  {
+   "state": "self.ffn_layers",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 545
+  },
+  {
+   "state": "self.norm_layers_1",
+   "file": "GPT_SoVITS/module/attentions.py",
+   "line": 546
+  },
+  {
+   "state": "self.layers",
+   "file": "GPT_SoVITS/module/core_vq.py",
+   "line": 366
+  },
+  {
+   "state": "self.boundaries",
+   "file": "GPT_SoVITS/module/data_utils.py",
+   "line": 990
+  },
+  {
+   "state": "mel_basis",
+   "file": "GPT_SoVITS/module/mel_processing.py",
+   "line": 36
+  },
+  {
+   "state": "hann_window",
+   "file": "GPT_SoVITS/module/mel_processing.py",
+   "line": 37
+  },
+  {
+   "state": "WINDOW",
+   "file": "GPT_SoVITS/module/models.py",
+   "line": 154
+  },
+  {
+   "state": "self.resblocks",
+   "file": "GPT_SoVITS/module/models.py",
+   "line": 473
+  },
+  {
+   "state": "v2pro_set",
+   "file": "GPT_SoVITS/module/models.py",
+   "line": 623
+  },
+  {
+   "state": "self.version",
+   "file": "GPT_SoVITS/module/models.py",
+   "line": 877
+  },
+  {
+   "state": "self.resblocks",
+   "file": "GPT_SoVITS/module/models_onnx.py",
+   "line": 416
+  },
+  {
+   "state": "v2pro_set",
+   "file": "GPT_SoVITS/module/models_onnx.py",
+   "line": 766
+  },
+  {
+   "state": "self.version",
+   "file": "GPT_SoVITS/module/models_onnx.py",
+   "line": 817
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "GPT_SoVITS/module/modules.py",
+   "line": 54
+  },
+  {
+   "state": "self.norm_layers",
+   "file": "GPT_SoVITS/module/modules.py",
+   "line": 55
+  },
+  {
+   "state": "self.convs_sep",
+   "file": "GPT_SoVITS/module/modules.py",
+   "line": 96
+  },
+  {
+   "state": "self.convs_1x1",
+   "file": "GPT_SoVITS/module/modules.py",
+   "line": 97
+  },
+  {
+   "state": "self.norms_1",
+   "file": "GPT_SoVITS/module/modules.py",
+   "line": 98
+  },
+  {
+   "state": "self.norms_2",
+   "file": "GPT_SoVITS/module/modules.py",
+   "line": 99
+  },
+  {
+   "state": "self.in_layers",
+   "file": "GPT_SoVITS/module/modules.py",
+   "line": 151
+  },
+  {
+   "state": "self.res_skip_layers",
+   "file": "GPT_SoVITS/module/modules.py",
+   "line": 152
+  },
+  {
+   "state": "self.in_layers",
+   "file": "GPT_SoVITS/module/mrte_model.py",
+   "line": 106
+  },
+  {
+   "state": "self.res_skip_layers",
+   "file": "GPT_SoVITS/module/mrte_model.py",
+   "line": 107
+  },
+  {
+   "state": "model_version2byte",
+   "file": "GPT_SoVITS/process_ckpt.py",
+   "line": 22
+  },
+  {
+   "state": "head2version",
+   "file": "GPT_SoVITS/process_ckpt.py",
+   "line": 72
+  },
+  {
+   "state": "hash_pretrained_dict",
+   "file": "GPT_SoVITS/process_ckpt.py",
+   "line": 81
+  },
+  {
+   "state": "_symbol_to_id_v1",
+   "file": "GPT_SoVITS/text/__init__.py",
+   "line": 10
+  },
+  {
+   "state": "_symbol_to_id_v2",
+   "file": "GPT_SoVITS/text/__init__.py",
+   "line": 11
+  },
+  {
+   "state": "rep_map",
+   "file": "GPT_SoVITS/text/cantonese.py",
+   "line": 60
+  },
+  {
+   "state": "pinyin_to_symbol_map",
+   "file": "GPT_SoVITS/text/chinese.py",
+   "line": 14
+  },
+  {
+   "state": "rep_map",
+   "file": "GPT_SoVITS/text/chinese.py",
+   "line": 26
+  },
+  {
+   "state": "pinyin_to_symbol_map",
+   "file": "GPT_SoVITS/text/chinese2.py",
+   "line": 15
+  },
+  {
+   "state": "rep_map",
+   "file": "GPT_SoVITS/text/chinese2.py",
+   "line": 41
+  },
+  {
+   "state": "not_erhua",
+   "file": "GPT_SoVITS/text/chinese2.py",
+   "line": 94
+  },
+  {
+   "state": "measurement_map",
+   "file": "GPT_SoVITS/text/en_normalization/expend.py",
+   "line": 10
+  },
+  {
+   "state": "asmd_map",
+   "file": "GPT_SoVITS/text/en_normalization/expend.py",
+   "line": 249
+  },
+  {
+   "state": "rep_map",
+   "file": "GPT_SoVITS/text/english.py",
+   "line": 27
+  },
+  {
+   "state": "self.cmu",
+   "file": "GPT_SoVITS/text/english.py",
+   "line": 255
+  },
+  {
+   "state": "self.namedict",
+   "file": "GPT_SoVITS/text/english.py",
+   "line": 256
+  },
+  {
+   "state": "self.polyphonic_chars_new",
+   "file": "GPT_SoVITS/text/g2pw/onnx_api.py",
+   "line": 161
+  },
+  {
+   "state": "self.monophonic_chars_dict",
+   "file": "GPT_SoVITS/text/g2pw/onnx_api.py",
+   "line": 165
+  },
+  {
+   "state": "self.char_bopomofo_dict",
+   "file": "GPT_SoVITS/text/g2pw/onnx_api.py",
+   "line": 174
+  },
+  {
+   "state": "_korean_classifiers",
+   "file": "GPT_SoVITS/text/korean.py",
+   "line": 62
+  },
+  {
+   "state": "self.must_neural_tone_words",
+   "file": "GPT_SoVITS/text/tone_sandhi.py",
+   "line": 24
+  },
+  {
+   "state": "s2t_dict",
+   "file": "GPT_SoVITS/text/zh_normalization/char_convert.py",
+   "line": 23
+  },
+  {
+   "state": "t2s_dict",
+   "file": "GPT_SoVITS/text/zh_normalization/char_convert.py",
+   "line": 24
+  },
+  {
+   "state": "asmd_map",
+   "file": "GPT_SoVITS/text/zh_normalization/num.py",
+   "line": 119
+  },
+  {
+   "state": "power_map",
+   "file": "GPT_SoVITS/text/zh_normalization/num.py",
+   "line": 136
+  },
+  {
+   "state": "measure_dict",
+   "file": "GPT_SoVITS/text/zh_normalization/quantifier.py",
+   "line": 21
+  },
+  {
+   "state": "funasr_models",
+   "file": "tools/asr/funasr_asr.py",
+   "line": 11
+  },
+  {
+   "state": "g_data_json",
+   "file": "tools/subfix_webui.py",
+   "line": 35
+  }
+ ],
+ "repo": "RVC-Boss/GPT-SoVITS",
+ "stars": 56634
+}

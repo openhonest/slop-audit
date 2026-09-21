@@ -1,0 +1,491 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.9,
+ "v1_mutable_ratio": 60.2,
+ "v1_details": "9094/15105 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 2185,
+  "promiscuous": 92,
+  "unresolved": 1522
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 1551,
+   "drives_decision": 634
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 92
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 1522
+  }
+ },
+ "v2_resolvable": 0.599,
+ "v2_promiscuous": [
+  {
+   "state": "self.x",
+   "file": "guides/training_with_built_in_methods.py",
+   "line": 604
+  },
+  {
+   "state": "self.y",
+   "file": "guides/training_with_built_in_methods.py",
+   "line": 605
+  },
+  {
+   "state": "self.x",
+   "file": "guides/training_with_built_in_methods.py",
+   "line": 688
+  },
+  {
+   "state": "self.y",
+   "file": "guides/training_with_built_in_methods.py",
+   "line": 689
+  },
+  {
+   "state": "_kernels",
+   "file": "keras/src/backend/numpy/image.py",
+   "line": 451
+  },
+  {
+   "state": "_ov_kernels",
+   "file": "keras/src/backend/openvino/image.py",
+   "line": 456
+  },
+  {
+   "state": "_kernels",
+   "file": "keras/src/backend/tensorflow/image.py",
+   "line": 972
+  },
+  {
+   "state": "_kernels",
+   "file": "keras/src/backend/torch/image.py",
+   "line": 1074
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/distillation/distiller_test.py",
+   "line": 49
+  },
+  {
+   "state": "self._layout_map",
+   "file": "keras/src/distribution/distribution_lib.py",
+   "line": 638
+  },
+  {
+   "state": "self._endpoint_names",
+   "file": "keras/src/export/saved_model_export_archive.py",
+   "line": 31
+  },
+  {
+   "state": "self._endpoint_signatures",
+   "file": "keras/src/export/saved_model_export_archive.py",
+   "line": 32
+  },
+  {
+   "state": "self._kernel",
+   "file": "keras/src/layers/convolutional/base_conv.py",
+   "line": 202
+  },
+  {
+   "state": "self._dtype_policy",
+   "file": "keras/src/layers/layer.py",
+   "line": 278
+  },
+  {
+   "state": "self._losses",
+   "file": "keras/src/layers/layer.py",
+   "line": 314
+  },
+  {
+   "state": "self._loss_ids",
+   "file": "keras/src/layers/layer.py",
+   "line": 315
+  },
+  {
+   "state": "self.call_signature_parameters",
+   "file": "keras/src/layers/layer.py",
+   "line": 319
+  },
+  {
+   "state": "self.rematted_functions",
+   "file": "keras/src/layers/layer_test.py",
+   "line": 25
+  },
+  {
+   "state": "self._backend_generators",
+   "file": "keras/src/layers/preprocessing/data_layer.py",
+   "line": 146
+  },
+  {
+   "state": "self.crosses_by_name",
+   "file": "keras/src/layers/preprocessing/feature_space.py",
+   "line": 431
+  },
+  {
+   "state": "self.preprocessors",
+   "file": "keras/src/layers/preprocessing/feature_space.py",
+   "line": 445
+  },
+  {
+   "state": "self.crossers",
+   "file": "keras/src/layers/preprocessing/feature_space.py",
+   "line": 449
+  },
+  {
+   "state": "self.boxes",
+   "file": "keras/src/layers/preprocessing/image_preprocessing/bounding_boxes/converters_test.py",
+   "line": 54
+  },
+  {
+   "state": "self.mask_token",
+   "file": "keras/src/layers/preprocessing/index_lookup.py",
+   "line": 223
+  },
+  {
+   "state": "self.oov_token",
+   "file": "keras/src/layers/preprocessing/index_lookup.py",
+   "line": 224
+  },
+  {
+   "state": "self._build_input_shape",
+   "file": "keras/src/layers/preprocessing/normalization.py",
+   "line": 127
+  },
+  {
+   "state": "self.cropping",
+   "file": "keras/src/layers/reshaping/cropping3d.py",
+   "line": 70
+  },
+  {
+   "state": "self.padding",
+   "file": "keras/src/layers/reshaping/zero_padding2d.py",
+   "line": 75
+  },
+  {
+   "state": "self.padding",
+   "file": "keras/src/layers/reshaping/zero_padding3d.py",
+   "line": 66
+  },
+  {
+   "state": "self.index_array",
+   "file": "keras/src/legacy/preprocessing/image.py",
+   "line": 49
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/legacy/preprocessing/image.py",
+   "line": 632
+  },
+  {
+   "state": "self.sample_weight",
+   "file": "keras/src/legacy/preprocessing/image.py",
+   "line": 636
+  },
+  {
+   "state": "self.class_indices",
+   "file": "keras/src/legacy/preprocessing/image.py",
+   "line": 759
+  },
+  {
+   "state": "self.data",
+   "file": "keras/src/legacy/preprocessing/sequence.py",
+   "line": 79
+  },
+  {
+   "state": "self.targets",
+   "file": "keras/src/legacy/preprocessing/sequence.py",
+   "line": 80
+  },
+  {
+   "state": "self._shared_objects_config",
+   "file": "keras/src/legacy/saving/serialization.py",
+   "line": 183
+  },
+  {
+   "state": "self._layers",
+   "file": "keras/src/models/sequential.py",
+   "line": 72
+  },
+  {
+   "state": "self._operations",
+   "file": "keras/src/ops/function.py",
+   "line": 83
+  },
+  {
+   "state": "self._nnx_op_mapping",
+   "file": "keras/src/ops/function.py",
+   "line": 115
+  },
+  {
+   "state": "self._inbound_nodes",
+   "file": "keras/src/ops/operation.py",
+   "line": 32
+  },
+  {
+   "state": "self._r",
+   "file": "keras/src/optimizers/adafactor.py",
+   "line": 96
+  },
+  {
+   "state": "self._c",
+   "file": "keras/src/optimizers/adafactor.py",
+   "line": 97
+  },
+  {
+   "state": "self._v",
+   "file": "keras/src/optimizers/adafactor.py",
+   "line": 98
+  },
+  {
+   "state": "self._accumulators",
+   "file": "keras/src/optimizers/adagrad.py",
+   "line": 74
+  },
+  {
+   "state": "self._velocity_hats",
+   "file": "keras/src/optimizers/adam.py",
+   "line": 98
+  },
+  {
+   "state": "self._trainable_variables_indices",
+   "file": "keras/src/optimizers/base_optimizer.py",
+   "line": 152
+  },
+  {
+   "state": "self._accumulated_gradients",
+   "file": "keras/src/optimizers/base_optimizer.py",
+   "line": 217
+  },
+  {
+   "state": "self._exclude_from_weight_decay_cache",
+   "file": "keras/src/optimizers/base_optimizer.py",
+   "line": 921
+  },
+  {
+   "state": "self._momentums",
+   "file": "keras/src/optimizers/lion.py",
+   "line": 94
+  },
+  {
+   "state": "self._var_to_optimizer_idx",
+   "file": "keras/src/optimizers/multi_optimizer.py",
+   "line": 250
+  },
+  {
+   "state": "self.momentums",
+   "file": "keras/src/optimizers/muon.py",
+   "line": 166
+  },
+  {
+   "state": "self.adam_velocities",
+   "file": "keras/src/optimizers/muon.py",
+   "line": 168
+  },
+  {
+   "state": "self.momentums",
+   "file": "keras/src/optimizers/optimizer_sparse_test.py",
+   "line": 20
+  },
+  {
+   "state": "self._velocities",
+   "file": "keras/src/optimizers/rmsprop.py",
+   "line": 97
+  },
+  {
+   "state": "self._momentums",
+   "file": "keras/src/optimizers/rmsprop.py",
+   "line": 99
+  },
+  {
+   "state": "self._average_gradients",
+   "file": "keras/src/optimizers/rmsprop.py",
+   "line": 103
+  },
+  {
+   "state": "self.momentums",
+   "file": "keras/src/optimizers/sgd.py",
+   "line": 91
+  },
+  {
+   "state": "self.errors",
+   "file": "keras/src/quantizers/report.py",
+   "line": 54
+  },
+  {
+   "state": "self.object_metadata",
+   "file": "keras/src/saving/file_editor.py",
+   "line": 106
+  },
+  {
+   "state": "GLOBAL_CUSTOM_OBJECTS",
+   "file": "keras/src/saving/object_registration.py",
+   "line": 6
+  },
+  {
+   "state": "GLOBAL_CUSTOM_NAMES",
+   "file": "keras/src/saving/object_registration.py",
+   "line": 7
+  },
+  {
+   "state": "self._h5_entry_group",
+   "file": "keras/src/saving/saving_lib.py",
+   "line": 1531
+  },
+  {
+   "state": "self._user_loss_weights",
+   "file": "keras/src/trainers/compile_utils.py",
+   "line": 450
+  },
+  {
+   "state": "self.array",
+   "file": "keras/src/trainers/data_adapters/array_slicing.py",
+   "line": 27
+  },
+  {
+   "state": "self.x",
+   "file": "keras/src/trainers/data_adapters/grain_dataset_adapter_test.py",
+   "line": 32
+  },
+  {
+   "state": "self.x",
+   "file": "keras/src/trainers/data_adapters/grain_dataset_adapter_test.py",
+   "line": 32
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/trainers/data_adapters/grain_dataset_adapter_test.py",
+   "line": 33
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/trainers/data_adapters/grain_dataset_adapter_test.py",
+   "line": 33
+  },
+  {
+   "state": "self.x",
+   "file": "keras/src/trainers/data_adapters/grain_dataset_adapter_test.py",
+   "line": 118
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/trainers/data_adapters/grain_dataset_adapter_test.py",
+   "line": 119
+  },
+  {
+   "state": "self.sample_weight",
+   "file": "keras/src/trainers/data_adapters/py_dataset_adapter_test.py",
+   "line": 33
+  },
+  {
+   "state": "self.x",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 84
+  },
+  {
+   "state": "self.x",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 84
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 85
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 85
+  },
+  {
+   "state": "self.x",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 113
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 114
+  },
+  {
+   "state": "self.x",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 144
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 145
+  },
+  {
+   "state": "self.data",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 200
+  },
+  {
+   "state": "self.data",
+   "file": "keras/src/trainers/epoch_iterator_test.py",
+   "line": 200
+  },
+  {
+   "state": "self._compiled_trainable_state",
+   "file": "keras/src/trainers/trainer.py",
+   "line": 216
+  },
+  {
+   "state": "self.x",
+   "file": "keras/src/trainers/trainer_test.py",
+   "line": 233
+  },
+  {
+   "state": "self.y",
+   "file": "keras/src/trainers/trainer_test.py",
+   "line": 234
+  },
+  {
+   "state": "self.batches",
+   "file": "keras/src/trainers/trainer_test.py",
+   "line": 1701
+  },
+  {
+   "state": "self.batches",
+   "file": "keras/src/trainers/trainer_test.py",
+   "line": 1701
+  },
+  {
+   "state": "REGISTERED_CLASSES",
+   "file": "keras/src/tree/dmtree_impl.py",
+   "line": 26
+  },
+  {
+   "state": "self.stateless_metrics",
+   "file": "keras/src/utils/progbar.py",
+   "line": 60
+  },
+  {
+   "state": "self._values",
+   "file": "keras/src/utils/progbar.py",
+   "line": 77
+  },
+  {
+   "state": "self.config",
+   "file": "keras/src/utils/tracking.py",
+   "line": 65
+  },
+  {
+   "state": "self.stored_ids",
+   "file": "keras/src/utils/tracking.py",
+   "line": 66
+  },
+  {
+   "state": "self.exclusions",
+   "file": "keras/src/utils/tracking.py",
+   "line": 69
+  }
+ ],
+ "repo": "keras-team/keras",
+ "stars": 63982
+}

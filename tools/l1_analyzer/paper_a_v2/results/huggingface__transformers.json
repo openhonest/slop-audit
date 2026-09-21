@@ -1,0 +1,5046 @@
+{
+ "status": "ok",
+ "clone_seconds": 4.1,
+ "v1_mutable_ratio": 71.8,
+ "v1_details": "26606/37031 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 18157,
+  "promiscuous": 1003,
+  "unresolved": 26182
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 14150,
+   "drives_decision": 4007
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 1003
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 26182
+  }
+ },
+ "v2_resolvable": 0.423,
+ "v2_promiscuous": [
+  {
+   "state": "self.input_proj",
+   "file": "examples/modular-transformers/modeling_test_detr.py",
+   "line": 1095
+  },
+  {
+   "state": "self.level_embed",
+   "file": "examples/modular-transformers/modeling_test_detr.py",
+   "line": 1116
+  },
+  {
+   "state": "self.id2label",
+   "file": "examples/pytorch/instance-segmentation/run_instance_segmentation.py",
+   "line": 202
+  },
+  {
+   "state": "task_to_keys",
+   "file": "examples/pytorch/text-classification/run_glue.py",
+   "line": 68
+  },
+  {
+   "state": "task_to_keys",
+   "file": "examples/pytorch/text-classification/run_glue_no_trainer.py",
+   "line": 74
+  },
+  {
+   "state": "self.num_features",
+   "file": "src/transformers/backbone_utils.py",
+   "line": 231
+  },
+  {
+   "state": "self.keys",
+   "file": "src/transformers/cache_utils.py",
+   "line": 122
+  },
+  {
+   "state": "self.values",
+   "file": "src/transformers/cache_utils.py",
+   "line": 123
+  },
+  {
+   "state": "self.keys",
+   "file": "src/transformers/cache_utils.py",
+   "line": 236
+  },
+  {
+   "state": "self.values",
+   "file": "src/transformers/cache_utils.py",
+   "line": 237
+  },
+  {
+   "state": "self.keys",
+   "file": "src/transformers/cache_utils.py",
+   "line": 724
+  },
+  {
+   "state": "self.conv_states",
+   "file": "src/transformers/cache_utils.py",
+   "line": 871
+  },
+  {
+   "state": "self.recurrent_states",
+   "file": "src/transformers/cache_utils.py",
+   "line": 872
+  },
+  {
+   "state": "self.is_conv_states_initialized",
+   "file": "src/transformers/cache_utils.py",
+   "line": 873
+  },
+  {
+   "state": "self.is_recurrent_states_initialized",
+   "file": "src/transformers/cache_utils.py",
+   "line": 874
+  },
+  {
+   "state": "self.conv_kernel_size",
+   "file": "src/transformers/cache_utils.py",
+   "line": 876
+  },
+  {
+   "state": "self.examples",
+   "file": "src/transformers/cli/chat.py",
+   "line": 373
+  },
+  {
+   "state": "self.loaded_models",
+   "file": "src/transformers/cli/serving/model_manager.py",
+   "line": 119
+  },
+  {
+   "state": "self._loading_subscribers",
+   "file": "src/transformers/cli/serving/model_manager.py",
+   "line": 126
+  },
+  {
+   "state": "self._loading_tasks",
+   "file": "src/transformers/cli/serving/model_manager.py",
+   "line": 127
+  },
+  {
+   "state": "self._generate_managers",
+   "file": "src/transformers/cli/serving/utils.py",
+   "line": 1000
+  },
+  {
+   "state": "_checkpoint_conversion_mapping_cache",
+   "file": "src/transformers/conversion_mapping.py",
+   "line": 1876
+  },
+  {
+   "state": "TOKENIZER_CLASSES",
+   "file": "src/transformers/convert_slow_tokenizers_checkpoints_to_fast.py",
+   "line": 31
+  },
+  {
+   "state": "self._original_target_patterns",
+   "file": "src/transformers/core_model_loading.py",
+   "line": 777
+  },
+  {
+   "state": "self.collected_tensors",
+   "file": "src/transformers/core_model_loading.py",
+   "line": 782
+  },
+  {
+   "state": "self.layer_targets",
+   "file": "src/transformers/core_model_loading.py",
+   "line": 783
+  },
+  {
+   "state": "self.compiled_sources",
+   "file": "src/transformers/core_model_loading.py",
+   "line": 837
+  },
+  {
+   "state": "self._int_64_keys",
+   "file": "src/transformers/data/data_collator.py",
+   "line": 1420
+  },
+  {
+   "state": "self._batch_dim_keys",
+   "file": "src/transformers/data/data_collator.py",
+   "line": 1421
+  },
+  {
+   "state": "self.features",
+   "file": "src/transformers/data/datasets/squad.py",
+   "line": 151
+  },
+  {
+   "state": "glue_processors",
+   "file": "src/transformers/data/processors/glue.py",
+   "line": 76
+  },
+  {
+   "state": "glue_output_modes",
+   "file": "src/transformers/data/processors/glue.py",
+   "line": 81
+  },
+  {
+   "state": "self.trace_batch_nums",
+   "file": "src/transformers/debug_utils.py",
+   "line": 149
+  },
+  {
+   "state": "self.batch_number",
+   "file": "src/transformers/debug_utils.py",
+   "line": 155
+  },
+  {
+   "state": "self.module_names",
+   "file": "src/transformers/debug_utils.py",
+   "line": 193
+  },
+  {
+   "state": "self.data",
+   "file": "src/transformers/feature_extraction_utils.py",
+   "line": 91
+  },
+  {
+   "state": "self.assistant_overlap_token_ids",
+   "file": "src/transformers/generation/candidate_generator.py",
+   "line": 656
+  },
+  {
+   "state": "self.full_seq_last_hidden_states",
+   "file": "src/transformers/generation/candidate_generator.py",
+   "line": 1493
+  },
+  {
+   "state": "self.sliding_windows",
+   "file": "src/transformers/generation/continuous_batching/cache.py",
+   "line": 186
+  },
+  {
+   "state": "self.layer_index_to_group_indices",
+   "file": "src/transformers/generation/continuous_batching/cache.py",
+   "line": 187
+  },
+  {
+   "state": "self._id_to_block",
+   "file": "src/transformers/generation/continuous_batching/cache_manager.py",
+   "line": 86
+  },
+  {
+   "state": "self.block_table",
+   "file": "src/transformers/generation/continuous_batching/cache_manager.py",
+   "line": 473
+  },
+  {
+   "state": "self.supported_keys",
+   "file": "src/transformers/generation/continuous_batching/cb_logits_processors.py",
+   "line": 101
+  },
+  {
+   "state": "self.scheduler",
+   "file": "src/transformers/generation/continuous_batching/continuous_api.py",
+   "line": 237
+  },
+  {
+   "state": "self.output_router",
+   "file": "src/transformers/generation/continuous_batching/continuous_api.py",
+   "line": 586
+  },
+  {
+   "state": "self.true_read_sizes",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 108
+  },
+  {
+   "state": "self.true_write_sizes",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 109
+  },
+  {
+   "state": "self.input_ids",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 154
+  },
+  {
+   "state": "self.position_ids",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 155
+  },
+  {
+   "state": "self.cumulative_seqlens_q",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 156
+  },
+  {
+   "state": "self.logits_indices",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 157
+  },
+  {
+   "state": "self.cumulative_seqlens_k",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 163
+  },
+  {
+   "state": "self.output_ids",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 172
+  },
+  {
+   "state": "self.attention_mask",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 183
+  },
+  {
+   "state": "self.io_pairs",
+   "file": "src/transformers/generation/continuous_batching/input_outputs.py",
+   "line": 671
+  },
+  {
+   "state": "self._free_cpu_blocks",
+   "file": "src/transformers/generation/continuous_batching/offloading_manager.py",
+   "line": 81
+  },
+  {
+   "state": "self.remaining_prefill_tokens",
+   "file": "src/transformers/generation/continuous_batching/requests.py",
+   "line": 187
+  },
+  {
+   "state": "self.active_requests",
+   "file": "src/transformers/generation/continuous_batching/scheduler.py",
+   "line": 51
+  },
+  {
+   "state": "self.waiting_requests",
+   "file": "src/transformers/generation/continuous_batching/scheduler.py",
+   "line": 52
+  },
+  {
+   "state": "self.waiting_requests_order",
+   "file": "src/transformers/generation/continuous_batching/scheduler.py",
+   "line": 53
+  },
+  {
+   "state": "self._requests_to_cancel",
+   "file": "src/transformers/generation/continuous_batching/scheduler.py",
+   "line": 54
+  },
+  {
+   "state": "self.generated_ngrams",
+   "file": "src/transformers/generation/logits_process.py",
+   "line": 1189
+  },
+  {
+   "state": "self.fixed_table",
+   "file": "src/transformers/generation/logits_process.py",
+   "line": 2478
+  },
+  {
+   "state": "self.active_batches",
+   "file": "src/transformers/generation/logits_process.py",
+   "line": 3182
+  },
+  {
+   "state": "STOP_STRING_EMBEDDING_CACHE",
+   "file": "src/transformers/generation/stopping_criteria.py",
+   "line": 19
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/integrations/fbgemm_fp8.py",
+   "line": 159
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/integrations/fbgemm_fp8.py",
+   "line": 166
+  },
+  {
+   "state": "self.gate_up_proj_activation_scale",
+   "file": "src/transformers/integrations/finegrained_fp8.py",
+   "line": 679
+  },
+  {
+   "state": "self.down_proj_activation_scale",
+   "file": "src/transformers/integrations/finegrained_fp8.py",
+   "line": 680
+  },
+  {
+   "state": "self._checkpoints_saved",
+   "file": "src/transformers/integrations/integration_utils.py",
+   "line": 1886
+  },
+  {
+   "state": "ATTN_MASK_NPU_CACHE",
+   "file": "src/transformers/integrations/npu_flash_attention.py",
+   "line": 37
+  },
+  {
+   "state": "self.weight_dict",
+   "file": "src/transformers/loss/loss_deimv2.py",
+   "line": 31
+  },
+  {
+   "state": "self.weight_dict",
+   "file": "src/transformers/loss/loss_rt_detr.py",
+   "line": 152
+  },
+  {
+   "state": "self.rope_parameters",
+   "file": "src/transformers/modeling_rope_utils.py",
+   "line": 744
+  },
+  {
+   "state": "str_to_torch_dtype",
+   "file": "src/transformers/modeling_utils.py",
+   "line": 275
+  },
+  {
+   "state": "self.all_tied_weights_keys",
+   "file": "src/transformers/modeling_utils.py",
+   "line": 1388
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/afmoe/modeling_afmoe.py",
+   "line": 179
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/afmoe/modeling_afmoe.py",
+   "line": 180
+  },
+  {
+   "state": "self.albert_layer_groups",
+   "file": "src/transformers/models/albert/modeling_albert.py",
+   "line": 268
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/apertus/modeling_apertus.py",
+   "line": 350
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/arcee/modeling_arcee.py",
+   "line": 352
+  },
+  {
+   "state": "self.patch_to_query_dict",
+   "file": "src/transformers/models/aria/modeling_aria.py",
+   "line": 170
+  },
+  {
+   "state": "self.query",
+   "file": "src/transformers/models/aria/modeling_aria.py",
+   "line": 177
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/aria/modeling_aria.py",
+   "line": 687
+  },
+  {
+   "state": "self.patch_to_query_dict",
+   "file": "src/transformers/models/aria/modular_aria.py",
+   "line": 277
+  },
+  {
+   "state": "self.query",
+   "file": "src/transformers/models/aria/modular_aria.py",
+   "line": 284
+  },
+  {
+   "state": "self.size_conversion",
+   "file": "src/transformers/models/aria/modular_aria.py",
+   "line": 579
+  },
+  {
+   "state": "self.size_conversion",
+   "file": "src/transformers/models/aria/processing_aria.py",
+   "line": 79
+  },
+  {
+   "state": "self._config_mapping",
+   "file": "src/transformers/models/auto/auto_factory.py",
+   "line": 585
+  },
+  {
+   "state": "self._reverse_config_mapping",
+   "file": "src/transformers/models/auto/auto_factory.py",
+   "line": 586
+  },
+  {
+   "state": "self._model_mapping",
+   "file": "src/transformers/models/auto/auto_factory.py",
+   "line": 587
+  },
+  {
+   "state": "self._modules",
+   "file": "src/transformers/models/auto/auto_factory.py",
+   "line": 590
+  },
+  {
+   "state": "DEPRECATED_MODELS",
+   "file": "src/transformers/models/auto/configuration_auto.py",
+   "line": 61
+  },
+  {
+   "state": "self._modules",
+   "file": "src/transformers/models/auto/configuration_auto.py",
+   "line": 101
+  },
+  {
+   "state": "REGISTERED_TOKENIZER_CLASSES",
+   "file": "src/transformers/models/auto/tokenization_auto.py",
+   "line": 62
+  },
+  {
+   "state": "REGISTERED_FAST_ALIASES",
+   "file": "src/transformers/models/auto/tokenization_auto.py",
+   "line": 63
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/axk1/modeling_axk1.py",
+   "line": 197
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/axk1/modeling_axk1.py",
+   "line": 198
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/axk1/modeling_axk1.py",
+   "line": 589
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/axk2/modeling_axk2.py",
+   "line": 355
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/axk2/modeling_axk2.py",
+   "line": 356
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/axk2/modeling_axk2.py",
+   "line": 758
+  },
+  {
+   "state": "self.lm_heads",
+   "file": "src/transformers/models/bark/modeling_bark.py",
+   "line": 892
+  },
+  {
+   "state": "self.speaker_embeddings",
+   "file": "src/transformers/models/bark/processing_bark.py",
+   "line": 53
+  },
+  {
+   "state": "self.fairseq_ids_to_tokens",
+   "file": "src/transformers/models/bartpho/tokenization_bartpho.py",
+   "line": 140
+  },
+  {
+   "state": "self._added_tokens_encoder",
+   "file": "src/transformers/models/bartpho/tokenization_bartpho.py",
+   "line": 248
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/beit/modeling_beit.py",
+   "line": 106
+  },
+  {
+   "state": "self.in_channels",
+   "file": "src/transformers/models/beit/modeling_beit.py",
+   "line": 814
+  },
+  {
+   "state": "self.fpn_convs",
+   "file": "src/transformers/models/beit/modeling_beit.py",
+   "line": 832
+  },
+  {
+   "state": "self.in_channels",
+   "file": "src/transformers/models/beit/modular_beit.py",
+   "line": 613
+  },
+  {
+   "state": "self.fpn_convs",
+   "file": "src/transformers/models/beit/modular_beit.py",
+   "line": 631
+  },
+  {
+   "state": "self.basic_tokenizer",
+   "file": "src/transformers/models/bert/tokenization_bert_legacy.py",
+   "line": 121
+  },
+  {
+   "state": "self.vocab",
+   "file": "src/transformers/models/bert/tokenization_bert_legacy.py",
+   "line": 423
+  },
+  {
+   "state": "self.vocab",
+   "file": "src/transformers/models/bert_japanese/tokenization_bert_japanese.py",
+   "line": 779
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/bertweet/tokenization_bertweet.py",
+   "line": 146
+  },
+  {
+   "state": "self.special_puncts",
+   "file": "src/transformers/models/bertweet/tokenization_bertweet.py",
+   "line": 150
+  },
+  {
+   "state": "self.symbols",
+   "file": "src/transformers/models/biogpt/convert_biogpt_original_pytorch_checkpoint_to_pytorch.py",
+   "line": 49
+  },
+  {
+   "state": "self.count",
+   "file": "src/transformers/models/biogpt/convert_biogpt_original_pytorch_checkpoint_to_pytorch.py",
+   "line": 50
+  },
+  {
+   "state": "self.indices",
+   "file": "src/transformers/models/biogpt/convert_biogpt_original_pytorch_checkpoint_to_pytorch.py",
+   "line": 51
+  },
+  {
+   "state": "self.cache_moses_tokenizer",
+   "file": "src/transformers/models/biogpt/tokenization_biogpt.py",
+   "line": 112
+  },
+  {
+   "state": "self.cache_moses_detokenizer",
+   "file": "src/transformers/models/biogpt/tokenization_biogpt.py",
+   "line": 113
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/biogpt/tokenization_biogpt.py",
+   "line": 123
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/bitnet/modeling_bitnet.py",
+   "line": 350
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/blenderbot_small/tokenization_blenderbot_small.py",
+   "line": 96
+  },
+  {
+   "state": "self.position_embedding",
+   "file": "src/transformers/models/blip/modeling_blip.py",
+   "line": 189
+  },
+  {
+   "state": "self.text_config",
+   "file": "src/transformers/models/blip_2/configuration_blip_2.py",
+   "line": 162
+  },
+  {
+   "state": "self.position_embedding",
+   "file": "src/transformers/models/blip_2/modeling_blip_2.py",
+   "line": 201
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/blip_2/modeling_blip_2.py",
+   "line": 771
+  },
+  {
+   "state": "self.cross_attn_layers",
+   "file": "src/transformers/models/blt/modeling_blt.py",
+   "line": 590
+  },
+  {
+   "state": "self.cross_attn_layers",
+   "file": "src/transformers/models/blt/modeling_blt.py",
+   "line": 701
+  },
+  {
+   "state": "self.cross_attn_layers",
+   "file": "src/transformers/models/blt/modular_blt.py",
+   "line": 536
+  },
+  {
+   "state": "self.cross_attn_layers",
+   "file": "src/transformers/models/blt/modular_blt.py",
+   "line": 647
+  },
+  {
+   "state": "self.cross_modal_image_layers",
+   "file": "src/transformers/models/bridgetower/modeling_bridgetower.py",
+   "line": 1112
+  },
+  {
+   "state": "self.cross_modal_text_layers",
+   "file": "src/transformers/models/bridgetower/modeling_bridgetower.py",
+   "line": 1115
+  },
+  {
+   "state": "self.cross_modal_text_link_tower",
+   "file": "src/transformers/models/bridgetower/modeling_bridgetower.py",
+   "line": 1128
+  },
+  {
+   "state": "self.cross_modal_image_link_tower",
+   "file": "src/transformers/models/bridgetower/modeling_bridgetower.py",
+   "line": 1129
+  },
+  {
+   "state": "self._added_tokens_decoder",
+   "file": "src/transformers/models/byt5/tokenization_byt5.py",
+   "line": 87
+  },
+  {
+   "state": "self.down",
+   "file": "src/transformers/models/chameleon/modeling_chameleon.py",
+   "line": 645
+  },
+  {
+   "state": "self.readout_projects",
+   "file": "src/transformers/models/chmv2/modeling_chmv2.py",
+   "line": 86
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/chmv2/modeling_chmv2.py",
+   "line": 236
+  },
+  {
+   "state": "self.readout_projects",
+   "file": "src/transformers/models/chmv2/modular_chmv2.py",
+   "line": 222
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/chmv2/modular_chmv2.py",
+   "line": 334
+  },
+  {
+   "state": "self.relative_position_bias_table",
+   "file": "src/transformers/models/clap/modeling_clap.py",
+   "line": 338
+  },
+  {
+   "state": "self.input_resolutions",
+   "file": "src/transformers/models/clap/modeling_clap.py",
+   "line": 737
+  },
+  {
+   "state": "self.group_norms",
+   "file": "src/transformers/models/clvp/modeling_clvp.py",
+   "line": 651
+  },
+  {
+   "state": "self.ones",
+   "file": "src/transformers/models/clvp/number_normalizer.py",
+   "line": 54
+  },
+  {
+   "state": "self.teens",
+   "file": "src/transformers/models/clvp/number_normalizer.py",
+   "line": 55
+  },
+  {
+   "state": "self.tens",
+   "file": "src/transformers/models/clvp/number_normalizer.py",
+   "line": 67
+  },
+  {
+   "state": "self.byte_encoder",
+   "file": "src/transformers/models/clvp/tokenization_clvp.py",
+   "line": 153
+  },
+  {
+   "state": "self.byte_decoder",
+   "file": "src/transformers/models/clvp/tokenization_clvp.py",
+   "line": 154
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/clvp/tokenization_clvp.py",
+   "line": 159
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/cohere/modeling_cohere.py",
+   "line": 377
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/cohere2_moe/modeling_cohere2_moe.py",
+   "line": 110
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/cohere2_moe/modeling_cohere2_moe.py",
+   "line": 111
+  },
+  {
+   "state": "self.hidden_states_norms",
+   "file": "src/transformers/models/convnext/modeling_convnext.py",
+   "line": 356
+  },
+  {
+   "state": "self.hidden_states_norms",
+   "file": "src/transformers/models/convnextv2/modeling_convnextv2.py",
+   "line": 380
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/cosmos3_edge/modeling_cosmos3_edge.py",
+   "line": 659
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/cosmos3_edge/modular_cosmos3_edge.py",
+   "line": 509
+  },
+  {
+   "state": "self.vocab",
+   "file": "src/transformers/models/cpmant/tokenization_cpmant.py",
+   "line": 47
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/csm/modeling_csm.py",
+   "line": 421
+  },
+  {
+   "state": "self.weight",
+   "file": "src/transformers/models/csm/modeling_csm.py",
+   "line": 520
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/csm/modeling_csm.py",
+   "line": 671
+  },
+  {
+   "state": "self.weight",
+   "file": "src/transformers/models/csm/modular_csm.py",
+   "line": 251
+  },
+  {
+   "state": "self.pos_encoding",
+   "file": "src/transformers/models/ctrl/modeling_ctrl.py",
+   "line": 317
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/ctrl/tokenization_ctrl.py",
+   "line": 135
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/cvt/modeling_cvt.py",
+   "line": 390
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/cwm/modeling_cwm.py",
+   "line": 345
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/cwm/modular_cwm.py",
+   "line": 124
+  },
+  {
+   "state": "self.aifi",
+   "file": "src/transformers/models/d_fine/modeling_d_fine.py",
+   "line": 1014
+  },
+  {
+   "state": "self.lqe_layers",
+   "file": "src/transformers/models/d_fine/modeling_d_fine.py",
+   "line": 1177
+  },
+  {
+   "state": "self.encoder_input_proj",
+   "file": "src/transformers/models/d_fine/modeling_d_fine.py",
+   "line": 1555
+  },
+  {
+   "state": "self.decoder_input_proj",
+   "file": "src/transformers/models/d_fine/modeling_d_fine.py",
+   "line": 1614
+  },
+  {
+   "state": "self.lqe_layers",
+   "file": "src/transformers/models/d_fine/modular_d_fine.py",
+   "line": 801
+  },
+  {
+   "state": "self.patterns",
+   "file": "src/transformers/models/dab_detr/modeling_dab_detr.py",
+   "line": 1180
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/data2vec/modeling_data2vec_vision.py",
+   "line": 83
+  },
+  {
+   "state": "self.in_channels",
+   "file": "src/transformers/models/data2vec/modeling_data2vec_vision.py",
+   "line": 927
+  },
+  {
+   "state": "self.fpn_convs",
+   "file": "src/transformers/models/data2vec/modeling_data2vec_vision.py",
+   "line": 945
+  },
+  {
+   "state": "self.blocks",
+   "file": "src/transformers/models/dbrx/modeling_dbrx.py",
+   "line": 484
+  },
+  {
+   "state": "self.blocks",
+   "file": "src/transformers/models/dbrx/modular_dbrx.py",
+   "line": 359
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/deepseek_ocr2/modeling_deepseek_ocr2.py",
+   "line": 901
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/deepseek_ocr2/modeling_deepseek_ocr2.py",
+   "line": 1150
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/deepseek_ocr2/modeling_deepseek_ocr2.py",
+   "line": 1151
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/deepseek_ocr2/modeling_deepseek_ocr2.py",
+   "line": 1338
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/deepseek_ocr2/modular_deepseek_ocr2.py",
+   "line": 817
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/deepseek_v2/modeling_deepseek_v2.py",
+   "line": 55
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/deepseek_v2/modeling_deepseek_v2.py",
+   "line": 56
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/deepseek_v2/modeling_deepseek_v2.py",
+   "line": 495
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/deepseek_v3/modeling_deepseek_v3.py",
+   "line": 183
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/deepseek_v3/modeling_deepseek_v3.py",
+   "line": 184
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/deepseek_v3/modeling_deepseek_v3.py",
+   "line": 572
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/deepseek_v32/modeling_deepseek_v32.py",
+   "line": 563
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/deepseek_v32/modeling_deepseek_v32.py",
+   "line": 564
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/deepseek_v32/modeling_deepseek_v32.py",
+   "line": 704
+  },
+  {
+   "state": "self.layer_types",
+   "file": "src/transformers/models/deepseek_v4/configuration_deepseek_v4.py",
+   "line": 233
+  },
+  {
+   "state": "self.mlp_layer_types",
+   "file": "src/transformers/models/deepseek_v4/configuration_deepseek_v4.py",
+   "line": 234
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 103
+  },
+  {
+   "state": "self.buffer_kv",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 192
+  },
+  {
+   "state": "self.buffer_gate",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 193
+  },
+  {
+   "state": "self.compressed_kv",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 194
+  },
+  {
+   "state": "self.entry_count",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 195
+  },
+  {
+   "state": "self.overlap_kv",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 276
+  },
+  {
+   "state": "self.overlap_gate",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 277
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 994
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/deepseek_v4/modeling_deepseek_v4.py",
+   "line": 995
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/deepseek_v4/modular_deepseek_v4.py",
+   "line": 104
+  },
+  {
+   "state": "self.buffer_kv",
+   "file": "src/transformers/models/deepseek_v4/modular_deepseek_v4.py",
+   "line": 162
+  },
+  {
+   "state": "self.buffer_gate",
+   "file": "src/transformers/models/deepseek_v4/modular_deepseek_v4.py",
+   "line": 163
+  },
+  {
+   "state": "self.compressed_kv",
+   "file": "src/transformers/models/deepseek_v4/modular_deepseek_v4.py",
+   "line": 164
+  },
+  {
+   "state": "self.entry_count",
+   "file": "src/transformers/models/deepseek_v4/modular_deepseek_v4.py",
+   "line": 165
+  },
+  {
+   "state": "self.overlap_kv",
+   "file": "src/transformers/models/deepseek_v4/modular_deepseek_v4.py",
+   "line": 246
+  },
+  {
+   "state": "self.overlap_gate",
+   "file": "src/transformers/models/deepseek_v4/modular_deepseek_v4.py",
+   "line": 247
+  },
+  {
+   "state": "self.input_proj",
+   "file": "src/transformers/models/deformable_detr/modeling_deformable_detr.py",
+   "line": 1185
+  },
+  {
+   "state": "self.level_embed",
+   "file": "src/transformers/models/deformable_detr/modeling_deformable_detr.py",
+   "line": 1206
+  },
+  {
+   "state": "self.class_embed",
+   "file": "src/transformers/models/deformable_detr/modeling_deformable_detr.py",
+   "line": 1557
+  },
+  {
+   "state": "self.bbox_embed",
+   "file": "src/transformers/models/deformable_detr/modeling_deformable_detr.py",
+   "line": 1558
+  },
+  {
+   "state": "self.input_proj",
+   "file": "src/transformers/models/deformable_detr/modular_deformable_detr.py",
+   "line": 1027
+  },
+  {
+   "state": "self.level_embed",
+   "file": "src/transformers/models/deformable_detr/modular_deformable_detr.py",
+   "line": 1048
+  },
+  {
+   "state": "self.class_embed",
+   "file": "src/transformers/models/deformable_detr/modular_deformable_detr.py",
+   "line": 1384
+  },
+  {
+   "state": "self.bbox_embed",
+   "file": "src/transformers/models/deformable_detr/modular_deformable_detr.py",
+   "line": 1385
+  },
+  {
+   "state": "self.fusion_proj",
+   "file": "src/transformers/models/deimv2/modeling_deimv2.py",
+   "line": 1168
+  },
+  {
+   "state": "self.input_proj",
+   "file": "src/transformers/models/deimv2/modeling_deimv2.py",
+   "line": 1218
+  },
+  {
+   "state": "self.aifi",
+   "file": "src/transformers/models/deimv2/modeling_deimv2.py",
+   "line": 1288
+  },
+  {
+   "state": "self.lqe_layers",
+   "file": "src/transformers/models/deimv2/modeling_deimv2.py",
+   "line": 1446
+  },
+  {
+   "state": "self.decoder_input_proj",
+   "file": "src/transformers/models/deimv2/modeling_deimv2.py",
+   "line": 1736
+  },
+  {
+   "state": "self.fusion_proj",
+   "file": "src/transformers/models/deimv2/modular_deimv2.py",
+   "line": 482
+  },
+  {
+   "state": "self.input_proj",
+   "file": "src/transformers/models/deimv2/modular_deimv2.py",
+   "line": 532
+  },
+  {
+   "state": "self.aifi",
+   "file": "src/transformers/models/deimv2/modular_deimv2.py",
+   "line": 590
+  },
+  {
+   "state": "self.decoder_input_proj",
+   "file": "src/transformers/models/deimv2/modular_deimv2.py",
+   "line": 702
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/deit/modeling_deit.py",
+   "line": 88
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/deit/modular_deit.py",
+   "line": 55
+  },
+  {
+   "state": "name_to_checkpoint",
+   "file": "src/transformers/models/depth_anything/convert_depth_anything_to_hf.py",
+   "line": 184
+  },
+  {
+   "state": "name_to_checkpoint",
+   "file": "src/transformers/models/depth_anything/convert_distill_any_depth_to_hf.py",
+   "line": 141
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/depth_anything/modeling_depth_anything.py",
+   "line": 72
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/depth_anything/modeling_depth_anything.py",
+   "line": 235
+  },
+  {
+   "state": "self.intermediate_hook_ids",
+   "file": "src/transformers/models/depth_pro/modeling_depth_pro.py",
+   "line": 225
+  },
+  {
+   "state": "self.scaled_images_overlap_ratios",
+   "file": "src/transformers/models/depth_pro/modeling_depth_pro.py",
+   "line": 228
+  },
+  {
+   "state": "self.scaled_images",
+   "file": "src/transformers/models/depth_pro/modeling_depth_pro.py",
+   "line": 506
+  },
+  {
+   "state": "self.intermediate",
+   "file": "src/transformers/models/depth_pro/modeling_depth_pro.py",
+   "line": 518
+  },
+  {
+   "state": "shape_mappings",
+   "file": "src/transformers/models/dia/convert_dia_to_hf.py",
+   "line": 37
+  },
+  {
+   "state": "self._added_tokens_decoder",
+   "file": "src/transformers/models/dia/tokenization_dia.py",
+   "line": 57
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/diffllama/modeling_diffllama.py",
+   "line": 427
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/diffusion_gemma/modeling_diffusion_gemma.py",
+   "line": 73
+  },
+  {
+   "state": "self.per_expert_scale",
+   "file": "src/transformers/models/diffusion_gemma/modeling_diffusion_gemma.py",
+   "line": 529
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/diffusion_gemma/modeling_diffusion_gemma.py",
+   "line": 564
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/diffusion_gemma/modeling_diffusion_gemma.py",
+   "line": 565
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/diffusion_gemma/modeling_diffusion_gemma.py",
+   "line": 912
+  },
+  {
+   "state": "self.text_config",
+   "file": "src/transformers/models/diffusion_gemma/modeling_diffusion_gemma.py",
+   "line": 1214
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/diffusion_gemma/modeling_diffusion_gemma.py",
+   "line": 1224
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/diffusion_gemma/modular_diffusion_gemma.py",
+   "line": 759
+  },
+  {
+   "state": "self.text_config",
+   "file": "src/transformers/models/diffusion_gemma/modular_diffusion_gemma.py",
+   "line": 1042
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/diffusion_gemma/modular_diffusion_gemma.py",
+   "line": 1052
+  },
+  {
+   "state": "self.hidden_states_norms",
+   "file": "src/transformers/models/dinat/modeling_dinat.py",
+   "line": 704
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/dinov2/modeling_dinov2.py",
+   "line": 51
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/dinov2_with_registers/modeling_dinov2_with_registers.py",
+   "line": 88
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/dinov2_with_registers/modular_dinov2_with_registers.py",
+   "line": 122
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/doge/modeling_doge.py",
+   "line": 537
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/donut/modeling_donut_swin.py",
+   "line": 153
+  },
+  {
+   "state": "self.relative_position_bias_table",
+   "file": "src/transformers/models/donut/modeling_donut_swin.py",
+   "line": 331
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/dots1/modeling_dots1.py",
+   "line": 331
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/dots1/modeling_dots1.py",
+   "line": 332
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/dots1/modeling_dots1.py",
+   "line": 472
+  },
+  {
+   "state": "name_to_url",
+   "file": "src/transformers/models/dpt/convert_dinov2_depth_to_hf.py",
+   "line": 191
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/dpt/modeling_dpt.py",
+   "line": 476
+  },
+  {
+   "state": "self.readout_projects",
+   "file": "src/transformers/models/dpt/modeling_dpt.py",
+   "line": 500
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/dpt/modeling_dpt.py",
+   "line": 842
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/edgetam/modeling_edgetam.py",
+   "line": 403
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/edgetam/modeling_edgetam.py",
+   "line": 759
+  },
+  {
+   "state": "self._vision_features",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 885
+  },
+  {
+   "state": "self.processed_frames",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 959
+  },
+  {
+   "state": "self._obj_idx_to_id",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 980
+  },
+  {
+   "state": "self.point_inputs_per_obj",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 984
+  },
+  {
+   "state": "self.mask_inputs_per_obj",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 985
+  },
+  {
+   "state": "self.output_dict_per_obj",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 988
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 1824
+  },
+  {
+   "state": "self.memory_temporal_positional_encoding",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 2053
+  },
+  {
+   "state": "self.occlusion_spatial_embedding_parameter",
+   "file": "src/transformers/models/edgetam_video/modeling_edgetam_video.py",
+   "line": 2072
+  },
+  {
+   "state": "self.stage_in_channels",
+   "file": "src/transformers/models/efficientloftr/configuration_efficientloftr.py",
+   "line": 106
+  },
+  {
+   "state": "self.stage_block_out_channels",
+   "file": "src/transformers/models/efficientloftr/configuration_efficientloftr.py",
+   "line": 112
+  },
+  {
+   "state": "model_classes",
+   "file": "src/transformers/models/efficientnet/convert_efficientnet_to_pytorch.py",
+   "line": 43
+  },
+  {
+   "state": "byte_encoder",
+   "file": "src/transformers/models/emu3/convert_emu3_weights_to_hf.py",
+   "line": 58
+  },
+  {
+   "state": "self.up",
+   "file": "src/transformers/models/emu3/modeling_emu3.py",
+   "line": 733
+  },
+  {
+   "state": "self.vocab_map",
+   "file": "src/transformers/models/emu3/modeling_emu3.py",
+   "line": 1058
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/emu3/modeling_emu3.py",
+   "line": 1197
+  },
+  {
+   "state": "self.up",
+   "file": "src/transformers/models/emu3/modular_emu3.py",
+   "line": 490
+  },
+  {
+   "state": "self.vocab_map",
+   "file": "src/transformers/models/emu3/modular_emu3.py",
+   "line": 815
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/encodec/modeling_encodec.py",
+   "line": 414
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/ernie4_5/modeling_ernie4_5.py",
+   "line": 346
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/ernie4_5_moe/modeling_ernie4_5_moe.py",
+   "line": 316
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/ernie4_5_moe/modeling_ernie4_5_moe.py",
+   "line": 317
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/ernie4_5_moe/modeling_ernie4_5_moe.py",
+   "line": 496
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/ernie4_5_moe/modular_ernie4_5_moe.py",
+   "line": 216
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/ernie4_5_vl_moe/modeling_ernie4_5_vl_moe.py",
+   "line": 377
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/ernie4_5_vl_moe/modeling_ernie4_5_vl_moe.py",
+   "line": 378
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/ernie4_5_vl_moe/modeling_ernie4_5_vl_moe.py",
+   "line": 729
+  },
+  {
+   "state": "self.v_bins",
+   "file": "src/transformers/models/esm/modeling_esmfold.py",
+   "line": 1207
+  },
+  {
+   "state": "self.af2_to_esm",
+   "file": "src/transformers/models/esm/modeling_esmfold.py",
+   "line": 2180
+  },
+  {
+   "state": "chi_angles_atoms",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 36
+  },
+  {
+   "state": "chi_angles_mask",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 62
+  },
+  {
+   "state": "rigid_group_atom_positions",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 123
+  },
+  {
+   "state": "residue_atoms",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 335
+  },
+  {
+   "state": "van_der_waals_radius",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 373
+  },
+  {
+   "state": "atom_order",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 395
+  },
+  {
+   "state": "restype_name_to_atom14_names",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 544
+  },
+  {
+   "state": "restype_order",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 594
+  },
+  {
+   "state": "restype_1to3",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 642
+  },
+  {
+   "state": "restype_3to1",
+   "file": "src/transformers/models/esm/openfold_utils/residue_constants.py",
+   "line": 670
+  },
+  {
+   "state": "_qtr_ind_dict",
+   "file": "src/transformers/models/esm/openfold_utils/rigid_utils.py",
+   "line": 121
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/eurobert/modeling_eurobert.py",
+   "line": 348
+  },
+  {
+   "state": "self.fullatt_block_indexes",
+   "file": "src/transformers/models/exaone4_5/modeling_exaone4_5.py",
+   "line": 501
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/exaone_moe/modeling_exaone_moe.py",
+   "line": 277
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/exaone_moe/modeling_exaone_moe.py",
+   "line": 278
+  },
+  {
+   "state": "self.resblocks",
+   "file": "src/transformers/models/fastspeech2_conformer/modeling_fastspeech2_conformer.py",
+   "line": 1390
+  },
+  {
+   "state": "self.attentions",
+   "file": "src/transformers/models/flaubert/modeling_flaubert.py",
+   "line": 733
+  },
+  {
+   "state": "self.layer_norm1",
+   "file": "src/transformers/models/flaubert/modeling_flaubert.py",
+   "line": 734
+  },
+  {
+   "state": "self.ffns",
+   "file": "src/transformers/models/flaubert/modeling_flaubert.py",
+   "line": 735
+  },
+  {
+   "state": "self.layer_norm2",
+   "file": "src/transformers/models/flaubert/modeling_flaubert.py",
+   "line": 736
+  },
+  {
+   "state": "self.cache_moses_punct_normalizer",
+   "file": "src/transformers/models/flaubert/tokenization_flaubert.py",
+   "line": 225
+  },
+  {
+   "state": "self.cache_moses_tokenizer",
+   "file": "src/transformers/models/flaubert/tokenization_flaubert.py",
+   "line": 227
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/flaubert/tokenization_flaubert.py",
+   "line": 244
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/flava/modeling_flava.py",
+   "line": 252
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/flex_olmo/modeling_flex_olmo.py",
+   "line": 313
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/flex_olmo/modeling_flex_olmo.py",
+   "line": 314
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/flex_olmo/modeling_flex_olmo.py",
+   "line": 438
+  },
+  {
+   "state": "self.parse_task_config",
+   "file": "src/transformers/models/florence2/modular_florence2.py",
+   "line": 424
+  },
+  {
+   "state": "self.banned_grounding_tokens",
+   "file": "src/transformers/models/florence2/modular_florence2.py",
+   "line": 425
+  },
+  {
+   "state": "self.all_special_tokens",
+   "file": "src/transformers/models/florence2/modular_florence2.py",
+   "line": 428
+  },
+  {
+   "state": "self.parse_task_config",
+   "file": "src/transformers/models/florence2/processing_florence2.py",
+   "line": 300
+  },
+  {
+   "state": "self.banned_grounding_tokens",
+   "file": "src/transformers/models/florence2/processing_florence2.py",
+   "line": 301
+  },
+  {
+   "state": "self.all_special_tokens",
+   "file": "src/transformers/models/florence2/processing_florence2.py",
+   "line": 304
+  },
+  {
+   "state": "self.focal_layers",
+   "file": "src/transformers/models/focalnet/modeling_focalnet.py",
+   "line": 262
+  },
+  {
+   "state": "best_score_hparams",
+   "file": "src/transformers/models/fsmt/convert_fsmt_original_pytorch_checkpoint_to_pytorch.py",
+   "line": 49
+  },
+  {
+   "state": "self.cache_moses_punct_normalizer",
+   "file": "src/transformers/models/fsmt/tokenization_fsmt.py",
+   "line": 190
+  },
+  {
+   "state": "self.cache_moses_tokenizer",
+   "file": "src/transformers/models/fsmt/tokenization_fsmt.py",
+   "line": 192
+  },
+  {
+   "state": "self.cache_moses_detokenizer",
+   "file": "src/transformers/models/fsmt/tokenization_fsmt.py",
+   "line": 193
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/fsmt/tokenization_fsmt.py",
+   "line": 213
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/funnel/modeling_funnel.py",
+   "line": 522
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma/modeling_gemma.py",
+   "line": 378
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma2/modeling_gemma2.py",
+   "line": 392
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma2/modular_gemma2.py",
+   "line": 325
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/gemma3/modeling_gemma3.py",
+   "line": 166
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma3/modeling_gemma3.py",
+   "line": 505
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/gemma3/modular_gemma3.py",
+   "line": 267
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/gemma3n/modeling_gemma3n.py",
+   "line": 677
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/gemma3n/modeling_gemma3n.py",
+   "line": 1547
+  },
+  {
+   "state": "self.altup_projections",
+   "file": "src/transformers/models/gemma3n/modeling_gemma3n.py",
+   "line": 1651
+  },
+  {
+   "state": "self.altup_unembed_projections",
+   "file": "src/transformers/models/gemma3n/modeling_gemma3n.py",
+   "line": 1655
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/gemma3n/modular_gemma3n.py",
+   "line": 1039
+  },
+  {
+   "state": "self.altup_projections",
+   "file": "src/transformers/models/gemma3n/modular_gemma3n.py",
+   "line": 1851
+  },
+  {
+   "state": "self.altup_unembed_projections",
+   "file": "src/transformers/models/gemma3n/modular_gemma3n.py",
+   "line": 1855
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma4/modeling_gemma4.py",
+   "line": 1029
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/gemma4/modeling_gemma4.py",
+   "line": 1095
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/gemma4/modeling_gemma4.py",
+   "line": 1295
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/gemma4/modeling_gemma4.py",
+   "line": 1296
+  },
+  {
+   "state": "self.per_expert_scale",
+   "file": "src/transformers/models/gemma4/modeling_gemma4.py",
+   "line": 1337
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma4/modeling_gemma4.py",
+   "line": 1933
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma4/modular_gemma4.py",
+   "line": 941
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/gemma4/modular_gemma4.py",
+   "line": 997
+  },
+  {
+   "state": "self.per_expert_scale",
+   "file": "src/transformers/models/gemma4/modular_gemma4.py",
+   "line": 1159
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma4/modular_gemma4.py",
+   "line": 1649
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/gemma4_unified/modeling_gemma4_unified.py",
+   "line": 205
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/gemma4_unified/modeling_gemma4_unified.py",
+   "line": 606
+  },
+  {
+   "state": "self.img_temporal_embedding",
+   "file": "src/transformers/models/git/modeling_git.py",
+   "line": 726
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/glm/modeling_glm.py",
+   "line": 367
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/glm4/modeling_glm4.py",
+   "line": 371
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/glm4_moe/modeling_glm4_moe.py",
+   "line": 352
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/glm4_moe/modeling_glm4_moe.py",
+   "line": 353
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/glm4_moe/modeling_glm4_moe.py",
+   "line": 493
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/glm4_moe_lite/modeling_glm4_moe_lite.py",
+   "line": 446
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/glm4_moe_lite/modeling_glm4_moe_lite.py",
+   "line": 447
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/glm4_moe_lite/modeling_glm4_moe_lite.py",
+   "line": 586
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/glm4v_moe/modeling_glm4v_moe.py",
+   "line": 263
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/glm4v_moe/modeling_glm4v_moe.py",
+   "line": 264
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/glm4v_moe/modeling_glm4v_moe.py",
+   "line": 927
+  },
+  {
+   "state": "self._cached_decode_position_ids",
+   "file": "src/transformers/models/glm_image/modeling_glm_image.py",
+   "line": 911
+  },
+  {
+   "state": "self._cached_decode_position_ids",
+   "file": "src/transformers/models/glm_image/modular_glm_image.py",
+   "line": 499
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/glm_moe_dsa/modeling_glm_moe_dsa.py",
+   "line": 539
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/glm_moe_dsa/modeling_glm_moe_dsa.py",
+   "line": 540
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/glm_moe_dsa/modeling_glm_moe_dsa.py",
+   "line": 681
+  },
+  {
+   "state": "self.attention_layers",
+   "file": "src/transformers/models/gpt_neo/modeling_gpt_neo.py",
+   "line": 264
+  },
+  {
+   "state": "self.vocab",
+   "file": "src/transformers/models/gpt_neox_japanese/tokenization_gpt_neox_japanese.py",
+   "line": 220
+  },
+  {
+   "state": "self.ids_to_tokens",
+   "file": "src/transformers/models/gpt_neox_japanese/tokenization_gpt_neox_japanese.py",
+   "line": 221
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/gpt_oss/modeling_gpt_oss.py",
+   "line": 75
+  },
+  {
+   "state": "self.gate_up_proj_bias",
+   "file": "src/transformers/models/gpt_oss/modeling_gpt_oss.py",
+   "line": 76
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/gpt_oss/modeling_gpt_oss.py",
+   "line": 77
+  },
+  {
+   "state": "self.down_proj_bias",
+   "file": "src/transformers/models/gpt_oss/modeling_gpt_oss.py",
+   "line": 78
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/gpt_oss/modular_gpt_oss.py",
+   "line": 72
+  },
+  {
+   "state": "self.gate_up_proj_bias",
+   "file": "src/transformers/models/gpt_oss/modular_gpt_oss.py",
+   "line": 73
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/gpt_oss/modular_gpt_oss.py",
+   "line": 74
+  },
+  {
+   "state": "self.down_proj_bias",
+   "file": "src/transformers/models/gpt_oss/modular_gpt_oss.py",
+   "line": 75
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granite/modeling_granite.py",
+   "line": 369
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granite/modular_granite.py",
+   "line": 117
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granite4_vision/modeling_granite4_vision.py",
+   "line": 557
+  },
+  {
+   "state": "self.layerwise_projectors",
+   "file": "src/transformers/models/granite4_vision/modeling_granite4_vision.py",
+   "line": 772
+  },
+  {
+   "state": "self.spatial_projectors",
+   "file": "src/transformers/models/granite4_vision/modeling_granite4_vision.py",
+   "line": 777
+  },
+  {
+   "state": "self.layerwise_projectors",
+   "file": "src/transformers/models/granite4_vision/modular_granite4_vision.py",
+   "line": 476
+  },
+  {
+   "state": "self.spatial_projectors",
+   "file": "src/transformers/models/granite4_vision/modular_granite4_vision.py",
+   "line": 481
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granite_swa/modeling_granite_swa.py",
+   "line": 393
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granite_swa/modular_granite_swa.py",
+   "line": 246
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/granitemoe/modeling_granitemoe.py",
+   "line": 157
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/granitemoe/modeling_granitemoe.py",
+   "line": 158
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granitemoe/modeling_granitemoe.py",
+   "line": 413
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granitemoe/modular_granitemoe.py",
+   "line": 159
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/granitemoe_swa/modeling_granitemoe_swa.py",
+   "line": 80
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/granitemoe_swa/modeling_granitemoe_swa.py",
+   "line": 81
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granitemoe_swa/modeling_granitemoe_swa.py",
+   "line": 504
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granitemoe_swa/modular_granitemoe_swa.py",
+   "line": 180
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/granitemoehybrid/modeling_granitemoehybrid.py",
+   "line": 873
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/granitemoehybrid/modeling_granitemoehybrid.py",
+   "line": 874
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/granitemoeshared/modeling_granitemoeshared.py",
+   "line": 148
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/granitemoeshared/modeling_granitemoeshared.py",
+   "line": 149
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/granitemoeshared/modeling_granitemoeshared.py",
+   "line": 481
+  },
+  {
+   "state": "self.input_proj_vision",
+   "file": "src/transformers/models/grounding_dino/modeling_grounding_dino.py",
+   "line": 1894
+  },
+  {
+   "state": "self.level_embed",
+   "file": "src/transformers/models/grounding_dino/modeling_grounding_dino.py",
+   "line": 1915
+  },
+  {
+   "state": "self.bbox_embed",
+   "file": "src/transformers/models/grounding_dino/modeling_grounding_dino.py",
+   "line": 2398
+  },
+  {
+   "state": "self.class_embed",
+   "file": "src/transformers/models/grounding_dino/modeling_grounding_dino.py",
+   "line": 2410
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/helium/modeling_helium.py",
+   "line": 349
+  },
+  {
+   "state": "self.schedule",
+   "file": "src/transformers/models/hiera/modeling_hiera.py",
+   "line": 593
+  },
+  {
+   "state": "self.stage_dimensions",
+   "file": "src/transformers/models/hiera/modeling_hiera.py",
+   "line": 999
+  },
+  {
+   "state": "self.hidden_states_norms",
+   "file": "src/transformers/models/hiera/modeling_hiera.py",
+   "line": 1293
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/higgs_audio_v2/modeling_higgs_audio_v2.py",
+   "line": 404
+  },
+  {
+   "state": "self.quantizers",
+   "file": "src/transformers/models/higgs_audio_v2_tokenizer/modeling_higgs_audio_v2_tokenizer.py",
+   "line": 409
+  },
+  {
+   "state": "self.L_bp_cycles_padded",
+   "file": "src/transformers/models/hrm_text/modeling_hrm_text.py",
+   "line": 431
+  },
+  {
+   "state": "self.L_bp_cycles_padded",
+   "file": "src/transformers/models/hrm_text/modular_hrm_text.py",
+   "line": 297
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/hunyuan_v1_dense/modeling_hunyuan_v1_dense.py",
+   "line": 392
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/hunyuan_v1_moe/modeling_hunyuan_v1_moe.py",
+   "line": 253
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/hunyuan_v1_moe/modeling_hunyuan_v1_moe.py",
+   "line": 254
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/hunyuan_v1_moe/modeling_hunyuan_v1_moe.py",
+   "line": 469
+  },
+  {
+   "state": "self.position_embedding",
+   "file": "src/transformers/models/hunyuan_vl/modeling_hunyuan_vl.py",
+   "line": 191
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/hunyuan_vl/modeling_hunyuan_vl.py",
+   "line": 772
+  },
+  {
+   "state": "self.position_embedding",
+   "file": "src/transformers/models/hunyuan_vl/modular_hunyuan_vl.py",
+   "line": 641
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/hunyuan_vl/modular_hunyuan_vl.py",
+   "line": 981
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/hy_v3/modeling_hy_v3.py",
+   "line": 321
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/hy_v3/modeling_hy_v3.py",
+   "line": 322
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/hy_v3/modeling_hy_v3.py",
+   "line": 465
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/hyperclovax/modeling_hyperclovax.py",
+   "line": 378
+  },
+  {
+   "state": "self.gated_cross_attn_layers",
+   "file": "src/transformers/models/idefics/modeling_idefics.py",
+   "line": 902
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/inkling/modeling_inkling.py",
+   "line": 306
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/inkling/modeling_inkling.py",
+   "line": 307
+  },
+  {
+   "state": "self.scales",
+   "file": "src/transformers/models/inkling/modeling_inkling.py",
+   "line": 948
+  },
+  {
+   "state": "self.scales",
+   "file": "src/transformers/models/inkling/modular_inkling.py",
+   "line": 1026
+  },
+  {
+   "state": "self.text_config",
+   "file": "src/transformers/models/instructblip/configuration_instructblip.py",
+   "line": 162
+  },
+  {
+   "state": "self.position_embedding",
+   "file": "src/transformers/models/instructblip/modeling_instructblip.py",
+   "line": 118
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/instructblip/modeling_instructblip.py",
+   "line": 680
+  },
+  {
+   "state": "self.text_config",
+   "file": "src/transformers/models/instructblipvideo/configuration_instructblipvideo.py",
+   "line": 167
+  },
+  {
+   "state": "self.position_embedding",
+   "file": "src/transformers/models/instructblipvideo/modeling_instructblipvideo.py",
+   "line": 76
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/instructblipvideo/modeling_instructblipvideo.py",
+   "line": 679
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/internvl/modeling_internvl.py",
+   "line": 240
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/internvl/modular_internvl.py",
+   "line": 205
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/jais2/modeling_jais2.py",
+   "line": 325
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/jamba/modeling_jamba.py",
+   "line": 554
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/jamba/modeling_jamba.py",
+   "line": 555
+  },
+  {
+   "state": "self.down",
+   "file": "src/transformers/models/janus/modeling_janus.py",
+   "line": 696
+  },
+  {
+   "state": "self.up",
+   "file": "src/transformers/models/janus/modeling_janus.py",
+   "line": 777
+  },
+  {
+   "state": "self.down",
+   "file": "src/transformers/models/janus/modular_janus.py",
+   "line": 510
+  },
+  {
+   "state": "self.up",
+   "file": "src/transformers/models/janus/modular_janus.py",
+   "line": 591
+  },
+  {
+   "state": "self.weight",
+   "file": "src/transformers/models/jetmoe/modeling_jetmoe.py",
+   "line": 147
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/jetmoe/modeling_jetmoe.py",
+   "line": 591
+  },
+  {
+   "state": "self.weight",
+   "file": "src/transformers/models/jetmoe/modular_jetmoe.py",
+   "line": 79
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/jetmoe/modular_jetmoe.py",
+   "line": 451
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/jina_embeddings_v3/modeling_jina_embeddings_v3.py",
+   "line": 382
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/jina_embeddings_v3/modular_jina_embeddings_v3.py",
+   "line": 249
+  },
+  {
+   "state": "self.per_layer_padding",
+   "file": "src/transformers/models/kyutai_speech_to_text/modeling_kyutai_speech_to_text.py",
+   "line": 137
+  },
+  {
+   "state": "self.per_layer_padding_mode",
+   "file": "src/transformers/models/kyutai_speech_to_text/modeling_kyutai_speech_to_text.py",
+   "line": 138
+  },
+  {
+   "state": "self.per_layer_in_channels",
+   "file": "src/transformers/models/kyutai_speech_to_text/modeling_kyutai_speech_to_text.py",
+   "line": 139
+  },
+  {
+   "state": "self.padding_cache",
+   "file": "src/transformers/models/kyutai_speech_to_text/modeling_kyutai_speech_to_text.py",
+   "line": 141
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/laguna/modeling_laguna.py",
+   "line": 77
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/laguna/modeling_laguna.py",
+   "line": 199
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/laguna/modeling_laguna.py",
+   "line": 200
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/laguna/modeling_laguna.py",
+   "line": 516
+  },
+  {
+   "state": "self.embeddings",
+   "file": "src/transformers/models/layoutlmv2/modeling_layoutlmv2.py",
+   "line": 567
+  },
+  {
+   "state": "self.attention_bias_cache",
+   "file": "src/transformers/models/levit/modeling_levit.py",
+   "line": 177
+  },
+  {
+   "state": "self.attention_biases",
+   "file": "src/transformers/models/levit/modeling_levit.py",
+   "line": 178
+  },
+  {
+   "state": "self.attention_bias_cache",
+   "file": "src/transformers/models/levit/modeling_levit.py",
+   "line": 242
+  },
+  {
+   "state": "self.attention_biases",
+   "file": "src/transformers/models/levit/modeling_levit.py",
+   "line": 259
+  },
+  {
+   "state": "self.full_attn_idxs",
+   "file": "src/transformers/models/lfm2/configuration_lfm2.py",
+   "line": 83
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/lfm2/modeling_lfm2.py",
+   "line": 465
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/lfm2_moe/modeling_lfm2_moe.py",
+   "line": 145
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/lfm2_moe/modeling_lfm2_moe.py",
+   "line": 146
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/lfm2_moe/modeling_lfm2_moe.py",
+   "line": 561
+  },
+  {
+   "state": "self.transformer_layers",
+   "file": "src/transformers/models/lightglue/modeling_lightglue.py",
+   "line": 520
+  },
+  {
+   "state": "self.match_assignment_layers",
+   "file": "src/transformers/models/lightglue/modeling_lightglue.py",
+   "line": 523
+  },
+  {
+   "state": "self.token_confidence",
+   "file": "src/transformers/models/lightglue/modeling_lightglue.py",
+   "line": 526
+  },
+  {
+   "state": "self.transformer_layers",
+   "file": "src/transformers/models/lightglue/modular_lightglue.py",
+   "line": 526
+  },
+  {
+   "state": "self.match_assignment_layers",
+   "file": "src/transformers/models/lightglue/modular_lightglue.py",
+   "line": 529
+  },
+  {
+   "state": "self.token_confidence",
+   "file": "src/transformers/models/lightglue/modular_lightglue.py",
+   "line": 532
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/llama/modeling_llama.py",
+   "line": 356
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/llama4/modeling_llama4.py",
+   "line": 502
+  },
+  {
+   "state": "model2template",
+   "file": "src/transformers/models/llava_next_video/convert_llava_next_video_weights_to_hf.py",
+   "line": 117
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/longcat_flash/modeling_longcat_flash.py",
+   "line": 185
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/longcat_flash/modeling_longcat_flash.py",
+   "line": 188
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/longcat_flash/modeling_longcat_flash.py",
+   "line": 584
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/longcat_flash/modular_longcat_flash.py",
+   "line": 98
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/longcat_flash/modular_longcat_flash.py",
+   "line": 101
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/longcat_flash/modular_longcat_flash.py",
+   "line": 348
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/longt5/modeling_longt5.py",
+   "line": 1083
+  },
+  {
+   "state": "self.entity_vocab",
+   "file": "src/transformers/models/luke/tokenization_luke.py",
+   "line": 285
+  },
+  {
+   "state": "self.reference_point_embed",
+   "file": "src/transformers/models/lw_detr/modeling_lw_detr.py",
+   "line": 1210
+  },
+  {
+   "state": "self.query_feat",
+   "file": "src/transformers/models/lw_detr/modeling_lw_detr.py",
+   "line": 1211
+  },
+  {
+   "state": "self.enc_output",
+   "file": "src/transformers/models/lw_detr/modeling_lw_detr.py",
+   "line": 1215
+  },
+  {
+   "state": "self.enc_output_norm",
+   "file": "src/transformers/models/lw_detr/modeling_lw_detr.py",
+   "line": 1216
+  },
+  {
+   "state": "self.enc_out_bbox_embed",
+   "file": "src/transformers/models/lw_detr/modeling_lw_detr.py",
+   "line": 1218
+  },
+  {
+   "state": "self.enc_out_class_embed",
+   "file": "src/transformers/models/lw_detr/modeling_lw_detr.py",
+   "line": 1221
+  },
+  {
+   "state": "self.reference_point_embed",
+   "file": "src/transformers/models/lw_detr/modular_lw_detr.py",
+   "line": 971
+  },
+  {
+   "state": "self.query_feat",
+   "file": "src/transformers/models/lw_detr/modular_lw_detr.py",
+   "line": 972
+  },
+  {
+   "state": "self.enc_output",
+   "file": "src/transformers/models/lw_detr/modular_lw_detr.py",
+   "line": 976
+  },
+  {
+   "state": "self.enc_output_norm",
+   "file": "src/transformers/models/lw_detr/modular_lw_detr.py",
+   "line": 977
+  },
+  {
+   "state": "self.enc_out_bbox_embed",
+   "file": "src/transformers/models/lw_detr/modular_lw_detr.py",
+   "line": 979
+  },
+  {
+   "state": "self.enc_out_class_embed",
+   "file": "src/transformers/models/lw_detr/modular_lw_detr.py",
+   "line": 982
+  },
+  {
+   "state": "self.visual_losses",
+   "file": "src/transformers/models/lxmert/modeling_lxmert.py",
+   "line": 632
+  },
+  {
+   "state": "self.decoder_dict",
+   "file": "src/transformers/models/lxmert/modeling_lxmert.py",
+   "line": 636
+  },
+  {
+   "state": "self.loss_fcts",
+   "file": "src/transformers/models/lxmert/modeling_lxmert.py",
+   "line": 860
+  },
+  {
+   "state": "self.lang_code_to_token",
+   "file": "src/transformers/models/m2m_100/tokenization_m2m_100.py",
+   "line": 134
+  },
+  {
+   "state": "self.lang_token_to_id",
+   "file": "src/transformers/models/m2m_100/tokenization_m2m_100.py",
+   "line": 150
+  },
+  {
+   "state": "self.id_to_lang_token",
+   "file": "src/transformers/models/m2m_100/tokenization_m2m_100.py",
+   "line": 154
+  },
+  {
+   "state": "self.model_results",
+   "file": "src/transformers/models/marian/convert_marian_tatoeba_to_pytorch.py",
+   "line": 59
+  },
+  {
+   "state": "self.tag2name",
+   "file": "src/transformers/models/marian/convert_marian_tatoeba_to_pytorch.py",
+   "line": 70
+  },
+  {
+   "state": "self.decoder",
+   "file": "src/transformers/models/marian/tokenization_marian.py",
+   "line": 134
+  },
+  {
+   "state": "self.current_encoder",
+   "file": "src/transformers/models/marian/tokenization_marian.py",
+   "line": 148
+  },
+  {
+   "state": "self.xpath_tag_sub_embeddings",
+   "file": "src/transformers/models/markuplm/modeling_markuplm.py",
+   "line": 63
+  },
+  {
+   "state": "self.xpath_subs_sub_embeddings",
+   "file": "src/transformers/models/markuplm/modeling_markuplm.py",
+   "line": 70
+  },
+  {
+   "state": "self.to_track",
+   "file": "src/transformers/models/mask2former/convert_mask2former_original_pytorch_checkpoint_to_pytorch.py",
+   "line": 63
+  },
+  {
+   "state": "self.feature_channels",
+   "file": "src/transformers/models/mask2former/modeling_mask2former.py",
+   "line": 1253
+  },
+  {
+   "state": "self.level_embed",
+   "file": "src/transformers/models/mask2former/modeling_mask2former.py",
+   "line": 1254
+  },
+  {
+   "state": "self.input_projections",
+   "file": "src/transformers/models/mask2former/modeling_mask2former.py",
+   "line": 1266
+  },
+  {
+   "state": "self.lateral_convolutions",
+   "file": "src/transformers/models/mask2former/modeling_mask2former.py",
+   "line": 1306
+  },
+  {
+   "state": "self.output_convolutions",
+   "file": "src/transformers/models/mask2former/modeling_mask2former.py",
+   "line": 1307
+  },
+  {
+   "state": "self.input_projections",
+   "file": "src/transformers/models/mask2former/modeling_mask2former.py",
+   "line": 2073
+  },
+  {
+   "state": "self.level_embed",
+   "file": "src/transformers/models/mask2former/modeling_mask2former.py",
+   "line": 2082
+  },
+  {
+   "state": "self.to_track",
+   "file": "src/transformers/models/maskformer/convert_maskformer_original_pytorch_checkpoint_to_pytorch.py",
+   "line": 59
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/maskformer/modeling_maskformer_swin.py",
+   "line": 117
+  },
+  {
+   "state": "self.relative_position_bias_table",
+   "file": "src/transformers/models/maskformer/modeling_maskformer_swin.py",
+   "line": 282
+  },
+  {
+   "state": "self.num_features",
+   "file": "src/transformers/models/maskformer/modeling_maskformer_swin.py",
+   "line": 782
+  },
+  {
+   "state": "self.hidden_states_norms",
+   "file": "src/transformers/models/maskformer/modeling_maskformer_swin.py",
+   "line": 783
+  },
+  {
+   "state": "megatron_to_transformers",
+   "file": "src/transformers/models/megatron_gpt2/checkpoint_reshaping_and_interoperability.py",
+   "line": 142
+  },
+  {
+   "state": "tensor_parallel_params",
+   "file": "src/transformers/models/megatron_gpt2/checkpoint_reshaping_and_interoperability.py",
+   "line": 150
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/mellum/modeling_mellum.py",
+   "line": 56
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/mellum/modeling_mellum.py",
+   "line": 294
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/mellum/modeling_mellum.py",
+   "line": 295
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/mellum/modeling_mellum.py",
+   "line": 466
+  },
+  {
+   "state": "self.per_layer_padding",
+   "file": "src/transformers/models/mimi/modeling_mimi.py",
+   "line": 97
+  },
+  {
+   "state": "self.per_layer_padding_mode",
+   "file": "src/transformers/models/mimi/modeling_mimi.py",
+   "line": 98
+  },
+  {
+   "state": "self.per_layer_in_channels",
+   "file": "src/transformers/models/mimi/modeling_mimi.py",
+   "line": 99
+  },
+  {
+   "state": "self.padding_cache",
+   "file": "src/transformers/models/mimi/modeling_mimi.py",
+   "line": 101
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/mimi/modeling_mimi.py",
+   "line": 1040
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/mimo_v2_flash/modeling_mimo_v2_flash.py",
+   "line": 77
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/mimo_v2_flash/modeling_mimo_v2_flash.py",
+   "line": 192
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/mimo_v2_flash/modeling_mimo_v2_flash.py",
+   "line": 193
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/mimo_v2_flash/modeling_mimo_v2_flash.py",
+   "line": 518
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/minicpm3/modeling_minicpm3.py",
+   "line": 442
+  },
+  {
+   "state": "self.mlp",
+   "file": "src/transformers/models/minicpmv4_6/modeling_minicpmv4_6.py",
+   "line": 527
+  },
+  {
+   "state": "self.mlp",
+   "file": "src/transformers/models/minicpmv4_6/modular_minicpmv4_6.py",
+   "line": 481
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/minimax/modeling_minimax.py",
+   "line": 479
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/minimax/modeling_minimax.py",
+   "line": 480
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/minimax_m2/modeling_minimax_m2.py",
+   "line": 76
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/minimax_m2/modeling_minimax_m2.py",
+   "line": 77
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/minimax_m2/modeling_minimax_m2.py",
+   "line": 431
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/minimax_m3_vl/modeling_minimax_m3_vl.py",
+   "line": 187
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/minimax_m3_vl/modeling_minimax_m3_vl.py",
+   "line": 188
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/minimax_m3_vl/modeling_minimax_m3_vl.py",
+   "line": 723
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/minimax_m3_vl/modular_minimax_m3_vl.py",
+   "line": 651
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/ministral/modeling_ministral.py",
+   "line": 346
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/ministral3/modeling_ministral3.py",
+   "line": 340
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/mistral/modeling_mistral.py",
+   "line": 329
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/mistral4/modeling_mistral4.py",
+   "line": 192
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/mistral4/modeling_mistral4.py",
+   "line": 193
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/mistral4/modeling_mistral4.py",
+   "line": 582
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/mixtral/modeling_mixtral.py",
+   "line": 65
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/mixtral/modeling_mixtral.py",
+   "line": 66
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/mixtral/modeling_mixtral.py",
+   "line": 419
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/mixtral/modular_mixtral.py",
+   "line": 144
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/mixtral/modular_mixtral.py",
+   "line": 145
+  },
+  {
+   "state": "self.cross_attention_layers",
+   "file": "src/transformers/models/mllama/modeling_mllama.py",
+   "line": 1025
+  },
+  {
+   "state": "self.fairseq_tokens_to_ids",
+   "file": "src/transformers/models/mluke/tokenization_mluke.py",
+   "line": 296
+  },
+  {
+   "state": "self.fairseq_ids_to_tokens",
+   "file": "src/transformers/models/mluke/tokenization_mluke.py",
+   "line": 302
+  },
+  {
+   "state": "self.input_proj_vision",
+   "file": "src/transformers/models/mm_grounding_dino/modeling_mm_grounding_dino.py",
+   "line": 1811
+  },
+  {
+   "state": "self.level_embed",
+   "file": "src/transformers/models/mm_grounding_dino/modeling_mm_grounding_dino.py",
+   "line": 1823
+  },
+  {
+   "state": "self.class_embed",
+   "file": "src/transformers/models/mm_grounding_dino/modeling_mm_grounding_dino.py",
+   "line": 2372
+  },
+  {
+   "state": "self.bbox_embed",
+   "file": "src/transformers/models/mm_grounding_dino/modeling_mm_grounding_dino.py",
+   "line": 2376
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/modernbert/modeling_modernbert.py",
+   "line": 104
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/modernbert_decoder/modeling_modernbert_decoder.py",
+   "line": 101
+  },
+  {
+   "state": "self.embed_tokens",
+   "file": "src/transformers/models/moshi/modeling_moshi.py",
+   "line": 607
+  },
+  {
+   "state": "self.embed_tokens",
+   "file": "src/transformers/models/moshi/modeling_moshi.py",
+   "line": 1046
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/mt5/modeling_mt5.py",
+   "line": 448
+  },
+  {
+   "state": "self.embed_tokens",
+   "file": "src/transformers/models/musicgen/modeling_musicgen.py",
+   "line": 425
+  },
+  {
+   "state": "self.embed_tokens",
+   "file": "src/transformers/models/musicgen_melody/modeling_musicgen_melody.py",
+   "line": 404
+  },
+  {
+   "state": "self._added_tokens_decoder",
+   "file": "src/transformers/models/myt5/tokenization_myt5.py",
+   "line": 190
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/nanochat/modeling_nanochat.py",
+   "line": 359
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/nemotron_asr_streaming/modeling_nemotron_asr_streaming.py",
+   "line": 154
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/nemotron_asr_streaming/modeling_nemotron_asr_streaming.py",
+   "line": 218
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/nemotron_asr_streaming/modular_nemotron_asr_streaming.py",
+   "line": 392
+  },
+  {
+   "state": "self.up_proj",
+   "file": "src/transformers/models/nemotron_h/modeling_nemotron_h.py",
+   "line": 662
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/nemotron_h/modeling_nemotron_h.py",
+   "line": 664
+  },
+  {
+   "state": "self.up_proj",
+   "file": "src/transformers/models/nemotron_h/modular_nemotron_h.py",
+   "line": 136
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/nemotron_h/modular_nemotron_h.py",
+   "line": 138
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/nomic_bert/modeling_nomic_bert.py",
+   "line": 399
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/olmo/modeling_olmo.py",
+   "line": 351
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/olmo2/modeling_olmo2.py",
+   "line": 355
+  },
+  {
+   "state": "self.storage_data",
+   "file": "src/transformers/models/olmo3/convert_olmo3_weights_to_hf.py",
+   "line": 144
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/olmo3/modeling_olmo3.py",
+   "line": 280
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/olmo3/modeling_olmo3.py",
+   "line": 382
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/olmo3/modular_olmo3.py",
+   "line": 236
+  },
+  {
+   "state": "self.storage_data",
+   "file": "src/transformers/models/olmo_hybrid/convert_olmo_hybrid_weights_to_hf.py",
+   "line": 167
+  },
+  {
+   "state": "self.layer_types",
+   "file": "src/transformers/models/olmo_hybrid/modeling_olmo_hybrid.py",
+   "line": 72
+  },
+  {
+   "state": "self.recurrent_states",
+   "file": "src/transformers/models/olmo_hybrid/modeling_olmo_hybrid.py",
+   "line": 77
+  },
+  {
+   "state": "self.value_cache",
+   "file": "src/transformers/models/olmo_hybrid/modeling_olmo_hybrid.py",
+   "line": 79
+  },
+  {
+   "state": "self.conv_states_q",
+   "file": "src/transformers/models/olmo_hybrid/modeling_olmo_hybrid.py",
+   "line": 81
+  },
+  {
+   "state": "self.conv_states_k",
+   "file": "src/transformers/models/olmo_hybrid/modeling_olmo_hybrid.py",
+   "line": 82
+  },
+  {
+   "state": "self.conv_states_v",
+   "file": "src/transformers/models/olmo_hybrid/modeling_olmo_hybrid.py",
+   "line": 83
+  },
+  {
+   "state": "self.layer_types",
+   "file": "src/transformers/models/olmo_hybrid/modular_olmo_hybrid.py",
+   "line": 204
+  },
+  {
+   "state": "self.recurrent_states",
+   "file": "src/transformers/models/olmo_hybrid/modular_olmo_hybrid.py",
+   "line": 209
+  },
+  {
+   "state": "self.value_cache",
+   "file": "src/transformers/models/olmo_hybrid/modular_olmo_hybrid.py",
+   "line": 211
+  },
+  {
+   "state": "self.conv_states_q",
+   "file": "src/transformers/models/olmo_hybrid/modular_olmo_hybrid.py",
+   "line": 213
+  },
+  {
+   "state": "self.conv_states_k",
+   "file": "src/transformers/models/olmo_hybrid/modular_olmo_hybrid.py",
+   "line": 214
+  },
+  {
+   "state": "self.conv_states_v",
+   "file": "src/transformers/models/olmo_hybrid/modular_olmo_hybrid.py",
+   "line": 215
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/olmoe/modeling_olmoe.py",
+   "line": 299
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/olmoe/modeling_olmoe.py",
+   "line": 300
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/olmoe/modeling_olmoe.py",
+   "line": 442
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/olmoe/modular_olmoe.py",
+   "line": 182
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 220
+  },
+  {
+   "state": "self.channel_projection_layers",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 661
+  },
+  {
+   "state": "self.encoder",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 671
+  },
+  {
+   "state": "self.lateral_convs",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 673
+  },
+  {
+   "state": "self.fpn_blocks",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 674
+  },
+  {
+   "state": "self.downsample_convs",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 689
+  },
+  {
+   "state": "self.pan_blocks",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 690
+  },
+  {
+   "state": "self.channel_projection_layers",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 1162
+  },
+  {
+   "state": "self.decoder_class_head",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 1190
+  },
+  {
+   "state": "self.decoder_bbox_head",
+   "file": "src/transformers/models/omdet_turbo/modeling_omdet_turbo.py",
+   "line": 1193
+  },
+  {
+   "state": "self.to_track",
+   "file": "src/transformers/models/oneformer/convert_to_hf_oneformer.py",
+   "line": 69
+  },
+  {
+   "state": "self.metadata",
+   "file": "src/transformers/models/oneformer/image_processing_oneformer.py",
+   "line": 298
+  },
+  {
+   "state": "self.metadata",
+   "file": "src/transformers/models/oneformer/image_processing_pil_oneformer.py",
+   "line": 316
+  },
+  {
+   "state": "self.feature_channels",
+   "file": "src/transformers/models/oneformer/modeling_oneformer.py",
+   "line": 1260
+  },
+  {
+   "state": "self.level_embed",
+   "file": "src/transformers/models/oneformer/modeling_oneformer.py",
+   "line": 1261
+  },
+  {
+   "state": "self.input_projections",
+   "file": "src/transformers/models/oneformer/modeling_oneformer.py",
+   "line": 1273
+  },
+  {
+   "state": "self.lateral_convs",
+   "file": "src/transformers/models/oneformer/modeling_oneformer.py",
+   "line": 1332
+  },
+  {
+   "state": "self.output_convs",
+   "file": "src/transformers/models/oneformer/modeling_oneformer.py",
+   "line": 1333
+  },
+  {
+   "state": "self.input_projections",
+   "file": "src/transformers/models/oneformer/modeling_oneformer.py",
+   "line": 2291
+  },
+  {
+   "state": "self.level_embed",
+   "file": "src/transformers/models/oneformer/modeling_oneformer.py",
+   "line": 2300
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py",
+   "line": 262
+  },
+  {
+   "state": "self.gate_up_proj_bias",
+   "file": "src/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py",
+   "line": 263
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py",
+   "line": 264
+  },
+  {
+   "state": "self.down_proj_bias",
+   "file": "src/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py",
+   "line": 265
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/paddleocr_vl/modeling_paddleocr_vl.py",
+   "line": 473
+  },
+  {
+   "state": "self.position_enc",
+   "file": "src/transformers/models/patchtst/modeling_patchtst.py",
+   "line": 640
+  },
+  {
+   "state": "self.projections",
+   "file": "src/transformers/models/patchtst/modeling_patchtst.py",
+   "line": 1482
+  },
+  {
+   "state": "self.dropouts",
+   "file": "src/transformers/models/patchtst/modeling_patchtst.py",
+   "line": 1483
+  },
+  {
+   "state": "self.flattens",
+   "file": "src/transformers/models/patchtst/modeling_patchtst.py",
+   "line": 1484
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/pe_audio/modeling_pe_audio.py",
+   "line": 627
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/pe_audio_video/modeling_pe_audio_video.py",
+   "line": 575
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/pe_audio_video/modular_pe_audio_video.py",
+   "line": 375
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/pe_video/modeling_pe_video.py",
+   "line": 503
+  },
+  {
+   "state": "self.output_shape",
+   "file": "src/transformers/models/perceiver/modeling_perceiver.py",
+   "line": 2156
+  },
+  {
+   "state": "self.padding",
+   "file": "src/transformers/models/perceiver/modeling_perceiver.py",
+   "line": 2262
+  },
+  {
+   "state": "self.mask_probs",
+   "file": "src/transformers/models/perceiver/modeling_perceiver.py",
+   "line": 3218
+  },
+  {
+   "state": "self.padding",
+   "file": "src/transformers/models/perceiver/modeling_perceiver.py",
+   "line": 3219
+  },
+  {
+   "state": "self.mask",
+   "file": "src/transformers/models/perceiver/modeling_perceiver.py",
+   "line": 3225
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/phi/modeling_phi.py",
+   "line": 331
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/phi/modular_phi.py",
+   "line": 190
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/phi3/modeling_phi3.py",
+   "line": 360
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/phimoe/modeling_phimoe.py",
+   "line": 320
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/phimoe/modeling_phimoe.py",
+   "line": 321
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/phimoe/modeling_phimoe.py",
+   "line": 610
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/phobert/tokenization_phobert.py",
+   "line": 131
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/pixio/modeling_pixio.py",
+   "line": 82
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/pixio/modular_pixio.py",
+   "line": 91
+  },
+  {
+   "state": "self.fairseq_tokens_to_ids",
+   "file": "src/transformers/models/plbart/tokenization_plbart.py",
+   "line": 153
+  },
+  {
+   "state": "self.fairseq_ids_to_tokens",
+   "file": "src/transformers/models/plbart/tokenization_plbart.py",
+   "line": 154
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/pop2piano/modeling_pop2piano.py",
+   "line": 442
+  },
+  {
+   "state": "self.aifi",
+   "file": "src/transformers/models/pp_doclayout_v2/modeling_pp_doclayout_v2.py",
+   "line": 1692
+  },
+  {
+   "state": "self.encoder_input_proj",
+   "file": "src/transformers/models/pp_doclayout_v2/modeling_pp_doclayout_v2.py",
+   "line": 2040
+  },
+  {
+   "state": "self.decoder_input_proj",
+   "file": "src/transformers/models/pp_doclayout_v2/modeling_pp_doclayout_v2.py",
+   "line": 2087
+  },
+  {
+   "state": "self.scale_heads",
+   "file": "src/transformers/models/pp_doclayout_v3/modeling_pp_doclayout_v3.py",
+   "line": 485
+  },
+  {
+   "state": "self.aifi",
+   "file": "src/transformers/models/pp_doclayout_v3/modeling_pp_doclayout_v3.py",
+   "line": 948
+  },
+  {
+   "state": "self.encoder_input_proj",
+   "file": "src/transformers/models/pp_doclayout_v3/modeling_pp_doclayout_v3.py",
+   "line": 1603
+  },
+  {
+   "state": "self.decoder_input_proj",
+   "file": "src/transformers/models/pp_doclayout_v3/modeling_pp_doclayout_v3.py",
+   "line": 1650
+  },
+  {
+   "state": "self.scale_heads",
+   "file": "src/transformers/models/pp_doclayout_v3/modular_pp_doclayout_v3.py",
+   "line": 738
+  },
+  {
+   "state": "self.encoder_input_proj",
+   "file": "src/transformers/models/pp_doclayout_v3/modular_pp_doclayout_v3.py",
+   "line": 997
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/pp_ocrv5_mobile_det/modeling_pp_ocrv5_mobile_det.py",
+   "line": 265
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/pp_ocrv5_mobile_det/modular_pp_ocrv5_mobile_det.py",
+   "line": 233
+  },
+  {
+   "state": "self.input_channel_adjustment_convolution",
+   "file": "src/transformers/models/pp_ocrv5_server_det/modeling_pp_ocrv5_server_det.py",
+   "line": 130
+  },
+  {
+   "state": "self.input_feature_projection_convolution",
+   "file": "src/transformers/models/pp_ocrv5_server_det/modeling_pp_ocrv5_server_det.py",
+   "line": 131
+  },
+  {
+   "state": "self.path_aggregation_head_convolution",
+   "file": "src/transformers/models/pp_ocrv5_server_det/modeling_pp_ocrv5_server_det.py",
+   "line": 132
+  },
+  {
+   "state": "self.path_aggregation_lateral_convolution",
+   "file": "src/transformers/models/pp_ocrv5_server_det/modeling_pp_ocrv5_server_det.py",
+   "line": 133
+  },
+  {
+   "state": "self.input_channel_adjustment_convolution",
+   "file": "src/transformers/models/pp_ocrv5_server_det/modular_pp_ocrv5_server_det.py",
+   "line": 585
+  },
+  {
+   "state": "self.input_feature_projection_convolution",
+   "file": "src/transformers/models/pp_ocrv5_server_det/modular_pp_ocrv5_server_det.py",
+   "line": 586
+  },
+  {
+   "state": "self.path_aggregation_head_convolution",
+   "file": "src/transformers/models/pp_ocrv5_server_det/modular_pp_ocrv5_server_det.py",
+   "line": 587
+  },
+  {
+   "state": "self.path_aggregation_lateral_convolution",
+   "file": "src/transformers/models/pp_ocrv5_server_det/modular_pp_ocrv5_server_det.py",
+   "line": 588
+  },
+  {
+   "state": "self.input_channel_adjustment_convolution",
+   "file": "src/transformers/models/pp_ocrv6_medium_det/modeling_pp_ocrv6_medium_det.py",
+   "line": 219
+  },
+  {
+   "state": "self.input_feature_projection_convolution",
+   "file": "src/transformers/models/pp_ocrv6_medium_det/modeling_pp_ocrv6_medium_det.py",
+   "line": 220
+  },
+  {
+   "state": "self.path_aggregation_head_convolution",
+   "file": "src/transformers/models/pp_ocrv6_medium_det/modeling_pp_ocrv6_medium_det.py",
+   "line": 221
+  },
+  {
+   "state": "self.path_aggregation_lateral_convolution",
+   "file": "src/transformers/models/pp_ocrv6_medium_det/modeling_pp_ocrv6_medium_det.py",
+   "line": 222
+  },
+  {
+   "state": "name_to_checkpoint",
+   "file": "src/transformers/models/prompt_depth_anything/convert_prompt_depth_anything_to_hf.py",
+   "line": 170
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/prompt_depth_anything/modeling_prompt_depth_anything.py",
+   "line": 291
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/prompt_depth_anything/modeling_prompt_depth_anything.py",
+   "line": 333
+  },
+  {
+   "state": "self.vocab",
+   "file": "src/transformers/models/prophetnet/tokenization_prophetnet.py",
+   "line": 203
+  },
+  {
+   "state": "self.basic_tokenizer",
+   "file": "src/transformers/models/prophetnet/tokenization_prophetnet.py",
+   "line": 344
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/qianfan_ocr/modeling_qianfan_ocr.py",
+   "line": 308
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen2/modeling_qwen2.py",
+   "line": 330
+  },
+  {
+   "state": "self.positional_embedding",
+   "file": "src/transformers/models/qwen2_5_omni/modeling_qwen2_5_omni.py",
+   "line": 855
+  },
+  {
+   "state": "self.fullatt_block_indexes",
+   "file": "src/transformers/models/qwen2_5_omni/modeling_qwen2_5_omni.py",
+   "line": 1218
+  },
+  {
+   "state": "self.blocks",
+   "file": "src/transformers/models/qwen2_5_omni/modeling_qwen2_5_omni.py",
+   "line": 2468
+  },
+  {
+   "state": "self.activations",
+   "file": "src/transformers/models/qwen2_5_omni/modeling_qwen2_5_omni.py",
+   "line": 3199
+  },
+  {
+   "state": "self.ups",
+   "file": "src/transformers/models/qwen2_5_omni/modeling_qwen2_5_omni.py",
+   "line": 3294
+  },
+  {
+   "state": "self.resblocks",
+   "file": "src/transformers/models/qwen2_5_omni/modeling_qwen2_5_omni.py",
+   "line": 3296
+  },
+  {
+   "state": "self.speaker_map",
+   "file": "src/transformers/models/qwen2_5_omni/modeling_qwen2_5_omni.py",
+   "line": 3662
+  },
+  {
+   "state": "self.positional_embedding",
+   "file": "src/transformers/models/qwen2_5_omni/modular_qwen2_5_omni.py",
+   "line": 1335
+  },
+  {
+   "state": "self.blocks",
+   "file": "src/transformers/models/qwen2_5_omni/modular_qwen2_5_omni.py",
+   "line": 2311
+  },
+  {
+   "state": "self.activations",
+   "file": "src/transformers/models/qwen2_5_omni/modular_qwen2_5_omni.py",
+   "line": 3055
+  },
+  {
+   "state": "self.ups",
+   "file": "src/transformers/models/qwen2_5_omni/modular_qwen2_5_omni.py",
+   "line": 3150
+  },
+  {
+   "state": "self.resblocks",
+   "file": "src/transformers/models/qwen2_5_omni/modular_qwen2_5_omni.py",
+   "line": 3152
+  },
+  {
+   "state": "self.speaker_map",
+   "file": "src/transformers/models/qwen2_5_omni/modular_qwen2_5_omni.py",
+   "line": 3518
+  },
+  {
+   "state": "self.fullatt_block_indexes",
+   "file": "src/transformers/models/qwen2_5_vl/modeling_qwen2_5_vl.py",
+   "line": 360
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/qwen2_moe/modeling_qwen2_moe.py",
+   "line": 289
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/qwen2_moe/modeling_qwen2_moe.py",
+   "line": 290
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen2_moe/modeling_qwen2_moe.py",
+   "line": 447
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen2_moe/modular_qwen2_moe.py",
+   "line": 161
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3/modeling_qwen3.py",
+   "line": 355
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3_5/modeling_qwen3_5.py",
+   "line": 1154
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/qwen3_5_moe/modeling_qwen3_5_moe.py",
+   "line": 747
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/qwen3_5_moe/modeling_qwen3_5_moe.py",
+   "line": 748
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3_5_moe/modeling_qwen3_5_moe.py",
+   "line": 1258
+  },
+  {
+   "state": "self.positional_embedding",
+   "file": "src/transformers/models/qwen3_asr/modeling_qwen3_asr.py",
+   "line": 341
+  },
+  {
+   "state": "self.positional_embedding",
+   "file": "src/transformers/models/qwen3_asr/modular_qwen3_asr.py",
+   "line": 164
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/qwen3_moe/modeling_qwen3_moe.py",
+   "line": 218
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/qwen3_moe/modeling_qwen3_moe.py",
+   "line": 219
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3_moe/modeling_qwen3_moe.py",
+   "line": 448
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/qwen3_next/modeling_qwen3_next.py",
+   "line": 737
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/qwen3_next/modeling_qwen3_next.py",
+   "line": 738
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3_next/modeling_qwen3_next.py",
+   "line": 916
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3_next/modular_qwen3_next.py",
+   "line": 667
+  },
+  {
+   "state": "self.positional_embedding",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 775
+  },
+  {
+   "state": "self.deepstack_visual_indexes",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 1126
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 1316
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 1317
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 2473
+  },
+  {
+   "state": "self.lm_head",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 2572
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 2703
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 2704
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py",
+   "line": 3477
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/qwen3_omni_moe/modular_qwen3_omni_moe.py",
+   "line": 1488
+  },
+  {
+   "state": "self.lm_head",
+   "file": "src/transformers/models/qwen3_omni_moe/modular_qwen3_omni_moe.py",
+   "line": 1574
+  },
+  {
+   "state": "self.deepstack_visual_indexes",
+   "file": "src/transformers/models/qwen3_vl/modeling_qwen3_vl.py",
+   "line": 638
+  },
+  {
+   "state": "self.deepstack_merger_list",
+   "file": "src/transformers/models/qwen3_vl/modeling_qwen3_vl.py",
+   "line": 639
+  },
+  {
+   "state": "self.deepstack_merger_list",
+   "file": "src/transformers/models/qwen3_vl/modular_qwen3_vl.py",
+   "line": 448
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/qwen3_vl_moe/modeling_qwen3_vl_moe.py",
+   "line": 97
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/qwen3_vl_moe/modeling_qwen3_vl_moe.py",
+   "line": 98
+  },
+  {
+   "state": "self.deepstack_visual_indexes",
+   "file": "src/transformers/models/qwen3_vl_moe/modeling_qwen3_vl_moe.py",
+   "line": 641
+  },
+  {
+   "state": "self.deepstack_merger_list",
+   "file": "src/transformers/models/qwen3_vl_moe/modeling_qwen3_vl_moe.py",
+   "line": 642
+  },
+  {
+   "state": "self.index_id_to_db_id",
+   "file": "src/transformers/models/rag/retrieval_rag.py",
+   "line": 106
+  },
+  {
+   "state": "self.passages",
+   "file": "src/transformers/models/rag/retrieval_rag.py",
+   "line": 108
+  },
+  {
+   "state": "self.input_gate_bias",
+   "file": "src/transformers/models/recurrent_gemma/modeling_recurrent_gemma.py",
+   "line": 305
+  },
+  {
+   "state": "self.recurrent_gate_bias",
+   "file": "src/transformers/models/recurrent_gemma/modeling_recurrent_gemma.py",
+   "line": 310
+  },
+  {
+   "state": "self.buckets_cache",
+   "file": "src/transformers/models/reformer/modeling_reformer.py",
+   "line": 72
+  },
+  {
+   "state": "self.states_cache",
+   "file": "src/transformers/models/reformer/modeling_reformer.py",
+   "line": 73
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/rf_detr/modeling_rf_detr.py",
+   "line": 91
+  },
+  {
+   "state": "self.reference_point_embed",
+   "file": "src/transformers/models/rf_detr/modeling_rf_detr.py",
+   "line": 1395
+  },
+  {
+   "state": "self.query_feat",
+   "file": "src/transformers/models/rf_detr/modeling_rf_detr.py",
+   "line": 1396
+  },
+  {
+   "state": "self.enc_output",
+   "file": "src/transformers/models/rf_detr/modeling_rf_detr.py",
+   "line": 1400
+  },
+  {
+   "state": "self.enc_output_norm",
+   "file": "src/transformers/models/rf_detr/modeling_rf_detr.py",
+   "line": 1401
+  },
+  {
+   "state": "self.enc_out_bbox_embed",
+   "file": "src/transformers/models/rf_detr/modeling_rf_detr.py",
+   "line": 1403
+  },
+  {
+   "state": "self.enc_out_class_embed",
+   "file": "src/transformers/models/rf_detr/modeling_rf_detr.py",
+   "line": 1406
+  },
+  {
+   "state": "self.basic_tokenizer",
+   "file": "src/transformers/models/roc_bert/tokenization_roc_bert.py",
+   "line": 149
+  },
+  {
+   "state": "self.vocab",
+   "file": "src/transformers/models/roc_bert/tokenization_roc_bert.py",
+   "line": 1266
+  },
+  {
+   "state": "self.vocab",
+   "file": "src/transformers/models/roformer/tokenization_utils.py",
+   "line": 21
+  },
+  {
+   "state": "self.aifi",
+   "file": "src/transformers/models/rt_detr/modeling_rt_detr.py",
+   "line": 1094
+  },
+  {
+   "state": "self.encoder_input_proj",
+   "file": "src/transformers/models/rt_detr/modeling_rt_detr.py",
+   "line": 1442
+  },
+  {
+   "state": "self.decoder_input_proj",
+   "file": "src/transformers/models/rt_detr/modeling_rt_detr.py",
+   "line": 1489
+  },
+  {
+   "state": "self.aifi",
+   "file": "src/transformers/models/rt_detr/modular_rt_detr.py",
+   "line": 1463
+  },
+  {
+   "state": "self.encoder_input_proj",
+   "file": "src/transformers/models/rt_detr/modular_rt_detr.py",
+   "line": 1681
+  },
+  {
+   "state": "self.decoder_input_proj",
+   "file": "src/transformers/models/rt_detr/modular_rt_detr.py",
+   "line": 1728
+  },
+  {
+   "state": "self.aifi",
+   "file": "src/transformers/models/rt_detr_v2/modeling_rt_detr_v2.py",
+   "line": 1128
+  },
+  {
+   "state": "self.encoder_input_proj",
+   "file": "src/transformers/models/rt_detr_v2/modeling_rt_detr_v2.py",
+   "line": 1360
+  },
+  {
+   "state": "self.decoder_input_proj",
+   "file": "src/transformers/models/rt_detr_v2/modeling_rt_detr_v2.py",
+   "line": 1407
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/sam/modeling_sam.py",
+   "line": 455
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/sam2/modeling_sam2.py",
+   "line": 224
+  },
+  {
+   "state": "self.stage_ends",
+   "file": "src/transformers/models/sam2/modeling_sam2.py",
+   "line": 622
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/sam2/modeling_sam2.py",
+   "line": 1128
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/sam2/modular_sam2.py",
+   "line": 363
+  },
+  {
+   "state": "self.stage_ends",
+   "file": "src/transformers/models/sam2/modular_sam2.py",
+   "line": 679
+  },
+  {
+   "state": "self._vision_features",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 65
+  },
+  {
+   "state": "self.processed_frames",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 139
+  },
+  {
+   "state": "self._obj_idx_to_id",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 160
+  },
+  {
+   "state": "self.point_inputs_per_obj",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 164
+  },
+  {
+   "state": "self.mask_inputs_per_obj",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 165
+  },
+  {
+   "state": "self.output_dict_per_obj",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 168
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 1406
+  },
+  {
+   "state": "self.memory_temporal_positional_encoding",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 1635
+  },
+  {
+   "state": "self.occlusion_spatial_embedding_parameter",
+   "file": "src/transformers/models/sam2_video/modeling_sam2_video.py",
+   "line": 1654
+  },
+  {
+   "state": "self._vision_features",
+   "file": "src/transformers/models/sam2_video/modular_sam2_video.py",
+   "line": 272
+  },
+  {
+   "state": "self.processed_frames",
+   "file": "src/transformers/models/sam2_video/modular_sam2_video.py",
+   "line": 346
+  },
+  {
+   "state": "self._obj_idx_to_id",
+   "file": "src/transformers/models/sam2_video/modular_sam2_video.py",
+   "line": 367
+  },
+  {
+   "state": "self.point_inputs_per_obj",
+   "file": "src/transformers/models/sam2_video/modular_sam2_video.py",
+   "line": 371
+  },
+  {
+   "state": "self.mask_inputs_per_obj",
+   "file": "src/transformers/models/sam2_video/modular_sam2_video.py",
+   "line": 372
+  },
+  {
+   "state": "self.output_dict_per_obj",
+   "file": "src/transformers/models/sam2_video/modular_sam2_video.py",
+   "line": 375
+  },
+  {
+   "state": "self.memory_temporal_positional_encoding",
+   "file": "src/transformers/models/sam2_video/modular_sam2_video.py",
+   "line": 1408
+  },
+  {
+   "state": "self.occlusion_spatial_embedding_parameter",
+   "file": "src/transformers/models/sam2_video/modular_sam2_video.py",
+   "line": 1427
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "src/transformers/models/sam3/modeling_sam3.py",
+   "line": 1989
+  },
+  {
+   "state": "self.norms",
+   "file": "src/transformers/models/sam3/modeling_sam3.py",
+   "line": 1995
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "src/transformers/models/sam3_lite_text/modeling_sam3_lite_text.py",
+   "line": 1752
+  },
+  {
+   "state": "self.norms",
+   "file": "src/transformers/models/sam3_lite_text/modeling_sam3_lite_text.py",
+   "line": 1758
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/sam3_tracker/modeling_sam3_tracker.py",
+   "line": 568
+  },
+  {
+   "state": "self._vision_features",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 70
+  },
+  {
+   "state": "self.processed_frames",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 144
+  },
+  {
+   "state": "self._obj_idx_to_id",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 165
+  },
+  {
+   "state": "self.point_inputs_per_obj",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 169
+  },
+  {
+   "state": "self.mask_inputs_per_obj",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 170
+  },
+  {
+   "state": "self.output_dict_per_obj",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 173
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 1413
+  },
+  {
+   "state": "self.memory_temporal_positional_encoding",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 1651
+  },
+  {
+   "state": "self.occlusion_spatial_embedding_parameter",
+   "file": "src/transformers/models/sam3_tracker_video/modeling_sam3_tracker_video.py",
+   "line": 1670
+  },
+  {
+   "state": "self._vision_features",
+   "file": "src/transformers/models/sam3_video/modeling_sam3_video.py",
+   "line": 80
+  },
+  {
+   "state": "self.processed_frames",
+   "file": "src/transformers/models/sam3_video/modeling_sam3_video.py",
+   "line": 154
+  },
+  {
+   "state": "self._obj_id_to_idx",
+   "file": "src/transformers/models/sam3_video/modeling_sam3_video.py",
+   "line": 174
+  },
+  {
+   "state": "self._obj_idx_to_id",
+   "file": "src/transformers/models/sam3_video/modeling_sam3_video.py",
+   "line": 175
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/sam_hq/modeling_sam_hq.py",
+   "line": 890
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "src/transformers/models/sam_hq/modular_sam_hq.py",
+   "line": 202
+  },
+  {
+   "state": "self.resblocks",
+   "file": "src/transformers/models/seamless_m4t/modeling_seamless_m4t.py",
+   "line": 2228
+  },
+  {
+   "state": "self.resblocks",
+   "file": "src/transformers/models/seamless_m4t_v2/modeling_seamless_m4t_v2.py",
+   "line": 2428
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/seed_oss/modeling_seed_oss.py",
+   "line": 357
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/seggpt/modeling_seggpt.py",
+   "line": 142
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/seggpt/modeling_seggpt.py",
+   "line": 441
+  },
+  {
+   "state": "self.context_stack",
+   "file": "src/transformers/models/sew_d/modeling_sew_d.py",
+   "line": 575
+  },
+  {
+   "state": "model_name_to_checkpoint",
+   "file": "src/transformers/models/siglip/convert_siglip_to_hf.py",
+   "line": 73
+  },
+  {
+   "state": "self.character",
+   "file": "src/transformers/models/slanext/image_processing_slanext.py",
+   "line": 203
+  },
+  {
+   "state": "self.pred",
+   "file": "src/transformers/models/slanext/image_processing_slanext.py",
+   "line": 228
+  },
+  {
+   "state": "self.character",
+   "file": "src/transformers/models/slanext/modular_slanext.py",
+   "line": 478
+  },
+  {
+   "state": "self.pred",
+   "file": "src/transformers/models/slanext/modular_slanext.py",
+   "line": 503
+  },
+  {
+   "state": "self.no_rope_layers",
+   "file": "src/transformers/models/smollm3/configuration_smollm3.py",
+   "line": 101
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/smollm3/modeling_smollm3.py",
+   "line": 359
+  },
+  {
+   "state": "self.no_rope_layers",
+   "file": "src/transformers/models/smollm3/modular_smollm3.py",
+   "line": 117
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/solar_open/modeling_solar_open.py",
+   "line": 152
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/solar_open/modeling_solar_open.py",
+   "line": 153
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/solar_open/modeling_solar_open.py",
+   "line": 464
+  },
+  {
+   "state": "self.lang_code_to_id",
+   "file": "src/transformers/models/speech_to_text/tokenization_speech_to_text.py",
+   "line": 131
+  },
+  {
+   "state": "self.resblocks",
+   "file": "src/transformers/models/speecht5/modeling_speecht5.py",
+   "line": 2982
+  },
+  {
+   "state": "self.ones",
+   "file": "src/transformers/models/speecht5/number_normalizer.py",
+   "line": 21
+  },
+  {
+   "state": "self.teens",
+   "file": "src/transformers/models/speecht5/number_normalizer.py",
+   "line": 22
+  },
+  {
+   "state": "self.tens",
+   "file": "src/transformers/models/speecht5/number_normalizer.py",
+   "line": 34
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/starcoder2/modeling_starcoder2.py",
+   "line": 332
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/starcoder2/modular_starcoder2.py",
+   "line": 136
+  },
+  {
+   "state": "self.relative_position_bias_table",
+   "file": "src/transformers/models/swin/modeling_swin.py",
+   "line": 343
+  },
+  {
+   "state": "self.hidden_states_norms",
+   "file": "src/transformers/models/swin/modeling_swin.py",
+   "line": 1087
+  },
+  {
+   "state": "self.relative_position_bias_table",
+   "file": "src/transformers/models/swin/modular_swin.py",
+   "line": 371
+  },
+  {
+   "state": "self.hidden_states_norms",
+   "file": "src/transformers/models/swin/modular_swin.py",
+   "line": 1046
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/swinv2/modeling_swinv2.py",
+   "line": 184
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/switch_transformers/modeling_switch_transformers.py",
+   "line": 522
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/switch_transformers/modular_switch_transformers.py",
+   "line": 270
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/t5/modeling_t5.py",
+   "line": 439
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/t5gemma/modeling_t5gemma.py",
+   "line": 639
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/t5gemma/modeling_t5gemma.py",
+   "line": 723
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/t5gemma/modular_t5gemma.py",
+   "line": 487
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/t5gemma/modular_t5gemma.py",
+   "line": 571
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/t5gemma2/modeling_t5gemma2.py",
+   "line": 104
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/t5gemma2/modeling_t5gemma2.py",
+   "line": 769
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/t5gemma2/modeling_t5gemma2.py",
+   "line": 971
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/t5gemma2/modular_t5gemma2.py",
+   "line": 554
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/t5gemma2/modular_t5gemma2.py",
+   "line": 756
+  },
+  {
+   "state": "self.basic_tokenizer",
+   "file": "src/transformers/models/tapas/tokenization_tapas.py",
+   "line": 279
+  },
+  {
+   "state": "self.vocab",
+   "file": "src/transformers/models/tapas/tokenization_tapas.py",
+   "line": 2150
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/timesfm/modeling_timesfm.py",
+   "line": 344
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/timesfm/modular_timesfm.py",
+   "line": 301
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/tipsv2/modeling_tipsv2.py",
+   "line": 124
+  },
+  {
+   "state": "self.readout_projects",
+   "file": "src/transformers/models/tipsv2_dpt/modeling_tipsv2_dpt.py",
+   "line": 145
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/tipsv2_dpt/modeling_tipsv2_dpt.py",
+   "line": 155
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/tipsv2_dpt/modeling_tipsv2_dpt.py",
+   "line": 304
+  },
+  {
+   "state": "self.readout_projects",
+   "file": "src/transformers/models/tipsv2_dpt/modular_tipsv2_dpt.py",
+   "line": 289
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/tipsv2_dpt/modular_tipsv2_dpt.py",
+   "line": 299
+  },
+  {
+   "state": "self.loss_map",
+   "file": "src/transformers/models/tvp/modeling_tvp.py",
+   "line": 69
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/udop/modeling_udop.py",
+   "line": 648
+  },
+  {
+   "state": "self.layer",
+   "file": "src/transformers/models/umt5/modeling_umt5.py",
+   "line": 430
+  },
+  {
+   "state": "self.dilations",
+   "file": "src/transformers/models/univnet/modeling_univnet.py",
+   "line": 372
+  },
+  {
+   "state": "self.in_channels",
+   "file": "src/transformers/models/upernet/modeling_upernet.py",
+   "line": 128
+  },
+  {
+   "state": "self.fpn_convs",
+   "file": "src/transformers/models/upernet/modeling_upernet.py",
+   "line": 148
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/vaultgemma/modeling_vaultgemma.py",
+   "line": 383
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/vibevoice_acoustic_tokenizer/modeling_vibevoice_acoustic_tokenizer.py",
+   "line": 169
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/vibevoice_asr/modeling_vibevoice_asr.py",
+   "line": 149
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/videomt/modeling_videomt.py",
+   "line": 1065
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/vilt/modeling_vilt.py",
+   "line": 86
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/vit/modeling_vit.py",
+   "line": 84
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/vit_msn/modeling_vit_msn.py",
+   "line": 81
+  },
+  {
+   "state": "self.weight",
+   "file": "src/transformers/models/vitdet/modeling_vitdet.py",
+   "line": 273
+  },
+  {
+   "state": "self.bias",
+   "file": "src/transformers/models/vitdet/modeling_vitdet.py",
+   "line": 274
+  },
+  {
+   "state": "self.conv_chans",
+   "file": "src/transformers/models/vitmatte/modeling_vitmatte.py",
+   "line": 116
+  },
+  {
+   "state": "self.conv_chans",
+   "file": "src/transformers/models/vitmatte/modeling_vitmatte.py",
+   "line": 189
+  },
+  {
+   "state": "self.fusion_channels",
+   "file": "src/transformers/models/vitmatte/modeling_vitmatte.py",
+   "line": 192
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/vitpose_backbone/modeling_vitpose_backbone.py",
+   "line": 85
+  },
+  {
+   "state": "self.in_layers",
+   "file": "src/transformers/models/vits/modeling_vits.py",
+   "line": 311
+  },
+  {
+   "state": "self.res_skip_layers",
+   "file": "src/transformers/models/vits/modeling_vits.py",
+   "line": 312
+  },
+  {
+   "state": "self.resblocks",
+   "file": "src/transformers/models/vits/modeling_vits.py",
+   "line": 492
+  },
+  {
+   "state": "self.convs_dilated",
+   "file": "src/transformers/models/vits/modeling_vits.py",
+   "line": 608
+  },
+  {
+   "state": "self.convs_pointwise",
+   "file": "src/transformers/models/vits/modeling_vits.py",
+   "line": 609
+  },
+  {
+   "state": "self.norms_1",
+   "file": "src/transformers/models/vits/modeling_vits.py",
+   "line": 610
+  },
+  {
+   "state": "self.norms_2",
+   "file": "src/transformers/models/vits/modeling_vits.py",
+   "line": 611
+  },
+  {
+   "state": "self.position_embeddings",
+   "file": "src/transformers/models/vivit/modeling_vivit.py",
+   "line": 81
+  },
+  {
+   "state": "self.mask_tokens",
+   "file": "src/transformers/models/vjepa2/modeling_vjepa2.py",
+   "line": 494
+  },
+  {
+   "state": "self.audio_token",
+   "file": "src/transformers/models/voxtral/processing_voxtral.py",
+   "line": 86
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/voxtral_realtime/modeling_voxtral_realtime.py",
+   "line": 104
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/voxtral_realtime/modeling_voxtral_realtime.py",
+   "line": 774
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/voxtral_realtime/modular_voxtral_realtime.py",
+   "line": 101
+  },
+  {
+   "state": "self.decoder",
+   "file": "src/transformers/models/wav2vec2/tokenization_wav2vec2.py",
+   "line": 164
+  },
+  {
+   "state": "self.decoder",
+   "file": "src/transformers/models/wav2vec2_with_lm/processing_wav2vec2_with_lm.py",
+   "line": 100
+  },
+  {
+   "state": "self.zeros",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 109
+  },
+  {
+   "state": "self.ones",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 111
+  },
+  {
+   "state": "self.ones_suffixed",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 135
+  },
+  {
+   "state": "self.tens",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 137
+  },
+  {
+   "state": "self.tens_suffixed",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 149
+  },
+  {
+   "state": "self.multipliers",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 151
+  },
+  {
+   "state": "self.multipliers_suffixed",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 167
+  },
+  {
+   "state": "self.decimals",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 168
+  },
+  {
+   "state": "self.preceding_prefixers",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 170
+  },
+  {
+   "state": "self.following_prefixers",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 176
+  },
+  {
+   "state": "self.prefixes",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 186
+  },
+  {
+   "state": "self.suffixers",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 187
+  },
+  {
+   "state": "self.specials",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 191
+  },
+  {
+   "state": "self.words",
+   "file": "src/transformers/models/whisper/english_normalizer.py",
+   "line": 193
+  },
+  {
+   "state": "self.language",
+   "file": "src/transformers/models/whisper/tokenization_whisper.py",
+   "line": 273
+  },
+  {
+   "state": "self.quantizers",
+   "file": "src/transformers/models/xcodec/modeling_xcodec.py",
+   "line": 282
+  },
+  {
+   "state": "self.config",
+   "file": "src/transformers/models/xcodec/modeling_xcodec.py",
+   "line": 448
+  },
+  {
+   "state": "self.attentions",
+   "file": "src/transformers/models/xlm/modeling_xlm.py",
+   "line": 710
+  },
+  {
+   "state": "self.layer_norm1",
+   "file": "src/transformers/models/xlm/modeling_xlm.py",
+   "line": 711
+  },
+  {
+   "state": "self.ffns",
+   "file": "src/transformers/models/xlm/modeling_xlm.py",
+   "line": 712
+  },
+  {
+   "state": "self.layer_norm2",
+   "file": "src/transformers/models/xlm/modeling_xlm.py",
+   "line": 713
+  },
+  {
+   "state": "self.cache_moses_punct_normalizer",
+   "file": "src/transformers/models/xlm/tokenization_xlm.py",
+   "line": 230
+  },
+  {
+   "state": "self.cache_moses_tokenizer",
+   "file": "src/transformers/models/xlm/tokenization_xlm.py",
+   "line": 232
+  },
+  {
+   "state": "self.cache",
+   "file": "src/transformers/models/xlm/tokenization_xlm.py",
+   "line": 251
+  },
+  {
+   "state": "self.rnn_state",
+   "file": "src/transformers/models/xlstm/modeling_xlstm.py",
+   "line": 1358
+  },
+  {
+   "state": "self.adapter_modules",
+   "file": "src/transformers/models/xmod/modeling_xmod.py",
+   "line": 431
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/youtu/modeling_youtu.py",
+   "line": 476
+  },
+  {
+   "state": "self.x_proj_weight",
+   "file": "src/transformers/models/zamba/modeling_zamba.py",
+   "line": 263
+  },
+  {
+   "state": "self.dt_proj_weight",
+   "file": "src/transformers/models/zamba/modeling_zamba.py",
+   "line": 271
+  },
+  {
+   "state": "self.dt_proj_bias",
+   "file": "src/transformers/models/zamba/modeling_zamba.py",
+   "line": 276
+  },
+  {
+   "state": "self.D",
+   "file": "src/transformers/models/zamba/modeling_zamba.py",
+   "line": 283
+  },
+  {
+   "state": "self.linear_q_adapter_list",
+   "file": "src/transformers/models/zamba2/modeling_zamba2.py",
+   "line": 266
+  },
+  {
+   "state": "self.linear_k_adapter_list",
+   "file": "src/transformers/models/zamba2/modeling_zamba2.py",
+   "line": 267
+  },
+  {
+   "state": "self.linear_v_adapter_list",
+   "file": "src/transformers/models/zamba2/modeling_zamba2.py",
+   "line": 268
+  },
+  {
+   "state": "self.layer_dic",
+   "file": "src/transformers/models/zamba2/modeling_zamba2.py",
+   "line": 292
+  },
+  {
+   "state": "self.gate_up_proj_adapter_list",
+   "file": "src/transformers/models/zamba2/modeling_zamba2.py",
+   "line": 908
+  },
+  {
+   "state": "self.layer_dic",
+   "file": "src/transformers/models/zamba2/modeling_zamba2.py",
+   "line": 920
+  },
+  {
+   "state": "self.linear_q_adapter_list",
+   "file": "src/transformers/models/zamba2/modular_zamba2.py",
+   "line": 109
+  },
+  {
+   "state": "self.linear_k_adapter_list",
+   "file": "src/transformers/models/zamba2/modular_zamba2.py",
+   "line": 110
+  },
+  {
+   "state": "self.linear_v_adapter_list",
+   "file": "src/transformers/models/zamba2/modular_zamba2.py",
+   "line": 111
+  },
+  {
+   "state": "self.layer_dic",
+   "file": "src/transformers/models/zamba2/modular_zamba2.py",
+   "line": 135
+  },
+  {
+   "state": "self.gate_up_proj_adapter_list",
+   "file": "src/transformers/models/zamba2/modular_zamba2.py",
+   "line": 251
+  },
+  {
+   "state": "self.layer_dic",
+   "file": "src/transformers/models/zamba2/modular_zamba2.py",
+   "line": 263
+  },
+  {
+   "state": "self.rope_type",
+   "file": "src/transformers/models/zaya/modeling_zaya.py",
+   "line": 57
+  },
+  {
+   "state": "self.gate_up_proj",
+   "file": "src/transformers/models/zaya/modeling_zaya.py",
+   "line": 586
+  },
+  {
+   "state": "self.down_proj",
+   "file": "src/transformers/models/zaya/modeling_zaya.py",
+   "line": 587
+  },
+  {
+   "state": "self.layers",
+   "file": "src/transformers/models/zoedepth/modeling_zoedepth.py",
+   "line": 75
+  },
+  {
+   "state": "self.readout_projects",
+   "file": "src/transformers/models/zoedepth/modeling_zoedepth.py",
+   "line": 81
+  },
+  {
+   "state": "self.convs",
+   "file": "src/transformers/models/zoedepth/modeling_zoedepth.py",
+   "line": 301
+  },
+  {
+   "state": "self.transformer_encoder",
+   "file": "src/transformers/models/zoedepth/modeling_zoedepth.py",
+   "line": 897
+  },
+  {
+   "state": "self.seed_bin_regressors",
+   "file": "src/transformers/models/zoedepth/modeling_zoedepth.py",
+   "line": 994
+  },
+  {
+   "state": "self.attractors",
+   "file": "src/transformers/models/zoedepth/modeling_zoedepth.py",
+   "line": 1022
+  },
+  {
+   "state": "self.conditional_log_binomial",
+   "file": "src/transformers/models/zoedepth/modeling_zoedepth.py",
+   "line": 1041
+  },
+  {
+   "state": "_monkey_patch_mapping_cache",
+   "file": "src/transformers/monkey_patching.py",
+   "line": 29
+  },
+  {
+   "state": "_compiled_patterns_cache",
+   "file": "src/transformers/monkey_patching.py",
+   "line": 30
+  },
+  {
+   "state": "self.task",
+   "file": "src/transformers/pipelines/base.py",
+   "line": 803
+  },
+  {
+   "state": "self.supported_tasks",
+   "file": "src/transformers/pipelines/base.py",
+   "line": 1344
+  },
+  {
+   "state": "self.task_aliases",
+   "file": "src/transformers/pipelines/base.py",
+   "line": 1345
+  },
+  {
+   "state": "self.dataset",
+   "file": "src/transformers/pipelines/pt_utils.py",
+   "line": 10
+  },
+  {
+   "state": "self._loader_batch_data",
+   "file": "src/transformers/pipelines/pt_utils.py",
+   "line": 61
+  },
+  {
+   "state": "self.dataset",
+   "file": "src/transformers/pipelines/pt_utils.py",
+   "line": 303
+  },
+  {
+   "state": "self.dataset",
+   "file": "src/transformers/pipelines/pt_utils.py",
+   "line": 315
+  },
+  {
+   "state": "self._counter",
+   "file": "src/transformers/testing_utils.py",
+   "line": 2702
+  },
+  {
+   "state": "self.args_dim",
+   "file": "src/transformers/time_series_utils.py",
+   "line": 94
+  },
+  {
+   "state": "self.data",
+   "file": "src/transformers/tokenization_python.py",
+   "line": 52
+  },
+  {
+   "state": "self._added_tokens_decoder",
+   "file": "src/transformers/tokenization_python.py",
+   "line": 423
+  },
+  {
+   "state": "self._added_tokens_encoder",
+   "file": "src/transformers/tokenization_python.py",
+   "line": 427
+  },
+  {
+   "state": "self._encodings",
+   "file": "src/transformers/tokenization_utils_base.py",
+   "line": 236
+  },
+  {
+   "state": "self.data",
+   "file": "src/transformers/tokenization_utils_base.py",
+   "line": 274
+  },
+  {
+   "state": "self._special_tokens_map",
+   "file": "src/transformers/tokenization_utils_base.py",
+   "line": 1008
+  },
+  {
+   "state": "self.eval_dataset",
+   "file": "src/transformers/trainer.py",
+   "line": 552
+  },
+  {
+   "state": "self._eval_dataloaders",
+   "file": "src/transformers/trainer.py",
+   "line": 919
+  },
+  {
+   "state": "self.gpu",
+   "file": "src/transformers/trainer_utils.py",
+   "line": 641
+  },
+  {
+   "state": "self.cpu",
+   "file": "src/transformers/trainer_utils.py",
+   "line": 668
+  },
+  {
+   "state": "trainer_log_levels",
+   "file": "src/transformers/training_args.py",
+   "line": 64
+  },
+  {
+   "state": "_registered_model_output_types",
+   "file": "src/transformers/utils/generic.py",
+   "line": 60
+  },
+  {
+   "state": "self._local_mapping",
+   "file": "src/transformers/utils/generic.py",
+   "line": 1108
+  },
+  {
+   "state": "self._object_missing_backend",
+   "file": "src/transformers/utils/import_utils.py",
+   "line": 2218
+  },
+  {
+   "state": "self._modules",
+   "file": "src/transformers/utils/import_utils.py",
+   "line": 2222
+  },
+  {
+   "state": "self._class_to_module",
+   "file": "src/transformers/utils/import_utils.py",
+   "line": 2223
+  },
+  {
+   "state": "self._objects",
+   "file": "src/transformers/utils/import_utils.py",
+   "line": 2286
+  },
+  {
+   "state": "log_levels",
+   "file": "src/transformers/utils/logging.py",
+   "line": 44
+  },
+  {
+   "state": "ops",
+   "file": "src/transformers/utils/versions.py",
+   "line": 26
+  },
+  {
+   "state": "PIPELINE_TEST_MAPPING",
+   "file": "utils/add_pipeline_model_mapping_to_test.py",
+   "line": 38
+  },
+  {
+   "state": "self._nodes",
+   "file": "utils/check_import_complexity.py",
+   "line": 115
+  },
+  {
+   "state": "self._seen",
+   "file": "utils/check_import_complexity.py",
+   "line": 117
+  },
+  {
+   "state": "data",
+   "file": "utils/create_dummy_models.py",
+   "line": 75
+  },
+  {
+   "state": "self.new_bases",
+   "file": "utils/modular_model_converter.py",
+   "line": 231
+  },
+  {
+   "state": "self.original_modeling_methods",
+   "file": "utils/modular_model_converter.py",
+   "line": 279
+  },
+  {
+   "state": "self.modular_methods",
+   "file": "utils/modular_model_converter.py",
+   "line": 280
+  },
+  {
+   "state": "self.all_assign_target",
+   "file": "utils/modular_model_converter.py",
+   "line": 281
+  },
+  {
+   "state": "self.deleted_targets",
+   "file": "utils/modular_model_converter.py",
+   "line": 282
+  },
+  {
+   "state": "self.global_names",
+   "file": "utils/modular_model_converter.py",
+   "line": 507
+  },
+  {
+   "state": "self._node_order",
+   "file": "utils/modular_model_converter.py",
+   "line": 574
+  },
+  {
+   "state": "self.modular_file_start_lines",
+   "file": "utils/modular_model_converter.py",
+   "line": 801
+  },
+  {
+   "state": "self.model_specific_imported_objects",
+   "file": "utils/modular_model_converter.py",
+   "line": 1455
+  },
+  {
+   "state": "self.imported_objects_per_file",
+   "file": "utils/modular_model_converter.py",
+   "line": 1594
+  },
+  {
+   "state": "self.start_lines_file_mapping",
+   "file": "utils/modular_model_converter.py",
+   "line": 1610
+  },
+  {
+   "state": "self.added_objects_file_mapping",
+   "file": "utils/modular_model_converter.py",
+   "line": 1611
+  },
+  {
+   "state": "job_to_test_map",
+   "file": "utils/notification_service.py",
+   "line": 36
+  },
+  {
+   "state": "test_to_result_name",
+   "file": "utils/notification_service.py",
+   "line": 47
+  },
+  {
+   "state": "self.additional_results",
+   "file": "utils/notification_service.py",
+   "line": 192
+  }
+ ],
+ "repo": "huggingface/transformers",
+ "stars": 159297
+}

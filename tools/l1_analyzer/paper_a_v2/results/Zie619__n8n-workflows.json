@@ -1,0 +1,46 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.8,
+ "v1_mutable_ratio": 58.4,
+ "v1_details": "108/185 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 15,
+  "promiscuous": 3,
+  "unresolved": 15
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 12,
+   "drives_decision": 3
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 3
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 15
+  }
+ },
+ "v2_resolvable": 0.545,
+ "v2_promiscuous": [
+  {
+   "state": "rate_limit_storage",
+   "file": "api_server.py",
+   "line": 33
+  },
+  {
+   "state": "self.webhook_endpoints",
+   "file": "src/integration_hub.py",
+   "line": 31
+  },
+  {
+   "state": "self.alerts",
+   "file": "src/performance_monitor.py",
+   "line": 47
+  }
+ ],
+ "repo": "Zie619/n8n-workflows",
+ "stars": 53728
+}

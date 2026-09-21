@@ -1,0 +1,531 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.5,
+ "v1_mutable_ratio": 63.6,
+ "v1_details": "2024/3182 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1280,
+  "promiscuous": 100,
+  "unresolved": 744
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 912,
+   "drives_decision": 368
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 100
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 744
+  }
+ },
+ "v2_resolvable": 0.65,
+ "v2_promiscuous": [
+  {
+   "state": "self._cat_scalers",
+   "file": "examples/benchmarks/TFT/data_formatters/qlib_Alpha158.py",
+   "line": 75
+  },
+  {
+   "state": "self.param_ranges",
+   "file": "examples/benchmarks/TFT/libs/hyperparam_opt.py",
+   "line": 62
+  },
+  {
+   "state": "self.fixed_params",
+   "file": "examples/benchmarks/TFT/libs/hyperparam_opt.py",
+   "line": 66
+  },
+  {
+   "state": "self.qs_layers",
+   "file": "examples/benchmarks/TFT/libs/tft_model.py",
+   "line": 271
+  },
+  {
+   "state": "self.ks_layers",
+   "file": "examples/benchmarks/TFT/libs/tft_model.py",
+   "line": 272
+  },
+  {
+   "state": "self.vs_layers",
+   "file": "examples/benchmarks/TFT/libs/tft_model.py",
+   "line": 273
+  },
+  {
+   "state": "self._input_obs_loc",
+   "file": "examples/benchmarks/TFT/libs/tft_model.py",
+   "line": 403
+  },
+  {
+   "state": "self._static_input_loc",
+   "file": "examples/benchmarks/TFT/libs/tft_model.py",
+   "line": 404
+  },
+  {
+   "state": "self._attention_components",
+   "file": "examples/benchmarks/TFT/libs/tft_model.py",
+   "line": 431
+  },
+  {
+   "state": "self.batch_slices",
+   "file": "examples/benchmarks/TRA/src/dataset.py",
+   "line": 137
+  },
+  {
+   "state": "self.feature_med",
+   "file": "examples/highfreq/highfreq_processor.py",
+   "line": 21
+  },
+  {
+   "state": "self.feature_std",
+   "file": "examples/highfreq/highfreq_processor.py",
+   "line": 22
+  },
+  {
+   "state": "self.feature_vmax",
+   "file": "examples/highfreq/highfreq_processor.py",
+   "line": 23
+  },
+  {
+   "state": "self.feature_vmin",
+   "file": "examples/highfreq/highfreq_processor.py",
+   "line": 24
+  },
+  {
+   "state": "self.data",
+   "file": "qlib/backtest/high_performance_ds.py",
+   "line": 109
+  },
+  {
+   "state": "self.data",
+   "file": "qlib/backtest/high_performance_ds.py",
+   "line": 143
+  },
+  {
+   "state": "self.data",
+   "file": "qlib/backtest/high_performance_ds.py",
+   "line": 311
+  },
+  {
+   "state": "self.data",
+   "file": "qlib/backtest/high_performance_ds.py",
+   "line": 565
+  },
+  {
+   "state": "self.data",
+   "file": "qlib/backtest/high_performance_ds.py",
+   "line": 613
+  },
+  {
+   "state": "self.position",
+   "file": "qlib/backtest/position.py",
+   "line": 268
+  },
+  {
+   "state": "_default_region_config",
+   "file": "qlib/config.py",
+   "line": 316
+  },
+  {
+   "state": "self.provider_uri",
+   "file": "qlib/config.py",
+   "line": 358
+  },
+  {
+   "state": "self.provider_uri",
+   "file": "qlib/config.py",
+   "line": 358
+  },
+  {
+   "state": "self.mount_path",
+   "file": "qlib/config.py",
+   "line": 359
+  },
+  {
+   "state": "self.mount_path",
+   "file": "qlib/config.py",
+   "line": 359
+  },
+  {
+   "state": "self._label",
+   "file": "qlib/contrib/data/dataset.py",
+   "line": 183
+  },
+  {
+   "state": "self._batch_slices",
+   "file": "qlib/contrib/data/dataset.py",
+   "line": 191
+  },
+  {
+   "state": "self._daily_slices",
+   "file": "qlib/contrib/data/dataset.py",
+   "line": 197
+  },
+  {
+   "state": "self._daily_index",
+   "file": "qlib/contrib/data/dataset.py",
+   "line": 198
+  },
+  {
+   "state": "self._memory",
+   "file": "qlib/contrib/data/dataset.py",
+   "line": 202
+  },
+  {
+   "state": "self._df_dict",
+   "file": "qlib/contrib/data/utils/sepdf.py",
+   "line": 50
+  },
+  {
+   "state": "self._sdf",
+   "file": "qlib/contrib/data/utils/sepdf.py",
+   "line": 152
+  },
+  {
+   "state": "self.join",
+   "file": "qlib/contrib/data/utils/sepdf.py",
+   "line": 154
+  },
+  {
+   "state": "self.meta_task_l",
+   "file": "qlib/contrib/meta/data_selection/dataset.py",
+   "line": 318
+  },
+  {
+   "state": "self.sample_ratios",
+   "file": "qlib/contrib/model/double_ensemble.py",
+   "line": 51
+  },
+  {
+   "state": "self.sub_features",
+   "file": "qlib/contrib/model/double_ensemble.py",
+   "line": 59
+  },
+  {
+   "state": "self.df_feature",
+   "file": "qlib/contrib/model/pytorch_adarnn.py",
+   "line": 343
+  },
+  {
+   "state": "self.df_label_reg",
+   "file": "qlib/contrib/model/pytorch_adarnn.py",
+   "line": 344
+  },
+  {
+   "state": "self.features",
+   "file": "qlib/contrib/model/pytorch_adarnn.py",
+   "line": 407
+  },
+  {
+   "state": "self.gate",
+   "file": "qlib/contrib/model/pytorch_adarnn.py",
+   "line": 431
+  },
+  {
+   "state": "self.bn_lst",
+   "file": "qlib/contrib/model/pytorch_adarnn.py",
+   "line": 436
+  },
+  {
+   "state": "self.metric",
+   "file": "qlib/contrib/model/pytorch_add.py",
+   "line": 80
+  },
+  {
+   "state": "self.conv",
+   "file": "qlib/contrib/model/pytorch_localformer.py",
+   "line": 269
+  },
+  {
+   "state": "self.conv",
+   "file": "qlib/contrib/model/pytorch_localformer_ts.py",
+   "line": 250
+  },
+  {
+   "state": "self.shared",
+   "file": "qlib/contrib/model/pytorch_tabnet.py",
+   "line": 554
+  },
+  {
+   "state": "self._nan_cnt",
+   "file": "qlib/contrib/report/data/ana.py",
+   "line": 115
+  },
+  {
+   "state": "self._nan_cnt",
+   "file": "qlib/contrib/report/data/ana.py",
+   "line": 127
+  },
+  {
+   "state": "self._skew",
+   "file": "qlib/contrib/report/data/ana.py",
+   "line": 154
+  },
+  {
+   "state": "self._kurt",
+   "file": "qlib/contrib/report/data/ana.py",
+   "line": 155
+  },
+  {
+   "state": "self._std",
+   "file": "qlib/contrib/report/data/ana.py",
+   "line": 180
+  },
+  {
+   "state": "self._mean",
+   "file": "qlib/contrib/report/data/ana.py",
+   "line": 181
+  },
+  {
+   "state": "self._df",
+   "file": "qlib/contrib/report/graph.py",
+   "line": 35
+  },
+  {
+   "state": "self.trade_amount_remain",
+   "file": "qlib/contrib/strategy/rule_strategy.py",
+   "line": 39
+  },
+  {
+   "state": "self.trade_trend",
+   "file": "qlib/contrib/strategy/rule_strategy.py",
+   "line": 147
+  },
+  {
+   "state": "self.trade_amount",
+   "file": "qlib/contrib/strategy/rule_strategy.py",
+   "line": 148
+  },
+  {
+   "state": "self.signal",
+   "file": "qlib/contrib/strategy/rule_strategy.py",
+   "line": 347
+  },
+  {
+   "state": "self.signal",
+   "file": "qlib/contrib/strategy/rule_strategy.py",
+   "line": 434
+  },
+  {
+   "state": "self.trade_amount",
+   "file": "qlib/contrib/strategy/rule_strategy.py",
+   "line": 456
+  },
+  {
+   "state": "self.volume",
+   "file": "qlib/contrib/strategy/rule_strategy.py",
+   "line": 571
+  },
+  {
+   "state": "self.volume_df",
+   "file": "qlib/contrib/strategy/rule_strategy.py",
+   "line": 574
+  },
+  {
+   "state": "self._riskdata_cache",
+   "file": "qlib/contrib/strategy/signal_strategy.py",
+   "line": 434
+  },
+  {
+   "state": "self.od",
+   "file": "qlib/data/cache.py",
+   "line": 50
+  },
+  {
+   "state": "self._data",
+   "file": "qlib/data/cache.py",
+   "line": 804
+  },
+  {
+   "state": "self._data",
+   "file": "qlib/data/cache.py",
+   "line": 804
+  },
+  {
+   "state": "self.expression_instance_cache",
+   "file": "qlib/data/data.py",
+   "line": 390
+  },
+  {
+   "state": "self.segments",
+   "file": "qlib/data/dataset/__init__.py",
+   "line": 120
+  },
+  {
+   "state": "self.idx_arr",
+   "file": "qlib/data/dataset/__init__.py",
+   "line": 428
+  },
+  {
+   "state": "self.freq",
+   "file": "qlib/data/dataset/loader.py",
+   "line": 182
+  },
+  {
+   "state": "self.hash_df",
+   "file": "qlib/data/dataset/storage.py",
+   "line": 103
+  },
+  {
+   "state": "self._ops",
+   "file": "qlib/data/ops.py",
+   "line": 1623
+  },
+  {
+   "state": "self.sampler",
+   "file": "qlib/model/utils.py",
+   "line": 20
+  },
+  {
+   "state": "self._order_df",
+   "file": "qlib/rl/contrib/train_onpolicy.py",
+   "line": 62
+  },
+  {
+   "state": "self._ticks_index",
+   "file": "qlib/rl/contrib/train_onpolicy.py",
+   "line": 63
+  },
+  {
+   "state": "self._last_yielded_saoe_strategy",
+   "file": "qlib/rl/order_execution/simulator_qlib.py",
+   "line": 101
+  },
+  {
+   "state": "self.ticks_index",
+   "file": "qlib/rl/order_execution/simulator_simple.py",
+   "line": 100
+  },
+  {
+   "state": "self.backtest_data",
+   "file": "qlib/rl/order_execution/strategy.py",
+   "line": 99
+  },
+  {
+   "state": "self.adapter_dict",
+   "file": "qlib/rl/order_execution/strategy.py",
+   "line": 322
+  },
+  {
+   "state": "self._alive_env_ids",
+   "file": "qlib/rl/utils/finite_env.py",
+   "line": 136
+  },
+  {
+   "state": "self._logged",
+   "file": "qlib/rl/utils/log.py",
+   "line": 76
+  },
+  {
+   "state": "self.episode_lengths",
+   "file": "qlib/rl/utils/log.py",
+   "line": 177
+  },
+  {
+   "state": "self.episode_rewards",
+   "file": "qlib/rl/utils/log.py",
+   "line": 178
+  },
+  {
+   "state": "self.episode_logs",
+   "file": "qlib/rl/utils/log.py",
+   "line": 179
+  },
+  {
+   "state": "self.metric_counts",
+   "file": "qlib/rl/utils/log.py",
+   "line": 422
+  },
+  {
+   "state": "self.metric_sums",
+   "file": "qlib/rl/utils/log.py",
+   "line": 423
+  },
+  {
+   "state": "self.index_map",
+   "file": "qlib/utils/index_data.py",
+   "line": 105
+  },
+  {
+   "state": "self._bind_id",
+   "file": "qlib/utils/index_data.py",
+   "line": 217
+  },
+  {
+   "state": "self.indices",
+   "file": "qlib/utils/index_data.py",
+   "line": 366
+  },
+  {
+   "state": "self.all_freq",
+   "file": "qlib/workflow/record_temp.py",
+   "line": 437
+  },
+  {
+   "state": "self.artifacts_path",
+   "file": "qlib/workflow/task/collect.py",
+   "line": 170
+  },
+  {
+   "state": "self.status",
+   "file": "qlib/workflow/task/collect.py",
+   "line": 182
+  },
+  {
+   "state": "self.mini_symbol_map",
+   "file": "scripts/data_collector/base.py",
+   "line": 73
+  },
+  {
+   "state": "self.instrument_list",
+   "file": "scripts/data_collector/base.py",
+   "line": 80
+  },
+  {
+   "state": "quarter_dict",
+   "file": "scripts/data_collector/br_index/collector.py",
+   "line": 19
+  },
+  {
+   "state": "self.years_4_month_periods",
+   "file": "scripts/data_collector/br_index/collector.py",
+   "line": 41
+  },
+  {
+   "state": "self._calendar_list",
+   "file": "scripts/data_collector/future_calendar_collector.py",
+   "line": 36
+  },
+  {
+   "state": "self.column_list",
+   "file": "scripts/data_collector/yahoo/collector.py",
+   "line": 526
+  },
+  {
+   "state": "self.old_qlib_data",
+   "file": "scripts/data_collector/yahoo/collector.py",
+   "line": 527
+  },
+  {
+   "state": "self.df_files",
+   "file": "scripts/dump_bin.py",
+   "line": 118
+  },
+  {
+   "state": "self._old_calendar_list",
+   "file": "scripts/dump_bin.py",
+   "line": 447
+  },
+  {
+   "state": "self._all_data",
+   "file": "scripts/dump_bin.py",
+   "line": 457
+  }
+ ],
+ "repo": "microsoft/qlib",
+ "stars": 40663
+}

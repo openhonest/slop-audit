@@ -1,0 +1,251 @@
+{
+ "status": "ok",
+ "clone_seconds": 4.0,
+ "v1_mutable_ratio": 42.0,
+ "v1_details": "2073/4939 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 779,
+  "promiscuous": 44,
+  "unresolved": 297
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 592,
+   "drives_decision": 187
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 44
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 297
+  }
+ },
+ "v2_resolvable": 0.735,
+ "v2_promiscuous": [
+  {
+   "state": "registered_tables",
+   "file": "examples/projects/option-greeks/querying.py",
+   "line": 36
+  },
+  {
+   "state": "self.client",
+   "file": "integration_tests/db_connectors/utils.py",
+   "line": 1538
+  },
+  {
+   "state": "self.client",
+   "file": "integration_tests/db_connectors/utils.py",
+   "line": 1616
+  },
+  {
+   "state": "parsers",
+   "file": "integration_tests/xpack/test_parsers.py",
+   "line": 9
+  },
+  {
+   "state": "single_page_parsers",
+   "file": "integration_tests/xpack/test_parsers.py",
+   "line": 62
+  },
+  {
+   "state": "self.cache",
+   "file": "python/pathway/internals/desugaring.py",
+   "line": 219
+  },
+  {
+   "state": "self.table_numbers",
+   "file": "python/pathway/internals/expression_printer.py",
+   "line": 24
+  },
+  {
+   "state": "self._storages",
+   "file": "python/pathway/internals/graph_runner/expression_evaluator.py",
+   "line": 137
+  },
+  {
+   "state": "self._mapping",
+   "file": "python/pathway/internals/graph_runner/row_transformer_operator_handler.py",
+   "line": 186
+  },
+  {
+   "state": "self.columns",
+   "file": "python/pathway/internals/graph_runner/state.py",
+   "line": 26
+  },
+  {
+   "state": "self.universes",
+   "file": "python/pathway/internals/graph_runner/state.py",
+   "line": 27
+  },
+  {
+   "state": "self.computers",
+   "file": "python/pathway/internals/graph_runner/state.py",
+   "line": 28
+  },
+  {
+   "state": "self.legacy_tables",
+   "file": "python/pathway/internals/graph_runner/state.py",
+   "line": 29
+  },
+  {
+   "state": "self.tables",
+   "file": "python/pathway/internals/graph_runner/state.py",
+   "line": 30
+  },
+  {
+   "state": "self.storages",
+   "file": "python/pathway/internals/graph_runner/state.py",
+   "line": 31
+  },
+  {
+   "state": "self.final_storages",
+   "file": "python/pathway/internals/graph_runner/storage_graph.py",
+   "line": 228
+  },
+  {
+   "state": "self._inner",
+   "file": "python/pathway/internals/helpers.py",
+   "line": 93
+  },
+  {
+   "state": "self.tables",
+   "file": "python/pathway/internals/interactive.py",
+   "line": 46
+  },
+  {
+   "state": "self._inner_table",
+   "file": "python/pathway/internals/joins.py",
+   "line": 605
+  },
+  {
+   "state": "self._joined_on_names",
+   "file": "python/pathway/internals/joins.py",
+   "line": 610
+  },
+  {
+   "state": "self._original_left",
+   "file": "python/pathway/internals/joins.py",
+   "line": 612
+  },
+  {
+   "state": "self._original_right",
+   "file": "python/pathway/internals/joins.py",
+   "line": 613
+  },
+  {
+   "state": "self.logs",
+   "file": "python/pathway/internals/monitoring.py",
+   "line": 25
+  },
+  {
+   "state": "self._inputs",
+   "file": "python/pathway/internals/operator.py",
+   "line": 100
+  },
+  {
+   "state": "self._outputs",
+   "file": "python/pathway/internals/operator.py",
+   "line": 101
+  },
+  {
+   "state": "self._universe_mapping",
+   "file": "python/pathway/internals/operator.py",
+   "line": 347
+  },
+  {
+   "state": "self.iterated_with_universe_copy",
+   "file": "python/pathway/internals/operator.py",
+   "line": 396
+  },
+  {
+   "state": "self._scope_stack",
+   "file": "python/pathway/internals/parse_graph.py",
+   "line": 121
+  },
+  {
+   "state": "self.error_log_stack",
+   "file": "python/pathway/internals/parse_graph.py",
+   "line": 148
+  },
+  {
+   "state": "self.tab",
+   "file": "python/pathway/internals/sql/processing.py",
+   "line": 474
+  },
+  {
+   "state": "self._columns",
+   "file": "python/pathway/internals/table.py",
+   "line": 121
+  },
+  {
+   "state": "self._mapping",
+   "file": "python/pathway/internals/table_slice.py",
+   "line": 39
+  },
+  {
+   "state": "self.temporary_column_to_original",
+   "file": "python/pathway/internals/type_interpreter.py",
+   "line": 711
+  },
+  {
+   "state": "self.original_column_to_temporary",
+   "file": "python/pathway/internals/type_interpreter.py",
+   "line": 712
+  },
+  {
+   "state": "self.universe_vars",
+   "file": "python/pathway/internals/universe_solver.py",
+   "line": 23
+  },
+  {
+   "state": "self.no_warn",
+   "file": "python/pathway/internals/universe_solver.py",
+   "line": 24
+  },
+  {
+   "state": "self.examples_by_id",
+   "file": "python/pathway/io/http/_server.py",
+   "line": 98
+  },
+  {
+   "state": "self.method_types",
+   "file": "python/pathway/io/http/_server.py",
+   "line": 164
+  },
+  {
+   "state": "self._registered_routes",
+   "file": "python/pathway/io/http/_server.py",
+   "line": 529
+  },
+  {
+   "state": "self.df",
+   "file": "python/pathway/io/python/__init__.py",
+   "line": 643
+  },
+  {
+   "state": "self.ppb",
+   "file": "python/pathway/stdlib/ml/hmm.py",
+   "line": 96
+  },
+  {
+   "state": "self._merge_result",
+   "file": "python/pathway/stdlib/temporal/_asof_join.py",
+   "line": 241
+  },
+  {
+   "state": "self.field_metadata",
+   "file": "python/pathway/third_party/airbyte_serverless/airbyte_utils.py",
+   "line": 102
+  },
+  {
+   "state": "SECRETS",
+   "file": "python/pathway/third_party/airbyte_serverless/connections.py",
+   "line": 18
+  }
+ ],
+ "repo": "pathwaycom/pathway",
+ "stars": 63549
+}

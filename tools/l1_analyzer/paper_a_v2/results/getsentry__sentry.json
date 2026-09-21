@@ -1,0 +1,1136 @@
+{
+ "status": "ok",
+ "clone_seconds": 9.1,
+ "v1_mutable_ratio": 44.2,
+ "v1_details": "11181/25308 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 4214,
+  "promiscuous": 221,
+  "unresolved": 850
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 3468,
+   "drives_decision": 746
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 221
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 850
+  }
+ },
+ "v2_resolvable": 0.839,
+ "v2_promiscuous": [
+  {
+   "state": "languages_dict",
+   "file": "bin/extension_language_map.py",
+   "line": 11
+  },
+  {
+   "state": "languages",
+   "file": "bin/extension_language_map.py",
+   "line": 21
+  },
+  {
+   "state": "self._next_ids",
+   "file": "fixtures/integrations/mock_service.py",
+   "line": 30
+  },
+  {
+   "state": "self._memory",
+   "file": "fixtures/integrations/mock_service.py",
+   "line": 38
+  },
+  {
+   "state": "self._counters",
+   "file": "src/apigw/circuitbreaker.py",
+   "line": 28
+  },
+  {
+   "state": "self.objs",
+   "file": "src/apigw/circuitbreaker.py",
+   "line": 99
+  },
+  {
+   "state": "self._labels",
+   "file": "src/bitfield/types.py",
+   "line": 113
+  },
+  {
+   "state": "self._id_registry",
+   "file": "src/sentry/adoption/manager.py",
+   "line": 14
+  },
+  {
+   "state": "self._slug_registry",
+   "file": "src/sentry/adoption/manager.py",
+   "line": 15
+  },
+  {
+   "state": "self._integration_slugs",
+   "file": "src/sentry/adoption/manager.py",
+   "line": 16
+  },
+  {
+   "state": "self._location_slugs",
+   "file": "src/sentry/adoption/manager.py",
+   "line": 17
+  },
+  {
+   "state": "self._event_types",
+   "file": "src/sentry/analytics/event_manager.py",
+   "line": 11
+  },
+  {
+   "state": "self.values",
+   "file": "src/sentry/api/paginator.py",
+   "line": 433
+  },
+  {
+   "state": "self.model_key_map",
+   "file": "src/sentry/api/paginator.py",
+   "line": 615
+  },
+  {
+   "state": "registry",
+   "file": "src/sentry/api/serializers/base.py",
+   "line": 26
+  },
+  {
+   "state": "self.collapse",
+   "file": "src/sentry/api/serializers/models/group.py",
+   "line": 259
+  },
+  {
+   "state": "self.expand",
+   "file": "src/sentry/api/serializers/models/group.py",
+   "line": 260
+  },
+  {
+   "state": "self.projects",
+   "file": "src/sentry/api/serializers/models/organization_member/expand/projects.py",
+   "line": 20
+  },
+  {
+   "state": "self.expand",
+   "file": "src/sentry/api/serializers/models/project.py",
+   "line": 357
+  },
+  {
+   "state": "self.collapse",
+   "file": "src/sentry/api/serializers/models/project.py",
+   "line": 359
+  },
+  {
+   "state": "self.date_linked_by_pr_id",
+   "file": "src/sentry/api/serializers/models/pullrequest.py",
+   "line": 135
+  },
+  {
+   "state": "self.status_by_pr_id",
+   "file": "src/sentry/api/serializers/models/pullrequest.py",
+   "line": 136
+  },
+  {
+   "state": "self.expand",
+   "file": "src/sentry/api/serializers/models/repository.py",
+   "line": 46
+  },
+  {
+   "state": "self.collapse",
+   "file": "src/sentry/api/serializers/models/team.py",
+   "line": 175
+  },
+  {
+   "state": "self.expand",
+   "file": "src/sentry/api/serializers/models/team.py",
+   "line": 176
+  },
+  {
+   "state": "self.request_stack",
+   "file": "src/sentry/app.py",
+   "line": 12
+  },
+  {
+   "state": "self._event_registry",
+   "file": "src/sentry/audit_log/manager.py",
+   "line": 84
+  },
+  {
+   "state": "self._event_id_lookup",
+   "file": "src/sentry/audit_log/manager.py",
+   "line": 85
+  },
+  {
+   "state": "self.__values",
+   "file": "src/sentry/auth/manager.py",
+   "line": 18
+  },
+  {
+   "state": "self.d",
+   "file": "src/sentry/auth/services/auth/impl.py",
+   "line": 220
+  },
+  {
+   "state": "self.foreign_fields",
+   "file": "src/sentry/backup/comparators.py",
+   "line": 251
+  },
+  {
+   "state": "self.mapping",
+   "file": "src/sentry/backup/dependencies.py",
+   "line": 249
+  },
+  {
+   "state": "self.interned_strings",
+   "file": "src/sentry/backup/sanitize.py",
+   "line": 194
+  },
+  {
+   "state": "self.interned_datetimes",
+   "file": "src/sentry/backup/sanitize.py",
+   "line": 195
+  },
+  {
+   "state": "tasks",
+   "file": "src/sentry/bgtasks/api.py",
+   "line": 15
+  },
+  {
+   "state": "self.pending_buffer_router",
+   "file": "src/sentry/buffer/redis.py",
+   "line": 93
+  },
+  {
+   "state": "self.buffer",
+   "file": "src/sentry/buffer/redis.py",
+   "line": 183
+  },
+  {
+   "state": "_env_cache",
+   "file": "src/sentry/conf/server.py",
+   "line": 72
+  },
+  {
+   "state": "_language_map",
+   "file": "src/sentry/constants.py",
+   "line": 290
+  },
+  {
+   "state": "INTEGRATION_ID_TO_PLATFORM_DATA",
+   "file": "src/sentry/constants.py",
+   "line": 412
+  },
+  {
+   "state": "self.order_by",
+   "file": "src/sentry/db/deletion.py",
+   "line": 35
+  },
+  {
+   "state": "self._encryption_handlers",
+   "file": "src/sentry/db/models/fields/encryption/_base.py",
+   "line": 67
+  },
+  {
+   "state": "_base_manager_base",
+   "file": "src/sentry/db/models/manager/base.py",
+   "line": 71
+  },
+  {
+   "state": "self._triggers",
+   "file": "src/sentry/db/models/manager/base.py",
+   "line": 98
+  },
+  {
+   "state": "self.__table_to_silo",
+   "file": "src/sentry/db/router.py",
+   "line": 116
+  },
+  {
+   "state": "self.project_groups",
+   "file": "src/sentry/deletions/defaults/group.py",
+   "line": 127
+  },
+  {
+   "state": "self.project_ids",
+   "file": "src/sentry/discover/endpoints/discover_key_transactions.py",
+   "line": 186
+  },
+  {
+   "state": "self.organization",
+   "file": "src/sentry/dynamic_sampling/per_org/configuration.py",
+   "line": 56
+  },
+  {
+   "state": "self.last_result",
+   "file": "src/sentry/dynamic_sampling/tasks/common.py",
+   "line": 269
+  },
+  {
+   "state": "self.__producers",
+   "file": "src/sentry/eventstream/kafka/backend.py",
+   "line": 40
+  },
+  {
+   "state": "version_handlers",
+   "file": "src/sentry/eventstream/kafka/protocol.py",
+   "line": 59
+  },
+  {
+   "state": "self.__lookup",
+   "file": "src/sentry/eventtypes/manager.py",
+   "line": 9
+  },
+  {
+   "state": "self._handler_registry",
+   "file": "src/sentry/features/manager.py",
+   "line": 49
+  },
+  {
+   "state": "self._feature_registry",
+   "file": "src/sentry/features/manager.py",
+   "line": 148
+  },
+  {
+   "state": "self.exposed_features",
+   "file": "src/sentry/features/manager.py",
+   "line": 151
+  },
+  {
+   "state": "self._flags",
+   "file": "src/sentry/grouping/enhancer/matchers.py",
+   "line": 336
+  },
+  {
+   "state": "LOGGING_COUNTER",
+   "file": "src/sentry/grouping/parameterization.py",
+   "line": 16
+  },
+  {
+   "state": "STRATEGIES",
+   "file": "src/sentry/grouping/strategies/base.py",
+   "line": 28
+  },
+  {
+   "state": "GROUPING_CONFIG_CLASSES",
+   "file": "src/sentry/grouping/strategies/configurations.py",
+   "line": 8
+  },
+  {
+   "state": "self._counters",
+   "file": "src/sentry/hybridcloud/apigateway_async/circuitbreaker.py",
+   "line": 28
+  },
+  {
+   "state": "self.objs",
+   "file": "src/sentry/hybridcloud/apigateway_async/circuitbreaker.py",
+   "line": 99
+  },
+  {
+   "state": "_outbox_categories_for_scope",
+   "file": "src/sentry/hybridcloud/outbox/category.py",
+   "line": 14
+  },
+  {
+   "state": "self._constructors",
+   "file": "src/sentry/hybridcloud/rpc/__init__.py",
+   "line": 117
+  },
+  {
+   "state": "self._singleton",
+   "file": "src/sentry/hybridcloud/rpc/__init__.py",
+   "line": 118
+  },
+  {
+   "state": "self._signatures",
+   "file": "src/sentry/hybridcloud/rpc/service.py",
+   "line": 150
+  },
+  {
+   "state": "_global_service_registry",
+   "file": "src/sentry/hybridcloud/rpc/service.py",
+   "line": 206
+  },
+  {
+   "state": "self.__values",
+   "file": "src/sentry/identity/manager.py",
+   "line": 9
+  },
+  {
+   "state": "self._login_providers",
+   "file": "src/sentry/identity/manager.py",
+   "line": 10
+  },
+  {
+   "state": "threshold_translators",
+   "file": "src/sentry/incidents/endpoints/utils.py",
+   "line": 28
+  },
+  {
+   "state": "data_condition_type_translators",
+   "file": "src/sentry/incidents/endpoints/utils.py",
+   "line": 33
+  },
+  {
+   "state": "self.by_action_service",
+   "file": "src/sentry/incidents/models/alert_rule.py",
+   "line": 348
+  },
+  {
+   "state": "self.by_slug",
+   "file": "src/sentry/incidents/models/alert_rule.py",
+   "line": 349
+  },
+  {
+   "state": "self.issue_type_to_image_builder",
+   "file": "src/sentry/integrations/issue_alert_image_builder.py",
+   "line": 46
+  },
+  {
+   "state": "self.__values",
+   "file": "src/sentry/integrations/manager.py",
+   "line": 16
+  },
+  {
+   "state": "self._event_handlers",
+   "file": "src/sentry/integrations/msteams/webhook.py",
+   "line": 211
+  },
+  {
+   "state": "self._buf",
+   "file": "src/sentry/integrations/perforce/p4protocol/protocol.py",
+   "line": 237
+  },
+  {
+   "state": "line_plot_fields",
+   "file": "src/sentry/integrations/slack/unfurl/discover.py",
+   "line": 61
+  },
+  {
+   "state": "self.gen_ai_spans",
+   "file": "src/sentry/issue_detection/detectors/consecutive_http_detector.py",
+   "line": 43
+  },
+  {
+   "state": "self.location_to_indicators",
+   "file": "src/sentry/issue_detection/detectors/http_overhead_detector.py",
+   "line": 64
+  },
+  {
+   "state": "self.parent_to_blocked_span",
+   "file": "src/sentry/issue_detection/detectors/io_main_thread_detector.py",
+   "line": 53
+  },
+  {
+   "state": "self.pattern",
+   "file": "src/sentry/issue_detection/detectors/mn_plus_one_db_span_detector.py",
+   "line": 171
+  },
+  {
+   "state": "self.spans",
+   "file": "src/sentry/issue_detection/detectors/mn_plus_one_db_span_detector.py",
+   "line": 179
+  },
+  {
+   "state": "self.potential_parents",
+   "file": "src/sentry/issue_detection/detectors/n_plus_one_db_span_detector.py",
+   "line": 65
+  },
+  {
+   "state": "self.trees",
+   "file": "src/sentry/issues/auto_source_code_config/code_mapping.py",
+   "line": 74
+  },
+  {
+   "state": "self._data",
+   "file": "src/sentry/issues/derived/framework.py",
+   "line": 180
+  },
+  {
+   "state": "self._data",
+   "file": "src/sentry/issues/derived/framework.py",
+   "line": 237
+  },
+  {
+   "state": "self._allowed",
+   "file": "src/sentry/issues/derived/framework.py",
+   "line": 238
+  },
+  {
+   "state": "value_converters",
+   "file": "src/sentry/issues/issue_search.py",
+   "line": 307
+  },
+  {
+   "state": "self._cache",
+   "file": "src/sentry/lang/javascript/cache.py",
+   "line": 15
+  },
+  {
+   "state": "self._errors",
+   "file": "src/sentry/lang/javascript/cache.py",
+   "line": 16
+  },
+  {
+   "state": "self._aliases",
+   "file": "src/sentry/lang/javascript/cache.py",
+   "line": 17
+  },
+  {
+   "state": "self._cache",
+   "file": "src/sentry/lang/javascript/cache.py",
+   "line": 72
+  },
+  {
+   "state": "self._entries_by_debug_id",
+   "file": "src/sentry/models/artifactbundle.py",
+   "line": 217
+  },
+  {
+   "state": "self._entries_by_url",
+   "file": "src/sentry/models/artifactbundle.py",
+   "line": 219
+  },
+  {
+   "state": "self.actor_label",
+   "file": "src/sentry/models/auditlogentry.py",
+   "line": 82
+  },
+  {
+   "state": "self._indexes",
+   "file": "src/sentry/models/files/abstractfile.py",
+   "line": 35
+  },
+  {
+   "state": "self.__cache",
+   "file": "src/sentry/models/groupmeta.py",
+   "line": 47
+  },
+  {
+   "state": "OrganizationStatus_labels",
+   "file": "src/sentry/models/organization.py",
+   "line": 72
+  },
+  {
+   "state": "invite_status_names",
+   "file": "src/sentry/models/organizationmember.py",
+   "line": 94
+  },
+  {
+   "state": "invite_status_names",
+   "file": "src/sentry/models/organizationmemberinvite.py",
+   "line": 45
+  },
+  {
+   "state": "self._entries_by_url",
+   "file": "src/sentry/models/releasefile.py",
+   "line": 162
+  },
+  {
+   "state": "self.expand",
+   "file": "src/sentry/monitors/serializers.py",
+   "line": 201
+  },
+  {
+   "state": "self.expand",
+   "file": "src/sentry/monitors/serializers.py",
+   "line": 350
+  },
+  {
+   "state": "self._subscriptions",
+   "file": "src/sentry/newsletter/dummy.py",
+   "line": 76
+  },
+  {
+   "state": "self.classes",
+   "file": "src/sentry/notifications/class_manager.py",
+   "line": 20
+  },
+  {
+   "state": "registry",
+   "file": "src/sentry/notifications/notify.py",
+   "line": 23
+  },
+  {
+   "state": "self._dict",
+   "file": "src/sentry/notifications/utils/participants.py",
+   "line": 59
+  },
+  {
+   "state": "self.registry",
+   "file": "src/sentry/options/manager.py",
+   "line": 194
+  },
+  {
+   "state": "self._local_cache",
+   "file": "src/sentry/options/store.py",
+   "line": 149
+  },
+  {
+   "state": "self.pipeline_views",
+   "file": "src/sentry/pipeline/base.py",
+   "line": 124
+  },
+  {
+   "state": "self._bindings",
+   "file": "src/sentry/plugins/base/binding_manager.py",
+   "line": 40
+  },
+  {
+   "state": "self.epoch_defaults",
+   "file": "src/sentry/projectoptions/manager.py",
+   "line": 8
+  },
+  {
+   "state": "self._hidden_fields",
+   "file": "src/sentry/release_health/metrics_sessions_v2.py",
+   "line": 140
+  },
+  {
+   "state": "self.cache",
+   "file": "src/sentry/replays/lib/cache.py",
+   "line": 29
+  },
+  {
+   "state": "self.cache",
+   "file": "src/sentry/replays/lib/cache.py",
+   "line": 77
+  },
+  {
+   "state": "self.cache",
+   "file": "src/sentry/replays/lib/cache.py",
+   "line": 116
+  },
+  {
+   "state": "self.events",
+   "file": "src/sentry/replays/usecases/ingest/event_parser.py",
+   "line": 708
+  },
+  {
+   "state": "optimized_sort_fields",
+   "file": "src/sentry/replays/usecases/query/configs/aggregate_sort.py",
+   "line": 80
+  },
+  {
+   "state": "varying_search_config",
+   "file": "src/sentry/replays/usecases/query/configs/scalar.py",
+   "line": 70
+  },
+  {
+   "state": "self._id_map",
+   "file": "src/sentry/roles/manager.py",
+   "line": 86
+  },
+  {
+   "state": "self._minimum_team_role_map",
+   "file": "src/sentry/roles/manager.py",
+   "line": 154
+  },
+  {
+   "state": "timeranges",
+   "file": "src/sentry/rules/filters/age_comparison.py",
+   "line": 17
+  },
+  {
+   "state": "self._rules",
+   "file": "src/sentry/rules/registry.py",
+   "line": 11
+  },
+  {
+   "state": "self._map",
+   "file": "src/sentry/rules/registry.py",
+   "line": 12
+  },
+  {
+   "state": "options_mapper",
+   "file": "src/sentry/runner/initializer.py",
+   "line": 72
+  },
+  {
+   "state": "self.referrer_allocation",
+   "file": "src/sentry/scm/private/rate_limit.py",
+   "line": 77
+  },
+  {
+   "state": "self.aggregates",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 250
+  },
+  {
+   "state": "self.equation_alias_map",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 257
+  },
+  {
+   "state": "self.value_resolver_map",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 259
+  },
+  {
+   "state": "self.meta_resolver_map",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 261
+  },
+  {
+   "state": "self.typed_tag_to_alias_map",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 271
+  },
+  {
+   "state": "self.config",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 280
+  },
+  {
+   "state": "self.field_alias_converter",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 356
+  },
+  {
+   "state": "self.function_converter",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 357
+  },
+  {
+   "state": "self.orderby_converter",
+   "file": "src/sentry/search/events/builder/base.py",
+   "line": 359
+  },
+  {
+   "state": "self._indexer_cache",
+   "file": "src/sentry/search/events/builder/metrics.py",
+   "line": 123
+  },
+  {
+   "state": "self.histogram_aliases",
+   "file": "src/sentry/search/events/builder/metrics.py",
+   "line": 1458
+  },
+  {
+   "state": "self._extra_filter_allowlist_fields",
+   "file": "src/sentry/search/events/builder/sessions.py",
+   "line": 26
+  },
+  {
+   "state": "self.total_score_weights",
+   "file": "src/sentry/search/events/datasets/metrics.py",
+   "line": 24
+  },
+  {
+   "state": "self.array_columns",
+   "file": "src/sentry/search/events/fields.py",
+   "line": 796
+  },
+  {
+   "state": "self.allowed_columns",
+   "file": "src/sentry/search/events/fields.py",
+   "line": 1049
+  },
+  {
+   "state": "self.allowed_columns",
+   "file": "src/sentry/search/events/fields.py",
+   "line": 2242
+  },
+  {
+   "state": "key_conversion_map",
+   "file": "src/sentry/search/events/filter.py",
+   "line": 526
+  },
+  {
+   "state": "self.conditions",
+   "file": "src/sentry/search/snuba/backend.py",
+   "line": 412
+  },
+  {
+   "state": "public_org_seer_method_registry",
+   "file": "src/sentry/seer/endpoints/organization_seer_rpc.py",
+   "line": 105
+  },
+  {
+   "state": "public_project_seer_method_registry",
+   "file": "src/sentry/seer/endpoints/organization_seer_rpc.py",
+   "line": 163
+  },
+  {
+   "state": "seer_method_registry",
+   "file": "src/sentry/seer/endpoints/seer_rpc.py",
+   "line": 320
+  },
+  {
+   "state": "_METRICS_INGEST_CONFIG_BY_USE_CASE",
+   "file": "src/sentry/sentry_metrics/configuration.py",
+   "line": 59
+  },
+  {
+   "state": "self._message_metrics",
+   "file": "src/sentry/sentry_metrics/consumers/indexer/batch.py",
+   "line": 106
+  },
+  {
+   "state": "self.invalid_msg_meta",
+   "file": "src/sentry/sentry_metrics/consumers/indexer/batch.py",
+   "line": 113
+  },
+  {
+   "state": "self.filtered_msg_meta",
+   "file": "src/sentry/sentry_metrics/consumers/indexer/batch.py",
+   "line": 114
+  },
+  {
+   "state": "self.__slice_to_producer",
+   "file": "src/sentry/sentry_metrics/consumers/indexer/slicing_router.py",
+   "line": 102
+  },
+  {
+   "state": "self.mapping",
+   "file": "src/sentry/sentry_metrics/indexer/base.py",
+   "line": 78
+  },
+  {
+   "state": "self.results",
+   "file": "src/sentry/sentry_metrics/indexer/base.py",
+   "line": 161
+  },
+  {
+   "state": "self.meta",
+   "file": "src/sentry/sentry_metrics/indexer/base.py",
+   "line": 162
+  },
+  {
+   "state": "self.results",
+   "file": "src/sentry/sentry_metrics/indexer/base.py",
+   "line": 271
+  },
+  {
+   "state": "self.rate_limiters",
+   "file": "src/sentry/sentry_metrics/indexer/limiters/writes.py",
+   "line": 226
+  },
+  {
+   "state": "self._strings",
+   "file": "src/sentry/sentry_metrics/indexer/mock.py",
+   "line": 24
+  },
+  {
+   "state": "self._snuba_data",
+   "file": "src/sentry/services/eventstore/models.py",
+   "line": 70
+  },
+  {
+   "state": "_receivers_that_raise",
+   "file": "src/sentry/signals.py",
+   "line": 18
+  },
+  {
+   "state": "_fencing_counters",
+   "file": "src/sentry/silo/safety.py",
+   "line": 17
+  },
+  {
+   "state": "self._tokens",
+   "file": "src/sentry/snuba/metrics/extraction.py",
+   "line": 1672
+  },
+  {
+   "state": "NAME_TO_MRI",
+   "file": "src/sentry/snuba/metrics/naming_layer/mapping.py",
+   "line": 30
+  },
+  {
+   "state": "MRI_TO_NAME",
+   "file": "src/sentry/snuba/metrics/naming_layer/mapping.py",
+   "line": 49
+  },
+  {
+   "state": "self._alias_to_metric_field",
+   "file": "src/sentry/snuba/metrics/query_builder.py",
+   "line": 789
+  },
+  {
+   "state": "self._alias_to_metric_field",
+   "file": "src/sentry/snuba/metrics/query_builder.py",
+   "line": 1271
+  },
+  {
+   "state": "self._timestamp_index",
+   "file": "src/sentry/snuba/metrics/query_builder.py",
+   "line": 1298
+  },
+  {
+   "state": "dropped_outcomes",
+   "file": "src/sentry/snuba/outcomes.py",
+   "line": 455
+  },
+  {
+   "state": "subscriber_registry",
+   "file": "src/sentry/snuba/query_subscriptions/consumer.py",
+   "line": 21
+  },
+  {
+   "state": "self.producers",
+   "file": "src/sentry/spans/consumers/process/flusher.py",
+   "line": 60
+  },
+  {
+   "state": "self.topics",
+   "file": "src/sentry/spans/consumers/process/flusher.py",
+   "line": 61
+  },
+  {
+   "state": "self.process_to_shards_map",
+   "file": "src/sentry/spans/consumers/process/flusher.py",
+   "line": 158
+  },
+  {
+   "state": "self.processes",
+   "file": "src/sentry/spans/consumers/process/flusher.py",
+   "line": 165
+  },
+  {
+   "state": "self.process_healthy_since",
+   "file": "src/sentry/spans/consumers/process/flusher.py",
+   "line": 166
+  },
+  {
+   "state": "self.process_backpressure_since",
+   "file": "src/sentry/spans/consumers/process/flusher.py",
+   "line": 169
+  },
+  {
+   "state": "self.process_restarts",
+   "file": "src/sentry/spans/consumers/process/flusher.py",
+   "line": 172
+  },
+  {
+   "state": "CONFIGURATIONS",
+   "file": "src/sentry/spans/grouping/strategy/config.py",
+   "line": 38
+  },
+  {
+   "state": "self.frame",
+   "file": "src/sentry/stacktraces/processing.py",
+   "line": 77
+  },
+  {
+   "state": "self.processable_frames",
+   "file": "src/sentry/stacktraces/processing.py",
+   "line": 84
+  },
+  {
+   "state": "project_breakdown_colors",
+   "file": "src/sentry/tasks/summaries/weekly_reports.py",
+   "line": 501
+  },
+  {
+   "state": "group_status_to_color",
+   "file": "src/sentry/tasks/summaries/weekly_reports.py",
+   "line": 515
+  },
+  {
+   "state": "backfill_fields",
+   "file": "src/sentry/tasks/unmerge.py",
+   "line": 119
+  },
+  {
+   "state": "_route_overrides",
+   "file": "src/sentry/taskworker/adapters.py",
+   "line": 40
+  },
+  {
+   "state": "self._route_map",
+   "file": "src/sentry/taskworker/adapters.py",
+   "line": 79
+  },
+  {
+   "state": "simulated_transaction_watermarks",
+   "file": "src/sentry/testutils/hybrid_cloud.py",
+   "line": 96
+  },
+  {
+   "state": "self.result",
+   "file": "src/sentry/testutils/hybrid_cloud.py",
+   "line": 154
+  },
+  {
+   "state": "EVENTS",
+   "file": "src/sentry/testutils/issue_detection/event_generators.py",
+   "line": 14
+  },
+  {
+   "state": "_FIXTURE_PATHS",
+   "file": "src/sentry/testutils/issue_detection/segment_span_generators.py",
+   "line": 28
+  },
+  {
+   "state": "_SEGMENT_FIXTURES",
+   "file": "src/sentry/testutils/issue_detection/segment_span_generators.py",
+   "line": 29
+  },
+  {
+   "state": "self.json_tests",
+   "file": "src/sentry/testutils/pytest/json_report_reruns.py",
+   "line": 29
+  },
+  {
+   "state": "model_backends",
+   "file": "src/sentry/tsdb/redissnuba.py",
+   "line": 56
+  },
+  {
+   "state": "serializer_map",
+   "file": "src/sentry/users/api/endpoints/user_authenticator_enroll.py",
+   "line": 84
+  },
+  {
+   "state": "self.__inverse",
+   "file": "src/sentry/utils/datastructures.py",
+   "line": 18
+  },
+  {
+   "state": "self.__type_handlers",
+   "file": "src/sentry/utils/email/list_resolver.py",
+   "line": 34
+  },
+  {
+   "state": "_cache",
+   "file": "src/sentry/utils/imports.py",
+   "line": 20
+  },
+  {
+   "state": "self.__records",
+   "file": "src/sentry/utils/kvstore/memory.py",
+   "line": 22
+  },
+  {
+   "state": "self._dangerous",
+   "file": "src/sentry/utils/lazy_service_wrapper.py",
+   "line": 63
+  },
+  {
+   "state": "self.cache",
+   "file": "src/sentry/utils/local_cache.py",
+   "line": 23
+  },
+  {
+   "state": "self.cache",
+   "file": "src/sentry/utils/local_cache.py",
+   "line": 66
+  },
+  {
+   "state": "self.cache",
+   "file": "src/sentry/utils/local_cache.py",
+   "line": 124
+  },
+  {
+   "state": "self.prompts",
+   "file": "src/sentry/utils/prompts.py",
+   "line": 43
+  },
+  {
+   "state": "self._clusters",
+   "file": "src/sentry/utils/redis.py",
+   "line": 58
+  },
+  {
+   "state": "self._clusters_bytes",
+   "file": "src/sentry/utils/redis.py",
+   "line": 99
+  },
+  {
+   "state": "self._clusters_str",
+   "file": "src/sentry/utils/redis.py",
+   "line": 100
+  },
+  {
+   "state": "self.registrations",
+   "file": "src/sentry/utils/registry.py",
+   "line": 21
+  },
+  {
+   "state": "self.reverse_lookup",
+   "file": "src/sentry/utils/registry.py",
+   "line": 22
+  },
+  {
+   "state": "self.fields",
+   "file": "src/sentry/utils/sdk_crashes/path_replacer.py",
+   "line": 54
+  },
+  {
+   "state": "self.backends",
+   "file": "src/sentry/utils/services.py",
+   "line": 132
+  },
+  {
+   "state": "self.request",
+   "file": "src/sentry/utils/session_store.py",
+   "line": 55
+  },
+  {
+   "state": "_snowflake_models",
+   "file": "src/sentry/utils/snowflake.py",
+   "line": 24
+  },
+  {
+   "state": "_type_mapping",
+   "file": "src/sentry/utils/types.py",
+   "line": 175
+  },
+  {
+   "state": "self.__warnings",
+   "file": "src/sentry/utils/warnings.py",
+   "line": 88
+  },
+  {
+   "state": "_registered_namespaces",
+   "file": "src/sentry/workflow_engine/caches/mapping.py",
+   "line": 6
+  },
+  {
+   "state": "self._thresholds",
+   "file": "src/sentry/workflow_engine/handlers/detector/stateful.py",
+   "line": 328
+  },
+  {
+   "state": "self.action_target_to_string",
+   "file": "src/sentry/workflow_engine/transformers.py",
+   "line": 140
+  },
+  {
+   "state": "self.action_target_from_string",
+   "file": "src/sentry/workflow_engine/transformers.py",
+   "line": 141
+  },
+  {
+   "state": "self._data",
+   "file": "src/sentry/workflow_engine/utils/scopedstats.py",
+   "line": 58
+  },
+  {
+   "state": "all_names",
+   "file": "src/social_auth/admin.py",
+   "line": 16
+  },
+  {
+   "state": "self.data",
+   "file": "src/social_auth/backends/__init__.py",
+   "line": 269
+  },
+  {
+   "state": "BACKENDSCACHE",
+   "file": "src/social_auth/backends/__init__.py",
+   "line": 728
+  },
+  {
+   "state": "self._except_vars",
+   "file": "tools/flake8_plugin.py",
+   "line": 148
+  }
+ ],
+ "repo": "getsentry/sentry",
+ "stars": 43569
+}

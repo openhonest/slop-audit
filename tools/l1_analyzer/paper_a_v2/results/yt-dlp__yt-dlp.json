@@ -1,0 +1,131 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.9,
+ "v1_mutable_ratio": 72.0,
+ "v1_details": "4064/5648 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 380,
+  "promiscuous": 20,
+  "unresolved": 107
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 237,
+   "drives_decision": 143
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 20
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 107
+  }
+ },
+ "v2_resolvable": 0.789,
+ "v2_promiscuous": [
+  {
+   "state": "self._commits",
+   "file": "devscripts/make_changelog.py",
+   "line": 265
+  },
+  {
+   "state": "self._ies",
+   "file": "yt_dlp/YoutubeDL.py",
+   "line": 643
+  },
+  {
+   "state": "self._pps",
+   "file": "yt_dlp/YoutubeDL.py",
+   "line": 645
+  },
+  {
+   "state": "self._printed_messages",
+   "file": "yt_dlp/YoutubeDL.py",
+   "line": 646
+  },
+  {
+   "state": "self._playlist_urls",
+   "file": "yt_dlp/YoutubeDL.py",
+   "line": 656
+  },
+  {
+   "state": "self.archive",
+   "file": "yt_dlp/YoutubeDL.py",
+   "line": 862
+  },
+  {
+   "state": "self.tokens",
+   "file": "yt_dlp/YoutubeDL.py",
+   "line": 2668
+  },
+  {
+   "state": "self.tokens",
+   "file": "yt_dlp/YoutubeDL.py",
+   "line": 2668
+  },
+  {
+   "state": "self._BID_TAGS",
+   "file": "yt_dlp/extractor/iqiyi.py",
+   "line": 380
+  },
+  {
+   "state": "self._TMP_FILES",
+   "file": "yt_dlp/extractor/openload.py",
+   "line": 111
+  },
+  {
+   "state": "self._STREAKS_API_INFO",
+   "file": "yt_dlp/extractor/tver.py",
+   "line": 120
+  },
+  {
+   "state": "self._player_cache",
+   "file": "yt_dlp/extractor/youtube/_video.py",
+   "line": 1931
+  },
+  {
+   "state": "self._buffer",
+   "file": "yt_dlp/networking/_curlcffi.py",
+   "line": 48
+  },
+  {
+   "state": "self._remove_sponsor_segments",
+   "file": "yt_dlp/postprocessor/modify_chapters.py",
+   "line": 19
+  },
+  {
+   "state": "self._cache",
+   "file": "yt_dlp/utils/_utils.py",
+   "line": 2236
+  },
+  {
+   "state": "self._entries",
+   "file": "yt_dlp/utils/_utils.py",
+   "line": 2444
+  },
+  {
+   "state": "self._cache",
+   "file": "yt_dlp/utils/_utils.py",
+   "line": 5075
+  },
+  {
+   "state": "self._order",
+   "file": "yt_dlp/utils/_utils.py",
+   "line": 5460
+  },
+  {
+   "state": "self.__sensitive_map",
+   "file": "yt_dlp/utils/networking.py",
+   "line": 38
+  },
+  {
+   "state": "self._downloaded",
+   "file": "yt_dlp/utils/progress.py",
+   "line": 32
+  }
+ ],
+ "repo": "yt-dlp/yt-dlp",
+ "stars": 156562
+}

@@ -1,0 +1,3511 @@
+{
+ "status": "ok",
+ "clone_seconds": 11.9,
+ "v1_mutable_ratio": 57.2,
+ "v1_details": "15763/27542 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 9097,
+  "promiscuous": 696,
+  "unresolved": 3236
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 6683,
+   "drives_decision": 2414
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 696
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 3236
+  }
+ },
+ "v2_resolvable": 0.752,
+ "v2_promiscuous": [
+  {
+   "state": "dest_resp_mapping",
+   "file": ".buildkite/copy_files.py",
+   "line": 63
+  },
+  {
+   "state": "self.branch",
+   "file": "ci/ray_ci/automation/push_ray_image.py",
+   "line": 92
+  },
+  {
+   "state": "self.commit",
+   "file": "ci/ray_ci/automation/push_ray_image.py",
+   "line": 93
+  },
+  {
+   "state": "self.branch",
+   "file": "ci/ray_ci/automation/push_release_test_image.py",
+   "line": 152
+  },
+  {
+   "state": "self.commit",
+   "file": "ci/ray_ci/automation/push_release_test_image.py",
+   "line": 153
+  },
+  {
+   "state": "self._visited",
+   "file": "ci/ray_ci/doc/module.py",
+   "line": 17
+  },
+  {
+   "state": "self.plugins",
+   "file": "ci/repro-ci.py",
+   "line": 136
+  },
+  {
+   "state": "all_toc_libs",
+   "file": "doc/source/conf.py",
+   "line": 337
+  },
+  {
+   "state": "actors",
+   "file": "doc/source/ray-core/doc_code/cgraph_quickstart.py",
+   "line": 149
+  },
+  {
+   "state": "self.shared_memory_objects",
+   "file": "doc/source/ray-core/doc_code/direct_transport_custom.py",
+   "line": 43
+  },
+  {
+   "state": "self.storage",
+   "file": "doc/source/ray-core/examples/rdt/grpo_contextual_bandits.py",
+   "line": 131
+  },
+  {
+   "state": "self.action_dirs",
+   "file": "doc/source/ray-core/examples/rdt/grpo_contextual_bandits.py",
+   "line": 173
+  },
+  {
+   "state": "self.cache",
+   "file": "doc/source/ray-more-libs/doc_code/dask_on_ray_callbacks.py",
+   "line": 67
+  },
+  {
+   "state": "self._hit_count",
+   "file": "doc/source/rllib/doc_code/replay_buffer_demo.py",
+   "line": 79
+  },
+  {
+   "state": "self.classmap",
+   "file": "doc/source/serve/doc_code/aws_neuron_core_inference_serve.py",
+   "line": 63
+  },
+  {
+   "state": "self.categories",
+   "file": "doc/source/serve/doc_code/grpc_proxy/grpc_guide.py",
+   "line": 197
+  },
+  {
+   "state": "self.nums",
+   "file": "doc/source/serve/doc_code/grpc_proxy/grpc_guide.py",
+   "line": 326
+  },
+  {
+   "state": "self.categories",
+   "file": "doc/source/serve/doc_code/resnet50_example.py",
+   "line": 37
+  },
+  {
+   "state": "self.label_list",
+   "file": "doc/source/serve/doc_code/sklearn_quickstart.py",
+   "line": 25
+  },
+  {
+   "state": "self.label_list",
+   "file": "doc/source/serve/doc_code/tutorial_sklearn.py",
+   "line": 61
+  },
+  {
+   "state": "self.desc_texts",
+   "file": "doc/source/serve/tutorials/video-analysis/deployments/decoder.py",
+   "line": 52
+  },
+  {
+   "state": "self.tag_texts",
+   "file": "doc/source/serve/tutorials/video-analysis/deployments/decoder.py",
+   "line": 52
+  },
+  {
+   "state": "_recorded_library_usages",
+   "file": "python/ray/_common/usage/usage_lib.py",
+   "line": 178
+  },
+  {
+   "state": "amd_product_dict",
+   "file": "python/ray/_private/accelerators/amd_gpu.py",
+   "line": 13
+  },
+  {
+   "state": "self.logger",
+   "file": "python/ray/_private/event/event_logger.py",
+   "line": 33
+  },
+  {
+   "state": "_event_logger",
+   "file": "python/ray/_private/event/event_logger.py",
+   "line": 129
+  },
+  {
+   "state": "self.event_types",
+   "file": "python/ray/_private/event/export_event_logger.py",
+   "line": 82
+  },
+  {
+   "state": "self.logger",
+   "file": "python/ray/_private/event/export_event_logger.py",
+   "line": 103
+  },
+  {
+   "state": "_export_event_logger",
+   "file": "python/ray/_private/event/export_event_logger.py",
+   "line": 214
+  },
+  {
+   "state": "self._function_execution_info",
+   "file": "python/ray/_private/function_manager.py",
+   "line": 117
+  },
+  {
+   "state": "self._num_task_executions",
+   "file": "python/ray/_private/function_manager.py",
+   "line": 118
+  },
+  {
+   "state": "self._metrics",
+   "file": "python/ray/_private/metrics_agent.py",
+   "line": 244
+  },
+  {
+   "state": "self._components",
+   "file": "python/ray/_private/metrics_agent.py",
+   "line": 306
+  },
+  {
+   "state": "self.all_processes",
+   "file": "python/ray/_private/node.py",
+   "line": 114
+  },
+  {
+   "state": "self._incremental_dict",
+   "file": "python/ray/_private/node.py",
+   "line": 747
+  },
+  {
+   "state": "self.reserved_ports",
+   "file": "python/ray/_private/parameter.py",
+   "line": 339
+  },
+  {
+   "state": "_default_color_mapping",
+   "file": "python/ray/_private/profiling.py",
+   "line": 25
+  },
+  {
+   "state": "self._encoding_to_formatter",
+   "file": "python/ray/_private/ray_logging/logging_config.py",
+   "line": 25
+  },
+  {
+   "state": "skip_pattern",
+   "file": "python/ray/_private/ray_microbenchmark_helpers.py",
+   "line": 13
+  },
+  {
+   "state": "self.labels",
+   "file": "python/ray/_private/resource_and_label_spec.py",
+   "line": 51
+  },
+  {
+   "state": "self._runtime_env_reference",
+   "file": "python/ray/_private/runtime_env/agent/runtime_env_agent.py",
+   "line": 79
+  },
+  {
+   "state": "self._uri_reference",
+   "file": "python/ray/_private/runtime_env/agent/runtime_env_agent.py",
+   "line": 82
+  },
+  {
+   "state": "self._reference_exclude_sources",
+   "file": "python/ray/_private/runtime_env/agent/runtime_env_agent.py",
+   "line": 89
+  },
+  {
+   "state": "self._per_job_logger_cache",
+   "file": "python/ray/_private/runtime_env/agent/runtime_env_agent.py",
+   "line": 209
+  },
+  {
+   "state": "self._env_cache",
+   "file": "python/ray/_private/runtime_env/agent/runtime_env_agent.py",
+   "line": 212
+  },
+  {
+   "state": "self._env_locks",
+   "file": "python/ray/_private/runtime_env/agent/runtime_env_agent.py",
+   "line": 215
+  },
+  {
+   "state": "self._plugin_manager",
+   "file": "python/ray/_private/runtime_env/agent/runtime_env_agent.py",
+   "line": 252
+  },
+  {
+   "state": "self._validated_named_conda_env",
+   "file": "python/ray/_private/runtime_env/conda.py",
+   "line": 274
+  },
+  {
+   "state": "self._create_locks",
+   "file": "python/ray/_private/runtime_env/pip.py",
+   "line": 309
+  },
+  {
+   "state": "self._created_hash_bytes",
+   "file": "python/ray/_private/runtime_env/pip.py",
+   "line": 311
+  },
+  {
+   "state": "self.plugins",
+   "file": "python/ray/_private/runtime_env/plugin.py",
+   "line": 123
+  },
+  {
+   "state": "self._used_uris",
+   "file": "python/ray/_private/runtime_env/uri_cache.py",
+   "line": 35
+  },
+  {
+   "state": "self._create_locks",
+   "file": "python/ray/_private/runtime_env/uv.py",
+   "line": 231
+  },
+  {
+   "state": "self._created_hash_bytes",
+   "file": "python/ray/_private/runtime_env/uv.py",
+   "line": 233
+  },
+  {
+   "state": "_HIGH_CARDINALITY_LABELS",
+   "file": "python/ray/_private/telemetry/metric_cardinality.py",
+   "line": 19
+  },
+  {
+   "state": "self._registered_instruments",
+   "file": "python/ray/_private/telemetry/open_telemetry_metric_recorder.py",
+   "line": 75
+  },
+  {
+   "state": "self._gauge_observations_by_name",
+   "file": "python/ray/_private/telemetry/open_telemetry_metric_recorder.py",
+   "line": 79
+  },
+  {
+   "state": "self._counter_observations_by_name",
+   "file": "python/ray/_private/telemetry/open_telemetry_metric_recorder.py",
+   "line": 80
+  },
+  {
+   "state": "self._sum_observations_by_name",
+   "file": "python/ray/_private/telemetry/open_telemetry_metric_recorder.py",
+   "line": 81
+  },
+  {
+   "state": "self._histogram_bucket_midpoints",
+   "file": "python/ray/_private/telemetry/open_telemetry_metric_recorder.py",
+   "line": 82
+  },
+  {
+   "state": "_registered_patterns",
+   "file": "python/ray/_private/thirdparty/pathspec/util.py",
+   "line": 21
+  },
+  {
+   "state": "_handles",
+   "file": "python/ray/_private/thirdparty/pyamdsmi/pyamdsmi.py",
+   "line": 49
+  },
+  {
+   "state": "_nvmlGetFunctionPointer_cache",
+   "file": "python/ray/_private/thirdparty/pynvml/pynvml.py",
+   "line": 1065
+  },
+  {
+   "state": "multiline_formats",
+   "file": "python/ray/_private/thirdparty/tabulate/tabulate.py",
+   "line": 689
+  },
+  {
+   "state": "self.original_visible_accelerator_ids",
+   "file": "python/ray/_private/worker.py",
+   "line": 468
+  },
+  {
+   "state": "self._ray_method_signatures",
+   "file": "python/ray/actor.py",
+   "line": 2401
+  },
+  {
+   "state": "self._ray_function_descriptor",
+   "file": "python/ray/actor.py",
+   "line": 2418
+  },
+  {
+   "state": "self._method_shells",
+   "file": "python/ray/actor.py",
+   "line": 2440
+  },
+  {
+   "state": "self._tracked_actors_to_task_futures",
+   "file": "python/ray/air/execution/_internal/actor_manager.py",
+   "line": 103
+  },
+  {
+   "state": "self._tracked_actors_to_state_futures",
+   "file": "python/ray/air/execution/_internal/actor_manager.py",
+   "line": 108
+  },
+  {
+   "state": "self._resource_request_to_pending_actors",
+   "file": "python/ray/air/execution/_internal/actor_manager.py",
+   "line": 119
+  },
+  {
+   "state": "self._pending_actors_to_enqueued_actor_tasks",
+   "file": "python/ray/air/execution/_internal/actor_manager.py",
+   "line": 135
+  },
+  {
+   "state": "self._failed_actor_ids",
+   "file": "python/ray/air/execution/_internal/actor_manager.py",
+   "line": 157
+  },
+  {
+   "state": "self._pg_to_request",
+   "file": "python/ray/air/execution/resources/placement_group.py",
+   "line": 87
+  },
+  {
+   "state": "self._request_to_staged_pgs",
+   "file": "python/ray/air/execution/resources/placement_group.py",
+   "line": 90
+  },
+  {
+   "state": "self._request_to_ready_pgs",
+   "file": "python/ray/air/execution/resources/placement_group.py",
+   "line": 95
+  },
+  {
+   "state": "self._trial_experiments",
+   "file": "python/ray/air/integrations/comet.py",
+   "line": 119
+  },
+  {
+   "state": "self._checkpoint_on",
+   "file": "python/ray/air/integrations/keras.py",
+   "line": 152
+  },
+  {
+   "state": "self._report_metrics_on",
+   "file": "python/ray/air/integrations/keras.py",
+   "line": 153
+  },
+  {
+   "state": "self._trial_runs",
+   "file": "python/ray/air/integrations/mlflow.py",
+   "line": 303
+  },
+  {
+   "state": "self._trial_logging_futures",
+   "file": "python/ray/air/integrations/wandb.py",
+   "line": 637
+  },
+  {
+   "state": "self._trial_queues",
+   "file": "python/ray/air/integrations/wandb.py",
+   "line": 639
+  },
+  {
+   "state": "self.cached_nodes",
+   "file": "python/ray/autoscaler/_private/_azure/node_provider.py",
+   "line": 117
+  },
+  {
+   "state": "self.terminating_nodes",
+   "file": "python/ray/autoscaler/_private/_azure/node_provider.py",
+   "line": 120
+  },
+  {
+   "state": "self.tag_cache_pending",
+   "file": "python/ray/autoscaler/_private/aliyun/node_provider.py",
+   "line": 52
+  },
+  {
+   "state": "self.cached_nodes",
+   "file": "python/ray/autoscaler/_private/aliyun/node_provider.py",
+   "line": 64
+  },
+  {
+   "state": "self.load_metrics",
+   "file": "python/ray/autoscaler/_private/autoscaler.py",
+   "line": 252
+  },
+  {
+   "state": "_log_info",
+   "file": "python/ray/autoscaler/_private/aws/config.py",
+   "line": 99
+  },
+  {
+   "state": "self.tag_cache",
+   "file": "python/ray/autoscaler/_private/aws/node_provider.py",
+   "line": 121
+  },
+  {
+   "state": "self.tag_cache_pending",
+   "file": "python/ray/autoscaler/_private/aws/node_provider.py",
+   "line": 123
+  },
+  {
+   "state": "self.cached_nodes",
+   "file": "python/ray/autoscaler/_private/aws/node_provider.py",
+   "line": 137
+  },
+  {
+   "state": "self.events_by_key",
+   "file": "python/ray/autoscaler/_private/event_summarizer.py",
+   "line": 10
+  },
+  {
+   "state": "self.throttled_messages",
+   "file": "python/ray/autoscaler/_private/event_summarizer.py",
+   "line": 15
+  },
+  {
+   "state": "self.callback_map",
+   "file": "python/ray/autoscaler/_private/event_system.py",
+   "line": 50
+  },
+  {
+   "state": "self._nodes",
+   "file": "python/ray/autoscaler/_private/fake_multi_node/node_provider.py",
+   "line": 275
+  },
+  {
+   "state": "self._nodes",
+   "file": "python/ray/autoscaler/_private/fake_multi_node/test_utils.py",
+   "line": 49
+  },
+  {
+   "state": "self.cached_nodes",
+   "file": "python/ray/autoscaler/_private/gcp/node_provider.py",
+   "line": 72
+  },
+  {
+   "state": "self.resources",
+   "file": "python/ray/autoscaler/_private/gcp/node_provider.py",
+   "line": 81
+  },
+  {
+   "state": "self._command_runners",
+   "file": "python/ray/autoscaler/_private/gcp/tpu_command_runner.py",
+   "line": 188
+  },
+  {
+   "state": "self.waiting_bundles",
+   "file": "python/ray/autoscaler/_private/load_metrics.py",
+   "line": 85
+  },
+  {
+   "state": "self.infeasible_bundles",
+   "file": "python/ray/autoscaler/_private/load_metrics.py",
+   "line": 86
+  },
+  {
+   "state": "self.store",
+   "file": "python/ray/autoscaler/_private/node_provider_availability_tracker.py",
+   "line": 88
+  },
+  {
+   "state": "self.node_mapping",
+   "file": "python/ray/autoscaler/_private/node_tracker.py",
+   "line": 17
+  },
+  {
+   "state": "_provider_instances",
+   "file": "python/ray/autoscaler/_private/providers.py",
+   "line": 14
+  },
+  {
+   "state": "self.nodes",
+   "file": "python/ray/autoscaler/_private/readonly/node_provider.py",
+   "line": 23
+  },
+  {
+   "state": "self.node_resource_updated",
+   "file": "python/ray/autoscaler/_private/resource_demand_scheduler.py",
+   "line": 110
+  },
+  {
+   "state": "self._nodes",
+   "file": "python/ray/autoscaler/_private/spark/node_provider.py",
+   "line": 36
+  },
+  {
+   "state": "self._created_node_id_set",
+   "file": "python/ray/autoscaler/_private/spark/spark_job_server.py",
+   "line": 18
+  },
+  {
+   "state": "_hash_cache",
+   "file": "python/ray/autoscaler/_private/util.py",
+   "line": 464
+  },
+  {
+   "state": "self.tag_cache",
+   "file": "python/ray/autoscaler/_private/vsphere/node_provider.py",
+   "line": 26
+  },
+  {
+   "state": "self.replica_index_to_nodes",
+   "file": "python/ray/autoscaler/batching_node_provider.py",
+   "line": 114
+  },
+  {
+   "state": "self._requests",
+   "file": "python/ray/autoscaler/v2/instance_manager/cloud_providers/kuberay/cloud_provider.py",
+   "line": 87
+  },
+  {
+   "state": "self._container_resources",
+   "file": "python/ray/autoscaler/v2/instance_manager/cloud_providers/kuberay/ippr_provider.py",
+   "line": 68
+  },
+  {
+   "state": "self._tables",
+   "file": "python/ray/autoscaler/v2/instance_manager/storage.py",
+   "line": 116
+  },
+  {
+   "state": "self._last_unavailable_timestamp",
+   "file": "python/ray/autoscaler/v2/instance_manager/subscribers/cloud_resource_monitor.py",
+   "line": 31
+  },
+  {
+   "state": "self.seen_states",
+   "file": "python/ray/autoscaler/v2/scheduler.py",
+   "line": 174
+  },
+  {
+   "state": "self.shapes",
+   "file": "python/ray/autoscaler/v2/scheduler.py",
+   "line": 212
+  },
+  {
+   "state": "self.total_resources",
+   "file": "python/ray/autoscaler/v2/scheduler.py",
+   "line": 345
+  },
+  {
+   "state": "self.available_resources_for_sched",
+   "file": "python/ray/autoscaler/v2/scheduler.py",
+   "line": 346
+  },
+  {
+   "state": "self.sched_requests",
+   "file": "python/ray/autoscaler/v2/scheduler.py",
+   "line": 350
+  },
+  {
+   "state": "self.labels",
+   "file": "python/ray/autoscaler/v2/scheduler.py",
+   "line": 354
+  },
+  {
+   "state": "_PICKLE_BY_VALUE_MODULES",
+   "file": "python/ray/cloudpickle/cloudpickle.py",
+   "line": 89
+  },
+  {
+   "state": "_BUILTIN_TYPE_NAMES",
+   "file": "python/ray/cloudpickle/cloudpickle.py",
+   "line": 396
+  },
+  {
+   "state": "self._communicator_to_type_hints",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 941
+  },
+  {
+   "state": "self._actors_to_created_communicator_id",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 948
+  },
+  {
+   "state": "self.dag_node_to_idx",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 987
+  },
+  {
+   "state": "self.actor_to_tasks",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 1013
+  },
+  {
+   "state": "self.actor_to_execution_schedule",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 1024
+  },
+  {
+   "state": "self.actor_to_node_id",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 1029
+  },
+  {
+   "state": "self._result_buffer",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 1037
+  },
+  {
+   "state": "self._channel_dict",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 1039
+  },
+  {
+   "state": "self._destructed_ref_idxs",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 1062
+  },
+  {
+   "state": "self._got_ref_idxs",
+   "file": "python/ray/dag/compiled_dag_node.py",
+   "line": 1067
+  },
+  {
+   "state": "self._stable_uuid",
+   "file": "python/ray/dag/dag_node.py",
+   "line": 72
+  },
+  {
+   "state": "self.cache",
+   "file": "python/ray/dag/dag_node.py",
+   "line": 515
+  },
+  {
+   "state": "self.cache",
+   "file": "python/ray/dag/dag_node.py",
+   "line": 515
+  },
+  {
+   "state": "self.input_attribute_nodes",
+   "file": "python/ray/dag/input_node.py",
+   "line": 92
+  },
+  {
+   "state": "self.input_type",
+   "file": "python/ray/dag/input_node.py",
+   "line": 94
+  },
+  {
+   "state": "self._dag_input_node",
+   "file": "python/ray/dag/input_node.py",
+   "line": 237
+  },
+  {
+   "state": "self._args",
+   "file": "python/ray/dag/input_node.py",
+   "line": 322
+  },
+  {
+   "state": "self._kwargs",
+   "file": "python/ray/dag/input_node.py",
+   "line": 323
+  },
+  {
+   "state": "_instances",
+   "file": "python/ray/dag/py_obj_scanner.py",
+   "line": 9
+  },
+  {
+   "state": "self._found",
+   "file": "python/ray/dag/py_obj_scanner.py",
+   "line": 45
+  },
+  {
+   "state": "self._replace_table",
+   "file": "python/ray/dag/py_obj_scanner.py",
+   "line": 51
+  },
+  {
+   "state": "self.name_to_suffix",
+   "file": "python/ray/dag/utils.py",
+   "line": 21
+  },
+  {
+   "state": "self._buffer",
+   "file": "python/ray/dashboard/modules/aggregator/multi_consumer_event_buffer.py",
+   "line": 44
+  },
+  {
+   "state": "self._exposable_event_types_list",
+   "file": "python/ray/dashboard/modules/aggregator/publisher/async_publisher_client.py",
+   "line": 59
+  },
+  {
+   "state": "self.events",
+   "file": "python/ray/dashboard/modules/event/event_head.py",
+   "line": 110
+  },
+  {
+   "state": "self._agents",
+   "file": "python/ray/dashboard/modules/job/job_head.py",
+   "line": 247
+  },
+  {
+   "state": "self.monitored_jobs",
+   "file": "python/ray/dashboard/modules/job/job_manager.py",
+   "line": 81
+  },
+  {
+   "state": "self._events",
+   "file": "python/ray/dashboard/modules/platform_events/platform_event_head.py",
+   "line": 45
+  },
+  {
+   "state": "self._cluster_pod_names",
+   "file": "python/ray/dashboard/modules/platform_events/providers/k8s_provider.py",
+   "line": 73
+  },
+  {
+   "state": "self._non_cluster_pod_names",
+   "file": "python/ray/dashboard/modules/platform_events/providers/k8s_provider.py",
+   "line": 77
+  },
+  {
+   "state": "self._proxy",
+   "file": "python/ray/dashboard/utils.py",
+   "line": 528
+  },
+  {
+   "state": "self._shuffled_indices",
+   "file": "python/ray/data/_internal/batcher.py",
+   "line": 231
+  },
+  {
+   "state": "self._blocks",
+   "file": "python/ray/data/_internal/block_batching/util.py",
+   "line": 491
+  },
+  {
+   "state": "self._ongoing_reqs",
+   "file": "python/ray/data/_internal/cluster_autoscaler/default_autoscaling_coordinator.py",
+   "line": 282
+  },
+  {
+   "state": "self._subcluster_selectors",
+   "file": "python/ray/data/_internal/cluster_autoscaler/default_autoscaling_coordinator.py",
+   "line": 284
+  },
+  {
+   "state": "self.original_metas",
+   "file": "python/ray/data/_internal/datasource/lerobot_datasource.py",
+   "line": 1451
+  },
+  {
+   "state": "self._array_chunks",
+   "file": "python/ray/data/_internal/datasource/zarrv2_datasource.py",
+   "line": 447
+  },
+  {
+   "state": "self._array_grids",
+   "file": "python/ray/data/_internal/datasource/zarrv2_datasource.py",
+   "line": 448
+  },
+  {
+   "state": "self._concurrency_caps",
+   "file": "python/ray/data/_internal/execution/backpressure_policy/concurrency_cap_backpressure_policy.py",
+   "line": 75
+  },
+  {
+   "state": "self._q_level_nbytes",
+   "file": "python/ray/data/_internal/execution/backpressure_policy/concurrency_cap_backpressure_policy.py",
+   "line": 78
+  },
+  {
+   "state": "self._q_level_dev",
+   "file": "python/ray/data/_internal/execution/backpressure_policy/concurrency_cap_backpressure_policy.py",
+   "line": 81
+  },
+  {
+   "state": "self._queue_level_thresholds",
+   "file": "python/ray/data/_internal/execution/backpressure_policy/concurrency_cap_backpressure_policy.py",
+   "line": 84
+  },
+  {
+   "state": "self._registered_ids",
+   "file": "python/ray/data/_internal/execution/block_ref_counter.py",
+   "line": 30
+  },
+  {
+   "state": "self._bundle_to_nodes",
+   "file": "python/ray/data/_internal/execution/bundle_queue/hash_link.py",
+   "line": 40
+  },
+  {
+   "state": "self._inner",
+   "file": "python/ray/data/_internal/execution/bundle_queue/reordering.py",
+   "line": 31
+  },
+  {
+   "state": "self._current_key",
+   "file": "python/ray/data/_internal/execution/bundle_queue/reordering.py",
+   "line": 32
+  },
+  {
+   "state": "self._finalized_keys",
+   "file": "python/ray/data/_internal/execution/bundle_queue/reordering.py",
+   "line": 33
+  },
+  {
+   "state": "self._running_tasks",
+   "file": "python/ray/data/_internal/execution/interfaces/op_runtime_metrics.py",
+   "line": 554
+  },
+  {
+   "state": "self._internal_inqueues",
+   "file": "python/ray/data/_internal/execution/interfaces/op_runtime_metrics.py",
+   "line": 562
+  },
+  {
+   "state": "self._per_node_metrics",
+   "file": "python/ray/data/_internal/execution/interfaces/op_runtime_metrics.py",
+   "line": 566
+  },
+  {
+   "state": "self._fifos",
+   "file": "python/ray/data/_internal/execution/metadata_fetcher.py",
+   "line": 213
+  },
+  {
+   "state": "self._running_actors",
+   "file": "python/ray/data/_internal/execution/operators/actor_pool_map_operator.py",
+   "line": 778
+  },
+  {
+   "state": "self._actor_to_logical_id",
+   "file": "python/ray/data/_internal/execution/operators/actor_pool_map_operator.py",
+   "line": 782
+  },
+  {
+   "state": "self._actor_resource_usage",
+   "file": "python/ray/data/_internal/execution/operators/actor_pool_map_operator.py",
+   "line": 785
+  },
+  {
+   "state": "self._alive_actors_to_in_flight_tasks_heap",
+   "file": "python/ray/data/_internal/execution/operators/actor_pool_map_operator.py",
+   "line": 799
+  },
+  {
+   "state": "self._alive_node_to_actor_heap",
+   "file": "python/ray/data/_internal/execution/operators/actor_pool_map_operator.py",
+   "line": 805
+  },
+  {
+   "state": "self._key_column_names",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 580
+  },
+  {
+   "state": "self._buffered_input_bundles",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 602
+  },
+  {
+   "state": "self._sample_bytes_by_input",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 614
+  },
+  {
+   "state": "self._shuffling_tasks",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 632
+  },
+  {
+   "state": "self._finalizing_tasks",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 642
+  },
+  {
+   "state": "self._has_schemas_broadcasted",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 647
+  },
+  {
+   "state": "self._partitions_stats",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 663
+  },
+  {
+   "state": "self._aggregators",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 1714
+  },
+  {
+   "state": "self._input_seq_partition_buckets",
+   "file": "python/ray/data/_internal/execution/operators/hash_shuffle.py",
+   "line": 2002
+  },
+  {
+   "state": "self._input_data",
+   "file": "python/ray/data/_internal/execution/operators/input_data_buffer.py",
+   "line": 40
+  },
+  {
+   "state": "self._input_done_flags",
+   "file": "python/ray/data/_internal/execution/operators/mix_operator.py",
+   "line": 57
+  },
+  {
+   "state": "self._locality_hints",
+   "file": "python/ray/data/_internal/execution/operators/output_splitter.py",
+   "line": 87
+  },
+  {
+   "state": "self._merge_buffer_refs_by_node",
+   "file": "python/ray/data/_internal/execution/operators/shuffle_operators/shuffle_map_operator.py",
+   "line": 121
+  },
+  {
+   "state": "self._merge_buffer_bytes_by_node",
+   "file": "python/ray/data/_internal/execution/operators/shuffle_operators/shuffle_map_operator.py",
+   "line": 124
+  },
+  {
+   "state": "self._merge_buffer_bundles_by_node",
+   "file": "python/ray/data/_internal/execution/operators/shuffle_operators/shuffle_map_operator.py",
+   "line": 125
+  },
+  {
+   "state": "self._partition_staging",
+   "file": "python/ray/data/_internal/execution/operators/shuffle_operators/shuffle_map_operator.py",
+   "line": 135
+  },
+  {
+   "state": "self._pending_inputs",
+   "file": "python/ray/data/_internal/execution/operators/shuffle_operators/shuffle_reduce_operator.py",
+   "line": 130
+  },
+  {
+   "state": "self._input_buffers",
+   "file": "python/ray/data/_internal/execution/operators/union_operator.py",
+   "line": 44
+  },
+  {
+   "state": "self._input_done_flags",
+   "file": "python/ray/data/_internal/execution/operators/union_operator.py",
+   "line": 48
+  },
+  {
+   "state": "self._input_buffers",
+   "file": "python/ray/data/_internal/execution/operators/zip_operator.py",
+   "line": 56
+  },
+  {
+   "state": "self._op_usages",
+   "file": "python/ray/data/_internal/execution/resource_manager.py",
+   "line": 122
+  },
+  {
+   "state": "self._op_running_usages",
+   "file": "python/ray/data/_internal/execution/resource_manager.py",
+   "line": 123
+  },
+  {
+   "state": "self._mem_op_internal",
+   "file": "python/ray/data/_internal/execution/resource_manager.py",
+   "line": 127
+  },
+  {
+   "state": "self._mem_op_outputs",
+   "file": "python/ray/data/_internal/execution/resource_manager.py",
+   "line": 131
+  },
+  {
+   "state": "self._op_reserved",
+   "file": "python/ray/data/_internal/execution/resource_manager.py",
+   "line": 666
+  },
+  {
+   "state": "self._reserved_for_op_outputs",
+   "file": "python/ray/data/_internal/execution/resource_manager.py",
+   "line": 675
+  },
+  {
+   "state": "self._op_budgets",
+   "file": "python/ray/data/_internal/execution/resource_manager.py",
+   "line": 679
+  },
+  {
+   "state": "self._op_starved_since",
+   "file": "python/ray/data/_internal/execution/resource_manager.py",
+   "line": 690
+  },
+  {
+   "state": "self._has_op_completed",
+   "file": "python/ray/data/_internal/execution/streaming_executor.py",
+   "line": 148
+  },
+  {
+   "state": "self.last_num_outputs",
+   "file": "python/ray/data/_internal/execution/streaming_executor_state.py",
+   "line": 85
+  },
+  {
+   "state": "self.last_output_time",
+   "file": "python/ray/data/_internal/execution/streaming_executor_state.py",
+   "line": 86
+  },
+  {
+   "state": "self.last_detection_time",
+   "file": "python/ray/data/_internal/execution/streaming_executor_state.py",
+   "line": 87
+  },
+  {
+   "state": "memory_units",
+   "file": "python/ray/data/_internal/execution/util.py",
+   "line": 62
+  },
+  {
+   "state": "self._actors",
+   "file": "python/ray/data/_internal/gpu_shuffle/hash_shuffle.py",
+   "line": 242
+  },
+  {
+   "state": "self._hanging_op_tasks",
+   "file": "python/ray/data/_internal/issue_detection/detectors/hanging_detector.py",
+   "line": 104
+  },
+  {
+   "state": "self._initial_memory_requests",
+   "file": "python/ray/data/_internal/issue_detection/detectors/high_memory_detector.py",
+   "line": 53
+  },
+  {
+   "state": "self._last_detection_times",
+   "file": "python/ray/data/_internal/issue_detection/issue_detector_manager.py",
+   "line": 35
+  },
+  {
+   "state": "self._next_bundle",
+   "file": "python/ray/data/_internal/iterator/stream_split_iterator.py",
+   "line": 218
+  },
+  {
+   "state": "self._num_rows_dispatched",
+   "file": "python/ray/data/_internal/iterator/stream_split_iterator.py",
+   "line": 239
+  },
+  {
+   "state": "self._replacements_by_key",
+   "file": "python/ray/data/_internal/logical/rules/common_subexpr_elimination.py",
+   "line": 172
+  },
+  {
+   "state": "self._rules",
+   "file": "python/ray/data/_internal/logical/ruleset.py",
+   "line": 26
+  },
+  {
+   "state": "self.allocated",
+   "file": "python/ray/data/_internal/memory_tracing.py",
+   "line": 63
+  },
+  {
+   "state": "self.deallocated",
+   "file": "python/ray/data/_internal/memory_tracing.py",
+   "line": 64
+  },
+  {
+   "state": "self.skip_dealloc",
+   "file": "python/ray/data/_internal/memory_tracing.py",
+   "line": 65
+  },
+  {
+   "state": "self._row",
+   "file": "python/ray/data/_internal/pandas_block.py",
+   "line": 207
+  },
+  {
+   "state": "_warned_credential_fs_ids",
+   "file": "python/ray/data/_internal/planner/_obstore_download.py",
+   "line": 511
+  },
+  {
+   "state": "_BUCKET_REGION_CACHE",
+   "file": "python/ray/data/_internal/planner/_obstore_download.py",
+   "line": 579
+  },
+  {
+   "state": "self._cache",
+   "file": "python/ray/data/_internal/planner/_obstore_download.py",
+   "line": 642
+  },
+  {
+   "state": "self._merge_task_options",
+   "file": "python/ray/data/_internal/planner/exchange/push_based_shuffle_task_scheduler.py",
+   "line": 150
+  },
+  {
+   "state": "self._all_merge_results",
+   "file": "python/ray/data/_internal/planner/exchange/push_based_shuffle_task_scheduler.py",
+   "line": 301
+  },
+  {
+   "state": "self._reduce_arg_blocks",
+   "file": "python/ray/data/_internal/planner/exchange/push_based_shuffle_task_scheduler.py",
+   "line": 356
+  },
+  {
+   "state": "self.block",
+   "file": "python/ray/data/_internal/planner/plan_expression/expression_evaluator.py",
+   "line": 596
+  },
+  {
+   "state": "self.ops",
+   "file": "python/ray/data/_internal/planner/plan_expression/expression_evaluator.py",
+   "line": 602
+  },
+  {
+   "state": "_canceled_threads",
+   "file": "python/ray/data/_internal/progress/base_progress.py",
+   "line": 19
+  },
+  {
+   "state": "self._sub_progress_metrics",
+   "file": "python/ray/data/_internal/progress/logging_progress.py",
+   "line": 119
+  },
+  {
+   "state": "self._op_display",
+   "file": "python/ray/data/_internal/progress/rich_progress.py",
+   "line": 146
+  },
+  {
+   "state": "CACHED_FUNCTIONS",
+   "file": "python/ray/data/_internal/remote_fn.py",
+   "line": 5
+  },
+  {
+   "state": "self.datasets",
+   "file": "python/ray/data/_internal/stats.py",
+   "line": 386
+  },
+  {
+   "state": "self.dataset_metadatas",
+   "file": "python/ray/data/_internal/stats.py",
+   "line": 393
+  },
+  {
+   "state": "self.per_node_metrics",
+   "file": "python/ray/data/_internal/stats.py",
+   "line": 494
+  },
+  {
+   "state": "self.heap",
+   "file": "python/ray/data/_internal/utils/heapdict.py",
+   "line": 63
+  },
+  {
+   "state": "self._buckets",
+   "file": "python/ray/data/_internal/weighted_round_robin.py",
+   "line": 48
+  },
+  {
+   "state": "self._preprocessors",
+   "file": "python/ray/data/preprocessors/chain.py",
+   "line": 54
+  },
+  {
+   "state": "_PREPROCESSOR_REGISTRY",
+   "file": "python/ray/data/preprocessors/version_support.py",
+   "line": 9
+  },
+  {
+   "state": "self.blocks",
+   "file": "python/ray/data/random_access_dataset.py",
+   "line": 213
+  },
+  {
+   "state": "self.arrow_col",
+   "file": "python/ray/data/random_access_dataset.py",
+   "line": 283
+  },
+  {
+   "state": "self.collective_data",
+   "file": "python/ray/experimental/channel/cpu_communicator.py",
+   "line": 29
+  },
+  {
+   "state": "self.num_actors_seen",
+   "file": "python/ray/experimental/channel/cpu_communicator.py",
+   "line": 33
+  },
+  {
+   "state": "self.num_actors_read",
+   "file": "python/ray/experimental/channel/cpu_communicator.py",
+   "line": 37
+  },
+  {
+   "state": "self.num_ops",
+   "file": "python/ray/experimental/channel/cpu_communicator.py",
+   "line": 102
+  },
+  {
+   "state": "self._out_of_band_tensors",
+   "file": "python/ray/experimental/channel/serialization_context.py",
+   "line": 22
+  },
+  {
+   "state": "self.intra_process_channel_buffers",
+   "file": "python/ray/experimental/channel/serialization_context.py",
+   "line": 32
+  },
+  {
+   "state": "self.channel_id_to_num_readers",
+   "file": "python/ray/experimental/channel/serialization_context.py",
+   "line": 35
+  },
+  {
+   "state": "self._node_id_to_readers",
+   "file": "python/ray/experimental/channel/shared_memory_channel.py",
+   "line": 231
+  },
+  {
+   "state": "self._buffers",
+   "file": "python/ray/experimental/channel/shared_memory_channel.py",
+   "line": 573
+  },
+  {
+   "state": "self._channel_dict",
+   "file": "python/ray/experimental/channel/shared_memory_channel.py",
+   "line": 707
+  },
+  {
+   "state": "self._reader_ranks",
+   "file": "python/ray/experimental/channel/torch_tensor_accelerator_channel.py",
+   "line": 402
+  },
+  {
+   "state": "self._typ",
+   "file": "python/ray/experimental/channel/torch_tensor_accelerator_channel.py",
+   "line": 410
+  },
+  {
+   "state": "self._accelerator_group_id",
+   "file": "python/ray/experimental/channel/torch_tensor_accelerator_channel.py",
+   "line": 415
+  },
+  {
+   "state": "self.counts",
+   "file": "python/ray/experimental/raysort/tracing_utils.py",
+   "line": 80
+  },
+  {
+   "state": "self._pool_tensor",
+   "file": "python/ray/experimental/rdt/nixl_memory_pool.py",
+   "line": 57
+  },
+  {
+   "state": "self._free_blocks",
+   "file": "python/ray/experimental/rdt/nixl_memory_pool.py",
+   "line": 63
+  },
+  {
+   "state": "self._allocated_blocks",
+   "file": "python/ray/experimental/rdt/nixl_memory_pool.py",
+   "line": 67
+  },
+  {
+   "state": "self._aborted_transfer_obj_ids",
+   "file": "python/ray/experimental/rdt/nixl_tensor_transport.py",
+   "line": 145
+  },
+  {
+   "state": "self._tensor_desc_cache",
+   "file": "python/ray/experimental/rdt/nixl_tensor_transport.py",
+   "line": 150
+  },
+  {
+   "state": "self._managed_meta_nixl",
+   "file": "python/ray/experimental/rdt/nixl_tensor_transport.py",
+   "line": 153
+  },
+  {
+   "state": "self._remote_agents",
+   "file": "python/ray/experimental/rdt/nixl_tensor_transport.py",
+   "line": 159
+  },
+  {
+   "state": "self._managed_rdt_metadata",
+   "file": "python/ray/experimental/rdt/rdt_manager.py",
+   "line": 182
+  },
+  {
+   "state": "self._queued_transfers",
+   "file": "python/ray/experimental/rdt/rdt_manager.py",
+   "line": 188
+  },
+  {
+   "state": "self._queued_frees",
+   "file": "python/ray/experimental/rdt/rdt_manager.py",
+   "line": 193
+  },
+  {
+   "state": "self.actor_id_to_transports_registered",
+   "file": "python/ray/experimental/rdt/rdt_manager.py",
+   "line": 222
+  },
+  {
+   "state": "self._rdt_store",
+   "file": "python/ray/experimental/rdt/rdt_store.py",
+   "line": 162
+  },
+  {
+   "state": "self._tensor_to_object_ids",
+   "file": "python/ray/experimental/rdt/rdt_store.py",
+   "line": 164
+  },
+  {
+   "state": "transport_managers",
+   "file": "python/ray/experimental/rdt/util.py",
+   "line": 37
+  },
+  {
+   "state": "self.bars_by_uuid",
+   "file": "python/ray/experimental/tqdm_ray.py",
+   "line": 236
+  },
+  {
+   "state": "self.bar_groups",
+   "file": "python/ray/experimental/tqdm_ray.py",
+   "line": 298
+  },
+  {
+   "state": "self.stages",
+   "file": "python/ray/llm/_internal/batch/processor/base.py",
+   "line": 344
+  },
+  {
+   "state": "self._dtype_mapping",
+   "file": "python/ray/llm/_internal/batch/stages/serve_deployment_stage.py",
+   "line": 65
+  },
+  {
+   "state": "self.lora_name_to_request",
+   "file": "python/ray/llm/_internal/batch/stages/vllm_engine_stage.py",
+   "line": 275
+  },
+  {
+   "state": "self.conversations",
+   "file": "python/ray/llm/_internal/serve/benchmark/runners.py",
+   "line": 83
+  },
+  {
+   "state": "self.session_is_warmup",
+   "file": "python/ray/llm/_internal/serve/benchmark/runners.py",
+   "line": 84
+  },
+  {
+   "state": "self.user_messages",
+   "file": "python/ray/llm/_internal/serve/benchmark/text_gen.py",
+   "line": 30
+  },
+  {
+   "state": "self._assistant_responses",
+   "file": "python/ray/llm/_internal/serve/benchmark/text_gen.py",
+   "line": 32
+  },
+  {
+   "state": "self._default_serve_handles",
+   "file": "python/ray/llm/_internal/serve/core/ingress/ingress.py",
+   "line": 266
+  },
+  {
+   "state": "self._model_cards",
+   "file": "python/ray/llm/_internal/serve/core/ingress/ingress.py",
+   "line": 267
+  },
+  {
+   "state": "self._configured_serve_handles",
+   "file": "python/ray/llm/_internal/serve/core/ingress/ingress.py",
+   "line": 274
+  },
+  {
+   "state": "self._requests",
+   "file": "python/ray/llm/_internal/serve/routing_policies/kv_aware/kv_token_tracker.py",
+   "line": 217
+  },
+  {
+   "state": "self._request_ids_by_worker",
+   "file": "python/ray/llm/_internal/serve/routing_policies/kv_aware/kv_token_tracker.py",
+   "line": 220
+  },
+  {
+   "state": "self._completed_request_ids",
+   "file": "python/ray/llm/_internal/serve/routing_policies/kv_aware/kv_token_tracker.py",
+   "line": 223
+  },
+  {
+   "state": "self.tenant_to_char_count",
+   "file": "python/ray/llm/_internal/serve/routing_policies/prefix_aware/prefix_tree.py",
+   "line": 95
+  },
+  {
+   "state": "self.tenant_to_lru_tail",
+   "file": "python/ray/llm/_internal/serve/routing_policies/prefix_aware/prefix_tree.py",
+   "line": 98
+  },
+  {
+   "state": "self.disk_cache",
+   "file": "python/ray/llm/_internal/serve/utils/lora_serve_utils.py",
+   "line": 151
+  },
+  {
+   "state": "self.active_syncing_tasks",
+   "file": "python/ray/llm/_internal/serve/utils/lora_serve_utils.py",
+   "line": 152
+  },
+  {
+   "state": "self._loader_cache",
+   "file": "python/ray/llm/_internal/serve/utils/registry.py",
+   "line": 121
+  },
+  {
+   "state": "self._resolved_cache",
+   "file": "python/ray/llm/_internal/serve/utils/registry.py",
+   "line": 122
+  },
+  {
+   "state": "self._pending",
+   "file": "python/ray/llm/_internal/serve/utils/registry.py",
+   "line": 123
+  },
+  {
+   "state": "_registries",
+   "file": "python/ray/llm/_internal/serve/utils/registry.py",
+   "line": 300
+  },
+  {
+   "state": "self._application_states",
+   "file": "python/ray/serve/_private/application_state.py",
+   "line": 1220
+  },
+  {
+   "state": "self._handle_requests",
+   "file": "python/ray/serve/_private/autoscaling_state.py",
+   "line": 75
+  },
+  {
+   "state": "self._replica_metrics",
+   "file": "python/ray/serve/_private/autoscaling_state.py",
+   "line": 79
+  },
+  {
+   "state": "self._cached_running_replica_strs",
+   "file": "python/ray/serve/_private/autoscaling_state.py",
+   "line": 97
+  },
+  {
+   "state": "self._deployment_autoscaling_states",
+   "file": "python/ray/serve/_private/autoscaling_state.py",
+   "line": 824
+  },
+  {
+   "state": "self._app_autoscaling_states",
+   "file": "python/ray/serve/_private/autoscaling_state.py",
+   "line": 1102
+  },
+  {
+   "state": "self._evicted_handle_keys",
+   "file": "python/ray/serve/_private/client.py",
+   "line": 73
+  },
+  {
+   "state": "_wrong_names_white_list",
+   "file": "python/ray/serve/_private/constants_utils.py",
+   "line": 51
+  },
+  {
+   "state": "_fully_deprecated_env_vars",
+   "file": "python/ray/serve/_private/constants_utils.py",
+   "line": 359
+  },
+  {
+   "state": "self._deployments",
+   "file": "python/ray/serve/_private/deployment_scheduler.py",
+   "line": 383
+  },
+  {
+   "state": "self._pending_replicas",
+   "file": "python/ray/serve/_private/deployment_scheduler.py",
+   "line": 386
+  },
+  {
+   "state": "self._launching_replicas",
+   "file": "python/ray/serve/_private/deployment_scheduler.py",
+   "line": 392
+  },
+  {
+   "state": "self._recovering_replicas",
+   "file": "python/ray/serve/_private/deployment_scheduler.py",
+   "line": 398
+  },
+  {
+   "state": "self._running_replicas",
+   "file": "python/ray/serve/_private/deployment_scheduler.py",
+   "line": 402
+  },
+  {
+   "state": "self._actors_by_state",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 419
+  },
+  {
+   "state": "self._replicas",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 2179
+  },
+  {
+   "state": "self._ranks",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 2391
+  },
+  {
+   "state": "self._local_rank_managers",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 2595
+  },
+  {
+   "state": "self._replica_to_node",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 2598
+  },
+  {
+   "state": "self._replicas_by_gang_id",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 2953
+  },
+  {
+   "state": "self._shutdown_tiers",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 5778
+  },
+  {
+   "state": "self._deployment_states",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 5782
+  },
+  {
+   "state": "self._app_deployment_mapping",
+   "file": "python/ray/serve/_private/deployment_state.py",
+   "line": 5787
+  },
+  {
+   "state": "self.backend_configs",
+   "file": "python/ray/serve/_private/haproxy.py",
+   "line": 861
+  },
+  {
+   "state": "self.key_listeners",
+   "file": "python/ray/serve/_private/long_poll.py",
+   "line": 137
+  },
+  {
+   "state": "self.snapshot_ids",
+   "file": "python/ray/serve/_private/long_poll.py",
+   "line": 339
+  },
+  {
+   "state": "self.object_snapshots",
+   "file": "python/ray/serve/_private/long_poll.py",
+   "line": 341
+  },
+  {
+   "state": "self.notifier_events",
+   "file": "python/ray/serve/_private/long_poll.py",
+   "line": 343
+  },
+  {
+   "state": "self._notify_timestamps",
+   "file": "python/ray/serve/_private/long_poll.py",
+   "line": 348
+  },
+  {
+   "state": "self._pending_clients_by_namespace",
+   "file": "python/ray/serve/_private/long_poll.py",
+   "line": 352
+  },
+  {
+   "state": "self._tasks",
+   "file": "python/ray/serve/_private/metrics_utils.py",
+   "line": 54
+  },
+  {
+   "state": "self._async_tasks",
+   "file": "python/ray/serve/_private/metrics_utils.py",
+   "line": 55
+  },
+  {
+   "state": "self.data",
+   "file": "python/ray/serve/_private/metrics_utils.py",
+   "line": 151
+  },
+  {
+   "state": "self._allocated_ports",
+   "file": "python/ray/serve/_private/node_port_manager.py",
+   "line": 36
+  },
+  {
+   "state": "self._quarantined_ports",
+   "file": "python/ray/serve/_private/node_port_manager.py",
+   "line": 39
+  },
+  {
+   "state": "self._streaming_sessions",
+   "file": "python/ray/serve/_private/proxy.py",
+   "line": 576
+  },
+  {
+   "state": "self.asgi_receive_queues",
+   "file": "python/ray/serve/_private/proxy.py",
+   "line": 1053
+  },
+  {
+   "state": "self.handles",
+   "file": "python/ray/serve/_private/proxy_router.py",
+   "line": 33
+  },
+  {
+   "state": "self.route_info",
+   "file": "python/ray/serve/_private/proxy_router.py",
+   "line": 42
+  },
+  {
+   "state": "self.app_to_is_cross_language",
+   "file": "python/ray/serve/_private/proxy_router.py",
+   "line": 44
+  },
+  {
+   "state": "self.endpoints",
+   "file": "python/ray/serve/_private/proxy_router.py",
+   "line": 48
+  },
+  {
+   "state": "self.route_patterns",
+   "file": "python/ray/serve/_private/proxy_router.py",
+   "line": 53
+  },
+  {
+   "state": "self._proxy_states",
+   "file": "python/ray/serve/_private/proxy_state.py",
+   "line": 615
+  },
+  {
+   "state": "self._cached_latencies",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 437
+  },
+  {
+   "state": "self._max_processing_latency_trackers",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 441
+  },
+  {
+   "state": "self._ingress_metrics",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 500
+  },
+  {
+   "state": "self._ingress_ongoing_requests",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 501
+  },
+  {
+   "state": "self._cached_ingress_request_counter",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 518
+  },
+  {
+   "state": "self._cached_ingress_request_error_counter",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 521
+  },
+  {
+   "state": "self._cached_deployment_request_error_counter",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 524
+  },
+  {
+   "state": "self._cached_ingress_processing_latencies",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 527
+  },
+  {
+   "state": "self._cached_user_method_info",
+   "file": "python/ray/serve/_private/replica.py",
+   "line": 3459
+  },
+  {
+   "state": "self._colocated_replica_ids",
+   "file": "python/ray/serve/_private/request_router/request_router.py",
+   "line": 84
+  },
+  {
+   "state": "self._replicas",
+   "file": "python/ray/serve/_private/request_router/request_router.py",
+   "line": 496
+  },
+  {
+   "state": "self._queue_len_gauge_last_update",
+   "file": "python/ray/serve/_private/request_router/request_router.py",
+   "line": 506
+  },
+  {
+   "state": "self._pending_requests_by_id",
+   "file": "python/ray/serve/_private/request_router/request_router.py",
+   "line": 533
+  },
+  {
+   "state": "self._pending_requests_by_model_id",
+   "file": "python/ray/serve/_private/request_router/request_router.py",
+   "line": 536
+  },
+  {
+   "state": "self.routers",
+   "file": "python/ray/serve/_private/router.py",
+   "line": 1929
+  },
+  {
+   "state": "_serializer_cache",
+   "file": "python/ray/serve/_private/serialization.py",
+   "line": 32
+  },
+  {
+   "state": "dead_replicas_context",
+   "file": "python/ray/serve/_private/test_utils.py",
+   "line": 94
+  },
+  {
+   "state": "uninitialized_replicas_context",
+   "file": "python/ray/serve/_private/test_utils.py",
+   "line": 98
+  },
+  {
+   "state": "self.store",
+   "file": "python/ray/serve/_private/test_utils.py",
+   "line": 154
+  },
+  {
+   "state": "self._available_attrs",
+   "file": "python/ray/serve/_private/utils.py",
+   "line": 432
+  },
+  {
+   "state": "self.curr_iteration_start_times",
+   "file": "python/ray/serve/batching.py",
+   "line": 161
+  },
+  {
+   "state": "_requests_pending_assignment",
+   "file": "python/ray/serve/context.py",
+   "line": 415
+  },
+  {
+   "state": "_in_flight_requests",
+   "file": "python/ray/serve/context.py",
+   "line": 452
+  },
+  {
+   "state": "self._replicas",
+   "file": "python/ray/serve/experimental/capacity_queue.py",
+   "line": 72
+  },
+  {
+   "state": "self._in_flight_timestamps",
+   "file": "python/ray/serve/experimental/capacity_queue.py",
+   "line": 75
+  },
+  {
+   "state": "self._ring_replicas",
+   "file": "python/ray/serve/experimental/consistent_hash_router.py",
+   "line": 111
+  },
+  {
+   "state": "self._replicas",
+   "file": "python/ray/serve/experimental/round_robin_router.py",
+   "line": 33
+  },
+  {
+   "state": "self._uuid",
+   "file": "python/ray/train/_checkpoint.py",
+   "line": 143
+  },
+  {
+   "state": "self.dataset_shards",
+   "file": "python/ray/train/_internal/backend_executor.py",
+   "line": 132
+  },
+  {
+   "state": "self._user_execution_options",
+   "file": "python/ray/train/_internal/data_config.py",
+   "line": 58
+  },
+  {
+   "state": "_checked_resources",
+   "file": "python/ray/train/_internal/session.py",
+   "line": 523
+  },
+  {
+   "state": "self.train_run_info_dict",
+   "file": "python/ray/train/_internal/state/state_manager.py",
+   "line": 31
+  },
+  {
+   "state": "self.x",
+   "file": "python/ray/train/examples/pytorch/torch_data_prefetch_benchmark/auto_pipeline_for_host_to_device_data_transfer.py",
+   "line": 33
+  },
+  {
+   "state": "self.y",
+   "file": "python/ray/train/examples/pytorch/torch_data_prefetch_benchmark/auto_pipeline_for_host_to_device_data_transfer.py",
+   "line": 34
+  },
+  {
+   "state": "self.x",
+   "file": "python/ray/train/examples/pytorch/torch_linear_example.py",
+   "line": 19
+  },
+  {
+   "state": "self.y",
+   "file": "python/ray/train/examples/pytorch/torch_linear_example.py",
+   "line": 20
+  },
+  {
+   "state": "self.convs",
+   "file": "python/ray/train/examples/pytorch_geometric/distributed_sage_example.py",
+   "line": 25
+  },
+  {
+   "state": "self._metrics",
+   "file": "python/ray/train/lightgbm/_lightgbm_utils.py",
+   "line": 82
+  },
+  {
+   "state": "TRAIN_PACKAGES",
+   "file": "python/ray/train/lint/check_circular_imports.py",
+   "line": 7
+  },
+  {
+   "state": "self._checkpoint_on",
+   "file": "python/ray/train/tensorflow/keras.py",
+   "line": 120
+  },
+  {
+   "state": "self._report_metrics_on",
+   "file": "python/ray/train/tensorflow/keras.py",
+   "line": 121
+  },
+  {
+   "state": "self._cached_dataset_shards",
+   "file": "python/ray/train/v2/_internal/callbacks/datasets.py",
+   "line": 55
+  },
+  {
+   "state": "self._metrics",
+   "file": "python/ray/train/v2/_internal/callbacks/metrics.py",
+   "line": 29
+  },
+  {
+   "state": "self._metrics",
+   "file": "python/ray/train/v2/_internal/callbacks/metrics.py",
+   "line": 79
+  },
+  {
+   "state": "self._datasets",
+   "file": "python/ray/train/v2/_internal/data_integration/dataset_manager.py",
+   "line": 30
+  },
+  {
+   "state": "self._datasets_to_split",
+   "file": "python/ray/train/v2/_internal/data_integration/dataset_manager.py",
+   "line": 32
+  },
+  {
+   "state": "self._dataset_iterators",
+   "file": "python/ray/train/v2/_internal/data_integration/dataset_manager.py",
+   "line": 43
+  },
+  {
+   "state": "self._pending_training_results",
+   "file": "python/ray/train/v2/_internal/execution/checkpoint/checkpoint_manager.py",
+   "line": 112
+  },
+  {
+   "state": "self._validated_checkpoints",
+   "file": "python/ray/train/v2/_internal/execution/checkpoint/checkpoint_manager.py",
+   "line": 118
+  },
+  {
+   "state": "self._timed_out_validation_checkpoints",
+   "file": "python/ray/train/v2/_internal/execution/checkpoint/checkpoint_manager.py",
+   "line": 119
+  },
+  {
+   "state": "self._failed_validation_checkpoints",
+   "file": "python/ray/train/v2/_internal/execution/checkpoint/checkpoint_manager.py",
+   "line": 120
+  },
+  {
+   "state": "self._checkpoint_to_report_index",
+   "file": "python/ray/train/v2/_internal/execution/checkpoint/checkpoint_manager.py",
+   "line": 123
+  },
+  {
+   "state": "self._timed_out_tasks",
+   "file": "python/ray/train/v2/_internal/execution/checkpoint/validation_manager.py",
+   "line": 100
+  },
+  {
+   "state": "self._finished_validations",
+   "file": "python/ray/train/v2/_internal/execution/checkpoint/validation_manager.py",
+   "line": 104
+  },
+  {
+   "state": "self._failure_domain_map",
+   "file": "python/ray/train/v2/_internal/execution/preemption.py",
+   "line": 88
+  },
+  {
+   "state": "self._dataset_shards",
+   "file": "python/ray/train/v2/_internal/execution/train_fn_utils.py",
+   "line": 232
+  },
+  {
+   "state": "self._run_attempts",
+   "file": "python/ray/train/v2/_internal/state/state_actor.py",
+   "line": 53
+  },
+  {
+   "state": "self._runs",
+   "file": "python/ray/train/v2/_internal/state/state_manager.py",
+   "line": 50
+  },
+  {
+   "state": "self._run_attempts",
+   "file": "python/ray/train/v2/_internal/state/state_manager.py",
+   "line": 52
+  },
+  {
+   "state": "self.x",
+   "file": "python/ray/train/v2/examples/pytorch/torchft_linear_example.py",
+   "line": 29
+  },
+  {
+   "state": "self.y",
+   "file": "python/ray/train/v2/examples/pytorch/torchft_linear_example.py",
+   "line": 30
+  },
+  {
+   "state": "self._metrics",
+   "file": "python/ray/train/xgboost/_xgboost_utils.py",
+   "line": 38
+  },
+  {
+   "state": "self.best_loss_per_trial",
+   "file": "python/ray/tune/examples/custom_checkpointing_with_callback.py",
+   "line": 43
+  },
+  {
+   "state": "self.recent_losses_per_trial",
+   "file": "python/ray/tune/examples/custom_checkpointing_with_callback.py",
+   "line": 44
+  },
+  {
+   "state": "self._cache",
+   "file": "python/ray/tune/execution/class_cache.py",
+   "line": 54
+  },
+  {
+   "state": "self._trial_num_checkpoints_since_last_sync",
+   "file": "python/ray/tune/execution/experiment_state.py",
+   "line": 102
+  },
+  {
+   "state": "self._actor_manager",
+   "file": "python/ray/tune/execution/tune_controller.py",
+   "line": 99
+  },
+  {
+   "state": "self._trial_to_actor",
+   "file": "python/ray/tune/execution/tune_controller.py",
+   "line": 108
+  },
+  {
+   "state": "self._resources_to_pending_trials",
+   "file": "python/ray/tune/execution/tune_controller.py",
+   "line": 111
+  },
+  {
+   "state": "self._resetting_trials",
+   "file": "python/ray/tune/execution/tune_controller.py",
+   "line": 126
+  },
+  {
+   "state": "self._staged_trials",
+   "file": "python/ray/tune/execution/tune_controller.py",
+   "line": 127
+  },
+  {
+   "state": "self.custom_dirname",
+   "file": "python/ray/tune/experiment/trial.py",
+   "line": 383
+  },
+  {
+   "state": "self._metrics",
+   "file": "python/ray/tune/integration/pytorch_lightning.py",
+   "line": 134
+  },
+  {
+   "state": "self._trial_to_run",
+   "file": "python/ray/tune/logger/aim.py",
+   "line": 77
+  },
+  {
+   "state": "self._trial_continue",
+   "file": "python/ray/tune/logger/csv.py",
+   "line": 31
+  },
+  {
+   "state": "self._trial_files",
+   "file": "python/ray/tune/logger/csv.py",
+   "line": 32
+  },
+  {
+   "state": "self._trial_csv",
+   "file": "python/ray/tune/logger/csv.py",
+   "line": 33
+  },
+  {
+   "state": "self._trial_configs",
+   "file": "python/ray/tune/logger/json.py",
+   "line": 30
+  },
+  {
+   "state": "self._trial_files",
+   "file": "python/ray/tune/logger/json.py",
+   "line": 31
+  },
+  {
+   "state": "self._trial_writer",
+   "file": "python/ray/tune/logger/tensorboardx.py",
+   "line": 45
+  },
+  {
+   "state": "self._trial_result",
+   "file": "python/ray/tune/logger/tensorboardx.py",
+   "line": 46
+  },
+  {
+   "state": "self._metric_columns",
+   "file": "python/ray/tune/progress_reporter.py",
+   "line": 196
+  },
+  {
+   "state": "self._last_print",
+   "file": "python/ray/tune/progress_reporter.py",
+   "line": 1337
+  },
+  {
+   "state": "self._last_print_iteration",
+   "file": "python/ray/tune/progress_reporter.py",
+   "line": 1338
+  },
+  {
+   "state": "self._to_flush",
+   "file": "python/ray/tune/registry.py",
+   "line": 209
+  },
+  {
+   "state": "self.to_flush",
+   "file": "python/ray/tune/registry.py",
+   "line": 302
+  },
+  {
+   "state": "self.references",
+   "file": "python/ray/tune/registry.py",
+   "line": 303
+  },
+  {
+   "state": "self._results",
+   "file": "python/ray/tune/result_grid.py",
+   "line": 85
+  },
+  {
+   "state": "self._trial_info",
+   "file": "python/ray/tune/schedulers/async_hyperband.py",
+   "line": 82
+  },
+  {
+   "state": "self._trial_info",
+   "file": "python/ray/tune/schedulers/hyperband.py",
+   "line": 119
+  },
+  {
+   "state": "self._last_pause",
+   "file": "python/ray/tune/schedulers/median_stopping_rule.py",
+   "line": 85
+  },
+  {
+   "state": "self._results",
+   "file": "python/ray/tune/schedulers/median_stopping_rule.py",
+   "line": 86
+  },
+  {
+   "state": "self._trial_state",
+   "file": "python/ray/tune/schedulers/pbt.py",
+   "line": 435
+  },
+  {
+   "state": "self.live_trials",
+   "file": "python/ray/tune/search/_mock.py",
+   "line": 10
+  },
+  {
+   "state": "self._live_trial_mapping",
+   "file": "python/ray/tune/search/ax/ax_search.py",
+   "line": 194
+  },
+  {
+   "state": "self._live_trials",
+   "file": "python/ray/tune/search/basic_variant.py",
+   "line": 314
+  },
+  {
+   "state": "self._config_counter",
+   "file": "python/ray/tune/search/bayesopt/bayesopt_search.py",
+   "line": 174
+  },
+  {
+   "state": "self.trial_to_params",
+   "file": "python/ray/tune/search/bohb/bohb_search.py",
+   "line": 143
+  },
+  {
+   "state": "self._live_trial_mapping",
+   "file": "python/ray/tune/search/hebo/hebo_search.py",
+   "line": 192
+  },
+  {
+   "state": "self._live_trial_mapping",
+   "file": "python/ray/tune/search/hyperopt/hyperopt_search.py",
+   "line": 186
+  },
+  {
+   "state": "self._points_to_evaluate",
+   "file": "python/ray/tune/search/nevergrad/nevergrad_search.py",
+   "line": 150
+  },
+  {
+   "state": "self._live_trial_mapping",
+   "file": "python/ray/tune/search/nevergrad/nevergrad_search.py",
+   "line": 196
+  },
+  {
+   "state": "self._completed_trials",
+   "file": "python/ray/tune/search/optuna/optuna_search.py",
+   "line": 388
+  },
+  {
+   "state": "self._ot_trials",
+   "file": "python/ray/tune/search/optuna/optuna_search.py",
+   "line": 390
+  },
+  {
+   "state": "self._trials",
+   "file": "python/ray/tune/search/repeater.py",
+   "line": 46
+  },
+  {
+   "state": "self.categories",
+   "file": "python/ray/tune/search/sample.py",
+   "line": 452
+  },
+  {
+   "state": "self._dim_dict",
+   "file": "python/ray/tune/search/zoopt/zoopt_search.py",
+   "line": 191
+  },
+  {
+   "state": "self._live_trial_mapping",
+   "file": "python/ray/tune/search/zoopt/zoopt_search.py",
+   "line": 202
+  },
+  {
+   "state": "self.solution_dict",
+   "file": "python/ray/tune/search/zoopt/zoopt_search.py",
+   "line": 205
+  },
+  {
+   "state": "self._iter",
+   "file": "python/ray/tune/stopper/maximum_iteration.py",
+   "line": 18
+  },
+  {
+   "state": "self._iter",
+   "file": "python/ray/tune/stopper/trial_plateau.py",
+   "line": 60
+  },
+  {
+   "state": "self._trial_results",
+   "file": "python/ray/tune/stopper/trial_plateau.py",
+   "line": 61
+  },
+  {
+   "state": "self.metric_analysis",
+   "file": "python/ray/tune/trainable/metadata.py",
+   "line": 38
+  },
+  {
+   "state": "self.metric_n_steps",
+   "file": "python/ray/tune/trainable/metadata.py",
+   "line": 40
+  },
+  {
+   "state": "self._snapshot",
+   "file": "python/ray/tune/utils/mock.py",
+   "line": 76
+  },
+  {
+   "state": "self._cached_objects",
+   "file": "python/ray/tune/utils/object_cache.py",
+   "line": 33
+  },
+  {
+   "state": "self._max_num_objects",
+   "file": "python/ray/tune/utils/object_cache.py",
+   "line": 34
+  },
+  {
+   "state": "self._idle_actors",
+   "file": "python/ray/util/actor_pool.py",
+   "line": 46
+  },
+  {
+   "state": "self._index_to_future",
+   "file": "python/ray/util/actor_pool.py",
+   "line": 52
+  },
+  {
+   "state": "_all_contexts",
+   "file": "python/ray/util/client/__init__.py",
+   "line": 314
+  },
+  {
+   "state": "self.cache",
+   "file": "python/ray/util/client/common.py",
+   "line": 787
+  },
+  {
+   "state": "self.cache",
+   "file": "python/ray/util/client/common.py",
+   "line": 874
+  },
+  {
+   "state": "self.outstanding_requests",
+   "file": "python/ray/util/client/dataclient.py",
+   "line": 200
+  },
+  {
+   "state": "self.ready_data",
+   "file": "python/ray/util/client/dataclient.py",
+   "line": 212
+  },
+  {
+   "state": "self.asyncio_waiting_data",
+   "file": "python/ray/util/client/dataclient.py",
+   "line": 215
+  },
+  {
+   "state": "self.client_last_seen",
+   "file": "python/ray/util/client/server/dataservicer.py",
+   "line": 138
+  },
+  {
+   "state": "self.reconnect_grace_periods",
+   "file": "python/ray/util/client/server/dataservicer.py",
+   "line": 140
+  },
+  {
+   "state": "self.response_caches",
+   "file": "python/ray/util/client/server/dataservicer.py",
+   "line": 142
+  },
+  {
+   "state": "self.servers",
+   "file": "python/ray/util/client/server/proxier.py",
+   "line": 138
+  },
+  {
+   "state": "self.clients_last_seen",
+   "file": "python/ray/util/client/server/proxier.py",
+   "line": 701
+  },
+  {
+   "state": "self.reconnect_grace_periods",
+   "file": "python/ray/util/client/server/proxier.py",
+   "line": 702
+  },
+  {
+   "state": "self.object_refs",
+   "file": "python/ray/util/client/server/server.py",
+   "line": 111
+  },
+  {
+   "state": "self.client_side_ref_map",
+   "file": "python/ray/util/client/server/server.py",
+   "line": 113
+  },
+  {
+   "state": "self.function_refs",
+   "file": "python/ray/util/client/server/server.py",
+   "line": 114
+  },
+  {
+   "state": "self.actor_refs",
+   "file": "python/ray/util/client/server/server.py",
+   "line": 115
+  },
+  {
+   "state": "self.actor_owners",
+   "file": "python/ray/util/client/server/server.py",
+   "line": 116
+  },
+  {
+   "state": "self.registered_actor_classes",
+   "file": "python/ray/util/client/server/server.py",
+   "line": 117
+  },
+  {
+   "state": "self.response_caches",
+   "file": "python/ray/util/client/server/server.py",
+   "line": 121
+  },
+  {
+   "state": "self.server",
+   "file": "python/ray/util/client/server/server_pickler.py",
+   "line": 36
+  },
+  {
+   "state": "self.server",
+   "file": "python/ray/util/client/server/server_pickler.py",
+   "line": 72
+  },
+  {
+   "state": "self._converted",
+   "file": "python/ray/util/client/worker.py",
+   "line": 184
+  },
+  {
+   "state": "self.reference_count",
+   "file": "python/ray/util/client/worker.py",
+   "line": 221
+  },
+  {
+   "state": "self._name_group_map",
+   "file": "python/ray/util/collective/collective.py",
+   "line": 74
+  },
+  {
+   "state": "self._pool",
+   "file": "python/ray/util/collective/collective_group/cuda_stream.py",
+   "line": 35
+  },
+  {
+   "state": "_device_stream_pool_map",
+   "file": "python/ray/util/collective/collective_group/cuda_stream.py",
+   "line": 78
+  },
+  {
+   "state": "self._dev_comm_map",
+   "file": "python/ray/util/collective/collective_group/nccl_collective_group.py",
+   "line": 133
+  },
+  {
+   "state": "self._dev_streams_map",
+   "file": "python/ray/util/collective/collective_group/nccl_collective_group.py",
+   "line": 134
+  },
+  {
+   "state": "self._dev_event_map",
+   "file": "python/ray/util/collective/collective_group/nccl_collective_group.py",
+   "line": 140
+  },
+  {
+   "state": "self.deps",
+   "file": "python/ray/util/dask/callbacks.py",
+   "line": 245
+  },
+  {
+   "state": "self.deps",
+   "file": "python/ray/util/dask/callbacks.py",
+   "line": 245
+  },
+  {
+   "state": "self.submitted",
+   "file": "python/ray/util/dask/callbacks.py",
+   "line": 246
+  },
+  {
+   "state": "self.submitted",
+   "file": "python/ray/util/dask/callbacks.py",
+   "line": 246
+  },
+  {
+   "state": "self.scheduled",
+   "file": "python/ray/util/dask/callbacks.py",
+   "line": 250
+  },
+  {
+   "state": "self.scheduled",
+   "file": "python/ray/util/dask/callbacks.py",
+   "line": 250
+  },
+  {
+   "state": "self.next_ith_buffer",
+   "file": "python/ray/util/iter.py",
+   "line": 1235
+  },
+  {
+   "state": "self._results",
+   "file": "python/ray/util/multiprocessing/pool.py",
+   "line": 212
+  },
+  {
+   "state": "self._indices",
+   "file": "python/ray/util/multiprocessing/pool.py",
+   "line": 218
+  },
+  {
+   "state": "self._actor_pool",
+   "file": "python/ray/util/multiprocessing/pool.py",
+   "line": 650
+  },
+  {
+   "state": "self.spark_job_server",
+   "file": "python/ray/util/spark/cluster_init.py",
+   "line": 113
+  },
+  {
+   "state": "self._user_bundle_label_selector",
+   "file": "python/ray/util/tpu.py",
+   "line": 578
+  },
+  {
+   "state": "self.result",
+   "file": "release/benchmarks/distributed/many_nodes_tests/dashboard_test.py",
+   "line": 60
+  },
+  {
+   "state": "INPUT_FILES_PER_WORKER",
+   "file": "release/nightly_tests/dataset/multi_node_train_benchmark.py",
+   "line": 641
+  },
+  {
+   "state": "self._file_urls",
+   "file": "release/nightly_tests/dataset/multi_node_train_benchmark.py",
+   "line": 708
+  },
+  {
+   "state": "self._scalar_template",
+   "file": "release/nightly_tests/dataset/worker_scaling_benchmark.py",
+   "line": 142
+  },
+  {
+   "state": "self._array_templates",
+   "file": "release/nightly_tests/dataset/worker_scaling_benchmark.py",
+   "line": 145
+  },
+  {
+   "state": "result_to_handle_map",
+   "file": "release/ray_release/alerts/handle.py",
+   "line": 15
+  },
+  {
+   "state": "gcp_gpu_instances",
+   "file": "release/ray_release/buildkite/concurrency.py",
+   "line": 59
+  },
+  {
+   "state": "frequency_str_to_enum",
+   "file": "release/ray_release/buildkite/settings.py",
+   "line": 20
+  },
+  {
+   "state": "priority_str_to_enum",
+   "file": "release/ray_release/buildkite/settings.py",
+   "line": 38
+  },
+  {
+   "state": "self.prepare_commands",
+   "file": "release/ray_release/command_runner/anyscale_job_runner.py",
+   "line": 129
+  },
+  {
+   "state": "command_runner_to_cluster_manager",
+   "file": "release/ray_release/glue.py",
+   "line": 55
+  },
+  {
+   "state": "job_status_to_return_code",
+   "file": "release/ray_release/job_manager/anyscale_job_manager.py",
+   "line": 32
+  },
+  {
+   "state": "terminal_state",
+   "file": "release/ray_release/job_manager/anyscale_job_manager.py",
+   "line": 37
+  },
+  {
+   "state": "job_status_to_return_code",
+   "file": "release/ray_release/job_manager/kuberay_job_manager.py",
+   "line": 20
+  },
+  {
+   "state": "self.categories",
+   "file": "release/serve_tests/workloads/resnet_50.py",
+   "line": 33
+  },
+  {
+   "state": "self._dataset_dirs",
+   "file": "release/train_tests/benchmark/image_classification/jpeg/factory.py",
+   "line": 45
+  },
+  {
+   "state": "self._data_dirs",
+   "file": "release/train_tests/benchmark/image_classification/jpeg/factory.py",
+   "line": 144
+  },
+  {
+   "state": "self.file_urls",
+   "file": "release/train_tests/benchmark/image_classification/jpeg/jpeg_iterable_dataset.py",
+   "line": 52
+  },
+  {
+   "state": "self._data_dirs",
+   "file": "release/train_tests/benchmark/image_classification/parquet/factory.py",
+   "line": 41
+  },
+  {
+   "state": "self.file_urls",
+   "file": "release/train_tests/benchmark/image_classification/parquet/parquet_iterable_dataset.py",
+   "line": 55
+  },
+  {
+   "state": "self._data_dirs",
+   "file": "release/train_tests/benchmark/image_classification/s3_url/factory.py",
+   "line": 38
+  },
+  {
+   "state": "self._metrics",
+   "file": "release/train_tests/benchmark/runner.py",
+   "line": 38
+  },
+  {
+   "state": "self.fail_markers",
+   "file": "release/train_tests/multinode_persistence/test_v1_persistence.py",
+   "line": 238
+  },
+  {
+   "state": "self._timers",
+   "file": "rllib/algorithms/algorithm.py",
+   "line": 490
+  },
+  {
+   "state": "self._counters",
+   "file": "rllib/algorithms/algorithm.py",
+   "line": 491
+  },
+  {
+   "state": "self._episode_history",
+   "file": "rllib/algorithms/algorithm.py",
+   "line": 492
+  },
+  {
+   "state": "self.algo",
+   "file": "rllib/algorithms/algorithm.py",
+   "line": 4868
+  },
+  {
+   "state": "self.algorithm_config_overrides_per_module",
+   "file": "rllib/algorithms/algorithm_config.py",
+   "line": 623
+  },
+  {
+   "state": "self._per_module_overrides",
+   "file": "rllib/algorithms/algorithm_config.py",
+   "line": 626
+  },
+  {
+   "state": "self._last_update_ts_by_mid",
+   "file": "rllib/algorithms/appo/appo_learner.py",
+   "line": 34
+  },
+  {
+   "state": "self._buffer",
+   "file": "rllib/algorithms/appo/utils.py",
+   "line": 51
+  },
+  {
+   "state": "self.last_update_ts_by_mid",
+   "file": "rllib/algorithms/dqn/dqn_learner.py",
+   "line": 48
+  },
+  {
+   "state": "self._ma_batches_being_built",
+   "file": "rllib/algorithms/impala/impala.py",
+   "line": 585
+  },
+  {
+   "state": "self.entropy_coeff_schedulers_per_module",
+   "file": "rllib/algorithms/impala/impala_learner.py",
+   "line": 129
+  },
+  {
+   "state": "self.results",
+   "file": "rllib/algorithms/impala/utils.py",
+   "line": 14
+  },
+  {
+   "state": "self.entropy_coeff_schedulers_per_module",
+   "file": "rllib/algorithms/ppo/ppo_learner.py",
+   "line": 34
+  },
+  {
+   "state": "self.qf_encoders",
+   "file": "rllib/algorithms/tqc/default_tqc_rl_module.py",
+   "line": 54
+  },
+  {
+   "state": "self.qf_heads",
+   "file": "rllib/algorithms/tqc/default_tqc_rl_module.py",
+   "line": 55
+  },
+  {
+   "state": "self.target_qf_encoders",
+   "file": "rllib/algorithms/tqc/default_tqc_rl_module.py",
+   "line": 69
+  },
+  {
+   "state": "self.target_qf_heads",
+   "file": "rllib/algorithms/tqc/default_tqc_rl_module.py",
+   "line": 70
+  },
+  {
+   "state": "self.timers",
+   "file": "rllib/connectors/action/pipeline.py",
+   "line": 23
+  },
+  {
+   "state": "self.timers",
+   "file": "rllib/connectors/agent/pipeline.py",
+   "line": 23
+  },
+  {
+   "state": "self.agent_collectors",
+   "file": "rllib/connectors/agent/view_requirement.py",
+   "line": 42
+  },
+  {
+   "state": "self._action_space_struct",
+   "file": "rllib/connectors/module_to_env/normalize_and_clip_actions.py",
+   "line": 66
+  },
+  {
+   "state": "ALL_CONNECTORS",
+   "file": "rllib/connectors/registry.py",
+   "line": 7
+  },
+  {
+   "state": "self._optimizer_parameters",
+   "file": "rllib/core/learner/learner.py",
+   "line": 261
+  },
+  {
+   "state": "self._named_optimizers",
+   "file": "rllib/core/learner/learner.py",
+   "line": 262
+  },
+  {
+   "state": "self._params",
+   "file": "rllib/core/learner/learner.py",
+   "line": 263
+  },
+  {
+   "state": "self._module_optimizers",
+   "file": "rllib/core/learner/learner.py",
+   "line": 266
+  },
+  {
+   "state": "self._optimizer_lr_schedules",
+   "file": "rllib/core/learner/learner.py",
+   "line": 272
+  },
+  {
+   "state": "self.metrics",
+   "file": "rllib/core/learner/learner.py",
+   "line": 278
+  },
+  {
+   "state": "self._grad_scalers",
+   "file": "rllib/core/learner/torch/torch_learner.py",
+   "line": 105
+  },
+  {
+   "state": "self._lr_schedulers",
+   "file": "rllib/core/learner/torch/torch_learner.py",
+   "line": 110
+  },
+  {
+   "state": "self._lr_scheduler_classes",
+   "file": "rllib/core/learner/torch/torch_learner.py",
+   "line": 111
+  },
+  {
+   "state": "self.base_encoders",
+   "file": "rllib/core/models/torch/encoder.py",
+   "line": 301
+  },
+  {
+   "state": "self.fusion_layers",
+   "file": "rllib/core/models/torch/encoder.py",
+   "line": 360
+  },
+  {
+   "state": "self.rl_module_specs",
+   "file": "rllib/core/rl_module/multi_rl_module.py",
+   "line": 124
+  },
+  {
+   "state": "self.rl_module_specs",
+   "file": "rllib/core/rl_module/multi_rl_module.py",
+   "line": 569
+  },
+  {
+   "state": "self.view_requirements",
+   "file": "rllib/evaluation/collectors/agent_collector.py",
+   "line": 90
+  },
+  {
+   "state": "self.initial_states",
+   "file": "rllib/evaluation/collectors/agent_collector.py",
+   "line": 92
+  },
+  {
+   "state": "self.buffers",
+   "file": "rllib/evaluation/collectors/agent_collector.py",
+   "line": 118
+  },
+  {
+   "state": "self.buffer_structs",
+   "file": "rllib/evaluation/collectors/agent_collector.py",
+   "line": 123
+  },
+  {
+   "state": "self.data_cols_with_dummy_values",
+   "file": "rllib/evaluation/collectors/agent_collector.py",
+   "line": 139
+  },
+  {
+   "state": "self.agent_collectors",
+   "file": "rllib/evaluation/collectors/simple_list_collector.py",
+   "line": 152
+  },
+  {
+   "state": "self.agent_key_to_policy_id",
+   "file": "rllib/evaluation/collectors/simple_list_collector.py",
+   "line": 154
+  },
+  {
+   "state": "self.forward_pass_agent_keys",
+   "file": "rllib/evaluation/collectors/simple_list_collector.py",
+   "line": 160
+  },
+  {
+   "state": "self.forward_pass_size",
+   "file": "rllib/evaluation/collectors/simple_list_collector.py",
+   "line": 161
+  },
+  {
+   "state": "self.episode_steps",
+   "file": "rllib/evaluation/collectors/simple_list_collector.py",
+   "line": 164
+  },
+  {
+   "state": "self.agent_steps",
+   "file": "rllib/evaluation/collectors/simple_list_collector.py",
+   "line": 167
+  },
+  {
+   "state": "self.episodes",
+   "file": "rllib/evaluation/collectors/simple_list_collector.py",
+   "line": 169
+  },
+  {
+   "state": "self._active_episodes",
+   "file": "rllib/evaluation/env_runner_v2.py",
+   "line": 260
+  },
+  {
+   "state": "self._batch_builders",
+   "file": "rllib/evaluation/env_runner_v2.py",
+   "line": 261
+  },
+  {
+   "state": "self.policy_map",
+   "file": "rllib/evaluation/episode_v2.py",
+   "line": 79
+  },
+  {
+   "state": "self._agent_to_policy",
+   "file": "rllib/evaluation/episode_v2.py",
+   "line": 84
+  },
+  {
+   "state": "self._agent_collectors",
+   "file": "rllib/evaluation/episode_v2.py",
+   "line": 85
+  },
+  {
+   "state": "self._agent_to_index",
+   "file": "rllib/evaluation/episode_v2.py",
+   "line": 88
+  },
+  {
+   "state": "self._agent_reward_history",
+   "file": "rllib/evaluation/episode_v2.py",
+   "line": 92
+  },
+  {
+   "state": "self._has_init_obs",
+   "file": "rllib/evaluation/episode_v2.py",
+   "line": 94
+  },
+  {
+   "state": "self._ds_shards",
+   "file": "rllib/evaluation/rollout_worker.py",
+   "line": 285
+  },
+  {
+   "state": "self.preprocessors",
+   "file": "rllib/evaluation/rollout_worker.py",
+   "line": 468
+  },
+  {
+   "state": "self.buffers",
+   "file": "rllib/evaluation/sample_batch_builder.py",
+   "line": 40
+  },
+  {
+   "state": "self.policy_map",
+   "file": "rllib/evaluation/sample_batch_builder.py",
+   "line": 97
+  },
+  {
+   "state": "self.policy_builders",
+   "file": "rllib/evaluation/sample_batch_builder.py",
+   "line": 100
+  },
+  {
+   "state": "self.agent_builders",
+   "file": "rllib/evaluation/sample_batch_builder.py",
+   "line": 103
+  },
+  {
+   "state": "self.agent_to_policy",
+   "file": "rllib/evaluation/sample_batch_builder.py",
+   "line": 105
+  },
+  {
+   "state": "self.action_dist",
+   "file": "rllib/examples/_old_api_stack/policy/cliff_walking_wall_policy.py",
+   "line": 34
+  },
+  {
+   "state": "self.storage",
+   "file": "rllib/examples/algorithms/classes/appo_w_shared_data_actor.py",
+   "line": 18
+  },
+  {
+   "state": "self.benchmark_envs",
+   "file": "rllib/examples/algorithms/dqn/benchmark_dqn_atari.py",
+   "line": 262
+  },
+  {
+   "state": "self.benchmark_envs",
+   "file": "rllib/examples/algorithms/dqn/benchmark_dqn_atari_rllib_preprocessing.py",
+   "line": 252
+  },
+  {
+   "state": "self.benchmark_envs",
+   "file": "rllib/examples/algorithms/ppo/benchmark_ppo_mujoco.py",
+   "line": 59
+  },
+  {
+   "state": "self.benchmark_envs",
+   "file": "rllib/examples/algorithms/sac/benchmark_sac_mujoco.py",
+   "line": 50
+  },
+  {
+   "state": "self._counts",
+   "file": "rllib/examples/connectors/classes/count_based_curiosity.py",
+   "line": 58
+  },
+  {
+   "state": "self.max_dists",
+   "file": "rllib/examples/curiosity/intrinsic_curiosity_model_based_curiosity.py",
+   "line": 120
+  },
+  {
+   "state": "self.task_threshold_map",
+   "file": "rllib/examples/curriculum/pong_curriculum_learning.py",
+   "line": 101
+  },
+  {
+   "state": "self.valid_actions",
+   "file": "rllib/examples/envs/classes/action_mask_env.py",
+   "line": 21
+  },
+  {
+   "state": "self.observation_space",
+   "file": "rllib/examples/envs/classes/cartpole_with_large_observation_space.py",
+   "line": 34
+  },
+  {
+   "state": "self.timesteps",
+   "file": "rllib/examples/envs/classes/debug_counter_env.py",
+   "line": 63
+  },
+  {
+   "state": "self.means",
+   "file": "rllib/examples/envs/classes/multi_agent/bandit_envs_discrete.py",
+   "line": 143
+  },
+  {
+   "state": "self.docs_db",
+   "file": "rllib/examples/envs/classes/multi_agent/bandit_envs_recommender_system.py",
+   "line": 58
+  },
+  {
+   "state": "self.users_db",
+   "file": "rllib/examples/envs/classes/multi_agent/bandit_envs_recommender_system.py",
+   "line": 60
+  },
+  {
+   "state": "self.terminateds",
+   "file": "rllib/examples/envs/classes/multi_agent/double_row_corridor_env.py",
+   "line": 46
+  },
+  {
+   "state": "self.agent_pos",
+   "file": "rllib/examples/envs/classes/multi_agent/double_row_corridor_env.py",
+   "line": 63
+  },
+  {
+   "state": "self.goals",
+   "file": "rllib/examples/envs/classes/multi_agent/double_row_corridor_env.py",
+   "line": 67
+  },
+  {
+   "state": "self.special_charge_queue",
+   "file": "rllib/examples/envs/classes/multi_agent/footsies/footsies_env.py",
+   "line": 102
+  },
+  {
+   "state": "self.current_matchups",
+   "file": "rllib/examples/envs/classes/multi_agent/footsies/utils.py",
+   "line": 36
+  },
+  {
+   "state": "self.action_id_to_str",
+   "file": "rllib/examples/envs/classes/multi_agent/footsies/utils.py",
+   "line": 74
+  },
+  {
+   "state": "self.history",
+   "file": "rllib/examples/envs/classes/repeat_after_me_env.py",
+   "line": 21
+  },
+  {
+   "state": "self.map",
+   "file": "rllib/examples/envs/classes/six_room_env.py",
+   "line": 61
+  },
+  {
+   "state": "self.map",
+   "file": "rllib/examples/envs/classes/windy_maze_env.py",
+   "line": 27
+  },
+  {
+   "state": "self.lr",
+   "file": "rllib/examples/learners/ppo_with_torch_lr_schedulers.py",
+   "line": 87
+  },
+  {
+   "state": "self._episode_start_position",
+   "file": "rllib/examples/metrics/custom_metrics_in_env_runners.py",
+   "line": 156
+  },
+  {
+   "state": "self.main_policies",
+   "file": "rllib/examples/multi_agent/utils/self_play_league_based_callback.py",
+   "line": 16
+  },
+  {
+   "state": "self.win_rates",
+   "file": "rllib/examples/multi_agent/utils/self_play_league_based_callback.py",
+   "line": 31
+  },
+  {
+   "state": "self.main_policies",
+   "file": "rllib/examples/multi_agent/utils/self_play_league_based_callback_old_api_stack.py",
+   "line": 15
+  },
+  {
+   "state": "self.win_rates",
+   "file": "rllib/examples/multi_agent/utils/self_play_league_based_callback_old_api_stack.py",
+   "line": 30
+  },
+  {
+   "state": "self._actions_per_vector_idx",
+   "file": "rllib/examples/rl_modules/classes/rock_paper_scissors_heuristic_rlm.py",
+   "line": 18
+  },
+  {
+   "state": "self.replay_buffers",
+   "file": "rllib/execution/buffers/mixin_replay_buffer.py",
+   "line": 81
+  },
+  {
+   "state": "self.last_added_batches",
+   "file": "rllib/execution/buffers/mixin_replay_buffer.py",
+   "line": 92
+  },
+  {
+   "state": "self.buffers",
+   "file": "rllib/execution/minibatch_buffer.py",
+   "line": 39
+  },
+  {
+   "state": "self.ttl",
+   "file": "rllib/execution/minibatch_buffer.py",
+   "line": 40
+  },
+  {
+   "state": "self.policy_map",
+   "file": "rllib/execution/multi_gpu_learner_thread.py",
+   "line": 106
+  },
+  {
+   "state": "self.value",
+   "file": "rllib/execution/segment_tree.py",
+   "line": 61
+  },
+  {
+   "state": "_cache",
+   "file": "rllib/models/modelv2.py",
+   "line": 377
+  },
+  {
+   "state": "self.lengths",
+   "file": "rllib/models/repeated_values.py",
+   "line": 47
+  },
+  {
+   "state": "self.cnns",
+   "file": "rllib/models/tf/complex_input_net.py",
+   "line": 55
+  },
+  {
+   "state": "self.one_hot",
+   "file": "rllib/models/tf/complex_input_net.py",
+   "line": 56
+  },
+  {
+   "state": "self.flatten_dims",
+   "file": "rllib/models/tf/complex_input_net.py",
+   "line": 57
+  },
+  {
+   "state": "self.flatten",
+   "file": "rllib/models/tf/complex_input_net.py",
+   "line": 58
+  },
+  {
+   "state": "self.cnns",
+   "file": "rllib/models/torch/complex_input_net.py",
+   "line": 62
+  },
+  {
+   "state": "self.one_hot",
+   "file": "rllib/models/torch/complex_input_net.py",
+   "line": 63
+  },
+  {
+   "state": "self.flatten_dims",
+   "file": "rllib/models/torch/complex_input_net.py",
+   "line": 64
+  },
+  {
+   "state": "self.flatten",
+   "file": "rllib/models/torch/complex_input_net.py",
+   "line": 65
+  },
+  {
+   "state": "self.cummulative_ips_values",
+   "file": "rllib/offline/estimators/weighted_importance_sampling.py",
+   "line": 41
+  },
+  {
+   "state": "self.episode_timestep_count",
+   "file": "rllib/offline/estimators/weighted_importance_sampling.py",
+   "line": 43
+  },
+  {
+   "state": "self.p",
+   "file": "rllib/offline/estimators/weighted_importance_sampling.py",
+   "line": 45
+  },
+  {
+   "state": "self.output_compress_columns",
+   "file": "rllib/offline/offline_env_runner.py",
+   "line": 110
+  },
+  {
+   "state": "self.module",
+   "file": "rllib/offline/offline_evaluation_runner.py",
+   "line": 119
+  },
+  {
+   "state": "self.module",
+   "file": "rllib/offline/offline_policy_evaluation_runner.py",
+   "line": 320
+  },
+  {
+   "state": "self.multi_gpu_tower_stacks",
+   "file": "rllib/policy/dynamic_tf_policy.py",
+   "line": 474
+  },
+  {
+   "state": "self.multi_gpu_tower_stacks",
+   "file": "rllib/policy/dynamic_tf_policy_v2.py",
+   "line": 662
+  },
+  {
+   "state": "self.view_requirements",
+   "file": "rllib/policy/policy.py",
+   "line": 421
+  },
+  {
+   "state": "self.cache",
+   "file": "rllib/policy/policy_map.py",
+   "line": 83
+  },
+  {
+   "state": "self._deque",
+   "file": "rllib/policy/policy_map.py",
+   "line": 88
+  },
+  {
+   "state": "self._policy_state_refs",
+   "file": "rllib/policy/policy_map.py",
+   "line": 91
+  },
+  {
+   "state": "self.intercepted_values",
+   "file": "rllib/policy/sample_batch.py",
+   "line": 225
+  },
+  {
+   "state": "self._slice_map",
+   "file": "rllib/policy/sample_batch.py",
+   "line": 265
+  },
+  {
+   "state": "self.policy_batches",
+   "file": "rllib/policy/sample_batch.py",
+   "line": 1371
+  },
+  {
+   "state": "self.multi_gpu_param_groups",
+   "file": "rllib/policy/torch_policy.py",
+   "line": 263
+  },
+  {
+   "state": "self._loaded_batches",
+   "file": "rllib/policy/torch_policy.py",
+   "line": 275
+  },
+  {
+   "state": "self.multi_gpu_param_groups",
+   "file": "rllib/policy/torch_policy_v2.py",
+   "line": 186
+  },
+  {
+   "state": "self._loaded_batches",
+   "file": "rllib/policy/torch_policy_v2.py",
+   "line": 198
+  },
+  {
+   "state": "self.tower_stats",
+   "file": "rllib/policy/torch_policy_v2.py",
+   "line": 208
+  },
+  {
+   "state": "self._actors",
+   "file": "rllib/utils/actor_manager.py",
+   "line": 302
+  },
+  {
+   "state": "self._remote_actor_states",
+   "file": "rllib/utils/actor_manager.py",
+   "line": 303
+  },
+  {
+   "state": "self._in_flight_req_to_actor_id",
+   "file": "rllib/utils/actor_manager.py",
+   "line": 309
+  },
+  {
+   "state": "self._objects",
+   "file": "rllib/utils/actors.py",
+   "line": 17
+  },
+  {
+   "state": "self.results_all_towers",
+   "file": "rllib/utils/metrics/learner_info.py",
+   "line": 22
+  },
+  {
+   "state": "self._start_times",
+   "file": "rllib/utils/metrics/legacy_stats.py",
+   "line": 194
+  },
+  {
+   "state": "self.stats_cls_lookup",
+   "file": "rllib/utils/metrics/metrics_logger.py",
+   "line": 163
+  },
+  {
+   "state": "self._start_times",
+   "file": "rllib/utils/metrics/stats/base.py",
+   "line": 52
+  },
+  {
+   "state": "self.items",
+   "file": "rllib/utils/metrics/window_stat.py",
+   "line": 39
+  },
+  {
+   "state": "self._start",
+   "file": "rllib/utils/minibatch_utils.py",
+   "line": 79
+  },
+  {
+   "state": "self._episodes",
+   "file": "rllib/utils/minibatch_utils.py",
+   "line": 303
+  },
+  {
+   "state": "self._target_lengths",
+   "file": "rllib/utils/minibatch_utils.py",
+   "line": 307
+  },
+  {
+   "state": "self._object_refs",
+   "file": "rllib/utils/minibatch_utils.py",
+   "line": 375
+  },
+  {
+   "state": "self.episodes",
+   "file": "rllib/utils/replay_buffers/episode_replay_buffer.py",
+   "line": 144
+  },
+  {
+   "state": "self.episode_id_to_index",
+   "file": "rllib/utils/replay_buffers/episode_replay_buffer.py",
+   "line": 152
+  },
+  {
+   "state": "self._module_to_indices",
+   "file": "rllib/utils/replay_buffers/multi_agent_episode_buffer.py",
+   "line": 154
+  },
+  {
+   "state": "self._num_module_timesteps",
+   "file": "rllib/utils/replay_buffers/multi_agent_episode_buffer.py",
+   "line": 161
+  },
+  {
+   "state": "self._num_module_timesteps_added",
+   "file": "rllib/utils/replay_buffers/multi_agent_episode_buffer.py",
+   "line": 168
+  },
+  {
+   "state": "self._num_module_episodes",
+   "file": "rllib/utils/replay_buffers/multi_agent_episode_buffer.py",
+   "line": 170
+  },
+  {
+   "state": "self._num_module_episodes_evicted",
+   "file": "rllib/utils/replay_buffers/multi_agent_episode_buffer.py",
+   "line": 173
+  },
+  {
+   "state": "self.sampled_timesteps_per_module",
+   "file": "rllib/utils/replay_buffers/multi_agent_episode_buffer.py",
+   "line": 176
+  },
+  {
+   "state": "self.episodes",
+   "file": "rllib/utils/replay_buffers/multi_agent_episode_buffer.py",
+   "line": 232
+  },
+  {
+   "state": "self.last_added_batches",
+   "file": "rllib/utils/replay_buffers/multi_agent_mixin_replay_buffer.py",
+   "line": 195
+  },
+  {
+   "state": "self._module_to_max_priority",
+   "file": "rllib/utils/replay_buffers/multi_agent_prioritized_episode_buffer.py",
+   "line": 179
+  },
+  {
+   "state": "self._module_to_sum_segment",
+   "file": "rllib/utils/replay_buffers/multi_agent_prioritized_episode_buffer.py",
+   "line": 180
+  },
+  {
+   "state": "self._module_to_min_segment",
+   "file": "rllib/utils/replay_buffers/multi_agent_prioritized_episode_buffer.py",
+   "line": 183
+  },
+  {
+   "state": "self._module_to_free_nodes",
+   "file": "rllib/utils/replay_buffers/multi_agent_prioritized_episode_buffer.py",
+   "line": 187
+  },
+  {
+   "state": "self._module_to_max_idx",
+   "file": "rllib/utils/replay_buffers/multi_agent_prioritized_episode_buffer.py",
+   "line": 192
+  },
+  {
+   "state": "self._module_to_tree_idx_to_sample_idx",
+   "file": "rllib/utils/replay_buffers/multi_agent_prioritized_episode_buffer.py",
+   "line": 194
+  },
+  {
+   "state": "self._module_to_last_sampled_indices",
+   "file": "rllib/utils/replay_buffers/multi_agent_prioritized_episode_buffer.py",
+   "line": 198
+  },
+  {
+   "state": "self.replay_buffers",
+   "file": "rllib/utils/replay_buffers/multi_agent_replay_buffer.py",
+   "line": 179
+  },
+  {
+   "state": "self._sum_segment",
+   "file": "rllib/utils/replay_buffers/prioritized_episode_buffer.py",
+   "line": 157
+  },
+  {
+   "state": "self._tree_idx_to_sample_idx",
+   "file": "rllib/utils/replay_buffers/prioritized_episode_buffer.py",
+   "line": 167
+  },
+  {
+   "state": "self._indices",
+   "file": "rllib/utils/replay_buffers/prioritized_episode_buffer.py",
+   "line": 273
+  },
+  {
+   "state": "self._it_sum",
+   "file": "rllib/utils/replay_buffers/prioritized_replay_buffer.py",
+   "line": 57
+  },
+  {
+   "state": "self._storage",
+   "file": "rllib/utils/replay_buffers/replay_buffer.py",
+   "line": 155
+  },
+  {
+   "state": "self._hit_count",
+   "file": "rllib/utils/replay_buffers/replay_buffer.py",
+   "line": 167
+  },
+  {
+   "state": "self.endpoints",
+   "file": "rllib/utils/schedules/piecewise_schedule.py",
+   "line": 58
+  },
+  {
+   "state": "torch_to_numpy_dtype_dict",
+   "file": "rllib/utils/tensor_dtype.py",
+   "line": 48
+  },
+  {
+   "state": "tf_to_numpy_dtype_dict",
+   "file": "rllib/utils/tensor_dtype.py",
+   "line": 52
+  },
+  {
+   "state": "self.param_counts",
+   "file": "rllib/utils/test_utils.py",
+   "line": 952
+  },
+  {
+   "state": "self.output_values",
+   "file": "rllib/utils/test_utils.py",
+   "line": 954
+  },
+  {
+   "state": "self._executed",
+   "file": "rllib/utils/tf_run_builder.py",
+   "line": 26
+  },
+  {
+   "state": "self.placeholders",
+   "file": "rllib/utils/tf_utils.py",
+   "line": 906
+  },
+  {
+   "state": "self.assignment_nodes",
+   "file": "rllib/utils/tf_utils.py",
+   "line": 907
+  }
+ ],
+ "repo": "ray-project/ray",
+ "stars": 42099
+}

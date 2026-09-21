@@ -1,0 +1,56 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.3,
+ "v1_mutable_ratio": 17.0,
+ "v1_details": "105/619 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 65,
+  "promiscuous": 5,
+  "unresolved": 17
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 51,
+   "drives_decision": 14
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 5
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 17
+  }
+ },
+ "v2_resolvable": 0.805,
+ "v2_promiscuous": [
+  {
+   "state": "wrong_scm_patterns",
+   "file": "thefuck/rules/scm_correction.py",
+   "line": 9
+  },
+  {
+   "state": "source_to_target",
+   "file": "thefuck/rules/switch_lang.py",
+   "line": 17
+  },
+  {
+   "state": "npm_commands",
+   "file": "thefuck/rules/yarn_command_not_found.py",
+   "line": 14
+  },
+  {
+   "state": "shells",
+   "file": "thefuck/shells/__init__.py",
+   "line": 14
+  },
+  {
+   "state": "self._commands",
+   "file": "thefuck/ui.py",
+   "line": 34
+  }
+ ],
+ "repo": "nvbn/thefuck",
+ "stars": 96475
+}

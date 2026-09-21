@@ -1,0 +1,221 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.9,
+ "v1_mutable_ratio": 44.9,
+ "v1_details": "1840/4098 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 622,
+  "promiscuous": 38,
+  "unresolved": 235
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 417,
+   "drives_decision": 205
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 38
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 235
+  }
+ },
+ "v2_resolvable": 0.737,
+ "v2_promiscuous": [
+  {
+   "state": "self._archiving",
+   "file": "nanobot/agent/autocompact.py",
+   "line": 27
+  },
+  {
+   "state": "self._waiters",
+   "file": "nanobot/agent/automation_turns.py",
+   "line": 58
+  },
+  {
+   "state": "self._runtime_context_providers",
+   "file": "nanobot/agent/loop.py",
+   "line": 399
+  },
+  {
+   "state": "self._pending_queues",
+   "file": "nanobot/agent/loop.py",
+   "line": 408
+  },
+  {
+   "state": "self._running_tasks",
+   "file": "nanobot/agent/subagent.py",
+   "line": 156
+  },
+  {
+   "state": "self._session_tasks",
+   "file": "nanobot/agent/subagent.py",
+   "line": 158
+  },
+  {
+   "state": "self._sessions",
+   "file": "nanobot/agent/tools/exec_session.py",
+   "line": 269
+  },
+  {
+   "state": "self._self_addresses",
+   "file": "nanobot/channels/email/runtime.py",
+   "line": 136
+  },
+  {
+   "state": "self._last_subject_by_chat",
+   "file": "nanobot/channels/email/runtime.py",
+   "line": 137
+  },
+  {
+   "state": "self._processed_message_ids",
+   "file": "nanobot/channels/feishu/runtime.py",
+   "line": 992
+  },
+  {
+   "state": "self._channel_errors",
+   "file": "nanobot/channels/manager.py",
+   "line": 120
+  },
+  {
+   "state": "self._usernames",
+   "file": "nanobot/channels/mattermost/runtime.py",
+   "line": 93
+  },
+  {
+   "state": "self._user_emails",
+   "file": "nanobot/channels/mattermost/runtime.py",
+   "line": 94
+  },
+  {
+   "state": "self._channel_types",
+   "file": "nanobot/channels/mattermost/runtime.py",
+   "line": 95
+  },
+  {
+   "state": "self._channel_team_ids",
+   "file": "nanobot/channels/mattermost/runtime.py",
+   "line": 96
+  },
+  {
+   "state": "self._thread_context_attempted",
+   "file": "nanobot/channels/mattermost/runtime.py",
+   "line": 102
+  },
+  {
+   "state": "self._cold_sessions",
+   "file": "nanobot/channels/mochat/runtime.py",
+   "line": 291
+  },
+  {
+   "state": "self._processed_ids",
+   "file": "nanobot/channels/napcat/runtime.py",
+   "line": 77
+  },
+  {
+   "state": "self._bot_outbound_ids",
+   "file": "nanobot/channels/napcat/runtime.py",
+   "line": 78
+  },
+  {
+   "state": "self._processed_ids",
+   "file": "nanobot/channels/qq/runtime.py",
+   "line": 215
+  },
+  {
+   "state": "self._account_id_aliases",
+   "file": "nanobot/channels/signal/runtime.py",
+   "line": 384
+  },
+  {
+   "state": "self._group_buffers",
+   "file": "nanobot/channels/signal/runtime.py",
+   "line": 389
+  },
+  {
+   "state": "self._target_cache",
+   "file": "nanobot/channels/slack/runtime.py",
+   "line": 115
+  },
+  {
+   "state": "self._thread_context_attempted",
+   "file": "nanobot/channels/slack/runtime.py",
+   "line": 116
+  },
+  {
+   "state": "self._media_group_buffers",
+   "file": "nanobot/channels/telegram/runtime.py",
+   "line": 471
+  },
+  {
+   "state": "self._webui_connections",
+   "file": "nanobot/channels/websocket/runtime.py",
+   "line": 276
+  },
+  {
+   "state": "self._processed_message_ids",
+   "file": "nanobot/channels/wecom/runtime.py",
+   "line": 99
+  },
+  {
+   "state": "self._sessions",
+   "file": "nanobot/channels/weixin/connect.py",
+   "line": 34
+  },
+  {
+   "state": "self._context_tokens",
+   "file": "nanobot/channels/weixin/runtime.py",
+   "line": 167
+  },
+  {
+   "state": "self._processed_ids",
+   "file": "nanobot/channels/weixin/runtime.py",
+   "line": 168
+  },
+  {
+   "state": "self._context_token_at",
+   "file": "nanobot/channels/weixin/runtime.py",
+   "line": 176
+  },
+  {
+   "state": "self._pending_tool_hints",
+   "file": "nanobot/channels/weixin/runtime.py",
+   "line": 177
+  },
+  {
+   "state": "self._processed_message_ids",
+   "file": "nanobot/channels/whatsapp/runtime.py",
+   "line": 297
+  },
+  {
+   "state": "self._self_jids",
+   "file": "nanobot/channels/whatsapp/runtime.py",
+   "line": 299
+  },
+  {
+   "state": "self._priority",
+   "file": "nanobot/command/router.py",
+   "line": 65
+  },
+  {
+   "state": "self._exact",
+   "file": "nanobot/command/router.py",
+   "line": 66
+  },
+  {
+   "state": "self.issues",
+   "file": "nanobot/config/errors.py",
+   "line": 60
+  },
+  {
+   "state": "_WEBSOCKET_TURN_WALL_STARTED_AT",
+   "file": "nanobot/session/webui_turns.py",
+   "line": 59
+  }
+ ],
+ "repo": "HKUDS/nanobot",
+ "stars": 39337
+}

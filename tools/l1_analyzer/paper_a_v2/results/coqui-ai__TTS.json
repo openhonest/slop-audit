@@ -1,0 +1,476 @@
+{
+ "status": "ok",
+ "clone_seconds": 1.0,
+ "v1_mutable_ratio": 65.8,
+ "v1_details": "1620/2462 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1339,
+  "promiscuous": 89,
+  "unresolved": 1318
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 1028,
+   "drives_decision": 311
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 89
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 1318
+  }
+ },
+ "v2_resolvable": 0.52,
+ "v2_promiscuous": [
+  {
+   "state": "self.items",
+   "file": "TTS/encoder/dataset.py",
+   "line": 31
+  },
+  {
+   "state": "self.classname_to_classid",
+   "file": "TTS/encoder/dataset.py",
+   "line": 40
+  },
+  {
+   "state": "self.additive_noise_config",
+   "file": "TTS/encoder/utils/generic_utils.py",
+   "line": 18
+  },
+  {
+   "state": "self.noise_list",
+   "file": "TTS/encoder/utils/generic_utils.py",
+   "line": 30
+  },
+  {
+   "state": "speaker_id_dict",
+   "file": "TTS/encoder/utils/prepare_voxceleb.py",
+   "line": 62
+  },
+  {
+   "state": "colormap",
+   "file": "TTS/encoder/utils/visual.py",
+   "line": 9
+  },
+  {
+   "state": "self.speaker_id_mapping",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 158
+  },
+  {
+   "state": "self.d_vector_mapping",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 159
+  },
+  {
+   "state": "self.language_id_mapping",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 160
+  },
+  {
+   "state": "self.phoneme_dataset",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 170
+  },
+  {
+   "state": "self.f0_dataset",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 175
+  },
+  {
+   "state": "self.energy_dataset",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 179
+  },
+  {
+   "state": "self.samples",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 604
+  },
+  {
+   "state": "self.samples",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 706
+  },
+  {
+   "state": "self.samples",
+   "file": "TTS/tts/datasets/dataset.py",
+   "line": 857
+  },
+  {
+   "state": "self.lm_heads",
+   "file": "TTS/tts/layers/bark/model_fine.py",
+   "line": 91
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "TTS/tts/layers/generic/gated_conv.py",
+   "line": 20
+  },
+  {
+   "state": "self.norm_layers",
+   "file": "TTS/tts/layers/generic/gated_conv.py",
+   "line": 21
+  },
+  {
+   "state": "self.in_layers",
+   "file": "TTS/tts/layers/generic/wavenet.py",
+   "line": 59
+  },
+  {
+   "state": "self.res_skip_layers",
+   "file": "TTS/tts/layers/generic/wavenet.py",
+   "line": 60
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "TTS/tts/layers/glow_tts/glow.py",
+   "line": 40
+  },
+  {
+   "state": "self.norm_layers",
+   "file": "TTS/tts/layers/glow_tts/glow.py",
+   "line": 41
+  },
+  {
+   "state": "self.attn_layers",
+   "file": "TTS/tts/layers/glow_tts/transformer.py",
+   "line": 368
+  },
+  {
+   "state": "self.norm_layers_1",
+   "file": "TTS/tts/layers/glow_tts/transformer.py",
+   "line": 369
+  },
+  {
+   "state": "self.ffn_layers",
+   "file": "TTS/tts/layers/glow_tts/transformer.py",
+   "line": 370
+  },
+  {
+   "state": "self.norm_layers_2",
+   "file": "TTS/tts/layers/glow_tts/transformer.py",
+   "line": 371
+  },
+  {
+   "state": "self.J",
+   "file": "TTS/tts/layers/tacotron/attentions.py",
+   "line": 58
+  },
+  {
+   "state": "self.alpha",
+   "file": "TTS/tts/layers/tacotron/attentions.py",
+   "line": 206
+  },
+  {
+   "state": "self.conv_projections",
+   "file": "TTS/tts/layers/tacotron/tacotron.py",
+   "line": 127
+  },
+  {
+   "state": "self.decoder_rnn_hiddens",
+   "file": "TTS/tts/layers/tacotron/tacotron.py",
+   "line": 362
+  },
+  {
+   "state": "self.use_timesteps",
+   "file": "TTS/tts/layers/tortoise/diffusion.py",
+   "line": 1106
+  },
+  {
+   "state": "self.pos_embedding",
+   "file": "TTS/tts/layers/tortoise/xtransformers.py",
+   "line": 1080
+  },
+  {
+   "state": "self.convs_sep",
+   "file": "TTS/tts/layers/vits/stochastic_duration_predictor.py",
+   "line": 31
+  },
+  {
+   "state": "self.convs_1x1",
+   "file": "TTS/tts/layers/vits/stochastic_duration_predictor.py",
+   "line": 32
+  },
+  {
+   "state": "self.norms_1",
+   "file": "TTS/tts/layers/vits/stochastic_duration_predictor.py",
+   "line": 33
+  },
+  {
+   "state": "self.norms_2",
+   "file": "TTS/tts/layers/vits/stochastic_duration_predictor.py",
+   "line": 34
+  },
+  {
+   "state": "self.codes",
+   "file": "TTS/tts/layers/xtts/dvae.py",
+   "line": 300
+  },
+  {
+   "state": "self.resblocks",
+   "file": "TTS/tts/layers/xtts/hifigan_decoder.py",
+   "line": 244
+  },
+  {
+   "state": "self.conds",
+   "file": "TTS/tts/layers/xtts/hifigan_decoder.py",
+   "line": 261
+  },
+  {
+   "state": "_abbreviations",
+   "file": "TTS/tts/layers/xtts/tokenizer.py",
+   "line": 74
+  },
+  {
+   "state": "_symbols_multilingual",
+   "file": "TTS/tts/layers/xtts/tokenizer.py",
+   "line": 241
+  },
+  {
+   "state": "_ordinal_re",
+   "file": "TTS/tts/layers/xtts/tokenizer.py",
+   "line": 438
+  },
+  {
+   "state": "self.failed_samples",
+   "file": "TTS/tts/layers/xtts/trainer/dataset.py",
+   "line": 55
+  },
+  {
+   "state": "self.speaker_manager",
+   "file": "TTS/tts/models/base_tts.py",
+   "line": 44
+  },
+  {
+   "state": "self.language_manager",
+   "file": "TTS/tts/models/base_tts.py",
+   "line": 45
+  },
+  {
+   "state": "hann_window",
+   "file": "TTS/tts/models/delightful_tts.py",
+   "line": 109
+  },
+  {
+   "state": "mel_basis",
+   "file": "TTS/tts/models/delightful_tts.py",
+   "line": 110
+  },
+  {
+   "state": "hann_window",
+   "file": "TTS/tts/models/vits.py",
+   "line": 46
+  },
+  {
+   "state": "mel_basis",
+   "file": "TTS/tts/models/vits.py",
+   "line": 47
+  },
+  {
+   "state": "self.language_manager",
+   "file": "TTS/tts/models/vits.py",
+   "line": 794
+  },
+  {
+   "state": "self.config",
+   "file": "TTS/tts/models/xtts.py",
+   "line": 207
+  },
+  {
+   "state": "self.tokenizer",
+   "file": "TTS/tts/models/xtts.py",
+   "line": 213
+  },
+  {
+   "state": "self.speaker_manager",
+   "file": "TTS/tts/models/xtts.py",
+   "line": 411
+  },
+  {
+   "state": "self.embeddings_by_names",
+   "file": "TTS/tts/utils/managers.py",
+   "line": 141
+  },
+  {
+   "state": "self._char_to_id",
+   "file": "TTS/tts/utils/text/characters.py",
+   "line": 86
+  },
+  {
+   "state": "self._id_to_char",
+   "file": "TTS/tts/utils/text/characters.py",
+   "line": 86
+  },
+  {
+   "state": "self._char_to_id",
+   "file": "TTS/tts/utils/text/characters.py",
+   "line": 271
+  },
+  {
+   "state": "self._id_to_char",
+   "file": "TTS/tts/utils/text/characters.py",
+   "line": 272
+  },
+  {
+   "state": "self.lang_to_phonemizer",
+   "file": "TTS/tts/utils/text/phonemizers/multi_phonemizer.py",
+   "line": 26
+  },
+  {
+   "state": "self.avg_values",
+   "file": "TTS/utils/generic_utils.py",
+   "line": 187
+  },
+  {
+   "state": "self.iters",
+   "file": "TTS/utils/generic_utils.py",
+   "line": 188
+  },
+  {
+   "state": "self.data",
+   "file": "TTS/utils/samplers.py",
+   "line": 183
+  },
+  {
+   "state": "self.speaker_manager",
+   "file": "TTS/vc/models/base_vc.py",
+   "line": 42
+  },
+  {
+   "state": "self.language_manager",
+   "file": "TTS/vc/models/base_vc.py",
+   "line": 43
+  },
+  {
+   "state": "self.resblocks",
+   "file": "TTS/vc/models/freevc.py",
+   "line": 121
+  },
+  {
+   "state": "mel_basis",
+   "file": "TTS/vc/modules/freevc/mel_processing.py",
+   "line": 36
+  },
+  {
+   "state": "hann_window",
+   "file": "TTS/vc/modules/freevc/mel_processing.py",
+   "line": 37
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "TTS/vc/modules/freevc/modules.py",
+   "line": 40
+  },
+  {
+   "state": "self.norm_layers",
+   "file": "TTS/vc/modules/freevc/modules.py",
+   "line": 41
+  },
+  {
+   "state": "self.convs_sep",
+   "file": "TTS/vc/modules/freevc/modules.py",
+   "line": 75
+  },
+  {
+   "state": "self.convs_1x1",
+   "file": "TTS/vc/modules/freevc/modules.py",
+   "line": 76
+  },
+  {
+   "state": "self.norms_1",
+   "file": "TTS/vc/modules/freevc/modules.py",
+   "line": 77
+  },
+  {
+   "state": "self.norms_2",
+   "file": "TTS/vc/modules/freevc/modules.py",
+   "line": 78
+  },
+  {
+   "state": "self.in_layers",
+   "file": "TTS/vc/modules/freevc/modules.py",
+   "line": 115
+  },
+  {
+   "state": "self.res_skip_layers",
+   "file": "TTS/vc/modules/freevc/modules.py",
+   "line": 116
+  },
+  {
+   "state": "self.cache",
+   "file": "TTS/vocoder/datasets/gan_dataset.py",
+   "line": 61
+  },
+  {
+   "state": "self.cache",
+   "file": "TTS/vocoder/datasets/wavegrad_dataset.py",
+   "line": 56
+  },
+  {
+   "state": "self.item_list",
+   "file": "TTS/vocoder/datasets/wavernn_dataset.py",
+   "line": 20
+  },
+  {
+   "state": "self.convs",
+   "file": "TTS/vocoder/layers/lvc_block.py",
+   "line": 106
+  },
+  {
+   "state": "self.pe",
+   "file": "TTS/vocoder/layers/wavegrad.py",
+   "line": 23
+  },
+  {
+   "state": "self.meanpools",
+   "file": "TTS/vocoder/models/hifigan_discriminator.py",
+   "line": 176
+  },
+  {
+   "state": "self.resblocks",
+   "file": "TTS/vocoder/models/hifigan_generator.py",
+   "line": 220
+  },
+  {
+   "state": "self.lvc_blocks",
+   "file": "TTS/vocoder/models/univnet_generator.py",
+   "line": 59
+  },
+  {
+   "state": "self.noise_level",
+   "file": "TTS/vocoder/models/wavegrad.py",
+   "line": 65
+  },
+  {
+   "state": "self.beta",
+   "file": "TTS/vocoder/models/wavegrad.py",
+   "line": 67
+  },
+  {
+   "state": "self.alpha_hat",
+   "file": "TTS/vocoder/models/wavegrad.py",
+   "line": 69
+  },
+  {
+   "state": "self.c1",
+   "file": "TTS/vocoder/models/wavegrad.py",
+   "line": 70
+  },
+  {
+   "state": "self.c2",
+   "file": "TTS/vocoder/models/wavegrad.py",
+   "line": 71
+  },
+  {
+   "state": "self.sigma",
+   "file": "TTS/vocoder/models/wavegrad.py",
+   "line": 72
+  }
+ ],
+ "repo": "coqui-ai/TTS",
+ "stars": 45053
+}

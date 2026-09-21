@@ -1,0 +1,416 @@
+{
+ "status": "ok",
+ "clone_seconds": 1.1,
+ "v1_mutable_ratio": 63.4,
+ "v1_details": "1955/3084 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1200,
+  "promiscuous": 77,
+  "unresolved": 392
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 1053,
+   "drives_decision": 147
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 77
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 392
+  }
+ },
+ "v2_resolvable": 0.765,
+ "v2_promiscuous": [
+  {
+   "state": "secure_hosts",
+   "file": "examples/contrib/sslstrip.py",
+   "line": 12
+  },
+  {
+   "state": "self.history",
+   "file": "examples/contrib/tls_passthrough.py",
+   "line": 41
+  },
+  {
+   "state": "self.mapping_templates",
+   "file": "examples/contrib/webscanner_helper/mapping.py",
+   "line": 70
+  },
+  {
+   "state": "self.master",
+   "file": "mitmproxy/addonmanager.py",
+   "line": 68
+  },
+  {
+   "state": "self.lookup",
+   "file": "mitmproxy/addonmanager.py",
+   "line": 133
+  },
+  {
+   "state": "self.layer",
+   "file": "mitmproxy/addons/clientplayback.py",
+   "line": 105
+  },
+  {
+   "state": "self.history",
+   "file": "mitmproxy/addons/command_history.py",
+   "line": 14
+  },
+  {
+   "state": "self.filtered_history",
+   "file": "mitmproxy/addons/command_history.py",
+   "line": 15
+  },
+  {
+   "state": "formats",
+   "file": "mitmproxy/addons/export.py",
+   "line": 159
+  },
+  {
+   "state": "self.authenticated",
+   "file": "mitmproxy/addons/proxyauth.py",
+   "line": 29
+  },
+  {
+   "state": "self._instances",
+   "file": "mitmproxy/addons/proxyserver.py",
+   "line": 47
+  },
+  {
+   "state": "self.connections",
+   "file": "mitmproxy/addons/proxyserver.py",
+   "line": 125
+  },
+  {
+   "state": "self.addons",
+   "file": "mitmproxy/addons/script.py",
+   "line": 160
+  },
+  {
+   "state": "self.flowmap",
+   "file": "mitmproxy/addons/serverplayback.py",
+   "line": 34
+  },
+  {
+   "state": "self.hosts",
+   "file": "mitmproxy/addons/stickyauth.py",
+   "line": 11
+  },
+  {
+   "state": "self.jar",
+   "file": "mitmproxy/addons/stickycookie.py",
+   "line": 37
+  },
+  {
+   "state": "self.view",
+   "file": "mitmproxy/addons/view.py",
+   "line": 52
+  },
+  {
+   "state": "self._store",
+   "file": "mitmproxy/addons/view.py",
+   "line": 149
+  },
+  {
+   "state": "self.orders",
+   "file": "mitmproxy/addons/view.py",
+   "line": 157
+  },
+  {
+   "state": "self.settings",
+   "file": "mitmproxy/addons/view.py",
+   "line": 187
+  },
+  {
+   "state": "self.certs",
+   "file": "mitmproxy/certs.py",
+   "line": 483
+  },
+  {
+   "state": "self.commands",
+   "file": "mitmproxy/command.py",
+   "line": 172
+  },
+  {
+   "state": "registry",
+   "file": "mitmproxy/contentviews/__init__.py",
+   "line": 59
+  },
+  {
+   "state": "self.connections",
+   "file": "mitmproxy/contentviews/_view_http3.py",
+   "line": 81
+  },
+  {
+   "state": "self._packet",
+   "file": "mitmproxy/contentviews/_view_mqtt.py",
+   "line": 61
+  },
+  {
+   "state": "self.open_tags",
+   "file": "mitmproxy/contentviews/_view_xml_html.py",
+   "line": 185
+  },
+  {
+   "state": "self.indent",
+   "file": "mitmproxy/contentviews/_view_xml_html.py",
+   "line": 186
+  },
+  {
+   "state": "_ansi_colors",
+   "file": "mitmproxy/contrib/click/__init__.py",
+   "line": 8
+  },
+  {
+   "state": "self.codePages",
+   "file": "mitmproxy/contrib/wbxml/ASWBXML.py",
+   "line": 53
+  },
+  {
+   "state": "self.tokenLookup",
+   "file": "mitmproxy/contrib/wbxml/ASWBXMLCodePage.py",
+   "line": 34
+  },
+  {
+   "state": "self.tagLookup",
+   "file": "mitmproxy/contrib/wbxml/ASWBXMLCodePage.py",
+   "line": 35
+  },
+  {
+   "state": "self.names",
+   "file": "mitmproxy/coretypes/bidi.py",
+   "line": 13
+  },
+  {
+   "state": "_iterate_map",
+   "file": "mitmproxy/eventsequence.py",
+   "line": 70
+  },
+  {
+   "state": "all_hooks",
+   "file": "mitmproxy/hooks.py",
+   "line": 39
+  },
+  {
+   "state": "converters",
+   "file": "mitmproxy/io/compat.py",
+   "line": 471
+  },
+  {
+   "state": "custom_decode",
+   "file": "mitmproxy/net/encoding.py",
+   "line": 62
+  },
+  {
+   "state": "custom_encode",
+   "file": "mitmproxy/net/encoding.py",
+   "line": 120
+  },
+  {
+   "state": "_cookie_params",
+   "file": "mitmproxy/net/http/cookies.py",
+   "line": 26
+  },
+  {
+   "state": "EC_CURVES",
+   "file": "mitmproxy/net/tls.py",
+   "line": 93
+  },
+  {
+   "state": "self.deferred",
+   "file": "mitmproxy/optmanager.py",
+   "line": 113
+  },
+  {
+   "state": "self._map",
+   "file": "mitmproxy/platform/windows.py",
+   "line": 203
+  },
+  {
+   "state": "self._map",
+   "file": "mitmproxy/platform/windows.py",
+   "line": 353
+  },
+  {
+   "state": "self.client_server_map",
+   "file": "mitmproxy/platform/windows.py",
+   "line": 435
+  },
+  {
+   "state": "command_reply_subclasses",
+   "file": "mitmproxy/proxy/events.py",
+   "line": 91
+  },
+  {
+   "state": "self.context",
+   "file": "mitmproxy/proxy/layer.py",
+   "line": 84
+  },
+  {
+   "state": "self.flows",
+   "file": "mitmproxy/proxy/layers/dns.py",
+   "line": 67
+  },
+  {
+   "state": "self.waiting_for_establishment",
+   "file": "mitmproxy/proxy/layers/http/__init__.py",
+   "line": 943
+  },
+  {
+   "state": "self.streams",
+   "file": "mitmproxy/proxy/layers/http/__init__.py",
+   "line": 944
+  },
+  {
+   "state": "self.connections",
+   "file": "mitmproxy/proxy/layers/http/__init__.py",
+   "line": 946
+  },
+  {
+   "state": "self.h2_conn",
+   "file": "mitmproxy/proxy/layers/http/_http2.py",
+   "line": 92
+  },
+  {
+   "state": "self.streams",
+   "file": "mitmproxy/proxy/layers/http/_http2.py",
+   "line": 93
+  },
+  {
+   "state": "self.their_stream_id",
+   "file": "mitmproxy/proxy/layers/http/_http2.py",
+   "line": 502
+  },
+  {
+   "state": "self.their_stream_id",
+   "file": "mitmproxy/proxy/layers/http/_http3.py",
+   "line": 271
+  },
+  {
+   "state": "self.stream_trailers",
+   "file": "mitmproxy/proxy/layers/http/_http_h2.py",
+   "line": 58
+  },
+  {
+   "state": "self._next_stream_id",
+   "file": "mitmproxy/proxy/layers/http/_http_h3.py",
+   "line": 68
+  },
+  {
+   "state": "self._closed_streams",
+   "file": "mitmproxy/proxy/layers/http/_http_h3.py",
+   "line": 126
+  },
+  {
+   "state": "self.connections",
+   "file": "mitmproxy/proxy/layers/quic/_raw_layers.py",
+   "line": 183
+  },
+  {
+   "state": "self.next_stream_id",
+   "file": "mitmproxy/proxy/layers/quic/_raw_layers.py",
+   "line": 188
+  },
+  {
+   "state": "self._wakeup_commands",
+   "file": "mitmproxy/proxy/layers/quic/_stream_layers.py",
+   "line": 74
+  },
+  {
+   "state": "self.quic",
+   "file": "mitmproxy/proxy/layers/quic/_stream_layers.py",
+   "line": 81
+  },
+  {
+   "state": "self.transports",
+   "file": "mitmproxy/proxy/server.py",
+   "line": 108
+  },
+  {
+   "state": "self.max_conns",
+   "file": "mitmproxy/proxy/server.py",
+   "line": 109
+  },
+  {
+   "state": "self.hook_handlers",
+   "file": "mitmproxy/proxy/server.py",
+   "line": 495
+  },
+  {
+   "state": "self._stack",
+   "file": "mitmproxy/proxy/tunnel.py",
+   "line": 187
+  },
+  {
+   "state": "self.options",
+   "file": "mitmproxy/tools/console/commander/commander.py",
+   "line": 27
+  },
+  {
+   "state": "self.cmds",
+   "file": "mitmproxy/tools/console/commands.py",
+   "line": 52
+  },
+  {
+   "state": "self.editor",
+   "file": "mitmproxy/tools/console/grideditor/base.py",
+   "line": 89
+  },
+  {
+   "state": "self.fields",
+   "file": "mitmproxy/tools/console/grideditor/base.py",
+   "line": 93
+  },
+  {
+   "state": "self.keys",
+   "file": "mitmproxy/tools/console/keymap.py",
+   "line": 75
+  },
+  {
+   "state": "keyAttrs",
+   "file": "mitmproxy/tools/console/keymap.py",
+   "line": 179
+  },
+  {
+   "state": "self.choices",
+   "file": "mitmproxy/tools/console/overlay.py",
+   "line": 108
+  },
+  {
+   "state": "self.search_term",
+   "file": "mitmproxy/tools/console/searchable.py",
+   "line": 22
+  },
+  {
+   "state": "self.onekey",
+   "file": "mitmproxy/tools/console/statusbar.py",
+   "line": 71
+  },
+  {
+   "state": "self.windows",
+   "file": "mitmproxy/tools/console/window.py",
+   "line": 55
+  },
+  {
+   "state": "self.stack",
+   "file": "mitmproxy/tools/console/window.py",
+   "line": 74
+  },
+  {
+   "state": "self.typemap",
+   "file": "mitmproxy/types.py",
+   "line": 472
+  },
+  {
+   "state": "app_info",
+   "file": "release/deploy-microsoft-store.py",
+   "line": 112
+  }
+ ],
+ "repo": "mitmproxy/mitmproxy",
+ "stars": 43062
+}

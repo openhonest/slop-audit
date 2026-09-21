@@ -1,0 +1,236 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.8,
+ "v1_mutable_ratio": 58.6,
+ "v1_details": "922/1574 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 742,
+  "promiscuous": 41,
+  "unresolved": 148
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 509,
+   "drives_decision": 233
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 41
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 148
+  }
+ },
+ "v2_resolvable": 0.841,
+ "v2_promiscuous": [
+  {
+   "state": "self._link_embedding_cache",
+   "file": "crawl4ai/adaptive_crawler.py",
+   "line": 623
+  },
+  {
+   "state": "self.hooks",
+   "file": "crawl4ai/async_crawler_strategy.py",
+   "line": 101
+  },
+  {
+   "state": "self.hooks",
+   "file": "crawl4ai/async_crawler_strategy.py",
+   "line": 2504
+  },
+  {
+   "state": "self.content_paths",
+   "file": "crawl4ai/async_database.py",
+   "line": 27
+  },
+  {
+   "state": "self.connection_pool",
+   "file": "crawl4ai/async_database.py",
+   "line": 30
+  },
+  {
+   "state": "self.rate_limit_codes",
+   "file": "crawl4ai/async_dispatcher.py",
+   "line": 39
+  },
+  {
+   "state": "self.domains",
+   "file": "crawl4ai/async_dispatcher.py",
+   "line": 40
+  },
+  {
+   "state": "self.colors",
+   "file": "crawl4ai/async_logger.py",
+   "line": 143
+  },
+  {
+   "state": "self.sessions",
+   "file": "crawl4ai/browser_manager.py",
+   "line": 731
+  },
+  {
+   "state": "self.contexts_by_config",
+   "file": "crawl4ai/browser_manager.py",
+   "line": 735
+  },
+  {
+   "state": "self._context_refcounts",
+   "file": "crawl4ai/browser_manager.py",
+   "line": 739
+  },
+  {
+   "state": "self._page_to_sig",
+   "file": "crawl4ai/browser_manager.py",
+   "line": 741
+  },
+  {
+   "state": "self._browser_endpoint_key",
+   "file": "crawl4ai/browser_manager.py",
+   "line": 750
+  },
+  {
+   "state": "self.stats",
+   "file": "crawl4ai/components/crawler_monitor.py",
+   "line": 406
+  },
+  {
+   "state": "self.included_tags",
+   "file": "crawl4ai/content_filter_strategy.py",
+   "line": 50
+  },
+  {
+   "state": "self.excluded_tags",
+   "file": "crawl4ai/content_filter_strategy.py",
+   "line": 101
+  },
+  {
+   "state": "self.header_tags",
+   "file": "crawl4ai/content_filter_strategy.py",
+   "line": 112
+  },
+  {
+   "state": "self.preserve_tags",
+   "file": "crawl4ai/content_filter_strategy.py",
+   "line": 591
+  },
+  {
+   "state": "self._index",
+   "file": "crawl4ai/deep_crawling/crazy.py",
+   "line": 73
+  },
+  {
+   "state": "self.bits",
+   "file": "crawl4ai/deep_crawling/crazy.py",
+   "line": 109
+  },
+  {
+   "state": "self._simple_suffixes",
+   "file": "crawl4ai/deep_crawling/filters.py",
+   "line": 156
+  },
+  {
+   "state": "self._selector_cache",
+   "file": "crawl4ai/extraction_strategy.py",
+   "line": 2055
+  },
+  {
+   "state": "self._result_cache",
+   "file": "crawl4ai/extraction_strategy.py",
+   "line": 2057
+  },
+  {
+   "state": "self._selector_cache",
+   "file": "crawl4ai/extraction_strategy.py",
+   "line": 2341
+  },
+  {
+   "state": "self.list",
+   "file": "crawl4ai/html2text/__init__.py",
+   "line": 116
+  },
+  {
+   "state": "self.tag_stack",
+   "file": "crawl4ai/html2text/__init__.py",
+   "line": 127
+  },
+  {
+   "state": "self.preceding_data",
+   "file": "crawl4ai/html2text/__init__.py",
+   "line": 140
+  },
+  {
+   "state": "self.preserve_tags",
+   "file": "crawl4ai/html2text/__init__.py",
+   "line": 1076
+  },
+  {
+   "state": "self.hooks",
+   "file": "crawl4ai/legacy/crawler_strategy.py",
+   "line": 130
+  },
+  {
+   "state": "self.document_map",
+   "file": "crawl4ai/legacy/llmtxt.py",
+   "line": 46
+  },
+  {
+   "state": "self.tokenized_facts",
+   "file": "crawl4ai/legacy/llmtxt.py",
+   "line": 47
+  },
+  {
+   "state": "self.content_paths",
+   "file": "crawl4ai/migrations.py",
+   "line": 22
+  },
+  {
+   "state": "self._temp_files",
+   "file": "crawl4ai/processors/pdf/__init__.py",
+   "line": 69
+  },
+  {
+   "state": "self._sessions",
+   "file": "crawl4ai/proxy_strategy.py",
+   "line": 208
+  },
+  {
+   "state": "self.procs",
+   "file": "crawl4ai/script/c4ai_script.py",
+   "line": 329
+  },
+  {
+   "state": "self.browser_combinations",
+   "file": "crawl4ai/user_agent_generator.py",
+   "line": 205
+  },
+  {
+   "state": "self.public_paths",
+   "file": "deploy/docker/auth_gate.py",
+   "line": 46
+  },
+  {
+   "state": "HOT_POOL",
+   "file": "deploy/docker/crawler_pool.py",
+   "line": 14
+  },
+  {
+   "state": "COLD_POOL",
+   "file": "deploy/docker/crawler_pool.py",
+   "line": 15
+  },
+  {
+   "state": "LAST_USED",
+   "file": "deploy/docker/crawler_pool.py",
+   "line": 16
+  },
+  {
+   "state": "USAGE_COUNT",
+   "file": "deploy/docker/crawler_pool.py",
+   "line": 17
+  }
+ ],
+ "repo": "unclecode/crawl4ai",
+ "stars": 63903
+}

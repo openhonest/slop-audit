@@ -1,0 +1,1931 @@
+{
+ "status": "ok",
+ "clone_seconds": 3.1,
+ "v1_mutable_ratio": 59.1,
+ "v1_details": "11698/19810 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 6279,
+  "promiscuous": 380,
+  "unresolved": 4072
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 4867,
+   "drives_decision": 1412
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 380
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 4072
+  }
+ },
+ "v2_resolvable": 0.621,
+ "v2_promiscuous": [
+  {
+   "state": "self._checkpoint_exporter",
+   "file": "official/core/base_trainer.py",
+   "line": 185
+  },
+  {
+   "state": "self._savedmodels",
+   "file": "official/core/savedmodel_checkpoint_manager.py",
+   "line": 56
+  },
+  {
+   "state": "self._seen_class_ids",
+   "file": "official/legacy/detection/evaluation/coco_evaluator.py",
+   "line": 524
+  },
+  {
+   "state": "self._norm_activations",
+   "file": "official/legacy/detection/modeling/architecture/fpn.py",
+   "line": 77
+  },
+  {
+   "state": "self._lateral_conv2d_op",
+   "file": "official/legacy/detection/modeling/architecture/fpn.py",
+   "line": 78
+  },
+  {
+   "state": "self._post_hoc_conv2d_op",
+   "file": "official/legacy/detection/modeling/architecture/fpn.py",
+   "line": 79
+  },
+  {
+   "state": "self._coarse_conv2d_op",
+   "file": "official/legacy/detection/modeling/architecture/fpn.py",
+   "line": 80
+  },
+  {
+   "state": "self._norm_activations",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 106
+  },
+  {
+   "state": "self._norm_activations",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 221
+  },
+  {
+   "state": "self._conv_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 327
+  },
+  {
+   "state": "self._conv_bn_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 328
+  },
+  {
+   "state": "self._fc_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 343
+  },
+  {
+   "state": "self._fc_bn_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 344
+  },
+  {
+   "state": "self._conv_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 466
+  },
+  {
+   "state": "self._conv_bn_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 467
+  },
+  {
+   "state": "self._fc_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 482
+  },
+  {
+   "state": "self._fc_bn_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 483
+  },
+  {
+   "state": "self._conv2d_ops",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 604
+  },
+  {
+   "state": "self._class_conv",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 752
+  },
+  {
+   "state": "self._class_norm_activation",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 753
+  },
+  {
+   "state": "self._box_conv",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 796
+  },
+  {
+   "state": "self._box_norm_activation",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 797
+  },
+  {
+   "state": "self._class_conv",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 1038
+  },
+  {
+   "state": "self._class_norm_activation",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 1039
+  },
+  {
+   "state": "self._fine_class_conv",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 1170
+  },
+  {
+   "state": "self._fine_class_bn",
+   "file": "official/legacy/detection/modeling/architecture/heads.py",
+   "line": 1171
+  },
+  {
+   "state": "self.available_policies",
+   "file": "official/legacy/image_classification/augment.py",
+   "line": 842
+  },
+  {
+   "state": "self.learning_rate_ops_cache",
+   "file": "official/legacy/image_classification/resnet/common.py",
+   "line": 64
+  },
+  {
+   "state": "self._cache",
+   "file": "official/legacy/transformer/utils/tokenizer.py",
+   "line": 93
+  },
+  {
+   "state": "self.r_w_bias",
+   "file": "official/legacy/xlnet/xlnet_modeling.py",
+   "line": 459
+  },
+  {
+   "state": "self.r_r_bias",
+   "file": "official/legacy/xlnet/xlnet_modeling.py",
+   "line": 465
+  },
+  {
+   "state": "self.r_s_bias",
+   "file": "official/legacy/xlnet/xlnet_modeling.py",
+   "line": 471
+  },
+  {
+   "state": "self.seg_embed",
+   "file": "official/legacy/xlnet/xlnet_modeling.py",
+   "line": 496
+  },
+  {
+   "state": "self.rel_multihead_layers",
+   "file": "official/legacy/xlnet/xlnet_modeling.py",
+   "line": 508
+  },
+  {
+   "state": "self.h_positionwise_ffn_layers",
+   "file": "official/legacy/xlnet/xlnet_modeling.py",
+   "line": 509
+  },
+  {
+   "state": "_BOUND",
+   "file": "official/modeling/hyperparams/base_config.py",
+   "line": 32
+  },
+  {
+   "state": "self.task_fns",
+   "file": "official/modeling/multitask/evaluator.py",
+   "line": 100
+  },
+  {
+   "state": "self._task_train_step_map",
+   "file": "official/modeling/multitask/interleaving_trainer.py",
+   "line": 63
+  },
+  {
+   "state": "self._task_step_counters",
+   "file": "official/modeling/multitask/interleaving_trainer.py",
+   "line": 70
+  },
+  {
+   "state": "self._tasks",
+   "file": "official/modeling/multitask/multitask.py",
+   "line": 53
+  },
+  {
+   "state": "self._task_weights",
+   "file": "official/modeling/multitask/multitask.py",
+   "line": 65
+  },
+  {
+   "state": "self.processors",
+   "file": "official/nlp/data/classifier_data_lib_test.py",
+   "line": 38
+  },
+  {
+   "state": "self._label_field",
+   "file": "official/nlp/data/sentence_prediction_dataloader.py",
+   "line": 59
+  },
+  {
+   "state": "self._label_name_mapping",
+   "file": "official/nlp/data/sentence_prediction_dataloader.py",
+   "line": 61
+  },
+  {
+   "state": "self.processors",
+   "file": "official/nlp/data/tagging_data_lib_test.py",
+   "line": 47
+  },
+  {
+   "state": "self.rand_attn",
+   "file": "official/nlp/modeling/layers/bigbird_attention.py",
+   "line": 432
+  },
+  {
+   "state": "self._intermediate_dense",
+   "file": "official/nlp/modeling/layers/gated_feedforward.py",
+   "line": 109
+  },
+  {
+   "state": "self._inner_activation_layers",
+   "file": "official/nlp/modeling/layers/gated_feedforward.py",
+   "line": 110
+  },
+  {
+   "state": "self._gate_dense",
+   "file": "official/nlp/modeling/layers/gated_feedforward.py",
+   "line": 111
+  },
+  {
+   "state": "self._output_dense",
+   "file": "official/nlp/modeling/layers/gated_feedforward.py",
+   "line": 112
+  },
+  {
+   "state": "self._output_dropout",
+   "file": "official/nlp/modeling/layers/gated_feedforward.py",
+   "line": 113
+  },
+  {
+   "state": "self._output_layer_norm",
+   "file": "official/nlp/modeling/layers/gated_feedforward.py",
+   "line": 114
+  },
+  {
+   "state": "self._position_embeddings",
+   "file": "official/nlp/modeling/layers/position_embedding.py",
+   "line": 79
+  },
+  {
+   "state": "self._query_shape",
+   "file": "official/nlp/modeling/layers/reuse_attention.py",
+   "line": 254
+  },
+  {
+   "state": "self.w_shape",
+   "file": "official/nlp/modeling/layers/spectral_normalization.py",
+   "line": 86
+  },
+  {
+   "state": "self.content_attention_bias",
+   "file": "official/nlp/modeling/layers/transformer_xl.py",
+   "line": 398
+  },
+  {
+   "state": "self.positional_attention_bias",
+   "file": "official/nlp/modeling/layers/transformer_xl.py",
+   "line": 403
+  },
+  {
+   "state": "self.segment_attention_bias",
+   "file": "official/nlp/modeling/layers/transformer_xl.py",
+   "line": 408
+  },
+  {
+   "state": "self.transformer_xl_layers",
+   "file": "official/nlp/modeling/layers/transformer_xl.py",
+   "line": 414
+  },
+  {
+   "state": "self.encoder_layers",
+   "file": "official/nlp/modeling/models/seq2seq_transformer.py",
+   "line": 416
+  },
+  {
+   "state": "self.decoder_layers",
+   "file": "official/nlp/modeling/models/seq2seq_transformer.py",
+   "line": 548
+  },
+  {
+   "state": "self.relative_embeddings",
+   "file": "official/nlp/modeling/models/t5.py",
+   "line": 1076
+  },
+  {
+   "state": "self.encoder_layers",
+   "file": "official/nlp/modeling/models/t5.py",
+   "line": 1092
+  },
+  {
+   "state": "self.relative_embeddings",
+   "file": "official/nlp/modeling/models/t5.py",
+   "line": 1242
+  },
+  {
+   "state": "self.decoder_layers",
+   "file": "official/nlp/modeling/models/t5.py",
+   "line": 1257
+  },
+  {
+   "state": "_str2transformer_cls",
+   "file": "official/nlp/modeling/networks/funnel_transformer.py",
+   "line": 40
+  },
+  {
+   "state": "self._att_input_pool_layers",
+   "file": "official/nlp/modeling/networks/funnel_transformer.py",
+   "line": 411
+  },
+  {
+   "state": "self._transformer_layers",
+   "file": "official/nlp/modeling/networks/mobile_bert_encoder.py",
+   "line": 101
+  },
+  {
+   "state": "self._position_embeddings",
+   "file": "official/nlp/modeling/networks/packed_sequence_embedding.py",
+   "line": 271
+  },
+  {
+   "state": "self.eos_id",
+   "file": "official/nlp/modeling/ops/beam_search.py",
+   "line": 148
+  },
+  {
+   "state": "self.vocab",
+   "file": "official/nlp/tools/tokenization.py",
+   "line": 318
+  },
+  {
+   "state": "intermediate_channel_size",
+   "file": "official/projects/assemblenet/modeling/assemblenet.py",
+   "line": 63
+  },
+  {
+   "state": "self._model_edge_weights",
+   "file": "official/projects/assemblenet/modeling/assemblenet.py",
+   "line": 433
+  },
+  {
+   "state": "self._model_edge_weights",
+   "file": "official/projects/assemblenet/modeling/assemblenet_plus.py",
+   "line": 181
+  },
+  {
+   "state": "self._stack",
+   "file": "official/projects/bigbird/recompute_grad.py",
+   "line": 59
+  },
+  {
+   "state": "self._input_specs",
+   "file": "official/projects/centernet/modeling/heads/centernet_head.py",
+   "line": 58
+  },
+  {
+   "state": "self._task_outputs",
+   "file": "official/projects/centernet/modeling/heads/centernet_head.py",
+   "line": 59
+  },
+  {
+   "state": "self._channel_dims_per_stage",
+   "file": "official/projects/centernet/modeling/layers/cn_nn_blocks.py",
+   "line": 174
+  },
+  {
+   "state": "self._blocks_per_stage",
+   "file": "official/projects/centernet/modeling/layers/cn_nn_blocks.py",
+   "line": 175
+  },
+  {
+   "state": "self.data",
+   "file": "official/projects/centernet/ops/box_list.py",
+   "line": 72
+  },
+  {
+   "state": "self._temporal_strides",
+   "file": "official/projects/const_cl/modeling/backbones/resnet_3d.py",
+   "line": 93
+  },
+  {
+   "state": "self._temporal_kernel_sizes",
+   "file": "official/projects/const_cl/modeling/backbones/resnet_3d.py",
+   "line": 94
+  },
+  {
+   "state": "self._use_self_gating",
+   "file": "official/projects/const_cl/modeling/backbones/resnet_3d.py",
+   "line": 100
+  },
+  {
+   "state": "self._mha_units",
+   "file": "official/projects/const_cl/modeling/heads/transformer_decoder.py",
+   "line": 181
+  },
+  {
+   "state": "self.hourglass_network",
+   "file": "official/projects/deepmac_maskrcnn/modeling/heads/hourglass_network.py",
+   "line": 408
+  },
+  {
+   "state": "self.output_conv",
+   "file": "official/projects/deepmac_maskrcnn/modeling/heads/hourglass_network.py",
+   "line": 409
+  },
+  {
+   "state": "self.intermediate_conv1",
+   "file": "official/projects/deepmac_maskrcnn/modeling/heads/hourglass_network.py",
+   "line": 423
+  },
+  {
+   "state": "self.intermediate_conv2",
+   "file": "official/projects/deepmac_maskrcnn/modeling/heads/hourglass_network.py",
+   "line": 424
+  },
+  {
+   "state": "self.intermediate_residual",
+   "file": "official/projects/deepmac_maskrcnn/modeling/heads/hourglass_network.py",
+   "line": 425
+  },
+  {
+   "state": "self.encoder_layers",
+   "file": "official/projects/detr/modeling/transformer.py",
+   "line": 82
+  },
+  {
+   "state": "self.decoder_layers",
+   "file": "official/projects/detr/modeling/transformer.py",
+   "line": 480
+  },
+  {
+   "state": "self._transformer_layers",
+   "file": "official/projects/edgetpu/nlp/modeling/encoder.py",
+   "line": 108
+  },
+  {
+   "state": "self.batch_norm_layer",
+   "file": "official/projects/edgetpu/vision/modeling/custom_layers.py",
+   "line": 126
+  },
+  {
+   "state": "self.kernel",
+   "file": "official/projects/edgetpu/vision/modeling/custom_layers.py",
+   "line": 167
+  },
+  {
+   "state": "self.bias",
+   "file": "official/projects/edgetpu/vision/modeling/custom_layers.py",
+   "line": 168
+  },
+  {
+   "state": "self.bn_layers",
+   "file": "official/projects/edgetpu/vision/modeling/custom_layers.py",
+   "line": 199
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "official/projects/edgetpu/vision/modeling/custom_layers.py",
+   "line": 309
+  },
+  {
+   "state": "self.bn_layers",
+   "file": "official/projects/edgetpu/vision/modeling/custom_layers.py",
+   "line": 310
+  },
+  {
+   "state": "self.resample_layers",
+   "file": "official/projects/edgetpu/vision/modeling/heads/bifpn_head.py",
+   "line": 356
+  },
+  {
+   "state": "self.fullres_conv_transpose",
+   "file": "official/projects/edgetpu/vision/modeling/heads/bifpn_head.py",
+   "line": 691
+  },
+  {
+   "state": "self.fullres_conv",
+   "file": "official/projects/edgetpu/vision/modeling/heads/bifpn_head.py",
+   "line": 692
+  },
+  {
+   "state": "self.resample_layers",
+   "file": "official/projects/edgetpu/vision/tasks/semantic_segmentation.py",
+   "line": 140
+  },
+  {
+   "state": "self.label_to_entity_type_index",
+   "file": "official/projects/fffner/utils/create_data.py",
+   "line": 51
+  },
+  {
+   "state": "self.data",
+   "file": "official/projects/fffner/utils/create_data.py",
+   "line": 62
+  },
+  {
+   "state": "raw_datasets",
+   "file": "official/projects/longformer/utils/longformer_tokenizer_to_tfrecord.py",
+   "line": 27
+  },
+  {
+   "state": "task_to_keys",
+   "file": "official/projects/longformer/utils/longformer_tokenizer_to_tfrecord.py",
+   "line": 36
+  },
+  {
+   "state": "self._label_field",
+   "file": "official/projects/lra/lra_dual_encoder_dataloader.py",
+   "line": 59
+  },
+  {
+   "state": "self._label_name_mapping",
+   "file": "official/projects/lra/lra_dual_encoder_dataloader.py",
+   "line": 61
+  },
+  {
+   "state": "self._transformer_layers",
+   "file": "official/projects/lra/mega_encoder.py",
+   "line": 134
+  },
+  {
+   "state": "self.rel_pos_bias",
+   "file": "official/projects/lra/moving_average_gated_attention.py",
+   "line": 45
+  },
+  {
+   "state": "self.norms",
+   "file": "official/projects/maskconver/modeling/layers/maskconver_head.py",
+   "line": 308
+  },
+  {
+   "state": "self._norms",
+   "file": "official/projects/maskconver/modeling/layers/multiscale_maskconver_head.py",
+   "line": 126
+  },
+  {
+   "state": "self._hidden_size",
+   "file": "official/projects/maxvit/modeling/maxvit.py",
+   "line": 538
+  },
+  {
+   "state": "self._output_filter_depths",
+   "file": "official/projects/mosaic/modeling/mosaic_blocks.py",
+   "line": 79
+  },
+  {
+   "state": "self._conv_branches",
+   "file": "official/projects/mosaic/modeling/mosaic_blocks.py",
+   "line": 110
+  },
+  {
+   "state": "self.layers",
+   "file": "official/projects/nhnet/decoder.py",
+   "line": 54
+  },
+  {
+   "state": "self.articles",
+   "file": "official/projects/nhnet/raw_data_processor.py",
+   "line": 55
+  },
+  {
+   "state": "self._projection_convs",
+   "file": "official/projects/panoptic/modeling/layers/fusion_layers.py",
+   "line": 115
+  },
+  {
+   "state": "self._projection_norms",
+   "file": "official/projects/panoptic/modeling/layers/fusion_layers.py",
+   "line": 116
+  },
+  {
+   "state": "self._fusion_convs",
+   "file": "official/projects/panoptic/modeling/layers/fusion_layers.py",
+   "line": 117
+  },
+  {
+   "state": "self._fusion_norms",
+   "file": "official/projects/panoptic/modeling/layers/fusion_layers.py",
+   "line": 118
+  },
+  {
+   "state": "self._backbone_endpoint_names",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 237
+  },
+  {
+   "state": "self._encoder_dropouts",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 255
+  },
+  {
+   "state": "self._stem_projections",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 260
+  },
+  {
+   "state": "self._stem_lns",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 264
+  },
+  {
+   "state": "self._encoders",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 486
+  },
+  {
+   "state": "self._output_ln_encs",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 501
+  },
+  {
+   "state": "self._projs",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 506
+  },
+  {
+   "state": "self._proj_lns",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 510
+  },
+  {
+   "state": "self._proj_mlps",
+   "file": "official/projects/pix2seq/modeling/pix2seq_model.py",
+   "line": 514
+  },
+  {
+   "state": "self.enc_layers",
+   "file": "official/projects/pix2seq/modeling/transformer.py",
+   "line": 53
+  },
+  {
+   "state": "self.mlp_layers",
+   "file": "official/projects/pix2seq/modeling/transformer.py",
+   "line": 285
+  },
+  {
+   "state": "self.layernorms",
+   "file": "official/projects/pix2seq/modeling/transformer.py",
+   "line": 286
+  },
+  {
+   "state": "self.dec_layers",
+   "file": "official/projects/pix2seq/modeling/transformer.py",
+   "line": 485
+  },
+  {
+   "state": "self._convs",
+   "file": "official/projects/pointpillars/modeling/heads.py",
+   "line": 84
+  },
+  {
+   "state": "self._att_predictors",
+   "file": "official/projects/pointpillars/modeling/heads.py",
+   "line": 113
+  },
+  {
+   "state": "self.ffn_add_layers",
+   "file": "official/projects/qat/nlp/modeling/layers/mobile_bert_layers.py",
+   "line": 329
+  },
+  {
+   "state": "self._quantizers",
+   "file": "official/projects/qat/nlp/quantization/helper.py",
+   "line": 24
+  },
+  {
+   "state": "self._quantizer_vars",
+   "file": "official/projects/qat/nlp/quantization/helper.py",
+   "line": 25
+  },
+  {
+   "state": "self._cls_norms",
+   "file": "official/projects/qat/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 163
+  },
+  {
+   "state": "self._box_norms",
+   "file": "official/projects/qat/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 194
+  },
+  {
+   "state": "self._att_predictors",
+   "file": "official/projects/qat/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 225
+  },
+  {
+   "state": "self._att_convs",
+   "file": "official/projects/qat/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 226
+  },
+  {
+   "state": "self._att_norms",
+   "file": "official/projects/qat/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 227
+  },
+  {
+   "state": "self._quantizers",
+   "file": "official/projects/qat/vision/quantization/helper.py",
+   "line": 101
+  },
+  {
+   "state": "self._quantizer_vars",
+   "file": "official/projects/qat/vision/quantization/helper.py",
+   "line": 102
+  },
+  {
+   "state": "self._temporal_conv_endpoints",
+   "file": "official/projects/s3d/modeling/s3d.py",
+   "line": 107
+  },
+  {
+   "state": "self._self_gating_endpoints",
+   "file": "official/projects/s3d/modeling/s3d.py",
+   "line": 109
+  },
+  {
+   "state": "self._layers",
+   "file": "official/projects/simclr/heads/simclr_head.py",
+   "line": 75
+  },
+  {
+   "state": "self._transformer_layers",
+   "file": "official/projects/token_dropping/encoder.py",
+   "line": 199
+  },
+  {
+   "state": "self.name_to_key",
+   "file": "official/projects/unified_detector/data_loaders/tf_example_decoder.py",
+   "line": 59
+  },
+  {
+   "state": "self._loss_weights",
+   "file": "official/projects/unified_detector/modeling/universal_detector.py",
+   "line": 113
+  },
+  {
+   "state": "self._parent",
+   "file": "official/projects/unified_detector/utils/utilities.py",
+   "line": 210
+  },
+  {
+   "state": "self._input_specs",
+   "file": "official/projects/videoglue/modeling/backbones/vit_3d.py",
+   "line": 171
+  },
+  {
+   "state": "self._mha_units",
+   "file": "official/projects/videoglue/modeling/heads/transformer_decoder.py",
+   "line": 185
+  },
+  {
+   "state": "self._dice_scores_per_class",
+   "file": "official/projects/volumetric_models/evaluation/segmentation_metrics.py",
+   "line": 63
+  },
+  {
+   "state": "self._count_per_class",
+   "file": "official/projects/volumetric_models/evaluation/segmentation_metrics.py",
+   "line": 66
+  },
+  {
+   "state": "self._norms",
+   "file": "official/projects/volumetric_models/modeling/heads/segmentation_heads_3d.py",
+   "line": 117
+  },
+  {
+   "state": "self.class_names",
+   "file": "official/projects/waste_identification_ml/llm_applications/milk_pouch_detection/src/models/classification.py",
+   "line": 64
+  },
+  {
+   "state": "self._loss_dict",
+   "file": "official/projects/yolo/losses/yolo_loss.py",
+   "line": 690
+  },
+  {
+   "state": "self._anchors",
+   "file": "official/projects/yolo/losses/yolov7_loss.py",
+   "line": 106
+  },
+  {
+   "state": "self._anchors",
+   "file": "official/projects/yolo/losses/yolov7_loss.py",
+   "line": 473
+  },
+  {
+   "state": "self._strides",
+   "file": "official/projects/yolo/losses/yolov7_loss.py",
+   "line": 474
+  },
+  {
+   "state": "self._layer_dict",
+   "file": "official/projects/yolo/modeling/backbones/darknet.py",
+   "line": 105
+  },
+  {
+   "state": "self._csp_level_mod",
+   "file": "official/projects/yolo/modeling/backbones/darknet.py",
+   "line": 410
+  },
+  {
+   "state": "self.preprocessors",
+   "file": "official/projects/yolo/modeling/decoders/yolo_decoder.py",
+   "line": 194
+  },
+  {
+   "state": "self.resamples",
+   "file": "official/projects/yolo/modeling/decoders/yolo_decoder.py",
+   "line": 197
+  },
+  {
+   "state": "self.preprocessors",
+   "file": "official/projects/yolo/modeling/decoders/yolo_decoder.py",
+   "line": 340
+  },
+  {
+   "state": "self.resamples",
+   "file": "official/projects/yolo/modeling/decoders/yolo_decoder.py",
+   "line": 343
+  },
+  {
+   "state": "self._head",
+   "file": "official/projects/yolo/modeling/heads/yolo_head.py",
+   "line": 111
+  },
+  {
+   "state": "self._convs",
+   "file": "official/projects/yolo/modeling/heads/yolov7_head.py",
+   "line": 83
+  },
+  {
+   "state": "self._implicit_adds",
+   "file": "official/projects/yolo/modeling/heads/yolov7_head.py",
+   "line": 84
+  },
+  {
+   "state": "self._implicit_muls",
+   "file": "official/projects/yolo/modeling/heads/yolov7_head.py",
+   "line": 85
+  },
+  {
+   "state": "self._anchors",
+   "file": "official/projects/yolo/modeling/layers/detection_generator.py",
+   "line": 116
+  },
+  {
+   "state": "self._box_type",
+   "file": "official/projects/yolo/modeling/layers/detection_generator.py",
+   "line": 140
+  },
+  {
+   "state": "self._path_scale",
+   "file": "official/projects/yolo/modeling/layers/detection_generator.py",
+   "line": 141
+  },
+  {
+   "state": "self._scale_xy",
+   "file": "official/projects/yolo/modeling/layers/detection_generator.py",
+   "line": 144
+  },
+  {
+   "state": "self._generator",
+   "file": "official/projects/yolo/modeling/layers/detection_generator.py",
+   "line": 146
+  },
+  {
+   "state": "self._len_mask",
+   "file": "official/projects/yolo/modeling/layers/detection_generator.py",
+   "line": 147
+  },
+  {
+   "state": "self.anchors",
+   "file": "official/projects/yolo/ops/anchor.py",
+   "line": 160
+  },
+  {
+   "state": "self.masks",
+   "file": "official/projects/yolo/ops/anchor.py",
+   "line": 161
+  },
+  {
+   "state": "self.anchor_free_level_limits",
+   "file": "official/projects/yolo/ops/anchor.py",
+   "line": 162
+  },
+  {
+   "state": "self.num_instances",
+   "file": "official/projects/yolo/ops/anchor.py",
+   "line": 172
+  },
+  {
+   "state": "self.center_radius",
+   "file": "official/projects/yolo/ops/anchor.py",
+   "line": 180
+  },
+  {
+   "state": "self.level_strides",
+   "file": "official/projects/yolo/ops/anchor.py",
+   "line": 181
+  },
+  {
+   "state": "self._wset",
+   "file": "official/projects/yolo/optimization/sgd_torch.py",
+   "line": 119
+  },
+  {
+   "state": "self._bset",
+   "file": "official/projects/yolo/optimization/sgd_torch.py",
+   "line": 120
+  },
+  {
+   "state": "self._feature_sizes",
+   "file": "official/projects/yt8m/dataloaders/yt8m_input.py",
+   "line": 262
+  },
+  {
+   "state": "self._feature_dtypes",
+   "file": "official/projects/yt8m/dataloaders/yt8m_input.py",
+   "line": 263
+  },
+  {
+   "state": "self._feature_from_bytes",
+   "file": "official/projects/yt8m/dataloaders/yt8m_input.py",
+   "line": 264
+  },
+  {
+   "state": "self.prediction",
+   "file": "official/projects/yt8m/eval_utils/eval_util_test.py",
+   "line": 28
+  },
+  {
+   "state": "self._ap_calculators",
+   "file": "official/projects/yt8m/eval_utils/mean_average_precision_calculator.py",
+   "line": 63
+  },
+  {
+   "state": "self._writers",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 92
+  },
+  {
+   "state": "self._write_locks",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 93
+  },
+  {
+   "state": "self._eval_pos_users",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 405
+  },
+  {
+   "state": "self._eval_pos_items",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 406
+  },
+  {
+   "state": "self._current_epoch_order",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 434
+  },
+  {
+   "state": "self._negative_table",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 824
+  },
+  {
+   "state": "self._per_user_neg_count",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 825
+  },
+  {
+   "state": "self.index_bounds",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 878
+  },
+  {
+   "state": "self._sorted_train_pos_items",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 879
+  },
+  {
+   "state": "self._total_negatives",
+   "file": "official/recommendation/data_pipeline.py",
+   "line": 880
+  },
+  {
+   "state": "self.seen_pairs",
+   "file": "official/recommendation/data_test.py",
+   "line": 79
+  },
+  {
+   "state": "self.holdout",
+   "file": "official/recommendation/data_test.py",
+   "line": 80
+  },
+  {
+   "state": "self._multi_hot_sizes",
+   "file": "official/recommendation/ranking/data/data_pipeline_multi_hot.py",
+   "line": 226
+  },
+  {
+   "state": "self._label_map",
+   "file": "official/vision/dataloaders/tfds_segmentation_decoders.py",
+   "line": 26
+  },
+  {
+   "state": "self._coco_gt",
+   "file": "official/vision/evaluation/coco_evaluator.py",
+   "line": 89
+  },
+  {
+   "state": "self._temporal_strides",
+   "file": "official/vision/modeling/backbones/resnet_3d.py",
+   "line": 133
+  },
+  {
+   "state": "self._temporal_kernel_sizes",
+   "file": "official/vision/modeling/backbones/resnet_3d.py",
+   "line": 134
+  },
+  {
+   "state": "self._use_self_gating",
+   "file": "official/vision/modeling/backbones/resnet_3d.py",
+   "line": 140
+  },
+  {
+   "state": "self._att_predictors",
+   "file": "official/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 288
+  },
+  {
+   "state": "self._att_convs",
+   "file": "official/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 298
+  },
+  {
+   "state": "self._att_norms",
+   "file": "official/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 299
+  },
+  {
+   "state": "self._norms",
+   "file": "official/vision/modeling/heads/dense_prediction_heads.py",
+   "line": 630
+  },
+  {
+   "state": "self.detection_head",
+   "file": "official/vision/modeling/maskrcnn_model.py",
+   "line": 111
+  },
+  {
+   "state": "self._cascade_layer_to_weights",
+   "file": "official/vision/modeling/maskrcnn_model.py",
+   "line": 138
+  },
+  {
+   "state": "self.available_policies",
+   "file": "official/vision/ops/augment.py",
+   "line": 1970
+  },
+  {
+   "state": "self.min_object_covered",
+   "file": "official/vision/ops/augment.py",
+   "line": 2870
+  },
+  {
+   "state": "self.min_box_overlap",
+   "file": "official/vision/ops/augment.py",
+   "line": 2873
+  },
+  {
+   "state": "self.prob_to_apply",
+   "file": "official/vision/ops/augment.py",
+   "line": 2876
+  },
+  {
+   "state": "self.thresholds",
+   "file": "official/vision/ops/box_matcher.py",
+   "line": 78
+  },
+  {
+   "state": "self.data",
+   "file": "official/vision/utils/object_detection/box_list.py",
+   "line": 56
+  },
+  {
+   "state": "self._flist",
+   "file": "research/adversarial_text/data/data_utils.py",
+   "line": 145
+  },
+  {
+   "state": "self._timesteps",
+   "file": "research/adversarial_text/data/data_utils.py",
+   "line": 146
+  },
+  {
+   "state": "self.layers",
+   "file": "research/adversarial_text/graphs.py",
+   "line": 134
+  },
+  {
+   "state": "self._mparams",
+   "file": "research/attention_ocr/python/model.py",
+   "line": 294
+  },
+  {
+   "state": "self._char_logits",
+   "file": "research/attention_ocr/python/sequence_layers.py",
+   "line": 118
+  },
+  {
+   "state": "self.train_images",
+   "file": "research/autoaugment/data_utils.py",
+   "line": 130
+  },
+  {
+   "state": "self.train_labels",
+   "file": "research/autoaugment/data_utils.py",
+   "line": 131
+  },
+  {
+   "state": "self._modality_types",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 411
+  },
+  {
+   "state": "self._all_graph",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 417
+  },
+  {
+   "state": "self._detection_cache",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 433
+  },
+  {
+   "state": "self._world_id_dict",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 440
+  },
+  {
+   "state": "self._depth_images",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 441
+  },
+  {
+   "state": "self._semantic_segmentations",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 442
+  },
+  {
+   "state": "self._annotated_targets",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 444
+  },
+  {
+   "state": "self._cached_imgs",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 445
+  },
+  {
+   "state": "self._graph_cache",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 446
+  },
+  {
+   "state": "self._cached_poses",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 508
+  },
+  {
+   "state": "self._vertex_to_pose",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 509
+  },
+  {
+   "state": "self._pose_to_vertex",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 510
+  },
+  {
+   "state": "self._detection_area",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 556
+  },
+  {
+   "state": "self._detection_table",
+   "file": "research/cognitive_planning/envs/active_vision_dataset_env.py",
+   "line": 571
+  },
+  {
+   "state": "self.cache",
+   "file": "research/cvt_text/base/utils.py",
+   "line": 30
+  },
+  {
+   "state": "self._labeled_train_ops",
+   "file": "research/cvt_text/model/multitask_model.py",
+   "line": 71
+  },
+  {
+   "state": "self.task_name",
+   "file": "research/cvt_text/task_specific/word_level/depparse_module.py",
+   "line": 34
+  },
+  {
+   "state": "self._punctuation",
+   "file": "research/cvt_text/task_specific/word_level/depparse_scorer.py",
+   "line": 29
+  },
+  {
+   "state": "self.task_name",
+   "file": "research/cvt_text/task_specific/word_level/tagging_module.py",
+   "line": 34
+  },
+  {
+   "state": "self.int_to_char",
+   "file": "research/deep_speech/decoder.py",
+   "line": 41
+  },
+  {
+   "state": "networks_map",
+   "file": "research/deeplab/core/feature_extractor.py",
+   "line": 232
+  },
+  {
+   "state": "arg_scopes_map",
+   "file": "research/deeplab/core/feature_extractor.py",
+   "line": 322
+  },
+  {
+   "state": "name_scope",
+   "file": "research/deeplab/core/feature_extractor.py",
+   "line": 456
+  },
+  {
+   "state": "self._operations",
+   "file": "research/deeplab/core/nas_cell.py",
+   "line": 73
+  },
+  {
+   "state": "self._hiddenstate_indices",
+   "file": "research/deeplab/core/nas_cell.py",
+   "line": 75
+  },
+  {
+   "state": "self.images_filenames",
+   "file": "research/delf/delf/python/datasets/generic_dataset.py",
+   "line": 53
+  },
+  {
+   "state": "self.bounding_boxes",
+   "file": "research/delf/delf/python/datasets/generic_dataset.py",
+   "line": 54
+  },
+  {
+   "state": "self._clusters",
+   "file": "research/delf/delf/python/datasets/tuples_dataset.py",
+   "line": 81
+  },
+  {
+   "state": "self._positive_pool",
+   "file": "research/delf/delf/python/datasets/tuples_dataset.py",
+   "line": 83
+  },
+  {
+   "state": "self._pidxs",
+   "file": "research/delf/delf/python/datasets/tuples_dataset.py",
+   "line": 93
+  },
+  {
+   "state": "self._nidxs",
+   "file": "research/delf/delf/python/datasets/tuples_dataset.py",
+   "line": 94
+  },
+  {
+   "state": "self._number_bits",
+   "file": "research/delf/delf/python/feature_aggregation_similarity.py",
+   "line": 56
+  },
+  {
+   "state": "self.tf_context",
+   "file": "research/efficient-hrl/agent.py",
+   "line": 70
+  },
+  {
+   "state": "self._action_vars",
+   "file": "research/efficient-hrl/agent.py",
+   "line": 83
+  },
+  {
+   "state": "self._tensors",
+   "file": "research/efficient-hrl/agents/circular_buffer.py",
+   "line": 47
+  },
+  {
+   "state": "self._sampler_fns",
+   "file": "research/efficient-hrl/context/context.py",
+   "line": 103
+  },
+  {
+   "state": "self._samplers",
+   "file": "research/efficient-hrl/context/context.py",
+   "line": 104
+  },
+  {
+   "state": "self.context_vars",
+   "file": "research/efficient-hrl/context/context.py",
+   "line": 131
+  },
+  {
+   "state": "self._override_indices",
+   "file": "research/efficient-hrl/context/samplers.py",
+   "line": 258
+  },
+  {
+   "state": "_tf_print_counts",
+   "file": "research/efficient-hrl/utils/utils.py",
+   "line": 28
+  },
+  {
+   "state": "_tf_print_running_sums",
+   "file": "research/efficient-hrl/utils/utils.py",
+   "line": 29
+  },
+  {
+   "state": "_tf_print_running_counts",
+   "file": "research/efficient-hrl/utils/utils.py",
+   "line": 30
+  },
+  {
+   "state": "inputs_ph_t",
+   "file": "research/lfads/synth_data/generate_itb_data.py",
+   "line": 100
+  },
+  {
+   "state": "spikes_a",
+   "file": "research/lfads/synth_data/generate_labeled_rnn_data.py",
+   "line": 91
+  },
+  {
+   "state": "spikes_b",
+   "file": "research/lfads/synth_data/generate_labeled_rnn_data.py",
+   "line": 95
+  },
+  {
+   "state": "self._items_to_handlers",
+   "file": "research/lstm_object_detection/inputs/tf_sequence_example_decoder.py",
+   "line": 228
+  },
+  {
+   "state": "EXPERIMENTAL_META_ARCH_BUILDER_MAP",
+   "file": "research/object_detection/builders/model_builder.py",
+   "line": 848
+  },
+  {
+   "state": "self._static_shapes",
+   "file": "research/object_detection/core/batcher.py",
+   "line": 105
+  },
+  {
+   "state": "self.data",
+   "file": "research/object_detection/core/box_list.py",
+   "line": 60
+  },
+  {
+   "state": "self._groundtruth_lists",
+   "file": "research/object_detection/core/model.py",
+   "line": 91
+  },
+  {
+   "state": "self._history",
+   "file": "research/object_detection/core/preprocessor_cache.py",
+   "line": 74
+  },
+  {
+   "state": "self._image_ids_to_keep",
+   "file": "research/object_detection/dataset_tools/context_rcnn/add_context_to_examples.py",
+   "line": 428
+  },
+  {
+   "state": "self._image_dict",
+   "file": "research/object_detection/dataset_tools/context_rcnn/create_cococameratraps_tfexample_main.py",
+   "line": 69
+  },
+  {
+   "state": "self._annotation_dict",
+   "file": "research/object_detection/dataset_tools/context_rcnn/create_cococameratraps_tfexample_main.py",
+   "line": 70
+  },
+  {
+   "state": "self._category_dict",
+   "file": "research/object_detection/dataset_tools/context_rcnn/create_cococameratraps_tfexample_main.py",
+   "line": 71
+  },
+  {
+   "state": "input_placeholder_fn_map",
+   "file": "research/object_detection/exporter.py",
+   "line": 262
+  },
+  {
+   "state": "self._kp_params_dict",
+   "file": "research/object_detection/meta_architectures/center_net_meta_arch.py",
+   "line": 2750
+  },
+  {
+   "state": "self._target_assigner_dict",
+   "file": "research/object_detection/meta_architectures/center_net_meta_arch.py",
+   "line": 2773
+  },
+  {
+   "state": "self.prediction_dict",
+   "file": "research/object_detection/meta_architectures/center_net_meta_arch_tf2_test.py",
+   "line": 3134
+  },
+  {
+   "state": "self._metrics",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 67
+  },
+  {
+   "state": "self._groundtruth_labeled_classes",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 71
+  },
+  {
+   "state": "self._metrics",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 542
+  },
+  {
+   "state": "self._image_id_to_mask_shape_map",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 985
+  },
+  {
+   "state": "self._image_ids_with_detections",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 986
+  },
+  {
+   "state": "self._metrics",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 1354
+  },
+  {
+   "state": "self._groundtruth_masks",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 1398
+  },
+  {
+   "state": "self._groundtruth_class_labels",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 1399
+  },
+  {
+   "state": "self._predicted_masks",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 1401
+  },
+  {
+   "state": "self._predicted_class_labels",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 1402
+  },
+  {
+   "state": "self._metrics",
+   "file": "research/object_detection/metrics/coco_evaluation.py",
+   "line": 1583
+  },
+  {
+   "state": "self._image_ids_with_detections",
+   "file": "research/object_detection/metrics/lvis_evaluation.py",
+   "line": 57
+  },
+  {
+   "state": "self._image_id_to_mask_shape_map",
+   "file": "research/object_detection/metrics/lvis_evaluation.py",
+   "line": 62
+  },
+  {
+   "state": "self._image_id_to_verified_neg_classes",
+   "file": "research/object_detection/metrics/lvis_evaluation.py",
+   "line": 63
+  },
+  {
+   "state": "self._image_id_to_not_exhaustive_classes",
+   "file": "research/object_detection/metrics/lvis_evaluation.py",
+   "line": 64
+  },
+  {
+   "state": "self._metrics",
+   "file": "research/object_detection/metrics/lvis_evaluation.py",
+   "line": 428
+  },
+  {
+   "state": "self.node_input_blocks",
+   "file": "research/object_detection/models/bidirectional_feature_pyramid_generators.py",
+   "line": 413
+  },
+  {
+   "state": "self.node_combine_op",
+   "file": "research/object_detection/models/bidirectional_feature_pyramid_generators.py",
+   "line": 414
+  },
+  {
+   "state": "self.node_post_combine_block",
+   "file": "research/object_detection/models/bidirectional_feature_pyramid_generators.py",
+   "line": 415
+  },
+  {
+   "state": "self.convolutions",
+   "file": "research/object_detection/models/feature_map_generators.py",
+   "line": 206
+  },
+  {
+   "state": "self.residual_blocks",
+   "file": "research/object_detection/models/feature_map_generators.py",
+   "line": 536
+  },
+  {
+   "state": "self.top_down_blocks",
+   "file": "research/object_detection/models/feature_map_generators.py",
+   "line": 537
+  },
+  {
+   "state": "self.reshape_blocks",
+   "file": "research/object_detection/models/feature_map_generators.py",
+   "line": 538
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "research/object_detection/models/feature_map_generators.py",
+   "line": 539
+  },
+  {
+   "state": "self.hourglass_network",
+   "file": "research/object_detection/models/keras_models/hourglass_network.py",
+   "line": 395
+  },
+  {
+   "state": "self.output_conv",
+   "file": "research/object_detection/models/keras_models/hourglass_network.py",
+   "line": 396
+  },
+  {
+   "state": "self.intermediate_conv1",
+   "file": "research/object_detection/models/keras_models/hourglass_network.py",
+   "line": 410
+  },
+  {
+   "state": "self.intermediate_conv2",
+   "file": "research/object_detection/models/keras_models/hourglass_network.py",
+   "line": 411
+  },
+  {
+   "state": "self.intermediate_residual",
+   "file": "research/object_detection/models/keras_models/hourglass_network.py",
+   "line": 412
+  },
+  {
+   "state": "self._feature_blocks",
+   "file": "research/object_detection/models/ssd_mobilenet_v1_fpn_keras_feature_extractor.py",
+   "line": 121
+  },
+  {
+   "state": "self._feature_blocks",
+   "file": "research/object_detection/models/ssd_mobilenet_v2_fpn_keras_feature_extractor.py",
+   "line": 124
+  },
+  {
+   "state": "self._node_specs",
+   "file": "research/object_detection/models/ssd_spaghettinet_feature_extractor.py",
+   "line": 46
+  },
+  {
+   "state": "self._nodes",
+   "file": "research/object_detection/models/ssd_spaghettinet_feature_extractor.py",
+   "line": 53
+  },
+  {
+   "state": "self._other_heads",
+   "file": "research/object_detection/predictors/convolutional_box_predictor.py",
+   "line": 95
+  },
+  {
+   "state": "self._other_heads",
+   "file": "research/object_detection/predictors/convolutional_box_predictor.py",
+   "line": 245
+  },
+  {
+   "state": "self._prediction_heads",
+   "file": "research/object_detection/predictors/convolutional_keras_box_predictor.py",
+   "line": 120
+  },
+  {
+   "state": "self._shared_nets",
+   "file": "research/object_detection/predictors/convolutional_keras_box_predictor.py",
+   "line": 137
+  },
+  {
+   "state": "self._prediction_heads",
+   "file": "research/object_detection/predictors/convolutional_keras_box_predictor.py",
+   "line": 285
+  },
+  {
+   "state": "self._additional_projection_layers",
+   "file": "research/object_detection/predictors/convolutional_keras_box_predictor.py",
+   "line": 305
+  },
+  {
+   "state": "self._base_tower_layers_for_heads",
+   "file": "research/object_detection/predictors/convolutional_keras_box_predictor.py",
+   "line": 307
+  },
+  {
+   "state": "self._head_scope_conv_layers",
+   "file": "research/object_detection/predictors/convolutional_keras_box_predictor.py",
+   "line": 316
+  },
+  {
+   "state": "self._third_stage_heads",
+   "file": "research/object_detection/predictors/mask_rcnn_box_predictor.py",
+   "line": 66
+  },
+  {
+   "state": "self._third_stage_heads",
+   "file": "research/object_detection/predictors/mask_rcnn_keras_box_predictor.py",
+   "line": 76
+  },
+  {
+   "state": "model_map",
+   "file": "research/object_detection/tpu_exporters/export_saved_model_tpu_lib.py",
+   "line": 33
+  },
+  {
+   "state": "self.data",
+   "file": "research/object_detection/utils/np_box_list.py",
+   "line": 56
+  },
+  {
+   "state": "self._image_ids",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 221
+  },
+  {
+   "state": "self._expected_keys",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 225
+  },
+  {
+   "state": "self._metric_names",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 265
+  },
+  {
+   "state": "self._metrics",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 540
+  },
+  {
+   "state": "self.groundtruth_labeled_classes",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 622
+  },
+  {
+   "state": "self._evaluatable_labels",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 913
+  },
+  {
+   "state": "self.groundtruth_boxes",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 1138
+  },
+  {
+   "state": "self.groundtruth_class_labels",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 1139
+  },
+  {
+   "state": "self.groundtruth_is_difficult_list",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 1141
+  },
+  {
+   "state": "self.groundtruth_is_group_of_list",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 1142
+  },
+  {
+   "state": "self.detection_keys",
+   "file": "research/object_detection/utils/object_detection_evaluation.py",
+   "line": 1150
+  },
+  {
+   "state": "self._image_ids",
+   "file": "research/object_detection/utils/vrd_evaluation.py",
+   "line": 83
+  },
+  {
+   "state": "self._evaluatable_labels",
+   "file": "research/object_detection/utils/vrd_evaluation.py",
+   "line": 85
+  },
+  {
+   "state": "self._negative_labels",
+   "file": "research/object_detection/utils/vrd_evaluation.py",
+   "line": 86
+  },
+  {
+   "state": "self._groundtruth_box_tuples",
+   "file": "research/object_detection/utils/vrd_evaluation.py",
+   "line": 435
+  },
+  {
+   "state": "self._groundtruth_class_tuples",
+   "file": "research/object_detection/utils/vrd_evaluation.py",
+   "line": 436
+  },
+  {
+   "state": "self.episode_running_rewards",
+   "file": "research/pcl_rl/controller.py",
+   "line": 110
+  },
+  {
+   "state": "self.episode_running_lengths",
+   "file": "research/pcl_rl/controller.py",
+   "line": 111
+  },
+  {
+   "state": "self.all_obs",
+   "file": "research/pcl_rl/controller.py",
+   "line": 148
+  },
+  {
+   "state": "self.all_act",
+   "file": "research/pcl_rl/controller.py",
+   "line": 152
+  },
+  {
+   "state": "self.all_pad",
+   "file": "research/pcl_rl/controller.py",
+   "line": 153
+  },
+  {
+   "state": "self.rewards",
+   "file": "research/pcl_rl/controller.py",
+   "line": 154
+  },
+  {
+   "state": "self.last_idxs",
+   "file": "research/pcl_rl/controller.py",
+   "line": 420
+  },
+  {
+   "state": "self.buffer",
+   "file": "research/pcl_rl/replay_buffer.py",
+   "line": 31
+  },
+  {
+   "state": "self.buffer",
+   "file": "research/pcl_rl/replay_buffer.py",
+   "line": 84
+  },
+  {
+   "state": "self.flat_tangent",
+   "file": "research/pcl_rl/trust_region.py",
+   "line": 75
+  },
+  {
+   "state": "self.uniform_samples",
+   "file": "research/rebar/rebar.py",
+   "line": 58
+  },
+  {
+   "state": "self.uniform_samples_v",
+   "file": "research/rebar/rebar.py",
+   "line": 59
+  },
+  {
+   "state": "self.mode",
+   "file": "research/seq_flow_lite/layers/projection_layers.py",
+   "line": 93
+  },
+  {
+   "state": "self.pool_windows",
+   "file": "research/seq_flow_lite/layers/transformer_layers.py",
+   "line": 443
+  },
+  {
+   "state": "datasets_map",
+   "file": "research/slim/datasets/dataset_factory.py",
+   "line": 27
+  },
+  {
+   "state": "self._operations",
+   "file": "research/slim/nets/nasnet/nasnet_utils.py",
+   "line": 272
+  },
+  {
+   "state": "self._hiddenstate_indices",
+   "file": "research/slim/nets/nasnet/nasnet_utils.py",
+   "line": 274
+  },
+  {
+   "state": "networks_map",
+   "file": "research/slim/nets/nets_factory.py",
+   "line": 40
+  },
+  {
+   "state": "arg_scopes_map",
+   "file": "research/slim/nets/nets_factory.py",
+   "line": 83
+  },
+  {
+   "state": "self.frames",
+   "file": "research/vid2depth/dataset/dataset_loader.py",
+   "line": 50
+  },
+  {
+   "state": "self.test_scenes",
+   "file": "research/vid2depth/dataset/dataset_loader.py",
+   "line": 179
+  },
+  {
+   "state": "self.frames",
+   "file": "research/vid2depth/dataset/dataset_loader.py",
+   "line": 488
+  },
+  {
+   "state": "self.depth",
+   "file": "research/vid2depth/model.py",
+   "line": 109
+  },
+  {
+   "state": "self.cloud",
+   "file": "research/vid2depth/model.py",
+   "line": 111
+  },
+  {
+   "state": "self.images",
+   "file": "research/vid2depth/model.py",
+   "line": 140
+  },
+  {
+   "state": "self.warped_image",
+   "file": "research/vid2depth/model.py",
+   "line": 142
+  },
+  {
+   "state": "self.warp_mask",
+   "file": "research/vid2depth/model.py",
+   "line": 143
+  },
+  {
+   "state": "self.warp_error",
+   "file": "research/vid2depth/model.py",
+   "line": 144
+  },
+  {
+   "state": "self.ssim_error",
+   "file": "research/vid2depth/model.py",
+   "line": 145
+  },
+  {
+   "state": "self.icp_transform",
+   "file": "research/vid2depth/model.py",
+   "line": 146
+  },
+  {
+   "state": "self.icp_residual",
+   "file": "research/vid2depth/model.py",
+   "line": 147
+  }
+ ],
+ "repo": "tensorflow/models",
+ "stars": 77676
+}

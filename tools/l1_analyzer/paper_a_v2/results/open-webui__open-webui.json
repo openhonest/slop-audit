@@ -1,0 +1,86 @@
+{
+ "status": "ok",
+ "clone_seconds": 2.6,
+ "v1_mutable_ratio": 39.3,
+ "v1_details": "1119/2845 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 687,
+  "promiscuous": 11,
+  "unresolved": 101
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 605,
+   "drives_decision": 82
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 11
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 101
+  }
+ },
+ "v2_resolvable": 0.874,
+ "v2_promiscuous": [
+  {
+   "state": "known_source_ext",
+   "file": "backend/open_webui/retrieval/loaders/main.py",
+   "line": 35
+  },
+  {
+   "state": "self.proxy_url",
+   "file": "backend/open_webui/retrieval/loaders/youtube.py",
+   "line": 64
+  },
+  {
+   "state": "self._distance_metric_map",
+   "file": "backend/open_webui/retrieval/vector/dbs/valkey.py",
+   "line": 172
+  },
+  {
+   "state": "self._updates",
+   "file": "backend/open_webui/socket/utils.py",
+   "line": 176
+  },
+  {
+   "state": "self._users",
+   "file": "backend/open_webui/socket/utils.py",
+   "line": 177
+  },
+  {
+   "state": "self.base_url",
+   "file": "backend/open_webui/utils/code_interpreter.py",
+   "line": 45
+  },
+  {
+   "state": "self.function_valves",
+   "file": "backend/open_webui/utils/filter.py",
+   "line": 14
+  },
+  {
+   "state": "self.user_valves",
+   "file": "backend/open_webui/utils/filter.py",
+   "line": 15
+  },
+  {
+   "state": "self.clients",
+   "file": "backend/open_webui/utils/oauth.py",
+   "line": 819
+  },
+  {
+   "state": "self._clients",
+   "file": "backend/open_webui/utils/oauth.py",
+   "line": 1279
+  },
+  {
+   "state": "_CONNECTION_POOL",
+   "file": "backend/open_webui/utils/redis.py",
+   "line": 39
+  }
+ ],
+ "repo": "open-webui/open-webui",
+ "stars": 131576
+}

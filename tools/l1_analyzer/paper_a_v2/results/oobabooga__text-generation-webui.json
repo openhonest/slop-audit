@@ -1,0 +1,151 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.8,
+ "v1_mutable_ratio": 31.4,
+ "v1_details": "337/1072 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 265,
+  "promiscuous": 24,
+  "unresolved": 61
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 179,
+   "drives_decision": 86
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 24
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 61
+  }
+ },
+ "v2_resolvable": 0.826,
+ "v2_promiscuous": [
+  {
+   "state": "language_codes",
+   "file": "extensions/google_translate/script.py",
+   "line": 11
+  },
+  {
+   "state": "self.top_token_ids_list",
+   "file": "extensions/perplexity_colors/script.py",
+   "line": 29
+  },
+  {
+   "state": "self.top_probs_list",
+   "file": "extensions/perplexity_colors/script.py",
+   "line": 30
+  },
+  {
+   "state": "self.last_probs",
+   "file": "extensions/perplexity_colors/script.py",
+   "line": 32
+  },
+  {
+   "state": "params",
+   "file": "extensions/silero_tts/script.py",
+   "line": 17
+  },
+  {
+   "state": "current_params",
+   "file": "extensions/silero_tts/script.py",
+   "line": 31
+  },
+  {
+   "state": "alphabet_map",
+   "file": "extensions/silero_tts/tts_preprocessor.py",
+   "line": 6
+  },
+  {
+   "state": "params",
+   "file": "extensions/superbooga/script.py",
+   "line": 13
+  },
+  {
+   "state": "self.id_to_info",
+   "file": "extensions/superboogav2/chromadb.py",
+   "line": 97
+  },
+  {
+   "state": "self.tool_calls_accum",
+   "file": "modules/api/anthropic.py",
+   "line": 274
+  },
+  {
+   "state": "category_embeddings",
+   "file": "modules/api/moderations.py",
+   "line": 9
+  },
+  {
+   "state": "_tool_approvals",
+   "file": "modules/chat.py",
+   "line": 50
+  },
+  {
+   "state": "self.job_queues",
+   "file": "modules/exllamav3.py",
+   "line": 66
+  },
+  {
+   "state": "self.grammar_encoding",
+   "file": "modules/grammar/grammar_utils.py",
+   "line": 364
+  },
+  {
+   "state": "self.rules_pos_dict",
+   "file": "modules/grammar/grammar_utils.py",
+   "line": 387
+  },
+  {
+   "state": "image_cache",
+   "file": "modules/html_generator.py",
+   "line": 26
+  },
+  {
+   "state": "chat_styles",
+   "file": "modules/html_generator.py",
+   "line": 57
+  },
+  {
+   "state": "llamacpp_valid_cache_types",
+   "file": "modules/llama_cpp_server.py",
+   "line": 27
+  },
+  {
+   "state": "loaders_and_params",
+   "file": "modules/loaders.py",
+   "line": 4
+  },
+  {
+   "state": "loaders_samplers",
+   "file": "modules/loaders.py",
+   "line": 136
+  },
+  {
+   "state": "self.sequence_breakers",
+   "file": "modules/sampler_hijack.py",
+   "line": 357
+  },
+  {
+   "state": "alias_to_dest",
+   "file": "modules/shared.py",
+   "line": 242
+  },
+  {
+   "state": "_mcp_server_cache",
+   "file": "modules/tool_use.py",
+   "line": 207
+  },
+  {
+   "state": "self.logit_bias",
+   "file": "modules/transformers_loader.py",
+   "line": 48
+  }
+ ],
+ "repo": "oobabooga/text-generation-webui",
+ "stars": 46484
+}

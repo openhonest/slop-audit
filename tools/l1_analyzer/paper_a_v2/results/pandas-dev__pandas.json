@@ -1,0 +1,701 @@
+{
+ "status": "ok",
+ "clone_seconds": 2.5,
+ "v1_mutable_ratio": 62.9,
+ "v1_details": "5690/9043 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1623,
+  "promiscuous": 134,
+  "unresolved": 791
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 1182,
+   "drives_decision": 441
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 134
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 791
+  }
+ },
+ "v2_resolvable": 0.69,
+ "v2_promiscuous": [
+  {
+   "state": "self.series",
+   "file": "asv_bench/benchmarks/algos/isin.py",
+   "line": 35
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/arithmetic.py",
+   "line": 179
+  },
+  {
+   "state": "self.s",
+   "file": "asv_bench/benchmarks/arithmetic.py",
+   "line": 264
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/categoricals.py",
+   "line": 86
+  },
+  {
+   "state": "self.ci",
+   "file": "asv_bench/benchmarks/categoricals.py",
+   "line": 243
+  },
+  {
+   "state": "self.c",
+   "file": "asv_bench/benchmarks/categoricals.py",
+   "line": 244
+  },
+  {
+   "state": "self.key",
+   "file": "asv_bench/benchmarks/categoricals.py",
+   "line": 245
+  },
+  {
+   "state": "self.data",
+   "file": "asv_bench/benchmarks/categoricals.py",
+   "line": 270
+  },
+  {
+   "state": "self.index",
+   "file": "asv_bench/benchmarks/categoricals.py",
+   "line": 294
+  },
+  {
+   "state": "self.series",
+   "file": "asv_bench/benchmarks/categoricals.py",
+   "line": 295
+  },
+  {
+   "state": "self.df3",
+   "file": "asv_bench/benchmarks/frame_methods.py",
+   "line": 156
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/frame_methods.py",
+   "line": 442
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/frame_methods.py",
+   "line": 469
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/frame_methods.py",
+   "line": 504
+  },
+  {
+   "state": "self.df2",
+   "file": "asv_bench/benchmarks/frame_methods.py",
+   "line": 597
+  },
+  {
+   "state": "_numba_unsupported_methods",
+   "file": "asv_bench/benchmarks/groupby.py",
+   "line": 59
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/groupby.py",
+   "line": 778
+  },
+  {
+   "state": "self.df_nans",
+   "file": "asv_bench/benchmarks/groupby.py",
+   "line": 1016
+  },
+  {
+   "state": "self.data",
+   "file": "asv_bench/benchmarks/hash_functions.py",
+   "line": 67
+  },
+  {
+   "state": "self.data",
+   "file": "asv_bench/benchmarks/hash_functions.py",
+   "line": 85
+  },
+  {
+   "state": "self.idx",
+   "file": "asv_bench/benchmarks/index_object.py",
+   "line": 161
+  },
+  {
+   "state": "self.sorted",
+   "file": "asv_bench/benchmarks/index_object.py",
+   "line": 168
+  },
+  {
+   "state": "self.data",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 42
+  },
+  {
+   "state": "self.s",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 168
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 191
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 236
+  },
+  {
+   "state": "self.df_dup",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 237
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 284
+  },
+  {
+   "state": "self.data",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 422
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 626
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/indexing.py",
+   "line": 642
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/io/csv.py",
+   "line": 80
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/io/sql.py",
+   "line": 28
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/io/sql.py",
+   "line": 77
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/io/sql.py",
+   "line": 106
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/io/sql.py",
+   "line": 152
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/io/style.py",
+   "line": 14
+  },
+  {
+   "state": "self.st",
+   "file": "asv_bench/benchmarks/io/style.py",
+   "line": 22
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/join_merge.py",
+   "line": 134
+  },
+  {
+   "state": "self.mi_unused_levels",
+   "file": "asv_bench/benchmarks/multiindex_object.py",
+   "line": 80
+  },
+  {
+   "state": "self.midx",
+   "file": "asv_bench/benchmarks/multiindex_object.py",
+   "line": 375
+  },
+  {
+   "state": "self.index",
+   "file": "asv_bench/benchmarks/period.py",
+   "line": 87
+  },
+  {
+   "state": "self.series",
+   "file": "asv_bench/benchmarks/period.py",
+   "line": 88
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/reindex.py",
+   "line": 16
+  },
+  {
+   "state": "self.s",
+   "file": "asv_bench/benchmarks/reindex.py",
+   "line": 27
+  },
+  {
+   "state": "self.s2",
+   "file": "asv_bench/benchmarks/reindex.py",
+   "line": 32
+  },
+  {
+   "state": "self.df_nan",
+   "file": "asv_bench/benchmarks/reindex.py",
+   "line": 99
+  },
+  {
+   "state": "self.df",
+   "file": "asv_bench/benchmarks/reshape.py",
+   "line": 127
+  },
+  {
+   "state": "self.sp_arr",
+   "file": "asv_bench/benchmarks/sparse.py",
+   "line": 198
+  },
+  {
+   "state": "self.sp_arr",
+   "file": "asv_bench/benchmarks/sparse.py",
+   "line": 215
+  },
+  {
+   "state": "self.s",
+   "file": "asv_bench/benchmarks/strings.py",
+   "line": 258
+  },
+  {
+   "state": "self.s",
+   "file": "asv_bench/benchmarks/strings.py",
+   "line": 275
+  },
+  {
+   "state": "self.series",
+   "file": "asv_bench/benchmarks/timedelta.py",
+   "line": 70
+  },
+  {
+   "state": "self.ts2",
+   "file": "asv_bench/benchmarks/timeseries.py",
+   "line": 203
+  },
+  {
+   "state": "self.ts3",
+   "file": "asv_bench/benchmarks/timeseries.py",
+   "line": 205
+  },
+  {
+   "state": "self.s",
+   "file": "asv_bench/benchmarks/timeseries.py",
+   "line": 244
+  },
+  {
+   "state": "self.ts",
+   "file": "asv_bench/benchmarks/timeseries.py",
+   "line": 259
+  },
+  {
+   "state": "_tzs",
+   "file": "asv_bench/benchmarks/tslibs/tslib.py",
+   "line": 38
+  },
+  {
+   "state": "this_repo",
+   "file": "doc/sphinxext/announce.py",
+   "line": 47
+  },
+  {
+   "state": "_deprecated_options",
+   "file": "pandas/_config/config.py",
+   "line": 92
+  },
+  {
+   "state": "_registered_options",
+   "file": "pandas/_config/config.py",
+   "line": 95
+  },
+  {
+   "state": "_reserved_keys",
+   "file": "pandas/_config/config.py",
+   "line": 101
+  },
+  {
+   "state": "_validation_funcs",
+   "file": "pandas/compat/numpy/function.py",
+   "line": 366
+  },
+  {
+   "state": "_hashtables",
+   "file": "pandas/core/algorithms.py",
+   "line": 256
+  },
+  {
+   "state": "_diff_special",
+   "file": "pandas/core/algorithms.py",
+   "line": 1494
+  },
+  {
+   "state": "_op_str_mapping",
+   "file": "pandas/core/computation/expressions.py",
+   "line": 146
+  },
+  {
+   "state": "self.env",
+   "file": "pandas/core/computation/ops.py",
+   "line": 91
+  },
+  {
+   "state": "self.op",
+   "file": "pandas/core/computation/ops.py",
+   "line": 221
+  },
+  {
+   "state": "_cmp_ops_dict",
+   "file": "pandas/core/computation/ops.py",
+   "line": 310
+  },
+  {
+   "state": "_bool_ops_dict",
+   "file": "pandas/core/computation/ops.py",
+   "line": 314
+  },
+  {
+   "state": "_binary_ops_dict",
+   "file": "pandas/core/computation/ops.py",
+   "line": 328
+  },
+  {
+   "state": "_unary_ops_dict",
+   "file": "pandas/core/computation/ops.py",
+   "line": 492
+  },
+  {
+   "state": "self.queryables",
+   "file": "pandas/core/computation/pytables.py",
+   "line": 124
+  },
+  {
+   "state": "self.scope",
+   "file": "pandas/core/computation/scope.py",
+   "line": 156
+  },
+  {
+   "state": "self.resolvers",
+   "file": "pandas/core/computation/scope.py",
+   "line": 186
+  },
+  {
+   "state": "self.index",
+   "file": "pandas/core/indexers/objects.py",
+   "line": 287
+  },
+  {
+   "state": "_masked_engines",
+   "file": "pandas/core/indexes/base.py",
+   "line": 225
+  },
+  {
+   "state": "self.values",
+   "file": "pandas/core/internals/blocks.py",
+   "line": 2011
+  },
+  {
+   "state": "_fill_methods",
+   "file": "pandas/core/missing.py",
+   "line": 1082
+  },
+  {
+   "state": "self._groupby",
+   "file": "pandas/core/resample.py",
+   "line": 2033
+  },
+  {
+   "state": "self.obj",
+   "file": "pandas/core/resample.py",
+   "line": 2037
+  },
+  {
+   "state": "_factorizers",
+   "file": "pandas/core/reshape/merge.py",
+   "line": 113
+  },
+  {
+   "state": "_unit_map",
+   "file": "pandas/core/tools/datetimes.py",
+   "line": 1260
+  },
+  {
+   "state": "_time_formats",
+   "file": "pandas/core/tools/times.py",
+   "line": 85
+  },
+  {
+   "state": "self._mean",
+   "file": "pandas/core/window/ewm.py",
+   "line": 1082
+  },
+  {
+   "state": "self.shape",
+   "file": "pandas/core/window/online.py",
+   "line": 101
+  },
+  {
+   "state": "self.obj",
+   "file": "pandas/core/window/rolling.py",
+   "line": 137
+  },
+  {
+   "state": "self.on",
+   "file": "pandas/core/window/rolling.py",
+   "line": 138
+  },
+  {
+   "state": "self._style_dict",
+   "file": "pandas/io/excel/_odswriter.py",
+   "line": 63
+  },
+  {
+   "state": "_writers",
+   "file": "pandas/io/excel/_util.py",
+   "line": 32
+  },
+  {
+   "state": "self.obj",
+   "file": "pandas/io/formats/csvs.py",
+   "line": 81
+  },
+  {
+   "state": "self.df",
+   "file": "pandas/io/formats/excel.py",
+   "line": 567
+  },
+  {
+   "state": "self.formatters",
+   "file": "pandas/io/formats/format.py",
+   "line": 456
+  },
+  {
+   "state": "self.ctx",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 133
+  },
+  {
+   "state": "self.ctx_index",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 134
+  },
+  {
+   "state": "self.ctx_columns",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 135
+  },
+  {
+   "state": "self.cell_context",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 136
+  },
+  {
+   "state": "self._display_funcs",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 142
+  },
+  {
+   "state": "self._display_funcs_index",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 145
+  },
+  {
+   "state": "self._display_funcs_index_names",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 148
+  },
+  {
+   "state": "self._display_funcs_columns",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 151
+  },
+  {
+   "state": "self._display_funcs_column_names",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 154
+  },
+  {
+   "state": "self.cellstyle_map_columns",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 343
+  },
+  {
+   "state": "self.cellstyle_map",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 355
+  },
+  {
+   "state": "self.cellstyle_map_index",
+   "file": "pandas/io/formats/style_render.py",
+   "line": 358
+  },
+  {
+   "state": "self.prefix_uri",
+   "file": "pandas/io/formats/xml.py",
+   "line": 161
+  },
+  {
+   "state": "self.kwds",
+   "file": "pandas/io/parsers/arrow_parser_wrapper.py",
+   "line": 53
+  },
+  {
+   "state": "self.unnamed_cols",
+   "file": "pandas/io/parsers/base_parser.py",
+   "line": 106
+  },
+  {
+   "state": "self.buf",
+   "file": "pandas/io/parsers/python_parser.py",
+   "line": 102
+  },
+  {
+   "state": "self._no_thousands_columns",
+   "file": "pandas/io/parsers/python_parser.py",
+   "line": 177
+  },
+  {
+   "state": "_pyarrow_unsupported",
+   "file": "pandas/io/parsers/readers.py",
+   "line": 202
+  },
+  {
+   "state": "self.coordinates",
+   "file": "pandas/io/pytables.py",
+   "line": 2531
+  },
+  {
+   "state": "self.non_index_axes",
+   "file": "pandas/io/pytables.py",
+   "line": 4225
+  },
+  {
+   "state": "self.column_names_raw",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 304
+  },
+  {
+   "state": "self.column_names",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 305
+  },
+  {
+   "state": "self.column_formats",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 306
+  },
+  {
+   "state": "self._column_convert_types",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 541
+  },
+  {
+   "state": "self._current_page_type",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 573
+  },
+  {
+   "state": "self._byte_chunk",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 832
+  },
+  {
+   "state": "self._str_values",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 839
+  },
+  {
+   "state": "self._string_chunk",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 889
+  },
+  {
+   "state": "self._str_offsets",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 898
+  },
+  {
+   "state": "self._str_valid",
+   "file": "pandas/io/sas/sas7bdat.py",
+   "line": 899
+  },
+  {
+   "state": "self.GSO",
+   "file": "pandas/io/stata.py",
+   "line": 1565
+  },
+  {
+   "state": "self._variable_labels",
+   "file": "pandas/io/stata.py",
+   "line": 2515
+  },
+  {
+   "state": "self._has_value_labels",
+   "file": "pandas/io/stata.py",
+   "line": 2518
+  },
+  {
+   "state": "self._converted_names",
+   "file": "pandas/io/stata.py",
+   "line": 2521
+  },
+  {
+   "state": "self.fmtlist",
+   "file": "pandas/io/stata.py",
+   "line": 2743
+  },
+  {
+   "state": "self._convert_strl",
+   "file": "pandas/io/stata.py",
+   "line": 3490
+  },
+  {
+   "state": "self.typlist",
+   "file": "pandas/io/stata.py",
+   "line": 3613
+  },
+  {
+   "state": "self.iterparse",
+   "file": "pandas/io/xml.py",
+   "line": 184
+  },
+  {
+   "state": "_backends",
+   "file": "pandas/plotting/_core.py",
+   "line": 2410
+  },
+  {
+   "state": "self.errors",
+   "file": "pandas/plotting/_matplotlib/core.py",
+   "line": 268
+  },
+  {
+   "state": "holiday_calendars",
+   "file": "pandas/tseries/holiday.py",
+   "line": 461
+  }
+ ],
+ "repo": "pandas-dev/pandas",
+ "stars": 48494
+}

@@ -1,0 +1,30 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.2,
+ "v1_mutable_ratio": 0.0,
+ "v1_details": "0/0 functions reference external mutable state (python)",
+ "v2_verdict": "n/a",
+ "v2_counts": {
+  "neutral": 0,
+  "promiscuous": 0,
+  "unresolved": 0
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 0,
+   "drives_decision": 0
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 0
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 0
+  }
+ },
+ "v2_resolvable": 1.0,
+ "v2_promiscuous": [],
+ "repo": "mindsdb/mindsdb",
+ "stars": 38968
+}

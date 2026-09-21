@@ -1,0 +1,291 @@
+{
+ "status": "ok",
+ "clone_seconds": 1.6,
+ "v1_mutable_ratio": 33.8,
+ "v1_details": "312/923 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 327,
+  "promiscuous": 52,
+  "unresolved": 230
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 286,
+   "drives_decision": 41
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 52
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 230
+  }
+ },
+ "v2_resolvable": 0.622,
+ "v2_promiscuous": [
+  {
+   "state": "self.nodes",
+   "file": "src/py2.x/dl/bp.py",
+   "line": 232
+  },
+  {
+   "state": "self.filters",
+   "file": "src/py2.x/dl/cnn.py",
+   "line": 163
+  },
+  {
+   "state": "self.layers",
+   "file": "src/py2.x/dl/fc.py",
+   "line": 75
+  },
+  {
+   "state": "self.c_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 25
+  },
+  {
+   "state": "self.h_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 27
+  },
+  {
+   "state": "self.f_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 29
+  },
+  {
+   "state": "self.i_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 31
+  },
+  {
+   "state": "self.o_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 33
+  },
+  {
+   "state": "self.ct_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 35
+  },
+  {
+   "state": "self.delta_h_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 133
+  },
+  {
+   "state": "self.delta_o_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 134
+  },
+  {
+   "state": "self.delta_i_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 135
+  },
+  {
+   "state": "self.delta_f_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 136
+  },
+  {
+   "state": "self.delta_ct_list",
+   "file": "src/py2.x/dl/lstm.py",
+   "line": 137
+  },
+  {
+   "state": "self.state_list",
+   "file": "src/py2.x/dl/rnn.py",
+   "line": 27
+  },
+  {
+   "state": "self.delta_list",
+   "file": "src/py2.x/dl/rnn.py",
+   "line": 61
+  },
+  {
+   "state": "iris",
+   "file": "src/py2.x/ml/3.DecisionTree/sklearn_dts_classify_demo.py",
+   "line": 26
+  },
+  {
+   "state": "iris",
+   "file": "src/py2.x/ml/5.Logistic/sklearn_logisticRegression_demo.py",
+   "line": 193
+  },
+  {
+   "state": "clf",
+   "file": "src/py2.x/ml/6.SVM/sklearn-svm-demo.py",
+   "line": 52
+  },
+  {
+   "state": "self.nodes",
+   "file": "src/py3.x/dl/bp.py",
+   "line": 232
+  },
+  {
+   "state": "self.filters",
+   "file": "src/py3.x/dl/cnn.py",
+   "line": 148
+  },
+  {
+   "state": "self.layers",
+   "file": "src/py3.x/dl/fc.py",
+   "line": 70
+  },
+  {
+   "state": "self.c_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 24
+  },
+  {
+   "state": "self.h_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 26
+  },
+  {
+   "state": "self.f_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 28
+  },
+  {
+   "state": "self.i_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 30
+  },
+  {
+   "state": "self.o_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 32
+  },
+  {
+   "state": "self.ct_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 34
+  },
+  {
+   "state": "self.delta_h_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 132
+  },
+  {
+   "state": "self.delta_o_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 133
+  },
+  {
+   "state": "self.delta_i_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 134
+  },
+  {
+   "state": "self.delta_f_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 135
+  },
+  {
+   "state": "self.delta_ct_list",
+   "file": "src/py3.x/dl/lstm.py",
+   "line": 136
+  },
+  {
+   "state": "self.state_list",
+   "file": "src/py3.x/dl/rnn.py",
+   "line": 19
+  },
+  {
+   "state": "self.delta_list",
+   "file": "src/py3.x/dl/rnn.py",
+   "line": 52
+  },
+  {
+   "state": "self.testset",
+   "file": "src/py3.x/ml/16.RecommenderSystems/RS-itemcf.py",
+   "line": 26
+  },
+  {
+   "state": "self.movie_sim_mat",
+   "file": "src/py3.x/ml/16.RecommenderSystems/RS-itemcf.py",
+   "line": 33
+  },
+  {
+   "state": "self.movie_popular",
+   "file": "src/py3.x/ml/16.RecommenderSystems/RS-itemcf.py",
+   "line": 34
+  },
+  {
+   "state": "self.testset",
+   "file": "src/py3.x/ml/16.RecommenderSystems/RS-usercf.py",
+   "line": 29
+  },
+  {
+   "state": "self.user_sim_mat",
+   "file": "src/py3.x/ml/16.RecommenderSystems/RS-usercf.py",
+   "line": 36
+  },
+  {
+   "state": "self.movie_popular",
+   "file": "src/py3.x/ml/16.RecommenderSystems/RS-usercf.py",
+   "line": 37
+  },
+  {
+   "state": "self.test_mat",
+   "file": "src/py3.x/ml/16.RecommenderSystems/sklearn-RS-demo-cf-item-test.py",
+   "line": 32
+  },
+  {
+   "state": "self.item_popular",
+   "file": "src/py3.x/ml/16.RecommenderSystems/sklearn-RS-demo-cf-item-test.py",
+   "line": 44
+  },
+  {
+   "state": "iris",
+   "file": "src/py3.x/ml/2.KNN/sklearn-knn-demo.py",
+   "line": 22
+  },
+  {
+   "state": "iris",
+   "file": "src/py3.x/ml/3.DecisionTree/sklearn_dts_classify_demo.py",
+   "line": 25
+  },
+  {
+   "state": "iris",
+   "file": "src/py3.x/ml/5.Logistic/sklearn_logisticRegression_demo.py",
+   "line": 192
+  },
+  {
+   "state": "clf",
+   "file": "src/py3.x/ml/6.SVM/sklearn-svm-demo.py",
+   "line": 51
+  },
+  {
+   "state": "segments",
+   "file": "src/py3.x/tensorflow2.x/text_bert.py",
+   "line": 176
+  },
+  {
+   "state": "indices",
+   "file": "src/py3.x/tensorflow2.x/text_bert.py",
+   "line": 176
+  },
+  {
+   "state": "predicts",
+   "file": "src/py3.x/tensorflow2.x/text_bert.py",
+   "line": 325
+  },
+  {
+   "state": "token_dict_rev",
+   "file": "src/py3.x/tensorflow2.x/text_bert.py",
+   "line": 336
+  },
+  {
+   "state": "tag_dic",
+   "file": "tutorials/keras/brat_tag.py",
+   "line": 11
+  }
+ ],
+ "repo": "apachecn/ailearning",
+ "stars": 42180
+}

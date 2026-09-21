@@ -1,0 +1,91 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.2,
+ "v1_mutable_ratio": 44.1,
+ "v1_details": "290/657 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 298,
+  "promiscuous": 12,
+  "unresolved": 55
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 176,
+   "drives_decision": 122
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 12
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 55
+  }
+ },
+ "v2_resolvable": 0.849,
+ "v2_promiscuous": [
+  {
+   "state": "self.streams",
+   "file": "src/you_get/extractor.py",
+   "line": 27
+  },
+  {
+   "state": "self.caption_tracks",
+   "file": "src/you_get/extractor.py",
+   "line": 32
+  },
+  {
+   "state": "self.stream_qualities",
+   "file": "src/you_get/extractors/bilibili.py",
+   "line": 154
+  },
+  {
+   "state": "self.mapping_table",
+   "file": "src/you_get/extractors/funshion.py",
+   "line": 25
+  },
+  {
+   "state": "fmt_level",
+   "file": "src/you_get/extractors/google.py",
+   "line": 36
+  },
+  {
+   "state": "self.streams",
+   "file": "src/you_get/extractors/imgur.py",
+   "line": 27
+  },
+  {
+   "state": "self.master_m3u8",
+   "file": "src/you_get/extractors/vimeo.py",
+   "line": 73
+  },
+  {
+   "state": "self.map",
+   "file": "src/you_get/processor/join_flv.py",
+   "line": 35
+  },
+  {
+   "state": "amf_readers",
+   "file": "src/you_get/processor/join_flv.py",
+   "line": 108
+  },
+  {
+   "state": "amf_writers_tags",
+   "file": "src/you_get/processor/join_flv.py",
+   "line": 154
+  },
+  {
+   "state": "amf_writers",
+   "file": "src/you_get/processor/join_flv.py",
+   "line": 163
+  },
+  {
+   "state": "atom_readers",
+   "file": "src/you_get/processor/join_mp4.py",
+   "line": 627
+  }
+ ],
+ "repo": "soimort/you-get",
+ "stars": 56814
+}

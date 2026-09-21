@@ -1,0 +1,1426 @@
+{
+ "status": "ok",
+ "clone_seconds": 6.2,
+ "v1_mutable_ratio": 54.4,
+ "v1_details": "3903/7174 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 2028,
+  "promiscuous": 279,
+  "unresolved": 1030
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 1369,
+   "drives_decision": 659
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 279
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 1030
+  }
+ },
+ "v2_resolvable": 0.691,
+ "v2_promiscuous": [
+  {
+   "state": "self._nvtx_domains",
+   "file": "accelerator/cuda_accelerator.py",
+   "line": 36
+  },
+  {
+   "state": "self.class_dict",
+   "file": "accelerator/cuda_accelerator.py",
+   "line": 342
+  },
+  {
+   "state": "self.class_dict",
+   "file": "accelerator/hpu_accelerator.py",
+   "line": 262
+  },
+  {
+   "state": "self.class_dict",
+   "file": "accelerator/mlu_accelerator.py",
+   "line": 21
+  },
+  {
+   "state": "self.class_dict",
+   "file": "accelerator/npu_accelerator.py",
+   "line": 27
+  },
+  {
+   "state": "self.class_dict",
+   "file": "accelerator/sdaa_accelerator.py",
+   "line": 51
+  },
+  {
+   "state": "self.class_dict",
+   "file": "accelerator/supa_accelerator.py",
+   "line": 241
+  },
+  {
+   "state": "self.class_dict",
+   "file": "accelerator/xpu_accelerator.py",
+   "line": 30
+  },
+  {
+   "state": "self.fail_label",
+   "file": "ci/test_torch_latest.py",
+   "line": 105
+  },
+  {
+   "state": "self.ctxt",
+   "file": "csrc/aio/py_test/ds_aio_basic.py",
+   "line": 19
+  },
+  {
+   "state": "self.ctxt",
+   "file": "csrc/aio/py_test/ds_aio_handle.py",
+   "line": 17
+  },
+  {
+   "state": "self.ctxt",
+   "file": "csrc/aio/py_test/torch_fastio_engine.py",
+   "line": 19
+  },
+  {
+   "state": "self.ctxt",
+   "file": "csrc/aio/py_test/torch_io.py",
+   "line": 16
+  },
+  {
+   "state": "self.records",
+   "file": "deepspeed/autotuning/autotuner.py",
+   "line": 102
+  },
+  {
+   "state": "self.finished_experiments",
+   "file": "deepspeed/autotuning/scheduler.py",
+   "line": 45
+  },
+  {
+   "state": "self.exp_paths",
+   "file": "deepspeed/autotuning/scheduler.py",
+   "line": 47
+  },
+  {
+   "state": "self.all_exps",
+   "file": "deepspeed/autotuning/tuner/index_based_tuner.py",
+   "line": 34
+  },
+  {
+   "state": "self.visited",
+   "file": "deepspeed/autotuning/tuner/model_based_tuner.py",
+   "line": 34
+  },
+  {
+   "state": "self.mp_rank_files",
+   "file": "deepspeed/checkpoint/deepspeed_checkpoint.py",
+   "line": 54
+  },
+  {
+   "state": "self.layer_keys",
+   "file": "deepspeed/checkpoint/deepspeed_checkpoint.py",
+   "line": 56
+  },
+  {
+   "state": "self.global_state",
+   "file": "deepspeed/checkpoint/deepspeed_checkpoint.py",
+   "line": 78
+  },
+  {
+   "state": "self.map",
+   "file": "deepspeed/checkpoint/reshape_meg_2d.py",
+   "line": 14
+  },
+  {
+   "state": "self.file_list",
+   "file": "deepspeed/checkpoint/zero_checkpoint.py",
+   "line": 22
+  },
+  {
+   "state": "self.available_coll",
+   "file": "deepspeed/comm/ccl.py",
+   "line": 58
+  },
+  {
+   "state": "_dtype_map",
+   "file": "deepspeed/comm/mori.py",
+   "line": 39
+  },
+  {
+   "state": "self.frames",
+   "file": "deepspeed/compile/backend.py",
+   "line": 49
+  },
+  {
+   "state": "GROUP_REGISTRY",
+   "file": "deepspeed/compile/custom_ops/sp_dp_registry.py",
+   "line": 8
+  },
+  {
+   "state": "self._params",
+   "file": "deepspeed/compile/graph_param.py",
+   "line": 38
+  },
+  {
+   "state": "self._param_name_to_grad",
+   "file": "deepspeed/compile/graph_param.py",
+   "line": 39
+  },
+  {
+   "state": "_DYNAMO_CONFIG_OWNERS",
+   "file": "deepspeed/compile/init_z3.py",
+   "line": 26
+  },
+  {
+   "state": "value_to_id",
+   "file": "deepspeed/compile/passes/offload_activation.py",
+   "line": 16
+  },
+  {
+   "state": "used_ids",
+   "file": "deepspeed/compile/passes/offload_activation.py",
+   "line": 17
+  },
+  {
+   "state": "offload_key_events",
+   "file": "deepspeed/compile/passes/offload_adam_states.py",
+   "line": 44
+  },
+  {
+   "state": "reload_key_events",
+   "file": "deepspeed/compile/passes/offload_adam_states.py",
+   "line": 45
+  },
+  {
+   "state": "self.cache",
+   "file": "deepspeed/compile/profilers/graph_profile.py",
+   "line": 146
+  },
+  {
+   "state": "self.env_values",
+   "file": "deepspeed/compile/util.py",
+   "line": 195
+  },
+  {
+   "state": "self.original_device",
+   "file": "deepspeed/compile/util.py",
+   "line": 196
+  },
+  {
+   "state": "self.devices",
+   "file": "deepspeed/compile/util.py",
+   "line": 383
+  },
+  {
+   "state": "self.base_tensors",
+   "file": "deepspeed/compile/util.py",
+   "line": 384
+  },
+  {
+   "state": "self.non_tensor",
+   "file": "deepspeed/compile/util.py",
+   "line": 388
+  },
+  {
+   "state": "self.bias",
+   "file": "deepspeed/compression/basic_layer.py",
+   "line": 144
+  },
+  {
+   "state": "self.bias",
+   "file": "deepspeed/compression/basic_layer.py",
+   "line": 433
+  },
+  {
+   "state": "self.weight",
+   "file": "deepspeed/compression/basic_layer.py",
+   "line": 614
+  },
+  {
+   "state": "self.bias",
+   "file": "deepspeed/compression/basic_layer.py",
+   "line": 615
+  },
+  {
+   "state": "self.running_mean",
+   "file": "deepspeed/compression/basic_layer.py",
+   "line": 616
+  },
+  {
+   "state": "self.running_var",
+   "file": "deepspeed/compression/basic_layer.py",
+   "line": 617
+  },
+  {
+   "state": "self.verbose",
+   "file": "deepspeed/compression/scheduler.py",
+   "line": 24
+  },
+  {
+   "state": "self.different_compression_methods",
+   "file": "deepspeed/compression/scheduler.py",
+   "line": 34
+  },
+  {
+   "state": "self.key_list",
+   "file": "deepspeed/inference/engine.py",
+   "line": 329
+  },
+  {
+   "state": "self.static_inputs",
+   "file": "deepspeed/inference/engine.py",
+   "line": 508
+  },
+  {
+   "state": "self.static_kwargs",
+   "file": "deepspeed/inference/engine.py",
+   "line": 509
+  },
+  {
+   "state": "quantized_weight_registry",
+   "file": "deepspeed/inference/quantization/layers.py",
+   "line": 15
+  },
+  {
+   "state": "self.split_k_map",
+   "file": "deepspeed/inference/v2/kernels/core_ops/cuda_linear/cuda_linear.py",
+   "line": 29
+  },
+  {
+   "state": "self._layer_types",
+   "file": "deepspeed/inference/v2/model_implementations/exaone4_5/model.py",
+   "line": 134
+  },
+  {
+   "state": "self._blocks",
+   "file": "deepspeed/inference/v2/ragged/blocked_allocator.py",
+   "line": 46
+  },
+  {
+   "state": "self._seqs",
+   "file": "deepspeed/inference/v2/ragged/ragged_manager.py",
+   "line": 92
+  },
+  {
+   "state": "self._input_ids_shadow",
+   "file": "deepspeed/inference/v2/ragged/ragged_wrapper.py",
+   "line": 107
+  },
+  {
+   "state": "self._token_to_seq_storage_shadow",
+   "file": "deepspeed/inference/v2/ragged/ragged_wrapper.py",
+   "line": 109
+  },
+  {
+   "state": "self._inflight_seq_descriptors_shadow",
+   "file": "deepspeed/inference/v2/ragged/ragged_wrapper.py",
+   "line": 110
+  },
+  {
+   "state": "self._kv_ptrs_shadow",
+   "file": "deepspeed/inference/v2/ragged/ragged_wrapper.py",
+   "line": 111
+  },
+  {
+   "state": "self._kv_cache_ids",
+   "file": "deepspeed/inference/v2/ragged/sequence_descriptor.py",
+   "line": 118
+  },
+  {
+   "state": "self._kv_cache_ids_shadow",
+   "file": "deepspeed/inference/v2/ragged/sequence_descriptor.py",
+   "line": 119
+  },
+  {
+   "state": "self._stats",
+   "file": "deepspeed/io/base_file_writer.py",
+   "line": 18
+  },
+  {
+   "state": "self._buffers",
+   "file": "deepspeed/io/double_io_buffer.py",
+   "line": 18
+  },
+  {
+   "state": "self.static_inputs",
+   "file": "deepspeed/model_implementations/diffusers/unet.py",
+   "line": 29
+  },
+  {
+   "state": "self.static_kwargs",
+   "file": "deepspeed/model_implementations/diffusers/unet.py",
+   "line": 32
+  },
+  {
+   "state": "self.static_decoder_inputs",
+   "file": "deepspeed/model_implementations/diffusers/vae.py",
+   "line": 27
+  },
+  {
+   "state": "self.static_decoder_kwargs",
+   "file": "deepspeed/model_implementations/diffusers/vae.py",
+   "line": 30
+  },
+  {
+   "state": "self.static_encoder_inputs",
+   "file": "deepspeed/model_implementations/diffusers/vae.py",
+   "line": 70
+  },
+  {
+   "state": "self.static_encoder_kwargs",
+   "file": "deepspeed/model_implementations/diffusers/vae.py",
+   "line": 73
+  },
+  {
+   "state": "self.static_inputs",
+   "file": "deepspeed/model_implementations/diffusers/vae.py",
+   "line": 113
+  },
+  {
+   "state": "self.static_kwargs",
+   "file": "deepspeed/model_implementations/diffusers/vae.py",
+   "line": 116
+  },
+  {
+   "state": "self.cuda_graph_created",
+   "file": "deepspeed/model_implementations/transformers/clip_encoder.py",
+   "line": 19
+  },
+  {
+   "state": "self.static_inputs",
+   "file": "deepspeed/model_implementations/transformers/clip_encoder.py",
+   "line": 20
+  },
+  {
+   "state": "self.static_kwargs",
+   "file": "deepspeed/model_implementations/transformers/clip_encoder.py",
+   "line": 21
+  },
+  {
+   "state": "self.static_output",
+   "file": "deepspeed/model_implementations/transformers/clip_encoder.py",
+   "line": 22
+  },
+  {
+   "state": "self._cuda_graphs",
+   "file": "deepspeed/model_implementations/transformers/clip_encoder.py",
+   "line": 23
+  },
+  {
+   "state": "self.all_reduce_linears",
+   "file": "deepspeed/module_inject/auto_tp.py",
+   "line": 207
+  },
+  {
+   "state": "self.linear_policies",
+   "file": "deepspeed/module_inject/auto_tp.py",
+   "line": 215
+  },
+  {
+   "state": "self._tied_gathered_column_module_names",
+   "file": "deepspeed/module_inject/auto_tp.py",
+   "line": 219
+  },
+  {
+   "state": "self._h4h_w",
+   "file": "deepspeed/module_inject/containers/base_moe.py",
+   "line": 26
+  },
+  {
+   "state": "self._h4h_b",
+   "file": "deepspeed/module_inject/containers/base_moe.py",
+   "line": 27
+  },
+  {
+   "state": "self._4hh_w",
+   "file": "deepspeed/module_inject/containers/base_moe.py",
+   "line": 28
+  },
+  {
+   "state": "self._4hh_b",
+   "file": "deepspeed/module_inject/containers/base_moe.py",
+   "line": 29
+  },
+  {
+   "state": "self._last_logged_events_samples",
+   "file": "deepspeed/monitor/comet.py",
+   "line": 78
+  },
+  {
+   "state": "self.ctxt",
+   "file": "deepspeed/nvme/ds_aio_basic.py",
+   "line": 19
+  },
+  {
+   "state": "self.ctxt",
+   "file": "deepspeed/nvme/ds_aio_handle.py",
+   "line": 22
+  },
+  {
+   "state": "self.ctxt",
+   "file": "deepspeed/nvme/torch_fastio_engine.py",
+   "line": 19
+  },
+  {
+   "state": "self.ctxt",
+   "file": "deepspeed/nvme/torch_io.py",
+   "line": 16
+  },
+  {
+   "state": "self.lamb_coeffs",
+   "file": "deepspeed/ops/lamb/fused_lamb.py",
+   "line": 67
+  },
+  {
+   "state": "self.lut_cache",
+   "file": "deepspeed/ops/sparse_attention/matmul.py",
+   "line": 641
+  },
+  {
+   "state": "self.lut_cache",
+   "file": "deepspeed/ops/sparse_attention/softmax.py",
+   "line": 240
+  },
+  {
+   "state": "self.kv_cache",
+   "file": "deepspeed/ops/transformer/inference/op_binding/workspace.py",
+   "line": 21
+  },
+  {
+   "state": "module_flop_count",
+   "file": "deepspeed/profiling/flops_profiler/profiler.py",
+   "line": 23
+  },
+  {
+   "state": "module_mac_count",
+   "file": "deepspeed/profiling/flops_profiler/profiler.py",
+   "line": 24
+  },
+  {
+   "state": "old_functions",
+   "file": "deepspeed/profiling/flops_profiler/profiler.py",
+   "line": 25
+  },
+  {
+   "state": "contiguous_data_buffers",
+   "file": "deepspeed/runtime/activation_checkpointing/checkpointing.py",
+   "line": 49
+  },
+  {
+   "state": "data_offsets",
+   "file": "deepspeed/runtime/activation_checkpointing/checkpointing.py",
+   "line": 50
+  },
+  {
+   "state": "contiguous_size_buffers",
+   "file": "deepspeed/runtime/activation_checkpointing/checkpointing.py",
+   "line": 52
+  },
+  {
+   "state": "size_offsets",
+   "file": "deepspeed/runtime/activation_checkpointing/checkpointing.py",
+   "line": 53
+  },
+  {
+   "state": "self.seeds_",
+   "file": "deepspeed/runtime/activation_checkpointing/checkpointing.py",
+   "line": 137
+  },
+  {
+   "state": "self.param_names",
+   "file": "deepspeed/runtime/bf16_optimizer.py",
+   "line": 56
+  },
+  {
+   "state": "self.real_dp_process_group",
+   "file": "deepspeed/runtime/bf16_optimizer.py",
+   "line": 81
+  },
+  {
+   "state": "self.bf16_groups_flat",
+   "file": "deepspeed/runtime/bf16_optimizer.py",
+   "line": 94
+  },
+  {
+   "state": "self.fp32_groups_gradients_flat",
+   "file": "deepspeed/runtime/bf16_optimizer.py",
+   "line": 102
+  },
+  {
+   "state": "self.fp32_groups_has_gradients",
+   "file": "deepspeed/runtime/bf16_optimizer.py",
+   "line": 105
+  },
+  {
+   "state": "self.expert_gradients",
+   "file": "deepspeed/runtime/bf16_optimizer.py",
+   "line": 135
+  },
+  {
+   "state": "self.optimizer_params",
+   "file": "deepspeed/runtime/config.py",
+   "line": 831
+  },
+  {
+   "state": "self.state",
+   "file": "deepspeed/runtime/data_pipeline/curriculum_scheduler.py",
+   "line": 15
+  },
+  {
+   "state": "self.random_ltd_scheduler",
+   "file": "deepspeed/runtime/data_pipeline/data_routing/basic_layer.py",
+   "line": 23
+  },
+  {
+   "state": "self.state",
+   "file": "deepspeed/runtime/data_pipeline/data_routing/scheduler.py",
+   "line": 18
+  },
+  {
+   "state": "self.config_schedule",
+   "file": "deepspeed/runtime/data_pipeline/data_routing/scheduler.py",
+   "line": 44
+  },
+  {
+   "state": "self.state",
+   "file": "deepspeed/runtime/data_pipeline/data_routing/scheduler.py",
+   "line": 52
+  },
+  {
+   "state": "self.sample_indices",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_analyzer.py",
+   "line": 62
+  },
+  {
+   "state": "self.metric_functions",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_analyzer.py",
+   "line": 478
+  },
+  {
+   "state": "self.sample_indices",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_analyzer.py",
+   "line": 483
+  },
+  {
+   "state": "self.values",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_analyzer.py",
+   "line": 881
+  },
+  {
+   "state": "self.data_efficiency_config",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 49
+  },
+  {
+   "state": "self.batch",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 66
+  },
+  {
+   "state": "self.current_difficulties",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 70
+  },
+  {
+   "state": "self.data_cluster_current_position",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 72
+  },
+  {
+   "state": "self.curriculum_schedulers",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 73
+  },
+  {
+   "state": "self.curriculum_index_to_sample",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 74
+  },
+  {
+   "state": "self.curriculum_index_to_metric",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 75
+  },
+  {
+   "state": "self.difficulty_type",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 76
+  },
+  {
+   "state": "self.clustering_type",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 77
+  },
+  {
+   "state": "self.data_clusters",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/data_sampler.py",
+   "line": 80
+  },
+  {
+   "state": "dtypes",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 102
+  },
+  {
+   "state": "self.dim_offsets",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 160
+  },
+  {
+   "state": "self.data_offsets",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 161
+  },
+  {
+   "state": "self.sizes",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 162
+  },
+  {
+   "state": "self.cache",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 223
+  },
+  {
+   "state": "self.cache_index",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 224
+  },
+  {
+   "state": "self._sizes",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 444
+  },
+  {
+   "state": "self._sizes",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 444
+  },
+  {
+   "state": "self._pointers",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 446
+  },
+  {
+   "state": "self._pointers",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/indexed_dataset.py",
+   "line": 446
+  },
+  {
+   "state": "self.batch_sizes",
+   "file": "deepspeed/runtime/data_pipeline/data_sampling/variable_batch_size_and_lr.py",
+   "line": 241
+  },
+  {
+   "state": "self.deepspeed_dataloader_config",
+   "file": "deepspeed/runtime/dataloader.py",
+   "line": 56
+  },
+  {
+   "state": "self.drop_path_rates",
+   "file": "deepspeed/runtime/domino/transformer.py",
+   "line": 441
+  },
+  {
+   "state": "self.layers",
+   "file": "deepspeed/runtime/domino/transformer.py",
+   "line": 454
+  },
+  {
+   "state": "self.expert_data_parallel_group",
+   "file": "deepspeed/runtime/engine.py",
+   "line": 1682
+  },
+  {
+   "state": "self.corrected_tensor_sizes",
+   "file": "deepspeed/runtime/fp16/onebit/lamb.py",
+   "line": 141
+  },
+  {
+   "state": "self.server_chunk_sizes",
+   "file": "deepspeed/runtime/fp16/onebit/lamb.py",
+   "line": 142
+  },
+  {
+   "state": "self.worker_errors",
+   "file": "deepspeed/runtime/fp16/onebit/lamb.py",
+   "line": 143
+  },
+  {
+   "state": "self.server_errors",
+   "file": "deepspeed/runtime/fp16/onebit/lamb.py",
+   "line": 144
+  },
+  {
+   "state": "self.lamb_coeffs",
+   "file": "deepspeed/runtime/fp16/onebit/lamb.py",
+   "line": 146
+  },
+  {
+   "state": "self.inference_policies",
+   "file": "deepspeed/runtime/hybrid_engine.py",
+   "line": 117
+  },
+  {
+   "state": "self.layer_lora_params",
+   "file": "deepspeed/runtime/hybrid_engine.py",
+   "line": 149
+  },
+  {
+   "state": "self.lora_params",
+   "file": "deepspeed/runtime/hybrid_engine.py",
+   "line": 285
+  },
+  {
+   "state": "self.global_rank",
+   "file": "deepspeed/runtime/pipe/engine.py",
+   "line": 107
+  },
+  {
+   "state": "self.pipe_buffers",
+   "file": "deepspeed/runtime/pipe/engine.py",
+   "line": 178
+  },
+  {
+   "state": "self._grad_layer_buf",
+   "file": "deepspeed/runtime/pipe/engine.py",
+   "line": 186
+  },
+  {
+   "state": "self.total_additional_losses",
+   "file": "deepspeed/runtime/pipe/engine.py",
+   "line": 202
+  },
+  {
+   "state": "self.checkpointable_layers",
+   "file": "deepspeed/runtime/pipe/module.py",
+   "line": 148
+  },
+  {
+   "state": "self.tied_modules",
+   "file": "deepspeed/runtime/pipe/module.py",
+   "line": 196
+  },
+  {
+   "state": "self.tied_weight_attrs",
+   "file": "deepspeed/runtime/pipe/module.py",
+   "line": 197
+  },
+  {
+   "state": "self.parts",
+   "file": "deepspeed/runtime/pipe/module.py",
+   "line": 405
+  },
+  {
+   "state": "_groups",
+   "file": "deepspeed/runtime/pipe/p2p.py",
+   "line": 15
+  },
+  {
+   "state": "self.dims",
+   "file": "deepspeed/runtime/pipe/topology.py",
+   "line": 35
+  },
+  {
+   "state": "self.mapping",
+   "file": "deepspeed/runtime/pipe/topology.py",
+   "line": 40
+  },
+  {
+   "state": "self.ckpt_list",
+   "file": "deepspeed/runtime/state_dict_factory.py",
+   "line": 52
+  },
+  {
+   "state": "self.sub_group_to_param_num",
+   "file": "deepspeed/runtime/superoffload/superoffload_stage3.py",
+   "line": 40
+  },
+  {
+   "state": "self.sub_group_grad_partition_counts",
+   "file": "deepspeed/runtime/superoffload/superoffload_stage3.py",
+   "line": 41
+  },
+  {
+   "state": "self.free_buffer_index",
+   "file": "deepspeed/runtime/swap_tensor/async_swapper.py",
+   "line": 22
+  },
+  {
+   "state": "self.swapped_gradients",
+   "file": "deepspeed/runtime/swap_tensor/optimizer_utils.py",
+   "line": 51
+  },
+  {
+   "state": "self.swap_params_info",
+   "file": "deepspeed/runtime/swap_tensor/optimizer_utils.py",
+   "line": 170
+  },
+  {
+   "state": "self.optimizer",
+   "file": "deepspeed/runtime/swap_tensor/optimizer_utils.py",
+   "line": 175
+  },
+  {
+   "state": "self.id_to_path",
+   "file": "deepspeed/runtime/swap_tensor/partitioned_param_swapper.py",
+   "line": 47
+  },
+  {
+   "state": "self.param_id_to_buffer_id",
+   "file": "deepspeed/runtime/swap_tensor/partitioned_param_swapper.py",
+   "line": 50
+  },
+  {
+   "state": "self.param_id_to_swap_buffer",
+   "file": "deepspeed/runtime/swap_tensor/partitioned_param_swapper.py",
+   "line": 53
+  },
+  {
+   "state": "self.param_id_to_numel",
+   "file": "deepspeed/runtime/swap_tensor/partitioned_param_swapper.py",
+   "line": 56
+  },
+  {
+   "state": "self.available_params",
+   "file": "deepspeed/runtime/swap_tensor/partitioned_param_swapper.py",
+   "line": 67
+  },
+  {
+   "state": "self.aio_config",
+   "file": "deepspeed/runtime/swap_tensor/partitioned_param_swapper.py",
+   "line": 93
+  },
+  {
+   "state": "self.swap_ops",
+   "file": "deepspeed/runtime/swap_tensor/pipelined_optimizer_swapper.py",
+   "line": 79
+  },
+  {
+   "state": "self.swap_tensors",
+   "file": "deepspeed/runtime/swap_tensor/utils.py",
+   "line": 46
+  },
+  {
+   "state": "self.compute_tensors",
+   "file": "deepspeed/runtime/swap_tensor/utils.py",
+   "line": 47
+  },
+  {
+   "state": "self.buffers",
+   "file": "deepspeed/runtime/swap_tensor/utils.py",
+   "line": 101
+  },
+  {
+   "state": "self.all_buffers",
+   "file": "deepspeed/runtime/swap_tensor/utils.py",
+   "line": 187
+  },
+  {
+   "state": "self.free_buffer_index",
+   "file": "deepspeed/runtime/swap_tensor/utils.py",
+   "line": 191
+  },
+  {
+   "state": "self.used_buffer_index",
+   "file": "deepspeed/runtime/swap_tensor/utils.py",
+   "line": 192
+  },
+  {
+   "state": "graph_cache",
+   "file": "deepspeed/runtime/utils.py",
+   "line": 89
+  },
+  {
+   "state": "self.param_id_index_buffer_offset",
+   "file": "deepspeed/runtime/zenflow/zenflow_stage_1_and_2.py",
+   "line": 126
+  },
+  {
+   "state": "self.param_id_grad_buffer_offset",
+   "file": "deepspeed/runtime/zenflow/zenflow_stage_1_and_2.py",
+   "line": 127
+  },
+  {
+   "state": "self.param_id_sum_buffer_offset",
+   "file": "deepspeed/runtime/zenflow/zenflow_stage_1_and_2.py",
+   "line": 130
+  },
+  {
+   "state": "self.zenflow_need_update",
+   "file": "deepspeed/runtime/zenflow/zenflow_stage_1_and_2.py",
+   "line": 132
+  },
+  {
+   "state": "self.contiguous_sizes",
+   "file": "deepspeed/runtime/zero/contiguous_memory_allocator.py",
+   "line": 22
+  },
+  {
+   "state": "self.tensor_addresses",
+   "file": "deepspeed/runtime/zero/contiguous_memory_allocator.py",
+   "line": 27
+  },
+  {
+   "state": "self.tensor_sizes",
+   "file": "deepspeed/runtime/zero/contiguous_memory_allocator.py",
+   "line": 30
+  },
+  {
+   "state": "self.tensor_ids",
+   "file": "deepspeed/runtime/zero/contiguous_memory_allocator.py",
+   "line": 33
+  },
+  {
+   "state": "self.tensor_map",
+   "file": "deepspeed/runtime/zero/contiguous_memory_allocator.py",
+   "line": 36
+  },
+  {
+   "state": "self.id_to_params",
+   "file": "deepspeed/runtime/zero/contiguous_memory_allocator.py",
+   "line": 39
+  },
+  {
+   "state": "FWD_MODULE_STACK",
+   "file": "deepspeed/runtime/zero/parameter_offload.py",
+   "line": 19
+  },
+  {
+   "state": "self.partitions",
+   "file": "deepspeed/runtime/zero/partition_parameters.py",
+   "line": 729
+  },
+  {
+   "state": "self.src_rank_by_group",
+   "file": "deepspeed/runtime/zero/partition_parameters.py",
+   "line": 2395
+  },
+  {
+   "state": "self.__inflight_param_registry",
+   "file": "deepspeed/runtime/zero/partitioned_param_coordinator.py",
+   "line": 104
+  },
+  {
+   "state": "self.__most_recent_step_id_param_fetched_for",
+   "file": "deepspeed/runtime/zero/partitioned_param_coordinator.py",
+   "line": 112
+  },
+  {
+   "state": "self.__step_id_module_fetched_for",
+   "file": "deepspeed/runtime/zero/partitioned_param_coordinator.py",
+   "line": 113
+  },
+  {
+   "state": "self.event_counters",
+   "file": "deepspeed/runtime/zero/partitioned_param_profiler.py",
+   "line": 28
+  },
+  {
+   "state": "self.param_names",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 230
+  },
+  {
+   "state": "self.fp16_partitioned_groups",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 394
+  },
+  {
+   "state": "self.fp16_partitioned_groups_flat_id",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 399
+  },
+  {
+   "state": "self.param_groups_fp16_flat_cpu_memory",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 402
+  },
+  {
+   "state": "self.muon_momentum_buffer_partitioned_groups_flat",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 408
+  },
+  {
+   "state": "self.next_swappable_fp32_partitioned_groups",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 409
+  },
+  {
+   "state": "self.partition_size",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 412
+  },
+  {
+   "state": "self.groups_padding",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 421
+  },
+  {
+   "state": "self.sub_group_to_group_id",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 425
+  },
+  {
+   "state": "self.sub_group_process_groups",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 426
+  },
+  {
+   "state": "self.sub_group_partition_counts",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 427
+  },
+  {
+   "state": "self.param_dict",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 450
+  },
+  {
+   "state": "self.ipg_buckets",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 463
+  },
+  {
+   "state": "self.grad_position",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 486
+  },
+  {
+   "state": "self.norm_for_param_grads",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 490
+  },
+  {
+   "state": "self.is_partition_reduced",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 493
+  },
+  {
+   "state": "self.is_grad_computed",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 496
+  },
+  {
+   "state": "self.averaged_gradients",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 499
+  },
+  {
+   "state": "self.debug_fp16_grads",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 516
+  },
+  {
+   "state": "self.offloaded_states",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 520
+  },
+  {
+   "state": "self.__param_id_to_grad_partition",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 706
+  },
+  {
+   "state": "self.sub_groups_using_muon",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 837
+  },
+  {
+   "state": "self.subgroup_to_device",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 1017
+  },
+  {
+   "state": "self.leaf_parameters",
+   "file": "deepspeed/runtime/zero/stage3.py",
+   "line": 1357
+  },
+  {
+   "state": "self.param_names",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 206
+  },
+  {
+   "state": "self.expert_dp_process_group",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 245
+  },
+  {
+   "state": "self.real_dp_process_group",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 252
+  },
+  {
+   "state": "self.extra_large_param_to_reduce",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 289
+  },
+  {
+   "state": "self.param_buffer_of_bit16_for_cpu_offload_groups",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 327
+  },
+  {
+   "state": "self.params_not_in_partition",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 332
+  },
+  {
+   "state": "self.params_in_partition",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 335
+  },
+  {
+   "state": "self.first_offset",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 340
+  },
+  {
+   "state": "self.partition_size",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 343
+  },
+  {
+   "state": "self.round_robin_bit16_indices",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 366
+  },
+  {
+   "state": "self.round_robin_bit16_meta",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 367
+  },
+  {
+   "state": "self.groups_padding",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 371
+  },
+  {
+   "state": "self.param_dict",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 534
+  },
+  {
+   "state": "self.is_param_in_current_partition",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 537
+  },
+  {
+   "state": "self.ipg_buckets",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 547
+  },
+  {
+   "state": "self.previous_reduced_grads",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 551
+  },
+  {
+   "state": "self.param_id",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 554
+  },
+  {
+   "state": "self.accumulated_grads_in_cpu",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 578
+  },
+  {
+   "state": "self.norm_for_param_grads",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 579
+  },
+  {
+   "state": "self.grad_position",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 581
+  },
+  {
+   "state": "self.param_to_partition_ids",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 595
+  },
+  {
+   "state": "self.is_partition_reduced",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 598
+  },
+  {
+   "state": "self.remaining_grads_in_partition",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 601
+  },
+  {
+   "state": "self.total_grads_in_partition",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 604
+  },
+  {
+   "state": "self.is_grad_computed",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 607
+  },
+  {
+   "state": "self.grad_partition_insertion_offset",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 610
+  },
+  {
+   "state": "self.grad_start_offset",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 613
+  },
+  {
+   "state": "self.averaged_gradients",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 616
+  },
+  {
+   "state": "self.all_grad_tensors",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 617
+  },
+  {
+   "state": "self.offload_gradient_dict",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 619
+  },
+  {
+   "state": "self.first_param_index_in_partition",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 622
+  },
+  {
+   "state": "self.offloaded_states",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 674
+  },
+  {
+   "state": "self.is_moe_param_group",
+   "file": "deepspeed/runtime/zero/stage_1_and_2.py",
+   "line": 760
+  },
+  {
+   "state": "self.in_parts",
+   "file": "deepspeed/runtime/zero/tiling.py",
+   "line": 101
+  },
+  {
+   "state": "self.out_parts",
+   "file": "deepspeed/runtime/zero/tiling.py",
+   "line": 102
+  },
+  {
+   "state": "self.linears",
+   "file": "deepspeed/runtime/zero/tiling.py",
+   "line": 110
+  },
+  {
+   "state": "self.tokens",
+   "file": "deepspeed/sequence/fpdt_layer.py",
+   "line": 85
+  },
+  {
+   "state": "self.labels",
+   "file": "deepspeed/sequence/fpdt_layer.py",
+   "line": 86
+  },
+  {
+   "state": "self.loss_mask",
+   "file": "deepspeed/sequence/fpdt_layer.py",
+   "line": 87
+  },
+  {
+   "state": "self.position_ids",
+   "file": "deepspeed/sequence/fpdt_layer.py",
+   "line": 89
+  },
+  {
+   "state": "self.comms_dict",
+   "file": "deepspeed/utils/comms_logging.py",
+   "line": 71
+  },
+  {
+   "state": "module_names",
+   "file": "deepspeed/utils/debug.py",
+   "line": 12
+  },
+  {
+   "state": "param_names",
+   "file": "deepspeed/utils/debug.py",
+   "line": 13
+  },
+  {
+   "state": "_EXPERT_PARALLEL_GROUP",
+   "file": "deepspeed/utils/groups.py",
+   "line": 37
+  },
+  {
+   "state": "_EXPERT_PARALLEL_GROUP_RANKS",
+   "file": "deepspeed/utils/groups.py",
+   "line": 39
+  },
+  {
+   "state": "_EXPERT_DATA_PARALLEL_GROUP",
+   "file": "deepspeed/utils/groups.py",
+   "line": 41
+  },
+  {
+   "state": "_EXPERT_DATA_PARALLEL_GROUP_RANKS",
+   "file": "deepspeed/utils/groups.py",
+   "line": 43
+  },
+  {
+   "state": "log_levels",
+   "file": "deepspeed/utils/logging.py",
+   "line": 13
+  },
+  {
+   "state": "self._layers",
+   "file": "deepspeed/utils/static_cache.py",
+   "line": 160
+  },
+  {
+   "state": "self.optim_fragment",
+   "file": "deepspeed/utils/tensor_fragment.py",
+   "line": 37
+  },
+  {
+   "state": "self.timers",
+   "file": "deepspeed/utils/timer.py",
+   "line": 121
+  },
+  {
+   "state": "self.flat_groups",
+   "file": "deepspeed/utils/zero_to_fp32.py",
+   "line": 428
+  },
+  {
+   "state": "self.input_ids",
+   "file": "examples/sdma_allgather/train_qwen3_zero3.py",
+   "line": 72
+  },
+  {
+   "state": "self.t",
+   "file": "examples/sdma_allgather/train_qwen3_zero3.py",
+   "line": 136
+  },
+  {
+   "state": "self.samples",
+   "file": "examples/sdma_allgather/train_zero3.py",
+   "line": 154
+  },
+  {
+   "state": "cuda_minor_mismatch_ok",
+   "file": "op_builder/builder.py",
+   "line": 83
+  }
+ ],
+ "repo": "deepspeedai/DeepSpeed",
+ "stars": 42077
+}

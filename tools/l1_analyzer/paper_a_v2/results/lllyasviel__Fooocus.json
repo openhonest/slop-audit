@@ -1,0 +1,431 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.6,
+ "v1_mutable_ratio": 55.2,
+ "v1_details": "1267/2294 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1325,
+  "promiscuous": 80,
+  "unresolved": 1245
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 1027,
+   "drives_decision": 298
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 80
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 1245
+  }
+ },
+ "v2_resolvable": 0.53,
+ "v2_promiscuous": [
+  {
+   "state": "self.layer",
+   "file": "extras/BLIP/models/med.py",
+   "line": 390
+  },
+  {
+   "state": "self.layer",
+   "file": "extras/BLIP/models/nlvr_encoder.py",
+   "line": 425
+  },
+  {
+   "state": "self.ClassHead",
+   "file": "extras/facexlib/detection/retinaface.py",
+   "line": 111
+  },
+  {
+   "state": "self.BboxHead",
+   "file": "extras/facexlib/detection/retinaface.py",
+   "line": 112
+  },
+  {
+   "state": "self.LandmarkHead",
+   "file": "extras/facexlib/detection/retinaface.py",
+   "line": 113
+  },
+  {
+   "state": "self.min_sizes",
+   "file": "extras/facexlib/detection/retinaface_utils.py",
+   "line": 12
+  },
+  {
+   "state": "self.steps",
+   "file": "extras/facexlib/detection/retinaface_utils.py",
+   "line": 13
+  },
+  {
+   "state": "self.pad_input_imgs",
+   "file": "extras/facexlib/utils/face_restoration_helper.py",
+   "line": 91
+  },
+  {
+   "state": "self.to_kvs",
+   "file": "extras/ip_adapter.py",
+   "line": 44
+  },
+  {
+   "state": "ip_adapters",
+   "file": "extras/ip_adapter.py",
+   "line": 88
+  },
+  {
+   "state": "self.concept_embeds_weights",
+   "file": "extras/safety_checker/models/safety_checker.py",
+   "line": 47
+  },
+  {
+   "state": "self.special_care_embeds_weights",
+   "file": "extras/safety_checker/models/safety_checker.py",
+   "line": 48
+  },
+  {
+   "state": "self.hypernet",
+   "file": "ldm_patched/contrib/external_hypernetwork.py",
+   "line": 80
+  },
+  {
+   "state": "self.num_res_blocks",
+   "file": "ldm_patched/controlnet/cldm.py",
+   "line": 85
+  },
+  {
+   "state": "self.paths",
+   "file": "ldm_patched/k_diffusion/utils.py",
+   "line": 268
+  },
+  {
+   "state": "self.down",
+   "file": "ldm_patched/ldm/modules/diffusionmodules/model.py",
+   "line": 331
+  },
+  {
+   "state": "self.up",
+   "file": "ldm_patched/ldm/modules/diffusionmodules/model.py",
+   "line": 366
+  },
+  {
+   "state": "self.down",
+   "file": "ldm_patched/ldm/modules/diffusionmodules/model.py",
+   "line": 474
+  },
+  {
+   "state": "self.up",
+   "file": "ldm_patched/ldm/modules/diffusionmodules/model.py",
+   "line": 588
+  },
+  {
+   "state": "self.num_res_blocks",
+   "file": "ldm_patched/ldm/modules/diffusionmodules/openaimodel.py",
+   "line": 458
+  },
+  {
+   "state": "self.m_name2s_name",
+   "file": "ldm_patched/ldm/modules/ema.py",
+   "line": 11
+  },
+  {
+   "state": "self.time_mode",
+   "file": "ldm_patched/ldm/modules/temporal_ae.py",
+   "line": 223
+  },
+  {
+   "state": "protected",
+   "file": "ldm_patched/modules/diffusers_convert.py",
+   "line": 202
+  },
+  {
+   "state": "code2idx",
+   "file": "ldm_patched/modules/diffusers_convert.py",
+   "line": 206
+  },
+  {
+   "state": "self.module_list",
+   "file": "ldm_patched/modules/gligen.py",
+   "line": 243
+  },
+  {
+   "state": "self.patches",
+   "file": "ldm_patched/modules/model_patcher.py",
+   "line": 12
+  },
+  {
+   "state": "self.backup",
+   "file": "ldm_patched/modules/model_patcher.py",
+   "line": 13
+  },
+  {
+   "state": "self.object_patches",
+   "file": "ldm_patched/modules/model_patcher.py",
+   "line": 14
+  },
+  {
+   "state": "self.object_patches_backup",
+   "file": "ldm_patched/modules/model_patcher.py",
+   "line": 15
+  },
+  {
+   "state": "self.model_keys",
+   "file": "ldm_patched/modules/model_patcher.py",
+   "line": 32
+  },
+  {
+   "state": "self.inv_vocab",
+   "file": "ldm_patched/modules/sd1_clip.py",
+   "line": 376
+  },
+  {
+   "state": "self.key_arr",
+   "file": "ldm_patched/pfn/architecture/RRDB.py",
+   "line": 74
+  },
+  {
+   "state": "self.model",
+   "file": "ldm_patched/pfn/architecture/SPSR.py",
+   "line": 129
+  },
+  {
+   "state": "self.key_arr",
+   "file": "ldm_patched/pfn/architecture/SRVGG.py",
+   "line": 39
+  },
+  {
+   "state": "self.state",
+   "file": "ldm_patched/pfn/architecture/Swin2SR.py",
+   "line": 916
+  },
+  {
+   "state": "self.ch_mult",
+   "file": "ldm_patched/pfn/architecture/face/codeformer.py",
+   "line": 273
+  },
+  {
+   "state": "self.attn_resolutions",
+   "file": "ldm_patched/pfn/architecture/face/codeformer.py",
+   "line": 277
+  },
+  {
+   "state": "self.channels",
+   "file": "ldm_patched/pfn/architecture/face/codeformer.py",
+   "line": 680
+  },
+  {
+   "state": "self.fuse_encoder_block",
+   "file": "ldm_patched/pfn/architecture/face/codeformer.py",
+   "line": 690
+  },
+  {
+   "state": "self.fuse_generator_block",
+   "file": "ldm_patched/pfn/architecture/face/codeformer.py",
+   "line": 699
+  },
+  {
+   "state": "self.fuse_convs_dict",
+   "file": "ldm_patched/pfn/architecture/face/codeformer.py",
+   "line": 709
+  },
+  {
+   "state": "self.conv_body_down",
+   "file": "ldm_patched/pfn/architecture/face/gfpgan_bilinear_arch.py",
+   "line": 214
+  },
+  {
+   "state": "self.conv_body_up",
+   "file": "ldm_patched/pfn/architecture/face/gfpgan_bilinear_arch.py",
+   "line": 226
+  },
+  {
+   "state": "self.toRGB",
+   "file": "ldm_patched/pfn/architecture/face/gfpgan_bilinear_arch.py",
+   "line": 233
+  },
+  {
+   "state": "self.condition_scale",
+   "file": "ldm_patched/pfn/architecture/face/gfpgan_bilinear_arch.py",
+   "line": 285
+  },
+  {
+   "state": "self.condition_shift",
+   "file": "ldm_patched/pfn/architecture/face/gfpgan_bilinear_arch.py",
+   "line": 286
+  },
+  {
+   "state": "self.conv_body_down",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_arch.py",
+   "line": 311
+  },
+  {
+   "state": "self.conv_body_up",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_arch.py",
+   "line": 325
+  },
+  {
+   "state": "self.toRGB",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_arch.py",
+   "line": 332
+  },
+  {
+   "state": "self.condition_scale",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_arch.py",
+   "line": 385
+  },
+  {
+   "state": "self.condition_shift",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_arch.py",
+   "line": 386
+  },
+  {
+   "state": "self.conv_body_down",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_clean_arch.py",
+   "line": 245
+  },
+  {
+   "state": "self.conv_body_up",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_clean_arch.py",
+   "line": 255
+  },
+  {
+   "state": "self.toRGB",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_clean_arch.py",
+   "line": 262
+  },
+  {
+   "state": "self.condition_scale",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_clean_arch.py",
+   "line": 296
+  },
+  {
+   "state": "self.condition_shift",
+   "file": "ldm_patched/pfn/architecture/face/gfpganv1_clean_arch.py",
+   "line": 297
+  },
+  {
+   "state": "self.down",
+   "file": "ldm_patched/pfn/architecture/face/restoreformer_arch.py",
+   "line": 326
+  },
+  {
+   "state": "self.up",
+   "file": "ldm_patched/pfn/architecture/face/restoreformer_arch.py",
+   "line": 478
+  },
+  {
+   "state": "self.up",
+   "file": "ldm_patched/pfn/architecture/face/restoreformer_arch.py",
+   "line": 605
+  },
+  {
+   "state": "self.style_convs",
+   "file": "ldm_patched/pfn/architecture/face/stylegan2_arch.py",
+   "line": 527
+  },
+  {
+   "state": "self.style_convs",
+   "file": "ldm_patched/pfn/architecture/face/stylegan2_bilinear_arch.py",
+   "line": 382
+  },
+  {
+   "state": "self.style_convs",
+   "file": "ldm_patched/pfn/architecture/face/stylegan2_clean_arch.py",
+   "line": 314
+  },
+  {
+   "state": "self.style_embedding",
+   "file": "ldm_patched/t2ia/adapter.py",
+   "line": 205
+  },
+  {
+   "state": "folder_names_and_paths",
+   "file": "ldm_patched/utils/path_utils.py",
+   "line": 6
+  },
+  {
+   "state": "filename_list_cache",
+   "file": "ldm_patched/utils/path_utils.py",
+   "line": 41
+  },
+  {
+   "state": "self.cn_tasks",
+   "file": "modules/async_worker.py",
+   "line": 103
+  },
+  {
+   "state": "auth_dict",
+   "file": "modules/auth.py",
+   "line": 9
+  },
+  {
+   "state": "config_dict",
+   "file": "modules/config.py",
+   "line": 27
+  },
+  {
+   "state": "default_loras",
+   "file": "modules/config.py",
+   "line": 304
+  },
+  {
+   "state": "available_aspect_ratios",
+   "file": "modules/config.py",
+   "line": 478
+  },
+  {
+   "state": "default_ip_images",
+   "file": "modules/config.py",
+   "line": 514
+  },
+  {
+   "state": "default_ip_types",
+   "file": "modules/config.py",
+   "line": 517
+  },
+  {
+   "state": "VAE_approx_models",
+   "file": "modules/core.py",
+   "line": 219
+  },
+  {
+   "state": "loaded_ControlNets",
+   "file": "modules/default_pipeline.py",
+   "line": 28
+  },
+  {
+   "state": "hash_cache",
+   "file": "modules/hash_cache.py",
+   "line": 10
+  },
+  {
+   "state": "self.mask",
+   "file": "modules/inpaint_worker.py",
+   "line": 177
+  },
+  {
+   "state": "patch_settings",
+   "file": "modules/patch.py",
+   "line": 49
+  },
+  {
+   "state": "styles",
+   "file": "modules/sdxl_styles.py",
+   "line": 25
+  },
+  {
+   "state": "styles_files",
+   "file": "modules/sdxl_styles.py",
+   "line": 26
+  },
+  {
+   "state": "all_styles",
+   "file": "modules/style_sorter.py",
+   "line": 7
+  }
+ ],
+ "repo": "lllyasviel/Fooocus",
+ "stars": 48061
+}

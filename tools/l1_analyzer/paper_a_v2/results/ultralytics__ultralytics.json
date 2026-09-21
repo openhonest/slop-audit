@@ -1,0 +1,551 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.9,
+ "v1_mutable_ratio": 65.3,
+ "v1_details": "1740/2665 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1154,
+  "promiscuous": 104,
+  "unresolved": 853
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 739,
+   "drives_decision": 415
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 104
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 853
+  }
+ },
+ "v2_resolvable": 0.596,
+ "v2_promiscuous": [
+  {
+   "state": "self.color_palette",
+   "file": "examples/RTDETR-ONNXRuntime-Python/main.py",
+   "line": 126
+  },
+  {
+   "state": "self.classes",
+   "file": "examples/YOLOv8-ONNXRuntime/main.py",
+   "line": 63
+  },
+  {
+   "state": "self.color_palette",
+   "file": "examples/YOLOv8-ONNXRuntime/main.py",
+   "line": 66
+  },
+  {
+   "state": "colors",
+   "file": "examples/YOLOv8-OpenCV-ONNX-Python/main.py",
+   "line": 14
+  },
+  {
+   "state": "track_history",
+   "file": "examples/YOLOv8-Region-Counter/yolov8_region_counter.py",
+   "line": 19
+  },
+  {
+   "state": "self.transforms",
+   "file": "ultralytics/data/augment.py",
+   "line": 151
+  },
+  {
+   "state": "self.npy_files",
+   "file": "ultralytics/data/base.py",
+   "line": 135
+  },
+  {
+   "state": "self.batch_shapes",
+   "file": "ultralytics/data/base.py",
+   "line": 392
+  },
+  {
+   "state": "self.batch",
+   "file": "ultralytics/data/base.py",
+   "line": 393
+  },
+  {
+   "state": "self.img_shapes",
+   "file": "ultralytics/data/dataset.py",
+   "line": 1208
+  },
+  {
+   "state": "self.img_offsets",
+   "file": "ultralytics/data/dataset.py",
+   "line": 1209
+  },
+  {
+   "state": "self.img_cache",
+   "file": "ultralytics/data/dataset.py",
+   "line": 1210
+  },
+  {
+   "state": "self.frames",
+   "file": "ultralytics/data/loaders.py",
+   "line": 115
+  },
+  {
+   "state": "self.threads",
+   "file": "ultralytics/data/loaders.py",
+   "line": 116
+  },
+  {
+   "state": "self.caps",
+   "file": "ultralytics/data/loaders.py",
+   "line": 117
+  },
+  {
+   "state": "self.shape",
+   "file": "ultralytics/data/loaders.py",
+   "line": 119
+  },
+  {
+   "state": "self.sct",
+   "file": "ultralytics/data/loaders.py",
+   "line": 282
+  },
+  {
+   "state": "self.files",
+   "file": "ultralytics/data/loaders.py",
+   "line": 386
+  },
+  {
+   "state": "self.video_flag",
+   "file": "ultralytics/data/loaders.py",
+   "line": 389
+  },
+  {
+   "state": "self.callbacks",
+   "file": "ultralytics/engine/exporter.py",
+   "line": 556
+  },
+  {
+   "state": "self.callbacks",
+   "file": "ultralytics/engine/model.py",
+   "line": 108
+  },
+  {
+   "state": "self.vid_writer",
+   "file": "ultralytics/engine/predictor.py",
+   "line": 144
+  },
+  {
+   "state": "self.results",
+   "file": "ultralytics/engine/predictor.py",
+   "line": 153
+  },
+  {
+   "state": "self.callbacks",
+   "file": "ultralytics/engine/predictor.py",
+   "line": 155
+  },
+  {
+   "state": "self.masks",
+   "file": "ultralytics/engine/results.py",
+   "line": 279
+  },
+  {
+   "state": "self.keypoints",
+   "file": "ultralytics/engine/results.py",
+   "line": 281
+  },
+  {
+   "state": "self.names",
+   "file": "ultralytics/engine/results.py",
+   "line": 286
+  },
+  {
+   "state": "self.callbacks",
+   "file": "ultralytics/engine/trainer.py",
+   "line": 168
+  },
+  {
+   "state": "self.plot_idx",
+   "file": "ultralytics/engine/trainer.py",
+   "line": 202
+  },
+  {
+   "state": "self.mongodb",
+   "file": "ultralytics/engine/tuner.py",
+   "line": 137
+  },
+  {
+   "state": "self.collection",
+   "file": "ultralytics/engine/tuner.py",
+   "line": 203
+  },
+  {
+   "state": "self.callbacks",
+   "file": "ultralytics/engine/validator.py",
+   "line": 143
+  },
+  {
+   "state": "self.cache",
+   "file": "ultralytics/models/sam/modules/blocks.py",
+   "line": 711
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "ultralytics/models/sam/modules/decoders.py",
+   "line": 76
+  },
+  {
+   "state": "self.output_hypernetworks_mlps",
+   "file": "ultralytics/models/sam/modules/decoders.py",
+   "line": 275
+  },
+  {
+   "state": "self.fpn_top_down_levels",
+   "file": "ultralytics/models/sam/modules/encoders.py",
+   "line": 556
+  },
+  {
+   "state": "self.window_spec",
+   "file": "ultralytics/models/sam/modules/encoders.py",
+   "line": 693
+  },
+  {
+   "state": "self.stage_ends",
+   "file": "ultralytics/models/sam/modules/encoders.py",
+   "line": 697
+  },
+  {
+   "state": "self.q_pool_blocks",
+   "file": "ultralytics/models/sam/modules/encoders.py",
+   "line": 699
+  },
+  {
+   "state": "self.global_att_blocks",
+   "file": "ultralytics/models/sam/modules/encoders.py",
+   "line": 709
+  },
+  {
+   "state": "self.vision_feats",
+   "file": "ultralytics/models/sam/predict.py",
+   "line": 1998
+  },
+  {
+   "state": "self.vision_pos_embeds",
+   "file": "ultralytics/models/sam/predict.py",
+   "line": 1999
+  },
+  {
+   "state": "self.feat_sizes",
+   "file": "ultralytics/models/sam/predict.py",
+   "line": 2000
+  },
+  {
+   "state": "self.coord_cache",
+   "file": "ultralytics/models/sam/sam3/decoder.py",
+   "line": 265
+  },
+  {
+   "state": "self.level_embed",
+   "file": "ultralytics/models/sam/sam3/encoder.py",
+   "line": 268
+  },
+  {
+   "state": "self.conv_layers",
+   "file": "ultralytics/models/sam/sam3/maskformer_segmentation.py",
+   "line": 166
+  },
+  {
+   "state": "self.norms",
+   "file": "ultralytics/models/sam/sam3/maskformer_segmentation.py",
+   "line": 167
+  },
+  {
+   "state": "self.positional_embedding",
+   "file": "ultralytics/models/sam/sam3/text_encoder_ve.py",
+   "line": 178
+  },
+  {
+   "state": "self.full_attn_ids",
+   "file": "ultralytics/models/sam/sam3/vitdet.py",
+   "line": 392
+  },
+  {
+   "state": "self.class_map",
+   "file": "ultralytics/models/yolo/detect/val.py",
+   "line": 56
+  },
+  {
+   "state": "self.names",
+   "file": "ultralytics/models/yolo/detect/val.py",
+   "line": 92
+  },
+  {
+   "state": "self.text_embeddings",
+   "file": "ultralytics/models/yolo/world/train.py",
+   "line": 66
+  },
+  {
+   "state": "self.training_data",
+   "file": "ultralytics/models/yolo/world/train_world.py",
+   "line": 90
+  },
+  {
+   "state": "self.input_info",
+   "file": "ultralytics/nn/backends/hailo.py",
+   "line": 57
+  },
+  {
+   "state": "self.device",
+   "file": "ultralytics/nn/backends/tensorflow.py",
+   "line": 90
+  },
+  {
+   "state": "self.bindings",
+   "file": "ultralytics/nn/backends/tensorrt.py",
+   "line": 71
+  },
+  {
+   "state": "self.feats_idx",
+   "file": "ultralytics/nn/distill_model.py",
+   "line": 82
+  },
+  {
+   "state": "self.projector",
+   "file": "ultralytics/nn/distill_model.py",
+   "line": 115
+  },
+  {
+   "state": "self.idx",
+   "file": "ultralytics/nn/modules/block.py",
+   "line": 1026
+  },
+  {
+   "state": "self.cv1",
+   "file": "ultralytics/nn/modules/block.py",
+   "line": 1934
+  },
+  {
+   "state": "self.cv2",
+   "file": "ultralytics/nn/modules/block.py",
+   "line": 1941
+  },
+  {
+   "state": "self.s",
+   "file": "ultralytics/nn/modules/block.py",
+   "line": 2047
+  },
+  {
+   "state": "self.proj",
+   "file": "ultralytics/nn/modules/head.py",
+   "line": 818
+  },
+  {
+   "state": "self.refine",
+   "file": "ultralytics/nn/modules/head.py",
+   "line": 821
+  },
+  {
+   "state": "self.cv3",
+   "file": "ultralytics/nn/modules/head.py",
+   "line": 966
+  },
+  {
+   "state": "self.cv4",
+   "file": "ultralytics/nn/modules/head.py",
+   "line": 967
+  },
+  {
+   "state": "self.input_proj",
+   "file": "ultralytics/nn/modules/head.py",
+   "line": 1604
+  },
+  {
+   "state": "self.weight",
+   "file": "ultralytics/nn/modules/transformer.py",
+   "line": 443
+  },
+  {
+   "state": "self.bias",
+   "file": "ultralytics/nn/modules/transformer.py",
+   "line": 444
+  },
+  {
+   "state": "self.states",
+   "file": "ultralytics/solutions/ai_gym.py",
+   "line": 42
+  },
+  {
+   "state": "self.color_mapping",
+   "file": "ultralytics/solutions/analytics.py",
+   "line": 90
+  },
+  {
+   "state": "self.counted_ids",
+   "file": "ultralytics/solutions/object_counter.py",
+   "line": 46
+  },
+  {
+   "state": "self.CFG",
+   "file": "ultralytics/solutions/solutions.py",
+   "line": 82
+  },
+  {
+   "state": "self.names",
+   "file": "ultralytics/solutions/solutions.py",
+   "line": 112
+  },
+  {
+   "state": "self.track_history",
+   "file": "ultralytics/solutions/solutions.py",
+   "line": 132
+  },
+  {
+   "state": "self.trk_frame_ids",
+   "file": "ultralytics/solutions/speed_estimation.py",
+   "line": 53
+  },
+  {
+   "state": "self.spd",
+   "file": "ultralytics/solutions/speed_estimation.py",
+   "line": 54
+  },
+  {
+   "state": "self.trk_hist",
+   "file": "ultralytics/solutions/speed_estimation.py",
+   "line": 55
+  },
+  {
+   "state": "self.observations",
+   "file": "ultralytics/trackers/oc_sort.py",
+   "line": 40
+  },
+  {
+   "state": "self._history",
+   "file": "ultralytics/trackers/track_tracker.py",
+   "line": 252
+  },
+  {
+   "state": "_formats",
+   "file": "ultralytics/utils/instance.py",
+   "line": 30
+  },
+  {
+   "state": "self._bboxes",
+   "file": "ultralytics/utils/instance.py",
+   "line": 234
+  },
+  {
+   "state": "self.keypoints",
+   "file": "ultralytics/utils/instance.py",
+   "line": 235
+  },
+  {
+   "state": "self.segments",
+   "file": "ultralytics/utils/instance.py",
+   "line": 237
+  },
+  {
+   "state": "self.matrix",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 358
+  },
+  {
+   "state": "self.matches",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 364
+  },
+  {
+   "state": "self.p",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 920
+  },
+  {
+   "state": "self.r",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 921
+  },
+  {
+   "state": "self.all_ap",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 923
+  },
+  {
+   "state": "self.names",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 1129
+  },
+  {
+   "state": "self.stats",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 1132
+  },
+  {
+   "state": "self.nt_per_class",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 1133
+  },
+  {
+   "state": "self.nt_per_image",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 1134
+  },
+  {
+   "state": "self.nt_per_image",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 1701
+  },
+  {
+   "state": "self._per_class_pixel_acc",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 1705
+  },
+  {
+   "state": "self.nt_per_class",
+   "file": "ultralytics/utils/metrics.py",
+   "line": 1706
+  },
+  {
+   "state": "self.palette",
+   "file": "ultralytics/utils/plotting.py",
+   "line": 139
+  },
+  {
+   "state": "self.limb_color",
+   "file": "ultralytics/utils/plotting.py",
+   "line": 359
+  },
+  {
+   "state": "self.kpt_color",
+   "file": "ultralytics/utils/plotting.py",
+   "line": 360
+  },
+  {
+   "state": "self.dark_colors",
+   "file": "ultralytics/utils/plotting.py",
+   "line": 361
+  },
+  {
+   "state": "self.light_colors",
+   "file": "ultralytics/utils/plotting.py",
+   "line": 372
+  },
+  {
+   "state": "self.input_formats",
+   "file": "ultralytics/utils/triton.py",
+   "line": 79
+  },
+  {
+   "state": "self.np_input_formats",
+   "file": "ultralytics/utils/triton.py",
+   "line": 80
+  },
+  {
+   "state": "self.input_names",
+   "file": "ultralytics/utils/triton.py",
+   "line": 81
+  }
+ ],
+ "repo": "ultralytics/ultralytics",
+ "stars": 55831
+}

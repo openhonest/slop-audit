@@ -245,3 +245,112 @@ def test_rust_refuses_a_directory_with_no_crate(tmp_path):
     result = rust_trace.decision_space_coverage(tmp_path, 60.0, ())
     assert result["band"] == "n/a"
     assert result["details"].strip()
+
+
+# --------------------------------------------------------------------------
+# C#: `dotnet test --collect "XPlat Code Coverage"` and a Cobertura report
+#
+# This fixture restores NuGet packages, so it reaches the network on a machine whose cache
+# is cold. Go, C and Rust above need nothing; this one does, and saying so beats a comment
+# claiming the whole file is offline when one quarter of it is not.
+#
+# Two projects and a solution file, because that is the shape a C# repository has and the
+# harness runs `dotnet test` at the repository root. A single test project put the code
+# under test inside the test assembly, which coverlet excludes, and the harness said so in
+# as many words; that refusal is held below rather than designed around.
+# --------------------------------------------------------------------------
+
+def _dotnet_project(root: pathlib.Path) -> pathlib.Path:
+    """A library with three branches and a test that reaches one of them.
+
+    Scaffolded with `dotnet new` rather than written out, because the template carries the
+    package references and the target framework this SDK expects, and pinning either here
+    would make the fixture stale the next time the SDK moves."""
+    lib, tests = root / "lib", root / "tests"
+    lib.mkdir()
+    tests.mkdir()
+    subprocess.run(["dotnet", "new", "classlib", "-o", "."], cwd=lib, check=True,
+                   capture_output=True)
+    subprocess.run(["dotnet", "new", "xunit", "-o", "."], cwd=tests, check=True,
+                   capture_output=True)
+    (lib / "Class1.cs").unlink(missing_ok=True)
+    (tests / "UnitTest1.cs").unlink(missing_ok=True)
+    _write(root, {
+        "lib/Classify.cs": '''
+            namespace Lib;
+
+            public static class Classify
+            {
+                public static string Band(int n)
+                {
+                    if (n < 0) { return "neg"; }
+                    if (n == 0) { return "zero"; }
+                    return "pos";
+                }
+            }
+        ''',
+        "tests/ClassifyTests.cs": '''
+            using Lib;
+
+            namespace Tests;
+
+            public class ClassifyTests
+            {
+                [Fact]
+                public void PositiveIsPositive() { Assert.Equal("pos", Classify.Band(3)); }
+            }
+        ''',
+    })
+    subprocess.run(["dotnet", "add", "reference", str(lib / "lib.csproj")],
+                   cwd=tests, check=True, capture_output=True)
+    # The solution file through `dotnet` rather than written out. A hand-rolled one parsed
+    # and then produced no coverage, and the harness reported that as a missing collector,
+    # which sent the reader to the test project rather than to the solution.
+    subprocess.run(["dotnet", "new", "sln", "-n", "fixture"], cwd=root, check=True,
+                   capture_output=True)
+    subprocess.run(["dotnet", "sln", "add", str(lib / "lib.csproj"), str(tests / "tests.csproj")],
+                   cwd=root, check=True, capture_output=True)
+    return root
+
+
+@pytest.fixture(scope="module")
+def csharp_project(tmp_path_factory) -> pathlib.Path:
+    return _dotnet_project(tmp_path_factory.mktemp("csharp"))
+
+
+@pytest.mark.skipif(shutil.which("dotnet") is None, reason="dotnet is not on PATH")
+def test_csharp_coverage_is_read_from_a_real_cobertura_report(csharp_project):
+    """The whole path: build, run the suite, drive the data collector, find the report it
+    wrote and read its branch counts. Every one of those steps was proved only through a
+    fake before this."""
+    from l1_analyzer import csharp_trace
+
+    result = csharp_trace.decision_space_coverage(csharp_project, 900.0, None)
+    assert result["band"] != "n/a", result["details"]
+    assert result["value"] == 50.0, result["details"]
+    assert "2/4 decision branches" in result["details"]
+    assert "dotnet" in result["details"], "the reading does not name the runtime that took it"
+
+
+@pytest.mark.skipif(shutil.which("dotnet") is None, reason="dotnet is not on PATH")
+def test_csharp_determinism_counts_every_run(csharp_project):
+    """`dotnet test` has no seed flag, so the runs vary by scheduler rather than by seed and
+    the sentence has to say which. A reader comparing this against a language that does seed
+    its runs would otherwise read the same words for two different guarantees."""
+    from l1_analyzer import csharp_trace
+
+    result = csharp_trace.test_determinism(csharp_project, 3, 900.0, runtime_override=None)
+    assert result["value"] == "3/3"
+    assert result["band"] == "Healthy"
+    assert "not seed-controlled" in result["details"]
+
+
+@pytest.mark.skipif(shutil.which("dotnet") is None, reason="dotnet is not on PATH")
+def test_csharp_refuses_a_directory_with_no_project(tmp_path):
+    """The refusal beside the measurement, so a real run tells them apart rather than which
+    of the two somebody remembered to test."""
+    from l1_analyzer import csharp_trace
+
+    result = csharp_trace.decision_space_coverage(tmp_path, 120.0, None)
+    assert result["band"] == "n/a"
+    assert result["details"].strip()

@@ -1,0 +1,276 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.6,
+ "v1_mutable_ratio": 51.5,
+ "v1_details": "916/1777 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 597,
+  "promiscuous": 49,
+  "unresolved": 103
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 403,
+   "drives_decision": 194
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 49
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 103
+  }
+ },
+ "v2_resolvable": 0.862,
+ "v2_promiscuous": [
+  {
+   "state": "self.file_paths",
+   "file": "crazy_functions/Latex_Project_Translate_Legacy.py",
+   "line": 7
+  },
+  {
+   "state": "self.results",
+   "file": "crazy_functions/Paper_Reading.py",
+   "line": 35
+  },
+  {
+   "state": "RAG_WORKER_REGISTER",
+   "file": "crazy_functions/Rag_Interface.py",
+   "line": 12
+  },
+  {
+   "state": "SOCIAL_NETWORK_WORKER_REGISTER",
+   "file": "crazy_functions/Social_Helper.py",
+   "line": 12
+  },
+  {
+   "state": "self.tools_to_select",
+   "file": "crazy_functions/Social_Helper.py",
+   "line": 87
+  },
+  {
+   "state": "self.file_paths",
+   "file": "crazy_functions/SourceCode_Analyse_JupyterNotebook.py",
+   "line": 9
+  },
+  {
+   "state": "explain_intention_to_user",
+   "file": "crazy_functions/Void_Terminal.py",
+   "line": 79
+  },
+  {
+   "state": "self.mapping",
+   "file": "crazy_functions/agent_fns/persistent.py",
+   "line": 5
+  },
+  {
+   "state": "self.previous_work_dir_files",
+   "file": "crazy_functions/agent_fns/pipe.py",
+   "line": 16
+  },
+  {
+   "state": "self.chatbot",
+   "file": "crazy_functions/agent_fns/pipe.py",
+   "line": 19
+  },
+  {
+   "state": "self.full_context_with_line_no",
+   "file": "crazy_functions/agent_fns/python_comment_agent.py",
+   "line": 182
+  },
+  {
+   "state": "self.parenting_ship",
+   "file": "crazy_functions/diagram_fns/file_tree.py",
+   "line": 11
+  },
+  {
+   "state": "self.workbook",
+   "file": "crazy_functions/doc_fns/conversation_doc/excel_doc.py",
+   "line": 13
+  },
+  {
+   "state": "self.chatbot",
+   "file": "crazy_functions/doc_fns/text_content_loader.py",
+   "line": 44
+  },
+  {
+   "state": "self.file_cache",
+   "file": "crazy_functions/doc_fns/text_content_loader.py",
+   "line": 49
+  },
+  {
+   "state": "self.safe_classes",
+   "file": "crazy_functions/latex_fns/latex_pickle_io.py",
+   "line": 24
+  },
+  {
+   "state": "self.data",
+   "file": "crazy_functions/live_audio/audio_io.py",
+   "line": 18
+  },
+  {
+   "state": "self.analysis_results",
+   "file": "crazy_functions/paper_fns/journal_paper_recom.py",
+   "line": 38
+  },
+  {
+   "state": "supports_format",
+   "file": "crazy_functions/rag_fns/rag_file_support.py",
+   "line": 4
+  },
+  {
+   "state": "self.workbook",
+   "file": "crazy_functions/review_fns/conversation_doc/excel_doc.py",
+   "line": 13
+  },
+  {
+   "state": "self.sort_options",
+   "file": "crazy_functions/review_fns/data_sources/arxiv_source.py",
+   "line": 168
+  },
+  {
+   "state": "self.sort_order_options",
+   "file": "crazy_functions/review_fns/data_sources/arxiv_source.py",
+   "line": 174
+  },
+  {
+   "state": "colors",
+   "file": "request_llms/bridge_all.py",
+   "line": 49
+  },
+  {
+   "state": "openai_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 73
+  },
+  {
+   "state": "api2d_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 74
+  },
+  {
+   "state": "newbing_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 75
+  },
+  {
+   "state": "gemini_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 76
+  },
+  {
+   "state": "claude_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 77
+  },
+  {
+   "state": "cohere_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 78
+  },
+  {
+   "state": "ollama_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 79
+  },
+  {
+   "state": "yimodel_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 80
+  },
+  {
+   "state": "deepseekapi_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 81
+  },
+  {
+   "state": "grok_model_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 82
+  },
+  {
+   "state": "volcengine_endpoint",
+   "file": "request_llms/bridge_all.py",
+   "line": 83
+  },
+  {
+   "state": "model_info",
+   "file": "request_llms/bridge_all.py",
+   "line": 119
+  },
+  {
+   "state": "claude_models",
+   "file": "request_llms/bridge_all.py",
+   "line": 648
+  },
+  {
+   "state": "qwen_models",
+   "file": "request_llms/bridge_all.py",
+   "line": 872
+  },
+  {
+   "state": "yi_models",
+   "file": "request_llms/bridge_all.py",
+   "line": 978
+  },
+  {
+   "state": "grok_models",
+   "file": "request_llms/bridge_all.py",
+   "line": 1060
+  },
+  {
+   "state": "self.text_tokenizer",
+   "file": "request_llms/chatglmoonx.py",
+   "line": 169
+  },
+  {
+   "state": "openai_endpoint",
+   "file": "request_llms/embed_models/bridge_all_embed.py",
+   "line": 8
+  },
+  {
+   "state": "self.llm_model_already_running",
+   "file": "request_llms/local_llm_class.py",
+   "line": 34
+  },
+  {
+   "state": "self._event_hub",
+   "file": "shared_utils/fastapi_stream_server.py",
+   "line": 442
+  },
+  {
+   "state": "mapping_dic",
+   "file": "shared_utils/map_names.py",
+   "line": 2
+  },
+  {
+   "state": "rev_mapping_dic",
+   "file": "shared_utils/map_names.py",
+   "line": 9
+  },
+  {
+   "state": "self._collections",
+   "file": "shared_utils/nltk_downloader.py",
+   "line": 488
+  },
+  {
+   "state": "self._packages",
+   "file": "shared_utils/nltk_downloader.py",
+   "line": 491
+  },
+  {
+   "state": "self._status_cache",
+   "file": "shared_utils/nltk_downloader.py",
+   "line": 504
+  },
+  {
+   "state": "self._info",
+   "file": "shared_utils/nltk_downloader.py",
+   "line": 1498
+  }
+ ],
+ "repo": "binary-husky/gpt_academic",
+ "stars": 70419
+}

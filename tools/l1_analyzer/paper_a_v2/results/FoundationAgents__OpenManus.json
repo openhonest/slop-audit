@@ -1,0 +1,71 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.2,
+ "v1_mutable_ratio": 73.7,
+ "v1_details": "275/373 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 100,
+  "promiscuous": 8,
+  "unresolved": 18
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 67,
+   "drives_decision": 33
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 8
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 18
+  }
+ },
+ "v2_resolvable": 0.857,
+ "v2_promiscuous": [
+  {
+   "state": "self.memory",
+   "file": "app/agent/base.py",
+   "line": 54
+  },
+  {
+   "state": "self.sandbox_link",
+   "file": "app/agent/sandbox_agent.py",
+   "line": 92
+  },
+  {
+   "state": "self.messages",
+   "file": "app/agent/toolcall.py",
+   "line": 43
+  },
+  {
+   "state": "self._sandboxes",
+   "file": "app/sandbox/core/manager.py",
+   "line": 50
+  },
+  {
+   "state": "self._locks",
+   "file": "app/sandbox/core/manager.py",
+   "line": 54
+  },
+  {
+   "state": "self._active_operations",
+   "file": "app/sandbox/core/manager.py",
+   "line": 56
+  },
+  {
+   "state": "self.messages",
+   "file": "app/schema.py",
+   "line": 165
+  },
+  {
+   "state": "self.tool_map",
+   "file": "app/tool/tool_collection.py",
+   "line": 17
+  }
+ ],
+ "repo": "FoundationAgents/OpenManus",
+ "stars": 55729
+}

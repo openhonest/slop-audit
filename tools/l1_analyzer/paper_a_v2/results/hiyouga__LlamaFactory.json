@@ -1,0 +1,126 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.5,
+ "v1_mutable_ratio": 43.5,
+ "v1_details": "638/1467 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 317,
+  "promiscuous": 19,
+  "unresolved": 111
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 238,
+   "drives_decision": 79
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 19
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 111
+  }
+ },
+ "v2_resolvable": 0.752,
+ "v2_promiscuous": [
+  {
+   "state": "TEMPLATES",
+   "file": "src/llamafactory/data/template.py",
+   "line": 487
+  },
+  {
+   "state": "self.experts",
+   "file": "src/llamafactory/model/model_utils/moe.py",
+   "line": 220
+  },
+  {
+   "state": "COMPOSITE_MODELS",
+   "file": "src/llamafactory/model/model_utils/visual.py",
+   "line": 65
+  },
+  {
+   "state": "self._forward_times",
+   "file": "src/llamafactory/train/callbacks.py",
+   "line": 517
+  },
+  {
+   "state": "self._backward_times",
+   "file": "src/llamafactory/train/callbacks.py",
+   "line": 518
+  },
+  {
+   "state": "self._stored_metrics",
+   "file": "src/llamafactory/train/dpo/trainer.py",
+   "line": 76
+  },
+  {
+   "state": "self._stored_metrics",
+   "file": "src/llamafactory/train/kto/trainer.py",
+   "line": 74
+  },
+  {
+   "state": "self.score_dict",
+   "file": "src/llamafactory/train/sft/metric.py",
+   "line": 99
+  },
+  {
+   "state": "self.strategy",
+   "file": "src/llamafactory/v1/accelerator/interface.py",
+   "line": 152
+  },
+  {
+   "state": "self.model_device_mesh",
+   "file": "src/llamafactory/v1/accelerator/interface.py",
+   "line": 165
+  },
+  {
+   "state": "self.data_device_mesh",
+   "file": "src/llamafactory/v1/accelerator/interface.py",
+   "line": 170
+  },
+  {
+   "state": "self.datasets",
+   "file": "src/llamafactory/v1/core/data_engine.py",
+   "line": 57
+  },
+  {
+   "state": "self.dataset_infos",
+   "file": "src/llamafactory/v1/core/data_engine.py",
+   "line": 59
+  },
+  {
+   "state": "self._dummy_fragments",
+   "file": "src/llamafactory/v1/core/rendering/rendering.py",
+   "line": 216
+  },
+  {
+   "state": "self._buffer",
+   "file": "src/llamafactory/v1/utils/objects.py",
+   "line": 25
+  },
+  {
+   "state": "self.name",
+   "file": "src/llamafactory/v1/utils/plugin.py",
+   "line": 54
+  },
+  {
+   "state": "self._id_to_elem",
+   "file": "src/llamafactory/webui/manager.py",
+   "line": 27
+  },
+  {
+   "state": "self._elem_to_id",
+   "file": "src/llamafactory/webui/manager.py",
+   "line": 28
+  },
+  {
+   "state": "self.running_data",
+   "file": "src/llamafactory/webui/runner.py",
+   "line": 71
+  }
+ ],
+ "repo": "hiyouga/LlamaFactory",
+ "stars": 70027
+}

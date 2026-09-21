@@ -1,0 +1,196 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.5,
+ "v1_mutable_ratio": 55.8,
+ "v1_details": "1235/2213 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 623,
+  "promiscuous": 33,
+  "unresolved": 121
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 421,
+   "drives_decision": 202
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 33
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 121
+  }
+ },
+ "v2_resolvable": 0.844,
+ "v2_promiscuous": [
+  {
+   "state": "self.state",
+   "file": "browser_use/agent/message_manager/service.py",
+   "line": 128
+  },
+  {
+   "state": "self.id",
+   "file": "browser_use/agent/service.py",
+   "line": 278
+  },
+  {
+   "state": "self.task_id",
+   "file": "browser_use/agent/service.py",
+   "line": 279
+  },
+  {
+   "state": "self.session_id",
+   "file": "browser_use/agent/service.py",
+   "line": 280
+  },
+  {
+   "state": "self.recent_action_hashes",
+   "file": "browser_use/agent/views.py",
+   "line": 181
+  },
+  {
+   "state": "self.recent_page_fingerprints",
+   "file": "browser_use/agent/views.py",
+   "line": 190
+  },
+  {
+   "state": "self.stderr_lines",
+   "file": "browser_use/beta/service.py",
+   "line": 335
+  },
+  {
+   "state": "self.notifications",
+   "file": "browser_use/beta/service.py",
+   "line": 336
+  },
+  {
+   "state": "self.task_id",
+   "file": "browser_use/beta/service.py",
+   "line": 4334
+  },
+  {
+   "state": "self.session_id",
+   "file": "browser_use/beta/service.py",
+   "line": 4527
+  },
+  {
+   "state": "_FONT_CACHE",
+   "file": "browser_use/browser/python_highlights.py",
+   "line": 22
+  },
+  {
+   "state": "self._cached_selector_map",
+   "file": "browser_use/browser/session.py",
+   "line": 662
+  },
+  {
+   "state": "self._targets",
+   "file": "browser_use/browser/session_manager.py",
+   "line": 38
+  },
+  {
+   "state": "self._sessions",
+   "file": "browser_use/browser/session_manager.py",
+   "line": 41
+  },
+  {
+   "state": "self._target_sessions",
+   "file": "browser_use/browser/session_manager.py",
+   "line": 44
+  },
+  {
+   "state": "self._session_to_target",
+   "file": "browser_use/browser/session_manager.py",
+   "line": 47
+  },
+  {
+   "state": "self._entries",
+   "file": "browser_use/browser/watchdogs/har_recording_watchdog.py",
+   "line": 153
+  },
+  {
+   "state": "self._top_level_pages",
+   "file": "browser_use/browser/watchdogs/har_recording_watchdog.py",
+   "line": 154
+  },
+  {
+   "state": "self._rects",
+   "file": "browser_use/dom/serializer/paint_order.py",
+   "line": 55
+  },
+  {
+   "state": "self._clickable_cache",
+   "file": "browser_use/dom/serializer/serializer.py",
+   "line": 83
+  },
+  {
+   "state": "self._next_synthetic_index",
+   "file": "browser_use/dom/serializer/serializer.py",
+   "line": 85
+  },
+  {
+   "state": "self.files",
+   "file": "browser_use/filesystem/file_system.py",
+   "line": 380
+  },
+  {
+   "state": "INIT_TEMPLATES",
+   "file": "browser_use/init_cmd.py",
+   "line": 32
+  },
+  {
+   "state": "_model_cache",
+   "file": "browser_use/llm/__init__.py",
+   "line": 100
+  },
+  {
+   "state": "ToolCallingModels",
+   "file": "browser_use/llm/groq/chat.py",
+   "line": 46
+  },
+  {
+   "state": "self._registered_actions",
+   "file": "browser_use/mcp/client.py",
+   "line": 75
+  },
+  {
+   "state": "self._registered_actions",
+   "file": "browser_use/mcp/controller.py",
+   "line": 48
+  },
+  {
+   "state": "self.active_sessions",
+   "file": "browser_use/mcp/server.py",
+   "line": 205
+  },
+  {
+   "state": "self.registered_llms",
+   "file": "browser_use/tokens/service.py",
+   "line": 61
+  },
+  {
+   "state": "self._pricing_data",
+   "file": "browser_use/tokens/service.py",
+   "line": 63
+  },
+  {
+   "state": "self.registry",
+   "file": "browser_use/tools/registry/service.py",
+   "line": 37
+  },
+  {
+   "state": "self.exclude_actions",
+   "file": "browser_use/tools/registry/service.py",
+   "line": 40
+  },
+  {
+   "state": "self.processed_events",
+   "file": "examples/integrations/slack/slack_api.py",
+   "line": 45
+  }
+ ],
+ "repo": "browser-use/browser-use",
+ "stars": 87569
+}

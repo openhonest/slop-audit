@@ -1,0 +1,451 @@
+{
+ "status": "ok",
+ "clone_seconds": 1.3,
+ "v1_mutable_ratio": 57.8,
+ "v1_details": "2936/5077 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1211,
+  "promiscuous": 84,
+  "unresolved": 312
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 832,
+   "drives_decision": 379
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 84
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 312
+  }
+ },
+ "v2_resolvable": 0.806,
+ "v2_promiscuous": [
+  {
+   "state": "self._seen",
+   "file": "lib/ansible/_internal/_display_utils.py",
+   "line": 23
+  },
+  {
+   "state": "self._stack",
+   "file": "lib/ansible/_internal/_json/__init__.py",
+   "line": 42
+  },
+  {
+   "state": "self._tripped_deprecation_info",
+   "file": "lib/ansible/_internal/_templating/_datatag.py",
+   "line": 44
+  },
+  {
+   "state": "self._jinja_builtins",
+   "file": "lib/ansible/_internal/_templating/_jinja_plugins.py",
+   "line": 48
+  },
+  {
+   "state": "self.args",
+   "file": "lib/ansible/cli/__init__.py",
+   "line": 151
+  },
+  {
+   "state": "PB_LOADED",
+   "file": "lib/ansible/cli/doc.py",
+   "line": 55
+  },
+  {
+   "state": "ref_style",
+   "file": "lib/ansible/cli/doc.py",
+   "line": 79
+  },
+  {
+   "state": "self._plugins",
+   "file": "lib/ansible/config/manager.py",
+   "line": 341
+  },
+  {
+   "state": "self._parsers",
+   "file": "lib/ansible/config/manager.py",
+   "line": 342
+  },
+  {
+   "state": "self.handlers",
+   "file": "lib/ansible/executor/play_iterator.py",
+   "line": 61
+  },
+  {
+   "state": "self.handler_notifications",
+   "file": "lib/ansible/executor/play_iterator.py",
+   "line": 63
+  },
+  {
+   "state": "self.handlers",
+   "file": "lib/ansible/executor/play_iterator.py",
+   "line": 215
+  },
+  {
+   "state": "self._host_states",
+   "file": "lib/ansible/executor/play_iterator.py",
+   "line": 217
+  },
+  {
+   "state": "self.scripts",
+   "file": "lib/ansible/executor/powershell/module_manifest.py",
+   "line": 57
+  },
+  {
+   "state": "self._util_deps",
+   "file": "lib/ansible/executor/powershell/module_manifest.py",
+   "line": 64
+  },
+  {
+   "state": "self.custom",
+   "file": "lib/ansible/executor/stats.py",
+   "line": 40
+  },
+  {
+   "state": "self._workers",
+   "file": "lib/ansible/executor/task_queue_manager.py",
+   "line": 206
+  },
+  {
+   "state": "self.roles",
+   "file": "lib/ansible/galaxy/__init__.py",
+   "line": 53
+  },
+  {
+   "state": "self._artifact_cache",
+   "file": "lib/ansible/galaxy/collection/concrete_artifact_manager.py",
+   "line": 72
+  },
+  {
+   "state": "self._galaxy_artifact_cache",
+   "file": "lib/ansible/galaxy/collection/concrete_artifact_manager.py",
+   "line": 73
+  },
+  {
+   "state": "self._artifact_meta_cache",
+   "file": "lib/ansible/galaxy/collection/concrete_artifact_manager.py",
+   "line": 74
+  },
+  {
+   "state": "self._galaxy_collection_cache",
+   "file": "lib/ansible/galaxy/collection/concrete_artifact_manager.py",
+   "line": 75
+  },
+  {
+   "state": "self._preferred_candidates",
+   "file": "lib/ansible/galaxy/dependency_resolution/providers.py",
+   "line": 95
+  },
+  {
+   "state": "self.reject_count_by_fqcn",
+   "file": "lib/ansible/galaxy/dependency_resolution/reporters.py",
+   "line": 60
+  },
+  {
+   "state": "self.groups",
+   "file": "lib/ansible/inventory/data.py",
+   "line": 46
+  },
+  {
+   "state": "self.hosts",
+   "file": "lib/ansible/inventory/data.py",
+   "line": 47
+  },
+  {
+   "state": "self.groups",
+   "file": "lib/ansible/inventory/host.py",
+   "line": 63
+  },
+  {
+   "state": "self._hosts_patterns_cache",
+   "file": "lib/ansible/inventory/manager.py",
+   "line": 161
+  },
+  {
+   "state": "self._pattern_cache",
+   "file": "lib/ansible/inventory/manager.py",
+   "line": 162
+  },
+  {
+   "state": "_untaggable_types",
+   "file": "lib/ansible/module_utils/_internal/_datatag/__init__.py",
+   "line": 177
+  },
+  {
+   "state": "_known_tag_types",
+   "file": "lib/ansible/module_utils/_internal/_datatag/__init__.py",
+   "line": 186
+  },
+  {
+   "state": "self.errors",
+   "file": "lib/ansible/module_utils/errors.py",
+   "line": 30
+  },
+  {
+   "state": "self.sysctl",
+   "file": "lib/ansible/module_utils/facts/hardware/netbsd.py",
+   "line": 49
+  },
+  {
+   "state": "self.sysctl",
+   "file": "lib/ansible/module_utils/facts/hardware/openbsd.py",
+   "line": 49
+  },
+  {
+   "state": "self.known_modules",
+   "file": "lib/ansible/module_utils/six/__init__.py",
+   "line": 199
+  },
+  {
+   "state": "self.files",
+   "file": "lib/ansible/modules/apt_repository.py",
+   "line": 234
+  },
+  {
+   "state": "self.files_mapping",
+   "file": "lib/ansible/modules/apt_repository.py",
+   "line": 235
+  },
+  {
+   "state": "self.new_repos",
+   "file": "lib/ansible/modules/apt_repository.py",
+   "line": 237
+  },
+  {
+   "state": "op_dict",
+   "file": "lib/ansible/modules/pip.py",
+   "line": 345
+  },
+  {
+   "state": "self.pattern",
+   "file": "lib/ansible/modules/service.py",
+   "line": 211
+  },
+  {
+   "state": "self.excludes",
+   "file": "lib/ansible/modules/unarchive.py",
+   "line": 329
+  },
+  {
+   "state": "self._infodict",
+   "file": "lib/ansible/modules/unarchive.py",
+   "line": 335
+  },
+  {
+   "state": "self.ips",
+   "file": "lib/ansible/modules/wait_for.py",
+   "line": 292
+  },
+  {
+   "state": "self.exclude_ips",
+   "file": "lib/ansible/modules/wait_for.py",
+   "line": 294
+  },
+  {
+   "state": "self.ips",
+   "file": "lib/ansible/modules/wait_for.py",
+   "line": 372
+  },
+  {
+   "state": "self.exclude_ips",
+   "file": "lib/ansible/modules/wait_for.py",
+   "line": 374
+  },
+  {
+   "state": "self._FILE_CACHE",
+   "file": "lib/ansible/parsing/dataloader.py",
+   "line": 61
+  },
+  {
+   "state": "string_to_vars",
+   "file": "lib/ansible/parsing/plugin_docs.py",
+   "line": 20
+  },
+  {
+   "state": "patterns",
+   "file": "lib/ansible/parsing/utils/addresses.py",
+   "line": 81
+  },
+  {
+   "state": "self._entries",
+   "file": "lib/ansible/playbook/__init__.py",
+   "line": 42
+  },
+  {
+   "state": "self.notified_hosts",
+   "file": "lib/ansible/playbook/handler.py",
+   "line": 30
+  },
+  {
+   "state": "self.role_cache",
+   "file": "lib/ansible/playbook/play.py",
+   "line": 99
+  },
+  {
+   "state": "self._dependencies",
+   "file": "lib/ansible/playbook/role/__init__.py",
+   "line": 147
+  },
+  {
+   "state": "self._task_blocks",
+   "file": "lib/ansible/playbook/role/__init__.py",
+   "line": 149
+  },
+  {
+   "state": "self._completed",
+   "file": "lib/ansible/playbook/role/__init__.py",
+   "line": 155
+  },
+  {
+   "state": "self._options",
+   "file": "lib/ansible/plugins/__init__.py",
+   "line": 81
+  },
+  {
+   "state": "self._origins",
+   "file": "lib/ansible/plugins/__init__.py",
+   "line": 82
+  },
+  {
+   "state": "self._task",
+   "file": "lib/ansible/plugins/action/__init__.py",
+   "line": 93
+  },
+  {
+   "state": "self._cache",
+   "file": "lib/ansible/plugins/cache/__init__.py",
+   "line": 95
+  },
+  {
+   "state": "self._sanitized",
+   "file": "lib/ansible/plugins/cache/__init__.py",
+   "line": 97
+  },
+  {
+   "state": "self._files",
+   "file": "lib/ansible/plugins/cache/__init__.py",
+   "line": 98
+  },
+  {
+   "state": "self._cache",
+   "file": "lib/ansible/plugins/cache/memory.py",
+   "line": 28
+  },
+  {
+   "state": "self._plugin_options",
+   "file": "lib/ansible/plugins/callback/__init__.py",
+   "line": 169
+  },
+  {
+   "state": "self._play",
+   "file": "lib/ansible/plugins/callback/default.py",
+   "line": 48
+  },
+  {
+   "state": "self._task_data",
+   "file": "lib/ansible/plugins/callback/junit.py",
+   "line": 161
+  },
+  {
+   "state": "self.host_data",
+   "file": "lib/ansible/plugins/callback/junit.py",
+   "line": 339
+  },
+  {
+   "state": "_valid_bool_true",
+   "file": "lib/ansible/plugins/filter/core.py",
+   "line": 101
+  },
+  {
+   "state": "_valid_bool_false",
+   "file": "lib/ansible/plugins/filter/core.py",
+   "line": 102
+  },
+  {
+   "state": "self.redirect_list",
+   "file": "lib/ansible/plugins/loader.py",
+   "line": 148
+  },
+  {
+   "state": "self._aliases",
+   "file": "lib/ansible/plugins/loader.py",
+   "line": 329
+  },
+  {
+   "state": "self._module_cache",
+   "file": "lib/ansible/plugins/loader.py",
+   "line": 349
+  },
+  {
+   "state": "self._plugin_path_cache",
+   "file": "lib/ansible/plugins/loader.py",
+   "line": 351
+  },
+  {
+   "state": "self._inventory",
+   "file": "lib/ansible/plugins/strategy/__init__.py",
+   "line": 234
+  },
+  {
+   "state": "self._workers",
+   "file": "lib/ansible/plugins/strategy/__init__.py",
+   "line": 235
+  },
+  {
+   "state": "self._queued_task_cache",
+   "file": "lib/ansible/plugins/strategy/__init__.py",
+   "line": 247
+  },
+  {
+   "state": "self._blocked_hosts",
+   "file": "lib/ansible/plugins/strategy/__init__.py",
+   "line": 258
+  },
+  {
+   "state": "self._active_connections",
+   "file": "lib/ansible/plugins/strategy/__init__.py",
+   "line": 270
+  },
+  {
+   "state": "CANONICAL_PATHS",
+   "file": "lib/ansible/plugins/vars/host_group_vars.py",
+   "line": 66
+  },
+  {
+   "state": "FOUND",
+   "file": "lib/ansible/plugins/vars/host_group_vars.py",
+   "line": 67
+  },
+  {
+   "state": "NAK",
+   "file": "lib/ansible/plugins/vars/host_group_vars.py",
+   "line": 68
+  },
+  {
+   "state": "color_to_log_level",
+   "file": "lib/ansible/utils/display.py",
+   "line": 206
+  },
+  {
+   "state": "_HAS_CONTROLPERSIST",
+   "file": "lib/ansible/utils/ssh_functions.py",
+   "line": 29
+  },
+  {
+   "state": "self._vars",
+   "file": "lib/ansible/vars/hostvars.py",
+   "line": 91
+  },
+  {
+   "state": "self._vars_cache",
+   "file": "lib/ansible/vars/manager.py",
+   "line": 126
+  }
+ ],
+ "repo": "ansible/ansible",
+ "stars": 68359
+}

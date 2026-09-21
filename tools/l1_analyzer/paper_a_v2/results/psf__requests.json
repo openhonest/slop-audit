@@ -1,0 +1,46 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.3,
+ "v1_mutable_ratio": 47.4,
+ "v1_details": "127/268 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 56,
+  "promiscuous": 3,
+  "unresolved": 19
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 36,
+   "drives_decision": 20
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 3
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 19
+  }
+ },
+ "v2_resolvable": 0.756,
+ "v2_promiscuous": [
+  {
+   "state": "self.proxy_manager",
+   "file": "src/requests/adapters.py",
+   "line": 213
+  },
+  {
+   "state": "self._new_headers",
+   "file": "src/requests/cookies.py",
+   "line": 48
+  },
+  {
+   "state": "self._store",
+   "file": "src/requests/structures.py",
+   "line": 54
+  }
+ ],
+ "repo": "psf/requests",
+ "stars": 53888
+}

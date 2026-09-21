@@ -1,0 +1,411 @@
+{
+ "status": "ok",
+ "clone_seconds": 4.1,
+ "v1_mutable_ratio": 42.7,
+ "v1_details": "3178/7434 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1757,
+  "promiscuous": 76,
+  "unresolved": 370
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 1283,
+   "drives_decision": 474
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 76
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 370
+  }
+ },
+ "v2_resolvable": 0.832,
+ "v2_promiscuous": [
+  {
+   "state": "self.components",
+   "file": "agent/canvas.py",
+   "line": 92
+  },
+  {
+   "state": "self.dsl",
+   "file": "agent/canvas.py",
+   "line": 95
+  },
+  {
+   "state": "self.globals",
+   "file": "agent/canvas.py",
+   "line": 332
+  },
+  {
+   "state": "self.variables",
+   "file": "agent/canvas.py",
+   "line": 340
+  },
+  {
+   "state": "self.history",
+   "file": "agent/canvas.py",
+   "line": 351
+  },
+  {
+   "state": "self.retrieval",
+   "file": "agent/canvas.py",
+   "line": 372
+  },
+  {
+   "state": "self.builtin_types",
+   "file": "agent/component/base.py",
+   "line": 203
+  },
+  {
+   "state": "self.func",
+   "file": "agent/component/base.py",
+   "line": 204
+  },
+  {
+   "state": "_CONTAINER_QUEUES",
+   "file": "agent/sandbox/executor_manager/core/container.py",
+   "line": 27
+  },
+  {
+   "state": "self._instances",
+   "file": "agent/sandbox/providers/local.py",
+   "line": 72
+  },
+  {
+   "state": "self._instances",
+   "file": "agent/sandbox/providers/ssh.py",
+   "line": 79
+  },
+  {
+   "state": "self._instances",
+   "file": "agent/sandbox/providers/tenki.py",
+   "line": 88
+  },
+  {
+   "state": "self.tools_map",
+   "file": "agent/tools/base.py",
+   "line": 52
+  },
+  {
+   "state": "self._processed_message_ids",
+   "file": "api/channels/dingtalk/channel.py",
+   "line": 43
+  },
+  {
+   "state": "self._inflight_message_ids",
+   "file": "api/channels/dingtalk/channel.py",
+   "line": 44
+  },
+  {
+   "state": "self._server",
+   "file": "api/channels/line/channel.py",
+   "line": 139
+  },
+  {
+   "state": "self._server",
+   "file": "api/channels/wecom/channel.py",
+   "line": 150
+  },
+  {
+   "state": "self._seen_message_ids",
+   "file": "api/channels/whatsapp/channel.py",
+   "line": 66
+  },
+  {
+   "state": "supported_operators",
+   "file": "api/db/db_utils.py",
+   "line": 71
+  },
+  {
+   "state": "safe_module",
+   "file": "api/utils/configs.py",
+   "line": 22
+  },
+  {
+   "state": "_USER_EMAIL_CACHE",
+   "file": "common/data_source/confluence_connector.py",
+   "line": 77
+  },
+  {
+   "state": "self._document_name_counts",
+   "file": "common/data_source/confluence_connector.py",
+   "line": 1210
+  },
+  {
+   "state": "self._document_name_paths",
+   "file": "common/data_source/confluence_connector.py",
+   "line": 1211
+  },
+  {
+   "state": "self._retrieved_folder_and_drive_ids",
+   "file": "common/data_source/google_drive/connector.py",
+   "line": 165
+  },
+  {
+   "state": "self.indexed_pages",
+   "file": "common/data_source/notion_connector.py",
+   "line": 68
+  },
+  {
+   "state": "self.page_path_cache",
+   "file": "common/data_source/notion_connector.py",
+   "line": 71
+  },
+  {
+   "state": "self.id_column",
+   "file": "common/data_source/rdbms_connector.py",
+   "line": 85
+  },
+  {
+   "state": "self.timestamp_column",
+   "file": "common/data_source/rdbms_connector.py",
+   "line": 86
+  },
+  {
+   "state": "self._id_to_name_map",
+   "file": "common/data_source/utils.py",
+   "line": 644
+  },
+  {
+   "state": "self._table_exists_cache",
+   "file": "common/doc_store/ob_conn_base.py",
+   "line": 112
+  },
+  {
+   "state": "self._vector_column_cache",
+   "file": "common/doc_store/ob_conn_base.py",
+   "line": 116
+  },
+  {
+   "state": "self.page_images",
+   "file": "deepdoc/parser/docling_parser.py",
+   "line": 93
+  },
+  {
+   "state": "self.figure_contexts",
+   "file": "deepdoc/parser/figure_parser.py",
+   "line": 204
+  },
+  {
+   "state": "self.descriptions",
+   "file": "deepdoc/parser/figure_parser.py",
+   "line": 207
+  },
+  {
+   "state": "self.positions",
+   "file": "deepdoc/parser/figure_parser.py",
+   "line": 208
+  },
+  {
+   "state": "self.pdf",
+   "file": "deepdoc/parser/mineru_parser.py",
+   "line": 359
+  },
+  {
+   "state": "self.page_images",
+   "file": "deepdoc/parser/mineru_parser.py",
+   "line": 360
+  },
+  {
+   "state": "self.pdf",
+   "file": "deepdoc/parser/mistral_parser.py",
+   "line": 91
+  },
+  {
+   "state": "self.page_images",
+   "file": "deepdoc/parser/mistral_parser.py",
+   "line": 92
+  },
+  {
+   "state": "self.page_images",
+   "file": "deepdoc/parser/paddleocr_parser.py",
+   "line": 245
+  },
+  {
+   "state": "self.pdf",
+   "file": "deepdoc/parser/paddleocr_parser.py",
+   "line": 641
+  },
+  {
+   "state": "self.parallel_limiter",
+   "file": "deepdoc/parser/pdf_parser.py",
+   "line": 71
+  },
+  {
+   "state": "self.mean_height",
+   "file": "deepdoc/parser/pdf_parser.py",
+   "line": 787
+  },
+  {
+   "state": "self.mean_width",
+   "file": "deepdoc/parser/pdf_parser.py",
+   "line": 1061
+  },
+  {
+   "state": "self.pdf",
+   "file": "deepdoc/parser/pdf_parser.py",
+   "line": 1621
+  },
+  {
+   "state": "self.pdf",
+   "file": "deepdoc/parser/pdf_parser.py",
+   "line": 2075
+  },
+  {
+   "state": "self.pdf",
+   "file": "deepdoc/parser/pdf_parser.py",
+   "line": 2101
+  },
+  {
+   "state": "self._shape_cache",
+   "file": "deepdoc/parser/ppt_parser.py",
+   "line": 25
+  },
+  {
+   "state": "self.pdf",
+   "file": "deepdoc/parser/somark_parser.py",
+   "line": 418
+  },
+  {
+   "state": "self.page_images",
+   "file": "deepdoc/parser/somark_parser.py",
+   "line": 419
+  },
+  {
+   "state": "self.garbage_layouts",
+   "file": "deepdoc/vision/layout_recognizer.py",
+   "line": 49
+  },
+  {
+   "state": "self.garbage_layouts",
+   "file": "deepdoc/vision/layout_recognizer.py",
+   "line": 278
+  },
+  {
+   "state": "self.rec_image_shape",
+   "file": "deepdoc/vision/ocr.py",
+   "line": 131
+  },
+  {
+   "state": "self.input_tensor",
+   "file": "deepdoc/vision/ocr.py",
+   "line": 136
+  },
+  {
+   "state": "self.input_tensor",
+   "file": "deepdoc/vision/ocr.py",
+   "line": 401
+  },
+  {
+   "state": "self.text_detector",
+   "file": "deepdoc/vision/ocr.py",
+   "line": 512
+  },
+  {
+   "state": "self.text_recognizer",
+   "file": "deepdoc/vision/ocr.py",
+   "line": 513
+  },
+  {
+   "state": "self.character",
+   "file": "deepdoc/vision/postprocess.py",
+   "line": 265
+  },
+  {
+   "state": "self.input_names",
+   "file": "deepdoc/vision/recognizer.py",
+   "line": 48
+  },
+  {
+   "state": "self.label_list",
+   "file": "deepdoc/vision/recognizer.py",
+   "line": 51
+  },
+  {
+   "state": "self._seen_evidence_ids",
+   "file": "rag/advanced_rag/harness/agent.py",
+   "line": 55
+  },
+  {
+   "state": "TOOL_REGISTRY",
+   "file": "rag/advanced_rag/harness/tools/registry.py",
+   "line": 7
+  },
+  {
+   "state": "self._rank",
+   "file": "rag/advanced_rag/knowlege_compile/raptor.py",
+   "line": 73
+  },
+  {
+   "state": "self._parent_chains",
+   "file": "rag/advanced_rag/knowlege_compile/raptor.py",
+   "line": 74
+  },
+  {
+   "state": "self._node_ids",
+   "file": "rag/advanced_rag/knowlege_compile/raptor.py",
+   "line": 75
+  },
+  {
+   "state": "self._tree",
+   "file": "rag/advanced_rag/knowlege_compile/raptor.py",
+   "line": 76
+  },
+  {
+   "state": "self.pdf",
+   "file": "rag/app/presentation.py",
+   "line": 121
+  },
+  {
+   "state": "self._prompt_variables",
+   "file": "rag/graphrag/general/graph_extractor.py",
+   "line": 87
+  },
+  {
+   "state": "self.tools_map",
+   "file": "rag/llm/tool_decorator.py",
+   "line": 292
+  },
+  {
+   "state": "self.df",
+   "file": "rag/nlp/term_weight.py",
+   "line": 86
+  },
+  {
+   "state": "self.ne",
+   "file": "rag/nlp/term_weight.py",
+   "line": 86
+  },
+  {
+   "state": "_loaded_prompts",
+   "file": "rag/prompts/template.py",
+   "line": 5
+  },
+  {
+   "state": "func_factory",
+   "file": "rag/svr/sync_data_source.py",
+   "line": 2139
+  },
+  {
+   "state": "self._recorded_values",
+   "file": "rag/svr/task_executor_refactor/write_operation_interceptor.py",
+   "line": 80
+  },
+  {
+   "state": "column_types",
+   "file": "rag/utils/ob_conn.py",
+   "line": 104
+  },
+  {
+   "state": "array_columns",
+   "file": "rag/utils/ob_conn.py",
+   "line": 105
+  }
+ ],
+ "repo": "infiniflow/ragflow",
+ "stars": 77911
+}

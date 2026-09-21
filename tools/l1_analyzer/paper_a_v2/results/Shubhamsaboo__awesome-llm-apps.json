@@ -1,0 +1,116 @@
+{
+ "status": "ok",
+ "clone_seconds": 2.2,
+ "v1_mutable_ratio": 29.6,
+ "v1_details": "587/1980 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 572,
+  "promiscuous": 17,
+  "unresolved": 155
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 465,
+   "drives_decision": 107
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 17
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 155
+  }
+ },
+ "v2_resolvable": 0.792,
+ "v2_promiscuous": [
+  {
+   "state": "self.board",
+   "file": "advanced_ai_agents/autonomous_game_playing_agent_apps/ai_tic_tac_toe_agent/utils.py",
+   "line": 14
+  },
+  {
+   "state": "active_sessions",
+   "file": "advanced_ai_agents/multi_agent_apps/ai_news_and_podcast_agents/beifong/integrations/slack/chat.py",
+   "line": 22
+  },
+  {
+   "state": "_TTS_ENGINES",
+   "file": "advanced_ai_agents/multi_agent_apps/ai_news_and_podcast_agents/beifong/utils/tts_engine_selector.py",
+   "line": 5
+  },
+  {
+   "state": "self.identities",
+   "file": "advanced_ai_agents/multi_agent_apps/multi_agent_trust_layer/multi_agent_trust_layer.py",
+   "line": 187
+  },
+  {
+   "state": "self.sponsor_to_agents",
+   "file": "advanced_ai_agents/multi_agent_apps/multi_agent_trust_layer/multi_agent_trust_layer.py",
+   "line": 188
+  },
+  {
+   "state": "self.scores",
+   "file": "advanced_ai_agents/multi_agent_apps/multi_agent_trust_layer/multi_agent_trust_layer.py",
+   "line": 236
+  },
+  {
+   "state": "self.delegations",
+   "file": "advanced_ai_agents/multi_agent_apps/multi_agent_trust_layer/multi_agent_trust_layer.py",
+   "line": 274
+  },
+  {
+   "state": "self.agent_delegations",
+   "file": "advanced_ai_agents/multi_agent_apps/multi_agent_trust_layer/multi_agent_trust_layer.py",
+   "line": 275
+  },
+  {
+   "state": "self.actions_requiring_approval",
+   "file": "advanced_ai_agents/single_agent_apps/ai_agent_governance/ai_agent_governance.py",
+   "line": 220
+  },
+  {
+   "state": "self.tools",
+   "file": "advanced_ai_agents/single_agent_apps/ai_agent_governance/ai_agent_governance.py",
+   "line": 429
+  },
+  {
+   "state": "sessions",
+   "file": "advanced_ai_agents/single_agent_apps/earnings_call_analyst_agent/live_demo/server.py",
+   "line": 72
+  },
+  {
+   "state": "sessions",
+   "file": "agent_skills/self-improving-agent-skills/backend/app.py",
+   "line": 42
+  },
+  {
+   "state": "test_scenarios",
+   "file": "ai_agent_framework_crash_course/google_adk_crash_course/7_plugins/app.py",
+   "line": 14
+  },
+  {
+   "state": "cols",
+   "file": "ai_agent_framework_crash_course/google_adk_crash_course/9_multi_agent_patterns/9_1_sequential_agent/app.py",
+   "line": 51
+  },
+  {
+   "state": "self.sessions",
+   "file": "ai_agent_framework_crash_course/openai_sdk_crash_course/7_sessions/streamlit_sessions_app.py",
+   "line": 50
+  },
+  {
+   "state": "self.events",
+   "file": "rag_tutorials/multimodal_agentic_rag/backend/rag_store.py",
+   "line": 125
+  },
+  {
+   "state": "self.items",
+   "file": "voice_ai_agents/ai_audio_tour_agent/printer.py",
+   "line": 16
+  }
+ ],
+ "repo": "Shubhamsaboo/awesome-llm-apps",
+ "stars": 105289
+}

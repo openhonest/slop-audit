@@ -1,0 +1,951 @@
+{
+ "status": "ok",
+ "clone_seconds": 7.3,
+ "v1_mutable_ratio": 58.2,
+ "v1_details": "13092/22493 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 12011,
+  "promiscuous": 184,
+  "unresolved": 2819
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 9912,
+   "drives_decision": 2099
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 184
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 2819
+  }
+ },
+ "v2_resolvable": 0.812,
+ "v2_promiscuous": [
+  {
+   "state": "self._jwks",
+   "file": "airflow-core/src/airflow/api_fastapi/auth/tokens.py",
+   "line": 142
+  },
+  {
+   "state": "self._app",
+   "file": "airflow-core/src/airflow/api_fastapi/execution_api/app.py",
+   "line": 388
+  },
+  {
+   "state": "self.file_last_changed",
+   "file": "airflow-core/src/airflow/dag_processing/dagbag.py",
+   "line": 203
+  },
+  {
+   "state": "self.attempts",
+   "file": "airflow-core/src/airflow/executors/base_executor.py",
+   "line": 246
+  },
+  {
+   "state": "_alias_to_executors_per_team",
+   "file": "airflow-core/src/airflow/executors/executor_loader.py",
+   "line": 46
+  },
+  {
+   "state": "_module_to_executors_per_team",
+   "file": "airflow-core/src/airflow/executors/executor_loader.py",
+   "line": 47
+  },
+  {
+   "state": "_classname_to_executors_per_team",
+   "file": "airflow-core/src/airflow/executors/executor_loader.py",
+   "line": 48
+  },
+  {
+   "state": "_team_name_to_executors",
+   "file": "airflow-core/src/airflow/executors/executor_loader.py",
+   "line": 50
+  },
+  {
+   "state": "self.alias",
+   "file": "airflow-core/src/airflow/executors/executor_utils.py",
+   "line": 28
+  },
+  {
+   "state": "self.executor",
+   "file": "airflow-core/src/airflow/jobs/scheduler_job_runner.py",
+   "line": 363
+  },
+  {
+   "state": "self._partition_unreachable_seen",
+   "file": "airflow-core/src/airflow/jobs/scheduler_job_runner.py",
+   "line": 380
+  },
+  {
+   "state": "self.triggers",
+   "file": "airflow-core/src/airflow/jobs/triggerer_job_runner.py",
+   "line": 1198
+  },
+  {
+   "state": "self.trigger_cache",
+   "file": "airflow-core/src/airflow/jobs/triggerer_job_runner.py",
+   "line": 1199
+  },
+  {
+   "state": "self.asset_key_to_id",
+   "file": "airflow-core/src/airflow/models/serialized_dag.py",
+   "line": 90
+  },
+  {
+   "state": "self.alias_names_to_asset_ids_names",
+   "file": "airflow-core/src/airflow/models/serialized_dag.py",
+   "line": 93
+  },
+  {
+   "state": "self.state",
+   "file": "airflow-core/src/airflow/models/taskinstance.py",
+   "line": 744
+  },
+  {
+   "state": "__compat_imports",
+   "file": "airflow-core/src/airflow/models/xcom.py",
+   "line": 409
+  },
+  {
+   "state": "self.mappers",
+   "file": "airflow-core/src/airflow/partition_mappers/chain.py",
+   "line": 41
+  },
+  {
+   "state": "self._taskflow_decorators",
+   "file": "airflow-core/src/airflow/providers_manager.py",
+   "line": 427
+  },
+  {
+   "state": "self._connection_form_widgets",
+   "file": "airflow-core/src/airflow/providers_manager.py",
+   "line": 436
+  },
+  {
+   "state": "self._field_behaviours",
+   "file": "airflow-core/src/airflow/providers_manager.py",
+   "line": 438
+  },
+  {
+   "state": "_serializer",
+   "file": "airflow-core/src/airflow/serialization/encoders.py",
+   "line": 293
+  },
+  {
+   "state": "self.event_dates",
+   "file": "airflow-core/src/airflow/timetables/events.py",
+   "line": 58
+  },
+  {
+   "state": "self._name_to_partition_mapper",
+   "file": "airflow-core/src/airflow/timetables/simple.py",
+   "line": 295
+  },
+  {
+   "state": "self._uri_to_partition_mapper",
+   "file": "airflow-core/src/airflow/timetables/simple.py",
+   "line": 296
+  },
+  {
+   "state": "self._subscribers",
+   "file": "airflow-core/src/airflow/triggers/shared_stream.py",
+   "line": 536
+  },
+  {
+   "state": "self._failed_subscribers",
+   "file": "airflow-core/src/airflow/triggers/shared_stream.py",
+   "line": 539
+  },
+  {
+   "state": "self._open_windows",
+   "file": "airflow-core/src/airflow/triggers/shared_stream.py",
+   "line": 555
+  },
+  {
+   "state": "self._groups",
+   "file": "airflow-core/src/airflow/triggers/shared_stream.py",
+   "line": 1207
+  },
+  {
+   "state": "self.varying_vars",
+   "file": "airflow-core/src/airflow/utils/dag_version_inflation_checker.py",
+   "line": 159
+  },
+  {
+   "state": "self.from_imports",
+   "file": "airflow-core/src/airflow/utils/dag_version_inflation_checker.py",
+   "line": 161
+  },
+  {
+   "state": "self.from_imports",
+   "file": "airflow-core/src/airflow/utils/dag_version_inflation_checker.py",
+   "line": 308
+  },
+  {
+   "state": "self.dag_instances",
+   "file": "airflow-core/src/airflow/utils/dag_version_inflation_checker.py",
+   "line": 309
+  },
+  {
+   "state": "self.static_check_result",
+   "file": "airflow-core/src/airflow/utils/dag_version_inflation_checker.py",
+   "line": 407
+  },
+  {
+   "state": "__deprecated_imports",
+   "file": "airflow-core/src/airflow/utils/helpers.py",
+   "line": 302
+  },
+  {
+   "state": "self.sync_dict",
+   "file": "airflow-core/src/airflow/utils/thread_safe_dict.py",
+   "line": 26
+  },
+  {
+   "state": "self.datamodels_extended_map",
+   "file": "airflow-ctl/src/airflowctl/ctl/cli_config.py",
+   "line": 463
+  },
+  {
+   "state": "self.func_map",
+   "file": "airflow-ctl/src/airflowctl/ctl/cli_config.py",
+   "line": 464
+  },
+  {
+   "state": "self.args_map",
+   "file": "airflow-ctl/src/airflowctl/ctl/cli_config.py",
+   "line": 466
+  },
+  {
+   "state": "self.commands_map",
+   "file": "airflow-ctl/src/airflowctl/ctl/cli_config.py",
+   "line": 467
+  },
+  {
+   "state": "self.excluded_parameters",
+   "file": "airflow-ctl/src/airflowctl/ctl/cli_config.py",
+   "line": 473
+  },
+  {
+   "state": "self.field_bool_default_datamodels",
+   "file": "airflow-ctl/src/airflowctl/ctl/cli_config.py",
+   "line": 489
+  },
+  {
+   "state": "self.excluded_output_keys",
+   "file": "airflow-ctl/src/airflowctl/ctl/cli_config.py",
+   "line": 499
+  },
+  {
+   "state": "self.dags_to_watch",
+   "file": "dev/airflow_perf/scheduler_dag_execution_timing.py",
+   "line": 52
+  },
+  {
+   "state": "SHORT_HASH_TO_TYPE_DICT",
+   "file": "dev/breeze/src/airflow_breeze/prepare_providers/provider_documentation.py",
+   "line": 103
+  },
+  {
+   "state": "precedence_order",
+   "file": "dev/breeze/src/airflow_breeze/prepare_providers/provider_documentation.py",
+   "line": 120
+  },
+  {
+   "state": "USED_SOCKETS",
+   "file": "dev/breeze/src/airflow_breeze/utils/kubernetes_utils.py",
+   "line": 68
+  },
+  {
+   "state": "PROVIDER_METADATA",
+   "file": "dev/breeze/src/airflow_breeze/utils/packages.py",
+   "line": 143
+  },
+  {
+   "state": "metadata_from_spreadsheet",
+   "file": "dev/breeze/src/airflow_breeze/utils/projects_google_spreadsheet.py",
+   "line": 56
+  },
+  {
+   "state": "self._pr_labels",
+   "file": "dev/breeze/src/airflow_breeze/utils/selective_checks.py",
+   "line": 715
+  },
+  {
+   "state": "self._github_actor",
+   "file": "dev/breeze/src/airflow_breeze/utils/selective_checks.py",
+   "line": 718
+  },
+  {
+   "state": "self._platform",
+   "file": "dev/breeze/src/airflow_breeze/utils/selective_checks.py",
+   "line": 720
+  },
+  {
+   "state": "parsed",
+   "file": "dev/prune_old_dirs.py",
+   "line": 62
+  },
+  {
+   "state": "self.author_cache",
+   "file": "dev/stats/get_important_pr_candidates.py",
+   "line": 624
+  },
+  {
+   "state": "to_check_versions",
+   "file": "dev/validate_version_added_fields_in_config.py",
+   "line": 121
+  },
+  {
+   "state": "local_options_plain",
+   "file": "dev/validate_version_added_fields_in_config.py",
+   "line": 144
+  },
+  {
+   "state": "self.package_name",
+   "file": "devel-common/src/sphinx_exts/docs_build/docs_builder.py",
+   "line": 47
+  },
+  {
+   "state": "self.captured_warnings",
+   "file": "devel-common/src/tests_common/_internals/capture_warnings.py",
+   "line": 157
+  },
+  {
+   "state": "self.NAME_TO_LEVEL",
+   "file": "devel-common/src/tests_common/test_utils/logs.py",
+   "line": 119
+  },
+  {
+   "state": "self.PER_LOGGER_LEVELS",
+   "file": "devel-common/src/tests_common/test_utils/logs.py",
+   "line": 120
+  },
+  {
+   "state": "self.mock_task_results",
+   "file": "devel-common/src/tests_common/test_utils/mock_executor.py",
+   "line": 58
+  },
+  {
+   "state": "MANDATORY_performance_DAG_VARIABLES",
+   "file": "performance/src/performance_dags/performance_dag/performance_dag_utils.py",
+   "line": 37
+  },
+  {
+   "state": "performance_DAG_VARIABLES_DEFAULT_VALUES",
+   "file": "performance/src/performance_dags/performance_dag/performance_dag_utils.py",
+   "line": 44
+  },
+  {
+   "state": "self.active_workers",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/batch/batch_executor.py",
+   "line": 107
+  },
+  {
+   "state": "self.key_to_id",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/batch/utils.py",
+   "line": 103
+  },
+  {
+   "state": "self.id_to_key",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/batch/utils.py",
+   "line": 104
+  },
+  {
+   "state": "self.id_to_failure_counts",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/batch/utils.py",
+   "line": 105
+  },
+  {
+   "state": "self.active_workers",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/ecs/ecs_executor.py",
+   "line": 117
+  },
+  {
+   "state": "self.key_to_arn",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/ecs/utils.py",
+   "line": 171
+  },
+  {
+   "state": "self.arn_to_key",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/ecs/utils.py",
+   "line": 172
+  },
+  {
+   "state": "self.tasks",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/ecs/utils.py",
+   "line": 173
+  },
+  {
+   "state": "self.key_to_failure_counts",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/ecs/utils.py",
+   "line": 174
+  },
+  {
+   "state": "self.key_to_task_info",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/executors/ecs/utils.py",
+   "line": 175
+  },
+  {
+   "state": "self.__query_results",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/hooks/athena.py",
+   "line": 92
+  },
+  {
+   "state": "self.skip_on_exit_code",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/operators/ecs.py",
+   "line": 504
+  },
+  {
+   "state": "self.target_statuses",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/dms.py",
+   "line": 67
+  },
+  {
+   "state": "self.termination_statuses",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/dms.py",
+   "line": 68
+  },
+  {
+   "state": "self.target_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/emr.py",
+   "line": 66
+  },
+  {
+   "state": "self.failed_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/emr.py",
+   "line": 67
+  },
+  {
+   "state": "self.target_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/emr.py",
+   "line": 151
+  },
+  {
+   "state": "self.target_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/emr.py",
+   "line": 211
+  },
+  {
+   "state": "self.target_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/lambda_function.py",
+   "line": 72
+  },
+  {
+   "state": "self.success_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/mwaa.py",
+   "line": 102
+  },
+  {
+   "state": "self.failure_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/mwaa.py",
+   "line": 103
+  },
+  {
+   "state": "self.success_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/mwaa.py",
+   "line": 241
+  },
+  {
+   "state": "self.failure_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/mwaa.py",
+   "line": 242
+  },
+  {
+   "state": "self.success_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/mwaa_serverless.py",
+   "line": 61
+  },
+  {
+   "state": "self.failure_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/mwaa_serverless.py",
+   "line": 62
+  },
+  {
+   "state": "self.error_statuses",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/rds.py",
+   "line": 135
+  },
+  {
+   "state": "self.success_state",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/sagemaker_unified_studio.py",
+   "line": 47
+  },
+  {
+   "state": "self.in_progress_states",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/sensors/sagemaker_unified_studio.py",
+   "line": 48
+  },
+  {
+   "state": "_waiter_arg",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/triggers/rds.py",
+   "line": 29
+  },
+  {
+   "state": "_status_paths",
+   "file": "providers/amazon/src/airflow/providers/amazon/aws/triggers/rds.py",
+   "line": 33
+  },
+  {
+   "state": "self.excluded_columns",
+   "file": "providers/apache/hive/src/airflow/providers/apache/hive/operators/hive_stats.py",
+   "line": 87
+  },
+  {
+   "state": "self.partition_names",
+   "file": "providers/apache/hive/src/airflow/providers/apache/hive/sensors/named_hive_partition.py",
+   "line": 60
+  },
+  {
+   "state": "self.jobs_error_status",
+   "file": "providers/apache/kylin/src/airflow/providers/apache/kylin/operators/kylin_cube.py",
+   "line": 134
+  },
+  {
+   "state": "self._conf",
+   "file": "providers/apache/spark/src/airflow/providers/apache/spark/hooks/spark_submit.py",
+   "line": 278
+  },
+  {
+   "state": "self._env_vars",
+   "file": "providers/apache/spark/src/airflow/providers/apache/spark/hooks/spark_submit.py",
+   "line": 301
+  },
+  {
+   "state": "self.workload_publish_retries",
+   "file": "providers/celery/src/airflow/providers/celery/executors/celery_executor.py",
+   "line": 156
+  },
+  {
+   "state": "self.task_publish_retries",
+   "file": "providers/cncf/kubernetes/src/airflow/providers/cncf/kubernetes/executors/kubernetes_executor.py",
+   "line": 142
+  },
+  {
+   "state": "self.skip_on_exit_code",
+   "file": "providers/cncf/kubernetes/src/airflow/providers/cncf/kubernetes/operators/pod.py",
+   "line": 487
+  },
+  {
+   "state": "self.registered_tables",
+   "file": "providers/common/sql/src/airflow/providers/common/sql/datafusion/engine.py",
+   "line": 41
+  },
+  {
+   "state": "self.descriptions",
+   "file": "providers/common/sql/src/airflow/providers/common/sql/hooks/sql.py",
+   "line": 199
+  },
+  {
+   "state": "self.column_mapping",
+   "file": "providers/common/sql/src/airflow/providers/common/sql/operators/sql.py",
+   "line": 672
+  },
+  {
+   "state": "self.checks",
+   "file": "providers/common/sql/src/airflow/providers/common/sql/operators/sql.py",
+   "line": 993
+  },
+  {
+   "state": "self.metrics_thresholds",
+   "file": "providers/common/sql/src/airflow/providers/common/sql/operators/sql.py",
+   "line": 1403
+  },
+  {
+   "state": "self._expression_list",
+   "file": "providers/databricks/src/airflow/providers/databricks/operators/databricks_sql.py",
+   "line": 421
+  },
+  {
+   "state": "self.skip_on_exit_code",
+   "file": "providers/docker/src/airflow/providers/docker/operators/docker.py",
+   "line": 333
+  },
+  {
+   "state": "self.skip_on_exit_code",
+   "file": "providers/edge3/src/airflow/providers/edge3/example_dags/win_test.py",
+   "line": 161
+  },
+  {
+   "state": "self.last_reported_state",
+   "file": "providers/edge3/src/airflow/providers/edge3/executors/edge_executor.py",
+   "line": 61
+  },
+  {
+   "state": "self.running",
+   "file": "providers/edge3/src/airflow/providers/edge3/executors/edge_executor.py",
+   "line": 287
+  },
+  {
+   "state": "self._l_",
+   "file": "providers/elasticsearch/src/airflow/providers/elasticsearch/log/es_response.py",
+   "line": 59
+  },
+  {
+   "state": "self._doc_type_map",
+   "file": "providers/elasticsearch/src/airflow/providers/elasticsearch/log/es_task_handler.py",
+   "line": 324
+  },
+  {
+   "state": "self._doc_type_map",
+   "file": "providers/elasticsearch/src/airflow/providers/elasticsearch/log/es_task_handler.py",
+   "line": 744
+  },
+  {
+   "state": "self.oauth_remotes",
+   "file": "providers/fab/src/airflow/providers/fab/auth_manager/security_manager/override.py",
+   "line": 420
+  },
+  {
+   "state": "self._client",
+   "file": "providers/google/src/airflow/providers/google/cloud/hooks/cloud_build.py",
+   "line": 66
+  },
+  {
+   "state": "self._ssl_cert_temp_files",
+   "file": "providers/google/src/airflow/providers/google/cloud/hooks/cloud_sql.py",
+   "line": 921
+  },
+  {
+   "state": "self.column_mapping",
+   "file": "providers/google/src/airflow/providers/google/cloud/operators/bigquery.py",
+   "line": 774
+  },
+  {
+   "state": "self.column_families",
+   "file": "providers/google/src/airflow/providers/google/cloud/operators/bigtable.py",
+   "line": 387
+  },
+  {
+   "state": "self.body",
+   "file": "providers/google/src/airflow/providers/google/cloud/operators/cloud_storage_transfer_service.py",
+   "line": 85
+  },
+  {
+   "state": "self.body",
+   "file": "providers/google/src/airflow/providers/google/cloud/operators/cloud_storage_transfer_service.py",
+   "line": 160
+  },
+  {
+   "state": "self.body",
+   "file": "providers/google/src/airflow/providers/google/cloud/operators/cloud_storage_transfer_service.py",
+   "line": 349
+  },
+  {
+   "state": "self.audio",
+   "file": "providers/google/src/airflow/providers/google/cloud/operators/speech_to_text.py",
+   "line": 96
+  },
+  {
+   "state": "self.audio",
+   "file": "providers/google/src/airflow/providers/google/cloud/operators/translate_speech.py",
+   "line": 137
+  },
+  {
+   "state": "self.expected_statuses",
+   "file": "providers/google/src/airflow/providers/google/cloud/sensors/bigquery_dts.py",
+   "line": 102
+  },
+  {
+   "state": "self.expected_statuses",
+   "file": "providers/google/src/airflow/providers/google/cloud/sensors/dataform.py",
+   "line": 74
+  },
+  {
+   "state": "self.failure_statuses",
+   "file": "providers/google/src/airflow/providers/google/cloud/sensors/dataform.py",
+   "line": 77
+  },
+  {
+   "state": "self.expected_statuses",
+   "file": "providers/google/src/airflow/providers/google/cloud/sensors/dataform.py",
+   "line": 155
+  },
+  {
+   "state": "self.failure_statuses",
+   "file": "providers/google/src/airflow/providers/google/cloud/sensors/dataform.py",
+   "line": 156
+  },
+  {
+   "state": "self.failure_statuses",
+   "file": "providers/google/src/airflow/providers/google/cloud/sensors/datafusion.py",
+   "line": 79
+  },
+  {
+   "state": "self.success_states",
+   "file": "providers/google/src/airflow/providers/google/cloud/sensors/workflows.py",
+   "line": 74
+  },
+  {
+   "state": "self.failure_states",
+   "file": "providers/google/src/airflow/providers/google/cloud/sensors/workflows.py",
+   "line": 75
+  },
+  {
+   "state": "self.source_object",
+   "file": "providers/google/src/airflow/providers/google/cloud/transfers/gcs_to_gcs.py",
+   "line": 220
+  },
+  {
+   "state": "self.bit_fields",
+   "file": "providers/google/src/airflow/providers/google/cloud/transfers/mssql_to_gcs.py",
+   "line": 81
+  },
+  {
+   "state": "self.partition_id",
+   "file": "providers/google/src/airflow/providers/google/cloud/triggers/bigquery.py",
+   "line": 828
+  },
+  {
+   "state": "self.composer_external_task_ids",
+   "file": "providers/google/src/airflow/providers/google/cloud/triggers/cloud_composer.py",
+   "line": 370
+  },
+  {
+   "state": "self.composer_external_task_group_id",
+   "file": "providers/google/src/airflow/providers/google/cloud/triggers/cloud_composer.py",
+   "line": 371
+  },
+  {
+   "state": "self.expected_statuses",
+   "file": "providers/google/src/airflow/providers/google/cloud/triggers/dataflow.py",
+   "line": 202
+  },
+  {
+   "state": "self.pod_names",
+   "file": "providers/google/src/airflow/providers/google/cloud/triggers/kubernetes_engine.py",
+   "line": 294
+  },
+  {
+   "state": "self.source_object",
+   "file": "providers/google/src/airflow/providers/google/suite/transfers/gcs_to_gdrive.py",
+   "line": 109
+  },
+  {
+   "state": "self.extras",
+   "file": "providers/grpc/src/airflow/providers/grpc/hooks/grpc.py",
+   "line": 80
+  },
+  {
+   "state": "_catalog",
+   "file": "providers/informatica/dev/informatica_simulator/app/main.py",
+   "line": 68
+  },
+  {
+   "state": "_resources_db",
+   "file": "providers/informatica/dev/informatica_simulator/app/main.py",
+   "line": 352
+  },
+  {
+   "state": "self.target_states",
+   "file": "providers/jenkins/src/airflow/providers/jenkins/sensors/jenkins.py",
+   "line": 50
+  },
+  {
+   "state": "self.secured_variables",
+   "file": "providers/microsoft/azure/src/airflow/providers/microsoft/azure/operators/container_instances.py",
+   "line": 216
+  },
+  {
+   "state": "self.expected_return_code",
+   "file": "providers/microsoft/winrm/src/airflow/providers/microsoft/winrm/operators/winrm.py",
+   "line": 112
+  },
+  {
+   "state": "self.extractors",
+   "file": "providers/openlineage/src/airflow/providers/openlineage/extractors/manager.py",
+   "line": 60
+  },
+  {
+   "state": "self._l_",
+   "file": "providers/opensearch/src/airflow/providers/opensearch/log/os_response.py",
+   "line": 34
+  },
+  {
+   "state": "self._doc_type_map",
+   "file": "providers/opensearch/src/airflow/providers/opensearch/log/os_task_handler.py",
+   "line": 390
+  },
+  {
+   "state": "self._doc_type_map",
+   "file": "providers/opensearch/src/airflow/providers/opensearch/log/os_task_handler.py",
+   "line": 890
+  },
+  {
+   "state": "self.extra",
+   "file": "providers/slack/src/airflow/providers/slack/utils/__init__.py",
+   "line": 42
+  },
+  {
+   "state": "self.skip_on_exit_code",
+   "file": "providers/ssh/src/airflow/providers/ssh/operators/ssh.py",
+   "line": 111
+  },
+  {
+   "state": "self.skip_on_exit_code",
+   "file": "providers/ssh/src/airflow/providers/ssh/operators/ssh_remote_job.py",
+   "line": 151
+  },
+  {
+   "state": "self.skip_on_exit_code",
+   "file": "providers/standard/src/airflow/providers/standard/operators/bash.py",
+   "line": 171
+  },
+  {
+   "state": "self.skip_on_exit_code",
+   "file": "providers/standard/src/airflow/providers/standard/operators/python.py",
+   "line": 533
+  },
+  {
+   "state": "self.failed_states",
+   "file": "providers/standard/src/airflow/providers/standard/operators/trigger_dagrun.py",
+   "line": 216
+  },
+  {
+   "state": "self._week_day_num",
+   "file": "providers/standard/src/airflow/providers/standard/operators/weekday.py",
+   "line": 110
+  },
+  {
+   "state": "self._week_day_num",
+   "file": "providers/standard/src/airflow/providers/standard/sensors/weekday.py",
+   "line": 93
+  },
+  {
+   "state": "cyborg_config",
+   "file": "scripts/ci/prek/boring_cyborg.py",
+   "line": 44
+  },
+  {
+   "state": "allowed_warnings",
+   "file": "scripts/ci/prek/check_deprecations.py",
+   "line": 40
+  },
+  {
+   "state": "self.classes",
+   "file": "scripts/ci/prek/check_trigger_serialize_init.py",
+   "line": 134
+  },
+  {
+   "state": "renames",
+   "file": "scripts/ci/prek/dump_supervisor_schemas.py",
+   "line": 58
+  },
+  {
+   "state": "PROVIDERS",
+   "file": "scripts/ci/prek/update_providers_dependencies.py",
+   "line": 51
+  },
+  {
+   "state": "PYPROJECT_TOML_CONTENT",
+   "file": "scripts/ci/prek/update_providers_dependencies.py",
+   "line": 53
+  },
+  {
+   "state": "STATES",
+   "file": "scripts/ci/prek/update_providers_dependencies.py",
+   "line": 175
+  },
+  {
+   "state": "status_map",
+   "file": "scripts/in_container/update_quarantined_test_status.py",
+   "line": 61
+  },
+  {
+   "state": "reverse_status_map",
+   "file": "scripts/in_container/update_quarantined_test_status.py",
+   "line": 66
+  },
+  {
+   "state": "LEVEL_TO_FILTERING_LOGGER",
+   "file": "shared/logging/src/airflow_shared/logging/structlog.py",
+   "line": 60
+  },
+  {
+   "state": "self.map",
+   "file": "shared/observability/src/airflow_shared/observability/metrics/otel_logger.py",
+   "line": 354
+  },
+  {
+   "state": "self.histograms",
+   "file": "shared/observability/src/airflow_shared/observability/metrics/otel_logger.py",
+   "line": 355
+  },
+  {
+   "state": "_CURRENT_CONTEXT",
+   "file": "task-sdk/src/airflow/sdk/definitions/_internal/contextmanager.py",
+   "line": 39
+  },
+  {
+   "state": "self.decorators_to_remove",
+   "file": "task-sdk/src/airflow/sdk/definitions/_internal/decorators.py",
+   "line": 49
+  },
+  {
+   "state": "self._by_name",
+   "file": "task-sdk/src/airflow/sdk/execution_time/context.py",
+   "line": 853
+  },
+  {
+   "state": "self._by_uri",
+   "file": "task-sdk/src/airflow/sdk/execution_time/context.py",
+   "line": 854
+  },
+  {
+   "state": "self._dict",
+   "file": "task-sdk/src/airflow/sdk/execution_time/context.py",
+   "line": 1082
+  },
+  {
+   "state": "self._assets",
+   "file": "task-sdk/src/airflow/sdk/execution_time/context.py",
+   "line": 1238
+  },
+  {
+   "state": "self._asset_aliases",
+   "file": "task-sdk/src/airflow/sdk/execution_time/context.py",
+   "line": 1239
+  },
+  {
+   "state": "self._versioned_models",
+   "file": "task-sdk/src/airflow/sdk/execution_time/schema/migrator.py",
+   "line": 110
+  },
+  {
+   "state": "_REMOTE_LOGGING_CONN_CACHE",
+   "file": "task-sdk/src/airflow/sdk/execution_time/supervisor.py",
+   "line": 1170
+  },
+  {
+   "state": "self._input_counts",
+   "file": "task-sdk/src/airflow/sdk/lineage.py",
+   "line": 112
+  },
+  {
+   "state": "self._output_counts",
+   "file": "task-sdk/src/airflow/sdk/lineage.py",
+   "line": 113
+  },
+  {
+   "state": "self._extra_counts",
+   "file": "task-sdk/src/airflow/sdk/lineage.py",
+   "line": 115
+  },
+  {
+   "state": "self._taskflow_decorators",
+   "file": "task-sdk/src/airflow/sdk/providers_manager_runtime.py",
+   "line": 155
+  },
+  {
+   "state": "self._hook_provider_dict",
+   "file": "task-sdk/src/airflow/sdk/providers_manager_runtime.py",
+   "line": 157
+  }
+ ],
+ "repo": "apache/airflow",
+ "stars": 45031
+}

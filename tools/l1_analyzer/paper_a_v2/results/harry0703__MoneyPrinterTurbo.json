@@ -1,0 +1,41 @@
+{
+ "status": "ok",
+ "clone_seconds": 5.1,
+ "v1_mutable_ratio": 19.4,
+ "v1_details": "91/469 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 92,
+  "promiscuous": 2,
+  "unresolved": 18
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 73,
+   "drives_decision": 19
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 2
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 18
+  }
+ },
+ "v2_resolvable": 0.839,
+ "v2_promiscuous": [
+  {
+   "state": "_runtime_disabled_video_codecs",
+   "file": "app/services/video.py",
+   "line": 91
+  },
+  {
+   "state": "locales",
+   "file": "webui/Main.py",
+   "line": 83
+  }
+ ],
+ "repo": "harry0703/MoneyPrinterTurbo",
+ "stars": 55591
+}

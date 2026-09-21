@@ -1,0 +1,331 @@
+{
+ "status": "ok",
+ "clone_seconds": 1.7,
+ "v1_mutable_ratio": 46.2,
+ "v1_details": "2507/5422 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 1003,
+  "promiscuous": 60,
+  "unresolved": 190
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 726,
+   "drives_decision": 277
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 60
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 190
+  }
+ },
+ "v2_resolvable": 0.848,
+ "v2_promiscuous": [
+  {
+   "state": "self._store",
+   "file": "backend/app/channels/dedupe_store.py",
+   "line": 56
+  },
+  {
+   "state": "self._active_thread_ids",
+   "file": "backend/app/channels/discord.py",
+   "line": 57
+  },
+  {
+   "state": "self._typing_tasks",
+   "file": "backend/app/channels/discord.py",
+   "line": 68
+  },
+  {
+   "state": "self._channel_metadata_synced",
+   "file": "backend/app/channels/manager.py",
+   "line": 940
+  },
+  {
+   "state": "self._channels",
+   "file": "backend/app/channels/service.py",
+   "line": 128
+  },
+  {
+   "state": "self._allowed_users",
+   "file": "backend/app/channels/telegram.py",
+   "line": 68
+  },
+  {
+   "state": "self._allowed_users",
+   "file": "backend/app/channels/wechat.py",
+   "line": 246
+  },
+  {
+   "state": "self._context_tokens_by_thread",
+   "file": "backend/app/channels/wechat.py",
+   "line": 254
+  },
+  {
+   "state": "self._ws_frames",
+   "file": "backend/app/channels/wecom.py",
+   "line": 43
+  },
+  {
+   "state": "self.permissions",
+   "file": "backend/app/gateway/authz.py",
+   "line": 84
+  },
+  {
+   "state": "_login_attempts",
+   "file": "backend/app/gateway/routers/auth.py",
+   "line": 174
+  },
+  {
+   "state": "_SETUP_STATUS_CACHE",
+   "file": "backend/app/gateway/routers/auth.py",
+   "line": 457
+  },
+  {
+   "state": "_SETUP_STATUS_INFLIGHT",
+   "file": "backend/app/gateway/routers/auth.py",
+   "line": 460
+  },
+  {
+   "state": "self._retrieval_warmed_scopes",
+   "file": "backend/packages/harness/deerflow/agents/memory/backends/deermem/deer_mem.py",
+   "line": 139
+  },
+  {
+   "state": "self._watermarks",
+   "file": "backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/updater.py",
+   "line": 785
+  },
+  {
+   "state": "self._tool_freq_overrides",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py",
+   "line": 237
+  },
+  {
+   "state": "self._history",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py",
+   "line": 255
+  },
+  {
+   "state": "self._warned",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py",
+   "line": 256
+  },
+  {
+   "state": "self._tool_name_history",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py",
+   "line": 260
+  },
+  {
+   "state": "self._tool_name_counter",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py",
+   "line": 266
+  },
+  {
+   "state": "self._tool_freq_warned",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py",
+   "line": 271
+  },
+  {
+   "state": "self._catalog_hash",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/mcp_routing_middleware.py",
+   "line": 44
+  },
+  {
+   "state": "self._model_cache",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/summarization_middleware.py",
+   "line": 145
+  },
+  {
+   "state": "self._pending_prompts",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/terminal_response_middleware.py",
+   "line": 81
+  },
+  {
+   "state": "self._exempt_tools",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/tool_progress_middleware.py",
+   "line": 213
+  },
+  {
+   "state": "self._phase_states",
+   "file": "backend/packages/harness/deerflow/agents/middlewares/tool_progress_middleware.py",
+   "line": 223
+  },
+  {
+   "state": "self._sandboxes",
+   "file": "backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py",
+   "line": 189
+  },
+  {
+   "state": "self._thread_sandboxes",
+   "file": "backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py",
+   "line": 191
+  },
+  {
+   "state": "self._thread_locks",
+   "file": "backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py",
+   "line": 192
+  },
+  {
+   "state": "self._warm_pool",
+   "file": "backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py",
+   "line": 198
+  },
+  {
+   "state": "self._local_teardown",
+   "file": "backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py",
+   "line": 208
+  },
+  {
+   "state": "self._acquire_inflight",
+   "file": "backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py",
+   "line": 211
+  },
+  {
+   "state": "self._leases",
+   "file": "backend/packages/harness/deerflow/community/aio_sandbox/ownership/memory.py",
+   "line": 41
+  },
+  {
+   "state": "self._boxes",
+   "file": "backend/packages/harness/deerflow/community/boxlite/provider.py",
+   "line": 194
+  },
+  {
+   "state": "self._warm_pool",
+   "file": "backend/packages/harness/deerflow/community/boxlite/provider.py",
+   "line": 196
+  },
+  {
+   "state": "self._skip_health_check_warm_ids",
+   "file": "backend/packages/harness/deerflow/community/boxlite/provider.py",
+   "line": 199
+  },
+  {
+   "state": "self._sessions",
+   "file": "backend/packages/harness/deerflow/community/browser_automation/session.py",
+   "line": 850
+  },
+  {
+   "state": "self._sandboxes",
+   "file": "backend/packages/harness/deerflow/community/e2b_sandbox/e2b_sandbox_provider.py",
+   "line": 137
+  },
+  {
+   "state": "self._evictions_in_progress",
+   "file": "backend/packages/harness/deerflow/community/e2b_sandbox/e2b_sandbox_provider.py",
+   "line": 151
+  },
+  {
+   "state": "self._remote_ops_in_progress",
+   "file": "backend/packages/harness/deerflow/community/e2b_sandbox/e2b_sandbox_provider.py",
+   "line": 154
+  },
+  {
+   "state": "self._unowned_remote_ops_in_progress",
+   "file": "backend/packages/harness/deerflow/community/e2b_sandbox/e2b_sandbox_provider.py",
+   "line": 157
+  },
+  {
+   "state": "self._acquire_inflight",
+   "file": "backend/packages/harness/deerflow/community/e2b_sandbox/e2b_sandbox_provider.py",
+   "line": 165
+  },
+  {
+   "state": "self._sandboxes",
+   "file": "backend/packages/harness/deerflow/community/tenki/provider.py",
+   "line": 120
+  },
+  {
+   "state": "self._warm_pool",
+   "file": "backend/packages/harness/deerflow/community/tenki/provider.py",
+   "line": 122
+  },
+  {
+   "state": "self._config",
+   "file": "backend/packages/harness/deerflow/community/tenki/provider.py",
+   "line": 128
+  },
+  {
+   "state": "self._denied",
+   "file": "backend/packages/harness/deerflow/guardrails/builtin.py",
+   "line": 17
+  },
+  {
+   "state": "self._locks",
+   "file": "backend/packages/harness/deerflow/mcp/oauth.py",
+   "line": 42
+  },
+  {
+   "state": "self._entries",
+   "file": "backend/packages/harness/deerflow/mcp/session_pool.py",
+   "line": 55
+  },
+  {
+   "state": "self._account_id",
+   "file": "backend/packages/harness/deerflow/models/openai_codex_provider.py",
+   "line": 98
+  },
+  {
+   "state": "self._data",
+   "file": "backend/packages/harness/deerflow/runtime/checkpoint_cache/memory.py",
+   "line": 24
+  },
+  {
+   "state": "self._seq_counters",
+   "file": "backend/packages/harness/deerflow/runtime/events/store/jsonl.py",
+   "line": 45
+  },
+  {
+   "state": "self._buffer",
+   "file": "backend/packages/harness/deerflow/runtime/journal.py",
+   "line": 244
+  },
+  {
+   "state": "self._counted_external_source_ids",
+   "file": "backend/packages/harness/deerflow/runtime/journal.py",
+   "line": 267
+  },
+  {
+   "state": "self._runs",
+   "file": "backend/packages/harness/deerflow/runtime/runs/store/memory.py",
+   "line": 16
+  },
+  {
+   "state": "self._streams",
+   "file": "backend/packages/harness/deerflow/runtime/stream_bridge/memory.py",
+   "line": 36
+  },
+  {
+   "state": "self._counters",
+   "file": "backend/packages/harness/deerflow/runtime/stream_bridge/memory.py",
+   "line": 37
+  },
+  {
+   "state": "self._agent_written_paths",
+   "file": "backend/packages/harness/deerflow/sandbox/local/local_sandbox.py",
+   "line": 194
+  },
+  {
+   "state": "_background_tasks",
+   "file": "backend/packages/harness/deerflow/subagents/executor.py",
+   "line": 256
+  },
+  {
+   "state": "self._counted_run_ids",
+   "file": "backend/packages/harness/deerflow/subagents/token_collector.py",
+   "line": 23
+  },
+  {
+   "state": "self._reserved_ports",
+   "file": "backend/packages/harness/deerflow/utils/network.py",
+   "line": 33
+  }
+ ],
+ "repo": "bytedance/deer-flow",
+ "stars": 61047
+}

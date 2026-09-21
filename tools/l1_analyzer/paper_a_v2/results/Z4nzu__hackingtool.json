@@ -1,0 +1,36 @@
+{
+ "status": "ok",
+ "clone_seconds": 0.4,
+ "v1_mutable_ratio": 20.6,
+ "v1_details": "72/350 functions reference external mutable state (python)",
+ "v2_verdict": "promiscuous",
+ "v2_counts": {
+  "neutral": 28,
+  "promiscuous": 1,
+  "unresolved": 3
+ },
+ "v2_coverage": {
+  "neutral": {
+   "observe_only": 26,
+   "drives_decision": 2
+  },
+  "promiscuous": {
+   "observe_only": 0,
+   "drives_decision": 1
+  },
+  "unresolved": {
+   "observe_only": 0,
+   "drives_decision": 3
+  }
+ },
+ "v2_resolvable": 0.906,
+ "v2_promiscuous": [
+  {
+   "state": "tool_definitions",
+   "file": "src/hackingtool/cli.py",
+   "line": 71
+  }
+ ],
+ "repo": "Z4nzu/hackingtool",
+ "stars": 58067
+}
