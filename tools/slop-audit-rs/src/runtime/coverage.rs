@@ -178,37 +178,10 @@ use crate::runtime::runners::{first_line, ran_tests, runner_for, which};
 use crate::runtime::run_untrusted;
 use std::path::Path;
 
-/// A JaCoCo-instrumented pom, used by the live test below.
+/// A JaCoCo-instrumented pom, shared with the determinism live test rather than written
+/// twice. Two copies of one fixture is two things to keep in step.
 #[cfg(test)]
-const JACOCO_POM: &str = r#"<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>fixture</groupId>
-  <artifactId>band</artifactId>
-  <version>1.0</version>
-  <properties>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
-  </properties>
-  <dependencies>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <version>5.10.2</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
-  <build><plugins>
-    <plugin>
-      <groupId>org.jacoco</groupId>
-      <artifactId>jacoco-maven-plugin</artifactId>
-      <version>0.8.12</version>
-      <executions>
-        <execution><goals><goal>prepare-agent</goal></goals></execution>
-        <execution><id>report</id><phase>test</phase><goals><goal>report</goal></goals></execution>
-      </executions>
-    </plugin>
-  </plugins></build>
-</project>"#;
+const JACOCO_POM: &str = include_str!("../../tests/fixtures/jacoco-pom.xml");
 
 /// A scratch directory no other run will use.
 ///
@@ -421,10 +394,10 @@ mod go_tests {
 // --------------------------------------------------------------------------
 
 /// One element found by the scan below: its name, its depth, and its attributes as text.
-struct Element<'a> {
-    name: &'a str,
-    depth: usize,
-    attrs: &'a str,
+pub struct Element<'a> {
+    pub name: &'a str,
+    pub depth: usize,
+    pub attrs: &'a str,
 }
 
 /// Every element in an XML document, with the depth it sits at.
@@ -437,7 +410,7 @@ struct Element<'a> {
 /// DEPTH IS THE POINT. JaCoCo writes a `counter` element at four levels, report, package,
 /// class and method, and the report-level ones are the grand total. A reader that matched
 /// every counter in the file would add the same branches four times over.
-fn elements(xml: &str) -> Vec<Element<'_>> {
+pub fn xml_elements(xml: &str) -> Vec<Element<'_>> {
     let mut found = Vec::new();
     let mut depth = 0usize;
     let bytes = xml.as_bytes();
@@ -472,7 +445,7 @@ fn elements(xml: &str) -> Vec<Element<'_>> {
 }
 
 /// One attribute's value, read out of an element's attribute text.
-fn attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
+pub fn xml_attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
     let key = format!("{name}=\"");
     let start = attrs.find(&key)? + key.len();
     let rest = &attrs[start..];
@@ -493,15 +466,15 @@ fn attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
 /// reading the second as zero would publish Slop for a repository whose coverage was never
 /// measured.
 pub fn jacoco_totals(xml: &str) -> Option<Totals> {
-    for element in elements(xml) {
+    for element in xml_elements(xml) {
         if element.name != "counter" || element.depth != 2 {
             continue;
         }
-        if attr(element.attrs, "type") != Some("BRANCH") {
+        if xml_attr(element.attrs, "type") != Some("BRANCH") {
             continue;
         }
-        let covered: i64 = attr(element.attrs, "covered")?.parse().ok()?;
-        let missed: i64 = attr(element.attrs, "missed")?.parse().ok()?;
+        let covered: i64 = xml_attr(element.attrs, "covered")?.parse().ok()?;
+        let missed: i64 = xml_attr(element.attrs, "missed")?.parse().ok()?;
         return Some(Totals { covered, total: covered + missed });
     }
     None
@@ -514,12 +487,12 @@ pub fn jacoco_totals(xml: &str) -> Option<Totals> {
 ///
 /// Nothing, never a pair of zeroes, for the reason the JaCoCo reader gives.
 pub fn cobertura_totals(xml: &str) -> Option<Totals> {
-    for element in elements(xml) {
+    for element in xml_elements(xml) {
         if element.name != "coverage" {
             continue;
         }
-        let covered: i64 = attr(element.attrs, "branches-covered")?.parse().ok()?;
-        let valid: i64 = attr(element.attrs, "branches-valid")?.parse().ok()?;
+        let covered: i64 = xml_attr(element.attrs, "branches-covered")?.parse().ok()?;
+        let valid: i64 = xml_attr(element.attrs, "branches-valid")?.parse().ok()?;
         return Some(Totals { covered, total: valid });
     }
     None
@@ -584,14 +557,14 @@ mod report_tests {
 
     #[test]
     fn the_scan_tracks_depth_through_self_closing_and_paired_tags() {
-        let found = elements(r#"<a><b/><c><d/></c></a>"#);
+        let found = xml_elements(r#"<a><b/><c><d/></c></a>"#);
         let depths: Vec<(&str, usize)> = found.iter().map(|e| (e.name, e.depth)).collect();
         assert_eq!(depths, vec![("a", 1), ("b", 2), ("c", 2), ("d", 3)]);
     }
 
     #[test]
     fn a_declaration_or_comment_is_not_an_element() {
-        let found = elements(r#"<?xml version="1.0"?><!-- note --><a/>"#);
+        let found = xml_elements(r#"<?xml version="1.0"?><!-- note --><a/>"#);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].name, "a");
     }
