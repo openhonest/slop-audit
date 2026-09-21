@@ -22,7 +22,8 @@ use slop_audit_rs::{lang, panel, state};
 use std::path::Path;
 
 fn usage() -> ! {
-    eprintln!("usage: slop-audit-rs <repo> [--lang KEY] [--tsv] [--version]");
+    eprintln!("usage: slop-audit-rs <repo> [--lang KEY] [--tsv] [--no-exec] [--version]");
+    eprintln!("  --no-exec  do not run the target's own test suite (it is run by default)");
     std::process::exit(2);
 }
 
@@ -40,6 +41,7 @@ fn main() {
     let mut lang_arg: Option<String> = None;
     let mut tsv = false;
     let mut census = false;
+    let mut exec_tests = true;
     let mut enumerate = false;
 
     let mut args = std::env::args().skip(1);
@@ -51,6 +53,10 @@ fn main() {
             // be diffed site by site against the Python reference on a real repository.
             // A count that matches by luck and a count that matches by agreement look the
             // same from the outside, and this is what tells them apart.
+            // This binary RUNS the audited project's suite, by the decision of
+            // 2026-09-21. The flag turns that off; there is no flag to turn it on, because
+            // it is on.
+            "--no-exec" => exec_tests = false,
             "--census" => census = true,
             // Beside --census, and for the same reason: this one dumps what the
             // CLASSIFIER'S walk reached, with the key each site yielded and the empty
@@ -111,7 +117,7 @@ fn main() {
 
     // One row per canonical indicator, whether or not this binary computes it. An
     // indicator it cannot compute prints its reason; see src/coverage.rs.
-    let panel = panel::analyze(repo, &language);
+    let panel = panel::analyze(repo, &language, exec_tests);
 
     if tsv {
         println!("lang\t{language}");

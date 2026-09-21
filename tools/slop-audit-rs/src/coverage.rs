@@ -22,14 +22,6 @@ pub enum Coverage {
     Measured,
     /// Implemented in the Python reference, not yet ported to this binary.
     NotPorted,
-    /// Needs the target's own suite to RUN, and the harness that runs it is not ported
-    /// yet.
-    ///
-    /// Kept apart from `NotPorted` because the two send a reader to different places: a
-    /// not-ported indicator reads a tree, and this one executes the audited project's
-    /// code. That difference is what an auditor has to disclose at a client site, so it
-    /// keeps its own row rather than being folded into the general case.
-    NeedsTestRun,
 }
 
 impl Coverage {
@@ -55,16 +47,6 @@ impl Coverage {
             }
             Coverage::NotPorted => {
                 "not ported to the portable binary; run the Python reference for this indicator"
-                    .into()
-            }
-            // The sentence this used to carry, "requires executing the target's own test
-            // suite, which this binary does not do", was true until 2026-09-21 and is a
-            // statement about a build in progress now. An auditor could hand this binary to
-            // a client's security team on the old sentence; they cannot on this one, and
-            // saying so is the point.
-            Coverage::NeedsTestRun => {
-                "the harness that runs the target's own test suite is not ported yet; run \
-                 the Python reference for this indicator"
                     .into()
             }
         }
@@ -106,7 +88,10 @@ pub const CANONICAL: &[(&str, &str, Coverage)] = &[
     ("L1.18", "mutable-state", Coverage::NotPorted),
     ("L1.18b", "finite-testability", Coverage::NotPorted),
     ("L1.19", "decision-space", Coverage::Measured),
-    ("L1.20", "test-determinism", Coverage::NeedsTestRun),
+    // Measured since 2026-09-21, when the decision was taken that this binary runs the
+    // audited project's own suite. The panel always produces the row: either a reading, or
+    // the reason the run did not take one.
+    ("L1.20", "test-determinism", Coverage::Measured),
     // The additive checks. They are part of the reference panel, so they are part of the
     // contract: leaving them out of this table is how they stayed invisible while the
     // differ compared only the intersection of the two key sets.
@@ -203,11 +188,15 @@ mod tests {
         let reason = |code: &str| {
             panel.iter().find(|i| i.code == code).unwrap().details.clone()
         };
+        // Two reasons remain, and they must stay distinguishable. A third, naming a tool
+        // to install, and a fourth, saying this binary does not run tests, were both
+        // removed when they stopped being true: the tools were replaced by algorithms, and
+        // the binary now runs the suite.
         let not_ported = reason("L1.18");
-        let needs_run = reason("L1.20");
-        assert_ne!(not_ported, needs_run);
+        let defect = reason("L1.20");
+        assert_ne!(not_ported, defect);
         assert!(not_ported.contains("not ported"), "{not_ported}");
-        assert!(needs_run.contains("test suite"), "{needs_run}");
+        assert!(defect.contains("defect in the binary"), "{defect}");
         // No canonical row names a tool any more. Every one that did was wrong about it,
         // and a reason that sends a reader to install something is worth this check.
         for ind in panel {

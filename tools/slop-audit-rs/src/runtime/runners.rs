@@ -373,10 +373,15 @@ pub fn first_line(output: &str) -> String {
         .unwrap_or_else(|| "no output".to_string())
 }
 
-/// The command for one attempt, with the seed filled in where the runner takes one.
-fn command_for(runner: &Runner, attempt: usize) -> Vec<String> {
-    runner.command.iter()
-        .map(|part| part.replace("{seed}", &attempt.to_string()))
+/// The command for one attempt, with the placeholders filled in.
+///
+/// `{seed}` where the runner takes one, and `{python}` where the row names an interpreter.
+/// One function, because filling them in two places is two places for the spelling of a
+/// placeholder to drift from the table that declares it.
+pub fn command_for(template: &[&str], attempt: usize, interpreter: &str) -> Vec<String> {
+    template.iter()
+        .map(|part| part.replace("{seed}", &attempt.to_string())
+                        .replace("{python}", interpreter))
         .collect()
 }
 
@@ -450,10 +455,7 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
 
     // Lazy, so the tally's return on a timed-out or never-run attempt stops the rest.
     let attempts = (1..=runs).map(|attempt| {
-        let filled: Vec<String> = command.iter()
-            .map(|part| part.replace("{seed}", &attempt.to_string())
-                            .replace("{python}", &interpreter))
-            .collect();
+        let filled = command_for(command, attempt, &interpreter);
         let finished = run_untrusted(&filled, repo, &[], timeout_seconds);
         let output = finished.output();
         // A row that declares exit codes is read by them, because a code cannot be deleted
@@ -559,7 +561,7 @@ mod tests {
         // The seed IS the position. Go shuffles with seeds one to N in order, so carrying
         // the number alongside would be a second copy of one fact.
         let runner = runner_for("go").expect("go");
-        assert_eq!(command_for(runner, 3),
+        assert_eq!(command_for(runner.command, 3, ""),
                    vec!["go", "test", "./...", "-shuffle=3", "-count=1"]);
     }
 
@@ -571,7 +573,7 @@ mod tests {
         assert_eq!(runner.ordering, Ordering::SchedulerVaried);
         assert_eq!(runner.unit, "run");
         assert!(runner.describe.contains("scheduler-varied"));
-        assert_eq!(command_for(runner, 3), vec!["dotnet", "test"]);
+        assert_eq!(command_for(runner.command, 3, ""), vec!["dotnet", "test"]);
     }
 
     #[test]
@@ -1019,9 +1021,7 @@ pub fn js_determinism(repo: &Path, runs: usize, timeout_seconds: f64,
         describe: format!("shuffled-order {name} runs passed cleanly (under {runtime})"),
     };
     let attempts = (1..=runs).map(|attempt| {
-        let filled: Vec<String> = command.iter()
-            .map(|part| part.replace("{seed}", &attempt.to_string()))
-            .collect();
+        let filled = command_for(command, attempt, "");
         let finished = run_untrusted(&filled, repo, &[], timeout_seconds);
         let output = finished.output();
         let ran = finished.status != TIMED_OUT
