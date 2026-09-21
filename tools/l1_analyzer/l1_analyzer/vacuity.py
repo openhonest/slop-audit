@@ -74,6 +74,7 @@ import ast
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer.boundary import boundary
 from l1_analyzer.vacuity_size import (  # noqa: F401 - re-exported: the tests read these
     _CONTAINER_CALLS,
     _SIZE_CALLS,
@@ -835,7 +836,13 @@ _IGNORED_PARTS = frozenset({".venv", "__pycache__", ".git", "build", "dist", "ta
                             "node_modules", ".mypy_cache", ".pytest_cache", ".ruff_cache"})
 
 
+@boundary
 def _python_files(root: Path) -> list[Path]:
+    """Every Python file under `root` this check will read, in a settled order.
+
+    Declared an edge on 2026-09-21, when `rglob` joined this package's own list of calls
+    that leave the process. It walks a tree, which is the edge; the declaration was missing
+    only because the reader could not see the call it makes."""
     return sorted(p for p in root.rglob("*.py") if not (_IGNORED_PARTS & set(p.parts)))
 
 

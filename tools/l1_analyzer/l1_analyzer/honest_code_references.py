@@ -49,12 +49,20 @@ def ours(path: Path) -> bool:
     return not (set(path.parts) & _NOT_OURS)
 
 
+@boundary
 def pages_and_stylesheets(repo: Path) -> tuple[list[Path], list[Path]]:
     """The rendered artifacts and the stylesheets they can resolve against.
 
     Both together, because neither is a finding on its own: a page with no stylesheet
     anywhere has nothing to resolve a class against, and reporting every class in it would
-    be a finding about this reader."""
+    be a finding about this reader.
+
+    Declared an edge on 2026-09-21, when `rglob` joined this package's own list of calls
+    that leave the process. It had walked the filesystem since it was written, and the
+    module's test asserting that no helper below the entry point touches a disk passed the
+    whole time, because the reader could not see the one call this function makes. The test
+    was right and the reader was short a name. What it does IS the edge: it finds files,
+    and everything deciding anything about them takes text."""
     pages, sheets = [], []
     for found in repo.rglob("*"):
         if not found.is_file() or not ours(found):

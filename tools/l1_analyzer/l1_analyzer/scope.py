@@ -288,9 +288,16 @@ def under_symlinked_dir(path: Path, root: Path) -> bool:
         current = current.parent
 
 
+@boundary
 def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
     """Every FILE under `repo` matching `pattern`. The single entry point for every
     scan in this module, so no reader has to remember what `rglob` yields.
+
+    Declared an edge on 2026-09-21, when `rglob` joined this package's own list of calls
+    that leave the process. The docstring below already called it the single entry point
+    for every scan here, which is what an edge IS, and the declaration was missing only
+    because the reader could not see the call it makes. Every scan in this instrument
+    reaches the filesystem through this line.
 
     `Path.rglob` yields directories as well as files, so a directory whose name ends in
     a source extension (node_modules/decimal.js is a real one) used to reach a reader,

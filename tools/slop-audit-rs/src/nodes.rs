@@ -144,3 +144,136 @@ mod tests {
         assert_eq!(names, vec!["A", "B"]);
     }
 }
+
+// --- readers that need one grammar's vocabulary -------------------------------
+//
+// Still no knowledge of state or verdicts: these read a parse tree through the generated
+// language table, which is a table of node types and field names.
+
+use crate::lang_spec::{lookup, LangSpec};
+
+/// Node identity. A field lookup hands back a fresh wrapper each call, so two values that
+/// name the same node are not the same value; the stable id is what compares them.
+pub fn same(a: Option<Node>, b: Option<Node>) -> bool {
+    match (a, b) {
+        (Some(a), Some(b)) => a.id() == b.id(),
+        _ => false,
+    }
+}
+
+/// A subscript's named children.
+fn sub_named<'t>(subscript: Node<'t>) -> Vec<Node<'t>> {
+    children(subscript).into_iter().filter(|c| c.is_named()).collect()
+}
+
+/// The collection being indexed. Rust's index expression has no fields, so the collection
+/// is the first named child; other grammars name it.
+pub fn sub_collection<'t>(subscript: Node<'t>, sp: &LangSpec) -> Option<Node<'t>> {
+    if sp.sub_positional {
+        return sub_named(subscript).into_iter().next();
+    }
+    field(Some(subscript), sp.sub_value?)
+}
+
+/// The key or index node of a subscript. Rust indexes positionally; C# wraps the key in a
+/// bracketed argument list; the others name it.
+pub fn sub_key<'t>(subscript: Node<'t>, sp: &LangSpec) -> Option<Node<'t>> {
+    if sp.sub_positional {
+        return sub_named(subscript).into_iter().nth(1);
+    }
+    let idx = field(Some(subscript), sp.sub_index?)?;
+    if idx.kind() == "bracketed_argument_list" {
+        return arg_value(first_named(Some(idx)));
+    }
+    Some(idx)
+}
+
+/// Unwrap a C# argument wrapper to the expression it carries.
+pub fn arg_value<'t>(node: Option<Node<'t>>) -> Option<Node<'t>> {
+    match node {
+        Some(n) if n.kind() == "argument" => first_named(Some(n)),
+        other => other,
+    }
+}
+
+/// True when this node is the assigned lvalue of an assignment, unwrapping an optional
+/// wrapper (Go puts assignment targets inside an expression list).
+pub fn is_lvalue(node: Option<Node>, sp: &LangSpec) -> bool {
+    let Some(mut node) = node else { return false };
+    let mut parent = node.parent();
+    if !sp.lvalue_wrapper.is_empty() {
+        if let Some(p) = parent {
+            if p.kind() == sp.lvalue_wrapper {
+                node = p;
+                parent = p.parent();
+            }
+        }
+    }
+    match parent {
+        Some(p) => sp.assign_types.contains(&p.kind())
+            && same(field(Some(p), sp.assign_left), Some(node)),
+        None => false,
+    }
+}
+
+/// The reference is the DECLARED NAME in a declaration.
+///
+/// A declaration binds the state, it does not consume it, which is what an assignment
+/// target does too. It is a separate predicate only because the node is not an assignment
+/// in any of the nine grammars and would never match the assignment types.
+///
+/// The FIELD is checked, not just the node type: `int y = stack.length;` puts `stack`
+/// under a declarator too, in the VALUE, where it is read and not bound.
+pub fn is_binding_site(reference: Node, parent: Node, sp: &LangSpec) -> bool {
+    match lookup(sp.binding_sites, parent.kind()) {
+        Some(binding_field) => same(field(Some(parent), binding_field), Some(reference)),
+        None => false,
+    }
+}
+
+/// Whether this reference is being written to rather than read.
+///
+/// The parent is optional because a node at the root of a parse has none, and callers pass
+/// `node.parent()` straight in. A reference with nothing above it is not being written to
+/// by anything.
+pub fn is_write_target(reference: Node, parent: Option<Node>, sp: &LangSpec) -> bool {
+    let Some(parent) = parent else { return false };
+    if is_lvalue(Some(reference), sp) || is_binding_site(reference, parent, sp) {
+        return true;
+    }
+    // `S[k] = v`: the reference is the collection of a subscript that is the assign target.
+    sp.subscript_types.contains(&parent.kind())
+        && same(sub_collection(parent, sp), Some(reference))
+        && is_lvalue(Some(parent), sp)
+}
+
+/// Peel the wrappers that leave a value's identity alone, so none of them can hide a
+/// literal underneath.
+///
+/// A unary operator over a literal is itself one compile-time value: `-1` is the last
+/// element, `+1` the second. So is a borrow, a parenthesis and a cast: `&1`, `(1)` and
+/// `(int)1` each name the same single constant that `1` names. Unwrapping rather than
+/// listing the wrapper is what keeps `-x` and `&k` unbounded, because both peel to an
+/// identifier, which is no literal.
+///
+/// The vocabulary is the VALUE wrapper list and deliberately not the flow walker's
+/// passthrough list, though the two overlap. Passthrough answers whether the value flows
+/// onward through this node, which is true of a boolean operator, a negation, a try and an
+/// await. None of those preserves a literal's identity: `s[1 or x]` is not a constant
+/// index, and folding it would be a false green rather than the false red this fixes.
+///
+/// The borrow is why it was worth a second pass. Rust's reference expression was already
+/// in its passthrough set, so the flow walker read the borrow as transparent while this
+/// predicate did not, and two walks disagreeing about one wrapper is what let the defect
+/// survive. In Rust it is not an edge case: `map.contains_key(&1)` is what real code
+/// writes, and it graded worst where the unidiomatic spelling graded neutral.
+pub fn unwrap_unary<'t>(node: Option<Node<'t>>, sp: &LangSpec) -> Option<Node<'t>> {
+    let mut current = node;
+    while let Some(n) = current {
+        if !sp.value_wrapper_types.contains(&n.kind()) {
+            return Some(n);
+        }
+        current = first_named(Some(n));
+    }
+    None
+}

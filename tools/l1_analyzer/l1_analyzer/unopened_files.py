@@ -69,8 +69,13 @@ def _ours(path: str) -> bool:
     return not (set(Path(path).parts) & _NOT_THIS_REPOSITORY)
 
 
+@boundary
 def files_on_disk(repo: Path) -> tuple[set[str], dict[str, set[str]]]:
     """Every file in the repository, by path from the root and by bare name.
+
+    Declared an edge on 2026-09-21, when `rglob` joined this package's own list of calls
+    that leave the process. Its name says what it does, and finding files on disk IS the
+    edge; the declaration was missing only because the reader could not see the call.
 
     Both, because a project spells the same file two ways. The code that reads it says
     `rules/business_rules.yaml` and the test that opens it says `business_rules.yaml`, so a

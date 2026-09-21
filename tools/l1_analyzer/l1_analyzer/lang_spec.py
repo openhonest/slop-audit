@@ -651,12 +651,20 @@ LANG_SPEC: dict[str, LangSpec] = {
         # variable is called, and a method of that name doing something else is rare enough
         # that counting it is the safer error. Reported by an adopter whose function made a
         # directory and was told it reached nothing outside the process.
+        # `rglob` joined `glob` on 2026-09-21. It is the recursive sibling of a name already
+        # here and reaches the filesystem in exactly the same way, and `callmap` had
+        # classified it as a filesystem call since it was written, so the two tables
+        # disagreed about one name for as long as both existed. Twenty-eight sites in this
+        # package walk a tree with it, `honest_code_references` among them, and every one
+        # of them was a function the edge reader was told reached nothing outside the
+        # process. Found when a declared boundary that walks a source tree was reported as
+        # declaring an edge it does not have.
         "io_calls": frozenset({
                           "Popen", "chmod", "check_output", "commit", "execute", "fetchall",
                           "fetchone", "glob", "hardlink_to", "input", "iterdir", "listdir",
                           "makedirs", "mkdir", "open", "print", "read_bytes", "read_text",
-                          "remove", "rename", "replace_file", "rmdir", "symlink_to", "touch",
-                          "unlink", "urlopen", "write_bytes", "write_text"}),
+                          "remove", "rename", "replace_file", "rglob", "rmdir", "symlink_to",
+                          "touch", "unlink", "urlopen", "write_bytes", "write_text"}),
         # A module matches on its full dotted text as written, or on its last segment. That
         # is what lets `urllib.request` and `http.client` be named without also naming every
         # `self.request` and every `self.client` in every codebase.
