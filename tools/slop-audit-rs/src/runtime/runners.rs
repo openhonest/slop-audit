@@ -118,6 +118,15 @@ pub struct Runner {
     pub no_runs: &'static str,
     /// The sentence for an attempt that executed nothing.
     pub nothing_ran: &'static str,
+    /// Exit codes that mean the suite did not complete a valid run, and why.
+    ///
+    /// An EXIT CODE is a better signal than a marker in the output, and Python is the one
+    /// row that has one. A marker can be deleted by the command's own flags, which is how
+    /// Java came to report that every Maven project on earth never ran its suite; an exit
+    /// code cannot be.
+    pub incomplete: &'static [(i32, &'static str)],
+    /// Exit codes that mean the runner collected nothing to run.
+    pub collected_nothing: &'static [i32],
     /// The ways this language's projects run their suites, where there is more than one.
     ///
     /// Empty for a language with one runner, which is most of them. A language with
@@ -143,6 +152,8 @@ pub const RUNNERS: &[Runner] = &[
         describe: "shuffled-order runs passed cleanly",
         no_runs: "no shuffled runs were made; determinism not measured",
         nothing_ran: "no test packages built or executed",
+        incomplete: &[],
+        collected_nothing: &[],
         variants: &[],
     },
     Runner {
@@ -161,6 +172,8 @@ pub const RUNNERS: &[Runner] = &[
                    not seed-controlled)",
         no_runs: "no `dotnet test` runs were made; determinism not measured",
         nothing_ran: "no test project built or executed",
+        incomplete: &[],
+        collected_nothing: &[],
         variants: &[],
     },
     Runner {
@@ -176,6 +189,8 @@ pub const RUNNERS: &[Runner] = &[
         describe: "cargo-test runs passed cleanly (libtest varies order across runs)",
         no_runs: "no cargo-test runs were made; determinism not measured",
         nothing_ran: "cargo test collected no tests",
+        incomplete: &[],
+        collected_nothing: &[],
         variants: &[],
     },
     Runner {
@@ -194,6 +209,32 @@ pub const RUNNERS: &[Runner] = &[
         describe: "",
         no_runs: "C has no standard test-order randomizer; determinism not measured",
         nothing_ran: "",
+        incomplete: &[],
+        collected_nothing: &[],
+        variants: &[],
+    },
+    Runner {
+        lang: "python",
+        tool: "python3",
+        tool_missing: "needs a Python interpreter in PATH",
+        // pytest-randomly supplies the seed; a project without it is refused by the
+        // caller, because five identical runs say nothing about order.
+        command: &["{python}", "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                   "--randomly-seed={seed}"],
+        ordering: Ordering::Seeded,
+        // Read by exit code instead, which is what the two tables below are for.
+        ran_markers: &[],
+        never_ran: &[],
+        unit: "seed",
+        describe: "randomized-order runs passed cleanly",
+        no_runs: "no randomized-order runs were made; determinism not measured",
+        nothing_ran: "pytest collected no tests",
+        incomplete: &[
+            (2, "the run was interrupted"),
+            (3, "pytest hit an internal error"),
+            (4, "pytest usage or collection error (the suite did not run)"),
+        ],
+        collected_nothing: &[5],
         variants: &[],
     },
     Runner {
@@ -209,6 +250,8 @@ pub const RUNNERS: &[Runner] = &[
         describe: "randomized-order runs passed cleanly",
         no_runs: "no randomized-order runs were made; determinism not measured",
         nothing_ran: "the runner reported no tests",
+        incomplete: &[],
+        collected_nothing: &[],
         variants: &[
             // RSpec first: a project with both a spec directory and a test directory is an
             // RSpec project, and order is what says so.
@@ -320,6 +363,15 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
         }
     };
     let command = variant.map(|v| v.command).unwrap_or(runner.command);
+    // A row whose command names an interpreter needs the project's own, resolved once.
+    let interpreter = if command.iter().any(|part| part.contains("{python}")) {
+        match python_interpreter(repo) {
+            Some((path, _provenance)) => path,
+            None => return not_measured(runner.tool_missing),
+        }
+    } else {
+        String::new()
+    };
     let markers = variant.map(|v| v.ran_markers).unwrap_or(runner.ran_markers);
     let nothing_ran = variant.map(|v| v.nothing_ran).unwrap_or(runner.nothing_ran);
 
@@ -336,22 +388,65 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
     // Lazy, so the tally's return on a timed-out or never-run attempt stops the rest.
     let attempts = (1..=runs).map(|attempt| {
         let filled: Vec<String> = command.iter()
-            .map(|part| part.replace("{seed}", &attempt.to_string()))
+            .map(|part| part.replace("{seed}", &attempt.to_string())
+                            .replace("{python}", &interpreter))
             .collect();
         let finished = run_untrusted(&filled, repo, &[], timeout_seconds);
         let output = finished.output();
-        let ran = finished.status != TIMED_OUT
-            && !runner.never_ran.iter().any(|m| output.contains(m))
-            && markers.iter().any(|m| output.contains(m));
+        // A row that declares exit codes is read by them, because a code cannot be deleted
+        // by the command's own flags the way a marker can. A row that declares none falls
+        // to its markers, which is every other language.
+        let by_code = !runner.incomplete.is_empty() || !runner.collected_nothing.is_empty();
+        let why = if runner.collected_nothing.contains(&finished.status) {
+            nothing_ran.to_string()
+        } else {
+            match runner.incomplete.iter().find(|(code, _)| *code == finished.status) {
+                Some((_, reason)) => (*reason).to_string(),
+                None => nothing_ran.to_string(),
+            }
+        };
+        let ran = if finished.status == TIMED_OUT {
+            false
+        } else if by_code {
+            !runner.collected_nothing.contains(&finished.status)
+                && !runner.incomplete.iter().any(|(code, _)| *code == finished.status)
+        } else {
+            !runner.never_ran.iter().any(|m| output.contains(m))
+                && markers.iter().any(|m| output.contains(m))
+        };
         Attempt {
             status: finished.status,
             isolation: finished.isolation,
             ran_tests: ran,
             summary: first_line(&output),
-            why_it_did_not_run: format!("{nothing_ran} under {toolchain}"),
+            why_it_did_not_run: format!("{why} under {toolchain}"),
         }
     });
     tally(attempts, &words, timeout_seconds)
+}
+
+/// The interpreter a Python project's suite must run under.
+///
+/// THE PROJECT'S OWN, not the one that happened to launch this binary. The target package
+/// and its test dependencies are installed in the project's environment, and a suite run
+/// under the wrong interpreter imports nothing and fails every time, which would read as a
+/// suite that cannot pass rather than one that was never given its own library.
+///
+/// The layouts are tried in the order a project is most likely to use. None of them
+/// present falls back to the interpreter on PATH, and the details line names which was
+/// used so a reading always says what took it.
+pub fn python_interpreter(repo: &Path) -> Option<(String, String)> {
+    const LAYOUTS: &[&str] = &[
+        ".venv/bin/python", ".venv/bin/python3", "venv/bin/python", "venv/bin/python3",
+        ".venv/Scripts/python.exe", "venv/Scripts/python.exe",
+    ];
+    for layout in LAYOUTS {
+        let candidate = repo.join(layout);
+        if candidate.is_file() {
+            return Some((candidate.display().to_string(), format!("the repo's {layout}")));
+        }
+    }
+    which("python3").map(|path| (path.display().to_string(), "python3 on PATH".into()))
 }
 
 /// The path of an executable on PATH, or nothing.
@@ -434,6 +529,13 @@ mod tests {
         // every project reported a suite that never ran.
         for runner in RUNNERS {
             if runner.ordering == Ordering::NotRandomizable {
+                continue;
+            }
+            // A row read by exit code needs no marker, which is the better signal: a
+            // code cannot be deleted by the command's own flags.
+            if !runner.incomplete.is_empty() || !runner.collected_nothing.is_empty() {
+                assert!(!runner.command.is_empty(), "{} has no command", runner.lang);
+                assert!(!runner.nothing_ran.is_empty(), "{} cannot say why", runner.lang);
                 continue;
             }
             if runner.variants.is_empty() {
@@ -940,5 +1042,102 @@ mod js_tests {
         let _ = std::fs::remove_dir_all(&root);
         assert_eq!(reading.band, "n/a");
         assert!(reading.details.contains("node --test"), "{}", reading.details);
+    }
+}
+
+#[cfg(test)]
+mod python_live {
+    //! The Python row against a real suite, including the two refusals its exit codes give.
+
+    use super::*;
+
+    /// A project with its own virtual environment, pytest and pytest-randomly installed.
+    /// Nothing is measured without the randomiser: five identical runs say nothing about
+    /// order, so a project without it is a refusal rather than a score.
+    fn pytest_project(body: &str) -> Option<std::path::PathBuf> {
+        let uv = which("uv")?;
+        let root = std::env::temp_dir().join(format!(
+            "slop-pydet-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos()).unwrap_or(0)));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).ok()?;
+        std::fs::write(root.join("band.py"),
+            "def band(n):\n    if n < 0:\n        return \"neg\"\n    return \"pos\"\n").ok()?;
+        std::fs::write(root.join("test_band.py"), body).ok()?;
+        let made = run_untrusted(
+            &[uv.display().to_string(), "venv".into(), ".venv".into()], &root, &[], 300.0);
+        if made.status != 0 {
+            let _ = std::fs::remove_dir_all(&root);
+            return None;
+        }
+        let installed = run_untrusted(
+            &[uv.display().to_string(), "pip".into(), "install".into(), "--quiet".into(),
+              "pytest".into(), "pytest-randomly".into()],
+            &root,
+            &[("VIRTUAL_ENV".into(), root.join(".venv").display().to_string())],
+            600.0);
+        if installed.status != 0 {
+            let _ = std::fs::remove_dir_all(&root);
+            return None;
+        }
+        Some(root)
+    }
+
+    #[test]
+    fn the_projects_own_interpreter_is_preferred_over_the_one_on_the_path() {
+        // The target package and its test dependencies live in the project's environment.
+        // A suite run under the wrong interpreter imports nothing and fails every time,
+        // which reads as a suite that cannot pass rather than one never given its library.
+        let root = std::env::temp_dir().join(format!("slop-pyenv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".venv").join("bin")).unwrap();
+        std::fs::write(root.join(".venv").join("bin").join("python"), "#!/bin/sh\n").unwrap();
+        let (path, provenance) = python_interpreter(&root).expect("an interpreter");
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(path.contains(".venv"), "{path}");
+        assert!(provenance.contains(".venv"), "{provenance}");
+    }
+
+    #[test]
+    fn a_real_suite_that_passes_every_seed_is_the_whole_count() {
+        let Some(root) = pytest_project(
+            "from band import band\n\n\ndef test_positive():\n    assert band(3) == \"pos\"\n")
+        else {
+            eprintln!("skipped: uv is not on PATH, or the environment would not build");
+            return;
+        };
+        let reading = test_determinism(&root, "python", 3, 600.0, "a python");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.value, "3/3", "{}", reading.details);
+        assert_eq!(reading.band, "Healthy");
+    }
+
+    #[test]
+    fn a_real_suite_that_collects_nothing_is_refused_rather_than_scored() {
+        // pytest answers exit 5, which cannot be deleted by a quiet flag the way a marker
+        // can. Nought of three would read as a flaky suite.
+        let Some(root) = pytest_project("# no tests here\n") else {
+            eprintln!("skipped: uv is not on PATH, or the environment would not build");
+            return;
+        };
+        let reading = test_determinism(&root, "python", 3, 600.0, "a python");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a", "{}", reading.details);
+        assert!(reading.details.contains("collected no tests"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_real_suite_that_will_not_import_is_refused_with_the_reason() {
+        // A collection error is exit 4: the suite did not run, which is not the same fact
+        // as a suite that ran and failed.
+        let Some(root) = pytest_project("import there_is_no_such_module\n") else {
+            eprintln!("skipped: uv is not on PATH, or the environment would not build");
+            return;
+        };
+        let reading = test_determinism(&root, "python", 3, 600.0, "a python");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a", "{}", reading.details);
+        assert!(reading.details.contains("did not run"), "{}", reading.details);
     }
 }
