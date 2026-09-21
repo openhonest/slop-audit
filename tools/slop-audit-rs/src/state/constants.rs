@@ -145,7 +145,11 @@ pub fn immutable_const_verdict(refs: &[Node], immutable_ctors: &[String], sp: &L
 /// A declaration binding several names is settled only if all of them are, and one binding
 /// none, such as an enum member with no initialiser, is not settled here at all: this rule
 /// reads what was written, and nothing was.
-pub fn literal_initialiser(declaration: Node, sp: &LangSpec, src: &[u8]) -> bool {
+///
+/// It takes no source buffer, because it reads no text: whether a value is a literal is a
+/// question about node TYPES, and a parameter nothing reads is a claim about the inputs
+/// that is not true.
+pub fn literal_initialiser(declaration: Node, sp: &LangSpec) -> bool {
     let Some((node_type, _name_field, value_field)) = sp.local_binding.first() else {
         return false;
     };
@@ -208,7 +212,7 @@ pub fn declared_constant(refs: &[Node], sp: &LangSpec, src: &[u8]) -> bool {
                     || sp.immutable_modifiers.contains(&text(Some(n), src).as_str());
                 names(c) || crate::nodes::children(c).into_iter().any(names)
             });
-            if declared && literal_initialiser(node, sp, src) {
+            if declared && literal_initialiser(node, sp) {
                 return true;
             }
         }

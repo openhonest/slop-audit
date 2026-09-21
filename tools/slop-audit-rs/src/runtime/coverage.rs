@@ -788,53 +788,6 @@ mod runner_tests {
     }
 }
 
-/// (covered, total) branches from a c8 json-summary, or nothing when it carries none.
-///
-/// The summary holds a `total` object beside one entry per FILE, and every one of those
-/// entries carries a `branches` object of its own. So the reader cannot search for the
-/// first `branches` it sees: it has to find the `total` key at the top level and read the
-/// branches inside that. Depth is what tells them apart, the same rule the XML scan uses.
-///
-/// Strings are skipped rather than scanned, because a file path is a key in this document
-/// and a path can contain a brace or the word total.
-pub fn c8_totals(json: &str) -> Option<Totals> {
-    let bytes = json.as_bytes();
-    let mut depth = 0usize;
-    let mut at = 0usize;
-    // Where the top-level `total` object begins, once its key has been seen.
-    let mut in_total_at: Option<usize> = None;
-    while at < bytes.len() {
-        match bytes[at] {
-            b'"' => {
-                let (text, next) = read_json_string(json, at)?;
-                at = next;
-                // A key at depth one names a section; `total` is the one this reads.
-                if depth == 1 && text == "total" {
-                    in_total_at = Some(at);
-                }
-                continue;
-            }
-            b'{' | b'[' => depth += 1,
-            b'}' | b']' => {
-                depth -= 1;
-                // Left the top-level `total` object without finding branches in it.
-                if depth == 1 && in_total_at.is_some() {
-                    in_total_at = None;
-                }
-            }
-            _ => {}
-        }
-        at += 1;
-        // Inside the `total` object, the `branches` key is the one to read.
-        if let Some(_) = in_total_at {
-            if depth == 2 && json[at..].starts_with("\"branches\"") {
-                return read_counter_object(&json[at + "\"branches\"".len()..]);
-            }
-        }
-    }
-    None
-}
-
 /// A JSON string starting at `at`, and the index just past it.
 fn read_json_string(json: &str, at: usize) -> Option<(String, usize)> {
     let bytes = json.as_bytes();
@@ -854,19 +807,104 @@ fn read_json_string(json: &str, at: usize) -> Option<(String, usize)> {
     None
 }
 
-/// `covered` and `total` out of a `{"total":N,"covered":M,...}` object.
-fn read_counter_object(rest: &str) -> Option<Totals> {
-    let open = rest.find('{')?;
-    let close = rest[open..].find('}')? + open;
-    let body = &rest[open + 1..close];
-    let number = |key: &str| -> Option<i64> {
-        let needle = format!("\"{key}\":");
-        let start = body.find(&needle)? + needle.len();
-        let tail = &body[start..];
-        let end = tail.find(|c: char| c != '-' && !c.is_ascii_digit()).unwrap_or(tail.len());
-        tail[..end].parse().ok()
-    };
-    Some(Totals { covered: number("covered")?, total: number("total")? })
+/// The body of a top-level object in a JSON document, by its key.
+///
+/// DEPTH IS THE POINT, the same rule the XML scan follows. A coverage summary holds a
+/// named section beside one entry per FILE, and a file path is itself a key: it can contain
+/// a brace, or the word the section is named with. Strings are skipped rather than scanned
+/// so neither can be mistaken for structure.
+fn json_section<'a>(json: &'a str, key: &str) -> Option<&'a str> {
+    let bytes = json.as_bytes();
+    let mut depth = 0usize;
+    let mut at = 0usize;
+    let mut want_value = false;
+    while at < bytes.len() {
+        match bytes[at] {
+            b'"' => {
+                let (text, next) = read_json_string(json, at)?;
+                // A key at depth one names a section; deeper is somebody's contents.
+                want_value = depth == 1 && text == key;
+                at = next;
+                continue;
+            }
+            b'{' | b'[' if want_value => {
+                let close = matching_close(json, at)?;
+                return Some(&json[at + 1..close]);
+            }
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => depth -= 1,
+            _ => {}
+        }
+        at += 1;
+    }
+    None
+}
+
+/// The index of the brace or bracket closing the one at `open`.
+fn matching_close(json: &str, open: usize) -> Option<usize> {
+    let bytes = json.as_bytes();
+    let mut depth = 0usize;
+    let mut at = open;
+    while at < bytes.len() {
+        match bytes[at] {
+            b'"' => {
+                let (_, next) = read_json_string(json, at)?;
+                at = next;
+                continue;
+            }
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(at);
+                }
+            }
+            _ => {}
+        }
+        at += 1;
+    }
+    None
+}
+
+/// A numeric field read out of a JSON object body.
+fn json_number(body: &str, key: &str) -> Option<i64> {
+    let needle = format!("\"{key}\":");
+    let start = body.find(&needle)? + needle.len();
+    let tail = body[start..].trim_start();
+    let end = tail.find(|c: char| c != '-' && !c.is_ascii_digit()).unwrap_or(tail.len());
+    tail[..end].parse().ok()
+}
+
+/// (covered, total) branches from a c8 json-summary, or nothing when it carries none.
+///
+/// The summary holds a `total` section beside one entry per file, and every one of those
+/// entries carries a `branches` object of its own. So the reader cannot search for the
+/// first `branches` it sees: it reads the top-level `total` section and takes the branches
+/// from inside that.
+pub fn c8_totals(json: &str) -> Option<Totals> {
+    let total = json_section(json, "total")?;
+    // Wrapped back into an object so the same depth rule applies one level in: inside the
+    // total section, `branches` is again a key at depth one.
+    let wrapped = format!("{{{total}}}");
+    let branches = json_section(&wrapped, "branches")?;
+    Some(Totals {
+        covered: json_number(branches, "covered")?,
+        total: json_number(branches, "total")?,
+    })
+}
+
+/// (covered, total) branches from a coverage.py JSON report, or nothing when it carries
+/// none.
+///
+/// Its totals sit at the top of a `totals` section under their own names rather than inside
+/// a branches object, which is why this is a second reader and not a second call: the shape
+/// is shared and the words are not.
+pub fn coveragepy_totals(json: &str) -> Option<Totals> {
+    let totals = json_section(json, "totals")?;
+    Some(Totals {
+        covered: json_number(totals, "covered_branches")?,
+        total: json_number(totals, "num_branches")?,
+    })
 }
 
 #[cfg(test)]
@@ -896,6 +934,20 @@ mod c8_tests {
     fn a_total_section_with_no_branches_yields_nothing() {
         let json = r#"{"total": {"lines":{"total":5,"covered":5}}}"#;
         assert_eq!(c8_totals(json), None);
+    }
+
+    #[test]
+    fn a_real_coverage_py_report_reads_its_totals_section() {
+        // The file checked in beside this crate is what coverage.py 7 wrote for a fixture
+        // with four branches and two covered, trimmed to one file entry. A parser proved
+        // only against a string the test holds is a parser proved against the test.
+        let json = include_str!("../../tests/reports/coveragepy-summary.json");
+        assert_eq!(coveragepy_totals(json), Some(Totals { covered: 2, total: 4 }));
+    }
+
+    #[test]
+    fn a_coverage_py_report_with_no_totals_yields_nothing_rather_than_zero() {
+        assert_eq!(coveragepy_totals(r#"{"files": {}}"#), None);
     }
 
     #[test]

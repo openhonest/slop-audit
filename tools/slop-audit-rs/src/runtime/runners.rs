@@ -12,7 +12,7 @@
 //! to count and the honest answer is a permanent refusal naming why.
 
 use crate::runtime::determinism::{not_measured, tally, Attempt, Reading, RunWords};
-use crate::runtime::{run_untrusted, Isolation, TIMED_OUT};
+use crate::runtime::{run_untrusted, TIMED_OUT};
 use std::path::Path;
 
 /// How one language varies the order its tests run in.
