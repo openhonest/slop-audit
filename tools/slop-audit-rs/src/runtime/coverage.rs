@@ -875,6 +875,29 @@ fn json_number(body: &str, key: &str) -> Option<i64> {
     tail[..end].parse().ok()
 }
 
+/// A string field read out of a JSON object body.
+pub fn json_string(body: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{key}\":");
+    let start = body.find(&needle)? + needle.len();
+    let tail = body[start..].trim_start();
+    if !tail.starts_with('"') {
+        return None;
+    }
+    read_json_string(tail, 0).map(|(text, _)| text)
+}
+
+/// Whether a JSON object body carries this key at all, which is how a manifest names a
+/// dependency: the version it maps to says nothing this reader needs.
+pub fn json_has_key(body: &str, key: &str) -> bool {
+    body.contains(&format!("\"{key}\":"))
+}
+
+/// The body of a top-level object, exposed so a manifest can be read the same way a report
+/// is. One scan, two kinds of document.
+pub fn json_object<'a>(json: &'a str, key: &str) -> Option<&'a str> {
+    json_section(json, key)
+}
+
 /// (covered, total) branches from a c8 json-summary, or nothing when it carries none.
 ///
 /// The summary holds a `total` section beside one entry per file, and every one of those
