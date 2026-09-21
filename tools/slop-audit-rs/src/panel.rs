@@ -56,6 +56,7 @@ fn runtime_coverage(repo: &Path, language: &str) -> Option<Reading> {
         "javascript" | "typescript" =>
             runtime_cov::js_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
         "python" => runtime_cov::python_coverage(repo, SUITE_TIMEOUT_SECONDS),
+        "c" => runtime_cov::c_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
         _ => return None,
     })
 }

@@ -722,3 +722,235 @@ mod live_coverage {
         assert!(reading.details.contains("collected no tests"), "{}", reading.details);
     }
 }
+
+// --------------------------------------------------------------------------
+// C, which has no coverage convention of its own and borrows one from the build.
+// --------------------------------------------------------------------------
+
+/// The make targets a repository can declare for its tests, in preference order.
+const C_TEST_TARGETS: &[&str] = &["test", "check"];
+
+/// The filenames make itself looks for, in the order make looks for them.
+const C_MAKEFILES: &[&str] = &["Makefile", "makefile", "GNUmakefile"];
+
+/// The flags that instrument a build for gcov.
+const C_COVERAGE_FLAGS: &str = "-O0 -g -fprofile-arcs -ftest-coverage";
+
+/// The first of `test` or `check` a makefile DECLARES as a target, and why there is none.
+///
+/// A pure function of the text. The anchor matters: a line beginning with the name and a
+/// colon is a rule declaring the target, and a recipe line that merely mentions the word is
+/// not. A reader that matched the bare word would run `make test` against a makefile whose
+/// only mention of it is in a comment.
+pub fn make_target_in(text: &str) -> Result<&'static str, String> {
+    for target in C_TEST_TARGETS {
+        for line in text.lines() {
+            let trimmed = line.trim_end();
+            if let Some(rest) = trimmed.strip_prefix(target) {
+                if rest.trim_start().starts_with(':') {
+                    return Ok(target);
+                }
+            }
+        }
+    }
+    Err(format!("the makefile declares no {} target", C_TEST_TARGETS.join(" or ")))
+}
+
+/// lcov's own summary line, as (percent, covered, total).
+///
+/// The COUNTS are read as well as the percentage, because they are what tells a real
+/// nought per cent from a build that instrumented nothing. lcov prints 0.0% for both, and
+/// one is a measurement of zero while the other is an absent measurement.
+pub fn lcov_lines(summary: &str) -> Option<(f64, i64, i64)> {
+    for line in summary.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("lines") {
+            continue;
+        }
+        let after_colon = trimmed.split_once(':')?.1.trim();
+        let percent: f64 = after_colon.split('%').next()?.trim().parse().ok()?;
+        let inside = after_colon.split_once('(')?.1;
+        let mut numbers = inside.split_whitespace();
+        let covered: i64 = numbers.next()?.parse().ok()?;
+        numbers.next()?; // the word "of"
+        let total: i64 = numbers.next()?.parse().ok()?;
+        return Some((percent, covered, total));
+    }
+    None
+}
+
+/// L1.19 for C: line coverage from a gcov-instrumented `make <target>`, totalled by lcov.
+///
+/// BEST EFFORT, and the refusals say why at each step. C has no coverage convention of its
+/// own, so this borrows the project's build: a makefile that declares a test target, built
+/// with instrumentation, then read by lcov. A project missing any of those is told which.
+pub fn c_coverage(repo: &Path, timeout_seconds: f64, compiler: &str) -> Reading {
+    if which("cc").is_none() && which("gcc").is_none() && which("clang").is_none() {
+        return not_measured("needs a C compiler (cc/gcc/clang) in PATH");
+    }
+    let makefile = C_MAKEFILES.iter()
+        .map(|name| repo.join(name))
+        .find(|path| path.exists());
+    let Some(makefile) = makefile else {
+        return not_measured(format!(
+            "C has no standard coverage convention; provide a build that runs tests under \
+             gcov/lcov (no {} found)", C_MAKEFILES.join(", ")));
+    };
+    let Ok(text) = std::fs::read_to_string(&makefile) else {
+        // An absent makefile and an unreadable one send a reader to different repairs.
+        return not_measured("the makefile could not be read");
+    };
+    let target = match make_target_in(&text) {
+        Ok(target) => target,
+        Err(why) => return not_measured(format!(
+            "C has no standard coverage convention; provide a build that runs tests under \
+             gcov/lcov ({why})")),
+    };
+    let Some(lcov) = which("lcov") else {
+        return not_measured(format!(
+            "C coverage needs lcov to total gcov data; install lcov (compiler: {compiler})"));
+    };
+
+    let scratch = scratch_dir("ccov");
+    let _ = std::fs::create_dir_all(&scratch);
+    let info = scratch.join("cov.info");
+    let env = [
+        ("CFLAGS".to_string(), C_COVERAGE_FLAGS.to_string()),
+        ("CXXFLAGS".to_string(), C_COVERAGE_FLAGS.to_string()),
+        ("LDFLAGS".to_string(), "--coverage".to_string()),
+    ];
+    let build = run_untrusted(
+        &["make".into(), target.to_string()], repo, &env, timeout_seconds);
+    let build_output = build.output();
+
+    if build.status == TIMED_OUT {
+        let _ = std::fs::remove_dir_all(&scratch);
+        return not_measured(format!(
+            "the test build/run timed out before coverage could be measured (make {target}){}",
+            crate::runtime::timeout_note(timeout_seconds)));
+    }
+    let capture = run_untrusted(
+        &[lcov.display().to_string(), "--capture".into(), "--directory".into(),
+          repo.display().to_string(), "--output-file".into(),
+          info.display().to_string(), "--quiet".into()],
+        repo, &[], timeout_seconds.min(120.0));
+    if capture.status == TIMED_OUT {
+        let _ = std::fs::remove_dir_all(&scratch);
+        return not_measured(format!("lcov coverage capture timed out{}",
+                                    crate::runtime::timeout_note(timeout_seconds)));
+    }
+    let summary = run_untrusted(
+        &[lcov.display().to_string(), "--summary".into(), info.display().to_string()],
+        repo, &[], timeout_seconds.min(60.0));
+    let summary_text = summary.output();
+    let _ = std::fs::remove_dir_all(&scratch);
+
+    // No gcov data means the instrumented build did not run the target's tests.
+    let Some((_percent, covered, total)) = lcov_lines(&summary_text) else {
+        return not_measured(format!(
+            "coverage produced no gcov data (make {target} exit {}): {}",
+            build.status, first_line(&build_output)));
+    };
+    let words = CoverageWords {
+        no_report: "coverage produced no gcov data",
+        // `0 of 0` lines is the refusal that matters. lcov prints nought per cent for an
+        // instrumented build that executed no instrumented code, and a rate over no lines
+        // is an absent measurement rather than a measurement of zero.
+        nothing_to_cover: "the instrumented build executed no instrumented lines \
+                           (lcov reported 0 of 0)",
+        how: "gcov line counters totalled by lcov",
+        toolchain: compiler.to_string(),
+        substitution: "; the standard C toolchain has no branch-coverage convention, so \
+                       this field carries LINE coverage where other languages carry branch \
+                       coverage",
+    };
+    verdict(Some(Totals { covered, total }), build.status, &words, timeout_seconds)
+}
+
+#[cfg(test)]
+mod c_tests {
+    use super::*;
+
+    #[test]
+    fn a_declared_target_is_found_and_a_mentioned_one_is_not() {
+        // The anchor is the rule. A reader matching the bare word would run `make test`
+        // against a makefile whose only mention of it is in a comment or a recipe line.
+        assert_eq!(make_target_in("all:\n\ttrue\ntest:\n\t./run\n"), Ok("test"));
+        assert_eq!(make_target_in("check:\n\t./run\n"), Ok("check"));
+        assert!(make_target_in("all:\n\t@echo run the test suite yourself\n").is_err());
+        assert!(make_target_in("# test: not a rule\n").is_err());
+    }
+
+    #[test]
+    fn test_is_preferred_over_check_when_a_makefile_declares_both() {
+        assert_eq!(make_target_in("check:\n\t./c\ntest:\n\t./t\n"), Ok("test"));
+    }
+
+    #[test]
+    fn the_summary_is_read_with_its_counts_and_not_only_its_percentage() {
+        // The counts are what tell a real nought per cent from a build that instrumented
+        // nothing, and lcov prints the same percentage for both.
+        let summary = "Reading tracefile cov.info\n  lines......: 87.5% (700 of 800 lines)\n\
+                       \x20 functions..: 90.0% (9 of 10 functions)\n";
+        assert_eq!(lcov_lines(summary), Some((87.5, 700, 800)));
+    }
+
+    #[test]
+    fn an_instrumented_build_that_executed_nothing_reads_as_nought_of_nought() {
+        let summary = "  lines......: 0.0% (0 of 0 lines)\n";
+        assert_eq!(lcov_lines(summary), Some((0.0, 0, 0)));
+        // Which the shared verdict then refuses, rather than banding it Slop.
+        let words = CoverageWords {
+            no_report: "no report", nothing_to_cover: "0 of 0",
+            how: "lcov", toolchain: "cc".into(), substitution: "",
+        };
+        let reading = verdict(Some(Totals { covered: 0, total: 0 }), 0, &words, 300.0);
+        assert_eq!(reading.band, "n/a");
+    }
+
+    #[test]
+    fn a_summary_with_no_lines_row_yields_nothing() {
+        assert_eq!(lcov_lines("Reading tracefile cov.info\n"), None);
+    }
+
+    #[test]
+    fn a_directory_with_no_makefile_is_told_what_it_needs() {
+        let root = scratch_dir("cnomake");
+        std::fs::create_dir_all(&root).unwrap();
+        let reading = c_coverage(&root, 30.0, "cc");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a");
+        assert!(reading.details.contains("gcov/lcov"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_makefile_with_no_test_target_names_what_it_looked_for() {
+        let root = scratch_dir("cnotarget");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("Makefile"), "all:\n\tcc -o x x.c\n").unwrap();
+        let reading = c_coverage(&root, 30.0, "cc");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a");
+        assert!(reading.details.contains("test or check"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_project_with_a_target_and_no_lcov_says_which_tool_is_missing() {
+        // The live path beyond this point is UNPROVEN on this machine: lcov is not
+        // installed here, so nothing exercises the capture, the summary or the verdict
+        // over real gcov data. The refusal below is what a reader on this machine gets,
+        // and it is the honest one.
+        let root = scratch_dir("cnolcov");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("Makefile"), "test:\n\t./run\n").unwrap();
+        let reading = c_coverage(&root, 30.0, "cc (Apple clang)");
+        let _ = std::fs::remove_dir_all(&root);
+        if which("lcov").is_some() {
+            eprintln!("skipped: lcov IS installed here, so this refusal cannot be reached");
+            return;
+        }
+        assert_eq!(reading.band, "n/a");
+        assert!(reading.details.contains("install lcov"), "{}", reading.details);
+        assert!(reading.details.contains("Apple clang"), "{}", reading.details);
+    }
+}
