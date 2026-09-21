@@ -16,6 +16,7 @@ from typing import TypedDict
 from tree_sitter import Node
 
 from l1_analyzer.lang_spec import COMPARISON_OPS, LANG_SPEC, LangSpec
+from l1_analyzer.ts_nodes import sub_key
 
 
 # How a project declares that a function IS an edge. Clause 4's rule is that I/O belongs at
@@ -613,11 +614,12 @@ def subscript_keys_called_in(node: Node, spec: LangSpec, raw: bytes) -> set[str]
         target = inner.child_by_field_name(spec["call_fn"])
         if target is None or target.type not in spec["subscript_types"]:
             continue
-        # A language that names no index field has no subscript key to read. It is declared
-        # optional and was passed straight to a reader that takes a name, so the languages
-        # this rule cannot serve reached it as `None` rather than being turned away.
-        index_field = spec["sub_index"]
-        key = target.child_by_field_name(index_field) if index_field else None
+        # Through the shared reader, not through the raw table key. A grammar that names no
+        # index field still HAS a key: Rust's index expression holds it by position, and
+        # reading the field name here declined Rust outright. The same shortcut in the
+        # finite-testability filters made a Rust keyed store invisible to three rules, which
+        # is what sent this one back for the same look.
+        key = sub_key(target, spec)
         if key is not None:
             called.add(node_text(key, raw).strip("\"'"))
     return called

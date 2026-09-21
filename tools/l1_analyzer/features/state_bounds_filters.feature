@@ -119,12 +119,6 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
     Then it is true for the shape the entry point is allowed to clear past the open-key guard
     But it does not check result invariance despite the module header naming that as part of the shape; the entry point checks that separately, before any rule runs
 
-  Scenario: _unwrap_unary peels unary operators off a key
-    Given a key node
-    When _unwrap_unary steps down through each unary operator to the operand
-    Then it returns the value underneath, so a negated literal is still recognised as one compile-time value
-    But an operator with no operand under it unwraps to nothing
-
   Scenario: _is_state_of_this_class recognises a key that is itself state of the class under analysis
     Given a key node
     When _is_state_of_this_class checks that it is an attribute of the instance or the class
@@ -133,7 +127,7 @@ Feature: state_bounds_filters — attribute-level false-positive filters for the
 
   Scenario: _is_open_key recognises a single key the class does not bound
     Given a key node, or nothing
-    When _is_open_key rules out a slice, a missing key, a literal and the class's own state
+    When _is_open_key rules out a slice, a missing key, a literal under any wrapper, and the class's own state
     Then it is true for anything left, which is a key the caller chooses, such as a parameter
     But a slice never reaches this rule, because selecting a contiguous run at a caller's width does not pick one stored value out of unboundedly many
 

@@ -83,6 +83,22 @@ pub fn descendants<'t>(scope: Node<'t>) -> Vec<Node<'t>> {
     out
 }
 
+/// Every NAMED node under `scope`, `scope` included, in source order.
+///
+/// The named walk and the all-children walk answer differently, and a caller has to say
+/// which it wants: a rule about syntax asks for the named one, a rule about text does not.
+pub fn named_descendants<'t>(scope: Node<'t>) -> Vec<Node<'t>> {
+    let mut out = Vec::new();
+    let mut stack = vec![scope];
+    while let Some(node) = stack.pop() {
+        out.push(node);
+        let named: Vec<Node<'t>> =
+            children(node).into_iter().filter(|c| c.is_named()).collect();
+        stack.extend(named.into_iter().rev());
+    }
+    out
+}
+
 /// Like `descendants`, but never descends into a nested node of one of `stop`.
 ///
 /// An inner record owns its own fields and is analysed as its own scope, so the enclosing

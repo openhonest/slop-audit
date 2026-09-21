@@ -36,7 +36,10 @@ const BOUNDED_BUILTINS: &[&str] =
 const EFFECT_CALLS: &[&str] = &["print", "repr", "str", "format", "log", "logging"];
 
 /// Every spelling of a comparison operator across the nine grammars.
-const COMPARISON_OPS: &[&str] = &["!=", "!==", "<", "<=", "<>", "==", "===", ">", ">="];
+/// Every operator that ASKS about a value rather than deriving one. Public because the
+/// finite-testability filters ask the same question of the same list, and two copies of it
+/// is two owners of one fact with nothing checking they agree.
+pub const COMPARISON_OPS: &[&str] = &["!=", "!==", "<", "<=", "<>", "==", "===", ">", ">="];
 
 /// How far a value is followed from the state it came from to the decision it reaches.
 ///

@@ -78,6 +78,7 @@ from l1_analyzer.ts_nodes import same as _same
 from l1_analyzer.ts_nodes import sub_collection as _sub_collection
 from l1_analyzer.ts_nodes import sub_key as _sub_key
 from l1_analyzer.ts_nodes import text as _text
+from l1_analyzer.ts_nodes import unwrap_unary as _unwrap_unary
 from l1_analyzer.ts_nodes import written_in_place as _written_in_place
 
 # Method names that mutate a container in place. The docstring used to CLAIM this was a
@@ -167,7 +168,7 @@ def _mutated_in_place(refs: list[Node], attr: str, sp: LangSpec) -> bool:
         if parent is None:
             continue
         # self.attr[...] as an assignment/del target
-        if parent.type in sp["subscript_types"] and _field(parent, sp["sub_value"]) == ref:
+        if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
             gp = parent.parent
             if gp is not None and (
                 (gp.type in sp["assign_types"] and _field(gp, sp["assign_left"]) == parent)
@@ -314,7 +315,7 @@ def _writes_are_plain_stores(cls: Node, attr: str, refs: list[Node], sp: LangSpe
         # `self.attr[k] += 1` inspects the stored value and writes it back, which is what a
         # counter does and not what a cache does. Told from a plain store by whether the
         # grammar hung an operator on the assignment, which every one of the nine does.
-        if parent.type in sp["subscript_types"] and _field(parent, sp["sub_value"]) == ref:
+        if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
             gp = parent.parent
             if gp is not None and gp.type in sp["assign_types"] \
                     and _field(gp, "operator") is not None:
@@ -391,7 +392,7 @@ def _stores_into(refs: list[Node], sp: LangSpec) -> bool:
         parent = ref.parent
         if parent is None:
             continue
-        if parent.type in sp["subscript_types"] and _field(parent, sp["sub_value"]) == ref:
+        if parent.type in sp["subscript_types"] and _same(_sub_collection(parent, sp), ref):
             gp = parent.parent
             if gp is not None and gp.type in sp["assign_types"] \
                     and _field(gp, sp["assign_left"]) == parent:
@@ -429,19 +430,6 @@ def _is_memoization(cls: Node, attr: str, refs: list[Node], sp: LangSpec) -> boo
 # rather than take one out, and the accumulator rule below argues separately about them.
 
 
-def _unwrap_unary(node: Node | None, sp: LangSpec) -> Node | None:
-    """Peel unary operators off a key. `s[-1]` is the last element, one compile-time value,
-    so the wrapper must not hide the literal underneath it.
-
-    Read from the language's own vocabulary since 2026-08-31. It read Python's, which was
-    right while the guard above it fired for Python alone and became a claim about eight
-    other grammars the day that guard widened."""
-    while node is not None and node.type in sp["unary_types"]:
-        named = node.named_children
-        node = named[0] if named else None
-    return node
-
-
 def _is_state_of_this_class(node: Node, sp: LangSpec) -> bool:
     """`self.x` / `cls.x`: state the enumerator reports separately, with its own verdict.
 
@@ -464,6 +452,12 @@ def _is_open_key(key: Node | None, sp: LangSpec) -> bool:
     what decided it before this guard existed and it decides it still."""
     if key is not None and key.type in sp["slice_types"]:
         return False
+    # Through the SHARED peeler, which is the one that knows a borrow and a parenthesis
+    # leave a literal's identity alone. This rule kept its own, over `unary_types` alone,
+    # and the two disagreed about ordinary code in three languages: `self.cache[(1)]` in
+    # Python and Java, and `c.cache[&1]` in Rust, were called open keys here and bounded
+    # values by the cell reader. The disagreement over-accuses, because an open key is what
+    # keeps a finding.
     key = _unwrap_unary(key, sp)
     if key is None or key.type in sp["literal_types"]:
         return False

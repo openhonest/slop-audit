@@ -44,6 +44,7 @@ fn main() {
     let mut exec_tests = true;
     let mut enumerate = false;
     let mut reads = false;
+    let mut filters = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -70,6 +71,11 @@ fn main() {
             // grammars diverge most, and a rule that composes them is only as sound as
             // they are.
             "--reads" => reads = true,
+            // The fourth of the family, and the one furthest from a node type: it dumps
+            // what each false-positive rule said about each piece of state. Those rules
+            // only ever CLEAR a finding, so a port that got them wrong reports more than
+            // it measured, which is the one direction this instrument must not fail in.
+            "--filters" => filters = true,
             // Before the repository check: it answers a question about the binary rather
             // than about a tree.
             "--version" => {
@@ -118,6 +124,16 @@ fn main() {
             for row in rows {
                 println!("{path}\t{}\t{}\t{}\t{}",
                          row.start, row.end, row.kind, row.flags.join(","));
+            }
+        }
+        return;
+    }
+
+    if filters {
+        for (path, rows) in state::filters::walk(repo, &language) {
+            for row in rows {
+                println!("{path}\t{}\t{}\t{}\t{}",
+                         row.scope, row.key, row.refs, row.answers);
             }
         }
         return;

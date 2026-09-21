@@ -12,6 +12,7 @@ pub mod cells;
 pub mod census;
 pub mod constants;
 pub mod enumerate;
+pub mod filters;
 pub mod partition;
 pub mod python_module;
 pub mod reach;
