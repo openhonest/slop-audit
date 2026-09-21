@@ -22,7 +22,13 @@ pub enum Coverage {
     Measured,
     /// Implemented in the Python reference, not yet ported to this binary.
     NotPorted,
-    /// Needs the target's own suite to run, which this binary does not do.
+    /// Needs the target's own suite to RUN, and the harness that runs it is not ported
+    /// yet.
+    ///
+    /// Kept apart from `NotPorted` because the two send a reader to different places: a
+    /// not-ported indicator reads a tree, and this one executes the audited project's
+    /// code. That difference is what an auditor has to disclose at a client site, so it
+    /// keeps its own row rather than being folded into the general case.
     NeedsTestRun,
 }
 
@@ -51,8 +57,14 @@ impl Coverage {
                 "not ported to the portable binary; run the Python reference for this indicator"
                     .into()
             }
+            // The sentence this used to carry, "requires executing the target's own test
+            // suite, which this binary does not do", was true until 2026-09-21 and is a
+            // statement about a build in progress now. An auditor could hand this binary to
+            // a client's security team on the old sentence; they cannot on this one, and
+            // saying so is the point.
             Coverage::NeedsTestRun => {
-                "requires executing the target's own test suite, which this binary does not do"
+                "the harness that runs the target's own test suite is not ported yet; run \
+                 the Python reference for this indicator"
                     .into()
             }
         }
