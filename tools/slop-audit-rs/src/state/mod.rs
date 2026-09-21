@@ -8,4 +8,5 @@
 //! and disagree with the reference on every repository, and a binary that disagrees is
 //! worse than one declaring a gap, because the gap line is honest.
 
+pub mod census;
 pub mod sites;

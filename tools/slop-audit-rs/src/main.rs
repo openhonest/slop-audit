@@ -10,9 +10,15 @@
 //! --tsv prints one tab-separated row per indicator, for the equality diff against the
 //! Python reference (validate.py). The default is the aligned human panel.
 //!
+//! --census prints one tab-separated row per declaration site the state census counts,
+//! rather than a panel. It grades nothing and is not in the usage line: it exists so the
+//! census port can be diffed site by site against the reference on a real repository,
+//! because a count that matches by luck and a count that matches by agreement look the
+//! same from outside.
+//!
 //! Arguments are parsed by hand: a CLI parser crate would add weight to a binary whose
 //! whole purpose is to be one small self-contained file.
-use slop_audit_rs::{lang, panel};
+use slop_audit_rs::{lang, panel, state};
 use std::path::Path;
 
 fn usage() -> ! {
@@ -33,11 +39,18 @@ fn main() {
     let mut repo_arg: Option<String> = None;
     let mut lang_arg: Option<String> = None;
     let mut tsv = false;
+    let mut census = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--tsv" => tsv = true,
+            // Not in the usage line: it prints no panel and grades nothing. It dumps the
+            // declaration sites this binary's census counts, one per row, so the port can
+            // be diffed site by site against the Python reference on a real repository.
+            // A count that matches by luck and a count that matches by agreement look the
+            // same from the outside, and this is what tells them apart.
+            "--census" => census = true,
             // Before the repository check: it answers a question about the binary rather
             // than about a tree.
             "--version" => {
@@ -71,6 +84,15 @@ fn main() {
         }
         None => lang::detect_primary_language(repo).to_string(),
     };
+
+    if census {
+        for (path, sites) in state::census::walk(repo, &language) {
+            for site in sites {
+                println!("{path}\t{}\t{}\t{}", site.kind, site.owner, site.name);
+            }
+        }
+        return;
+    }
 
     // One row per canonical indicator, whether or not this binary computes it. An
     // indicator it cannot compute prints its reason; see src/coverage.rs.

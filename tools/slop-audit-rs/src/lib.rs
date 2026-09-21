@@ -522,3 +522,41 @@ mod walk_tests {
         let _ = fs::remove_dir_all(&root);
     }
 }
+
+/// Every path this repository's own `.gitignore` excludes, resolved.
+///
+/// An audit measures what the project says is part of it. A `.gitignore` entry is that
+/// statement, written by whoever put it there: a build directory, a vendored dependency, a
+/// scratch tree kept for reference. Reading them reports code the project has declared is
+/// not its own, and a fresh clone then reads differently from the working copy.
+///
+/// What forced it in the reference: a repository held a `python.botched` directory beside
+/// `python`, 262 MB and 20,743 files, ignored at line 19 of its `.gitignore`. It carried
+/// the only three pieces of provably unbounded state in the whole measurement, so the
+/// repository read as not exhaustively testable on the strength of code the project had
+/// disowned.
+///
+/// IGNORED, NOT UNTRACKED, and the difference is the whole rule. Both a build directory
+/// and a module written five minutes ago are untracked. Only the first carries a statement
+/// that it is not part of the project. Skipping untracked files would make this instrument
+/// blind to uncommitted work, which is the work a developer most wants measured: an audit
+/// that goes quiet on what you just wrote reports on the past.
+///
+/// An empty set where there is no git, so the walk reads everything. A tarball, an
+/// extracted archive and a vendored copy are all real audit subjects, and refusing them
+/// would turn a working reading into no reading at all.
+pub fn ignored_paths(repo: &Path) -> HashSet<PathBuf> {
+    let run = std::process::Command::new("git")
+        .args(["ls-files", "--others", "--ignored", "--exclude-standard", "-z"])
+        .current_dir(repo)
+        .output();
+    let Ok(out) = run else { return HashSet::new() };
+    if !out.status.success() {
+        return HashSet::new();
+    }
+    String::from_utf8_lossy(&out.stdout)
+        .split('\0')
+        .filter(|name| !name.is_empty())
+        .filter_map(|name| repo.join(name).canonicalize().ok())
+        .collect()
+}

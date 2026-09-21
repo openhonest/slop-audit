@@ -39,19 +39,54 @@ pub fn first_named<'t>(node: Option<Node<'t>>) -> Option<Node<'t>> {
     first
 }
 
+/// A node's children, ALL of them, named and anonymous alike.
+///
+/// The reference walks `node.children`, which in its binding includes the punctuation and
+/// keyword nodes. Walking only the named ones would skip a node type a grammar files as
+/// anonymous, and two walks that disagree about which children exist disagree about what
+/// the file declares.
+pub fn children<'t>(node: Node<'t>) -> Vec<Node<'t>> {
+    let mut cursor = node.walk();
+    let all: Vec<Node<'t>> = node.children(&mut cursor).collect();
+    all
+}
+
 /// Every node under `scope`, `scope` included, in source order.
 ///
-/// The reference walks with an explicit stack for the same reason this does: a recursive
-/// walk over a deeply nested expression is a stack overflow on somebody's generated file,
-/// and the analyzer has to survive files nobody wrote by hand.
+/// An explicit stack, not recursion. Parse-tree depth is set by the file being audited,
+/// which is unbounded input, so a walk that recurses once per level has a ceiling nobody
+/// chose. On 2026-09-05 five of two hundred repositories crashed the reference's recursive
+/// walk, and they were the five largest: the instrument could not read the codebases its
+/// claim is about.
+///
+/// Children go on reversed so they come off in order. A stack pops last in first out, and
+/// the promise here is source order: a caller reading the first reference as the
+/// declaration would otherwise get the last one.
 pub fn descendants<'t>(scope: Node<'t>) -> Vec<Node<'t>> {
     let mut out = Vec::new();
     let mut stack = vec![scope];
     while let Some(node) = stack.pop() {
         out.push(node);
-        let mut cursor = node.walk();
-        let children: Vec<Node<'t>> = node.named_children(&mut cursor).collect();
-        stack.extend(children.into_iter().rev());
+        stack.extend(children(node).into_iter().rev());
+    }
+    out
+}
+
+/// Like `descendants`, but never descends into a nested node of one of `stop`.
+///
+/// An inner record owns its own fields and is analysed as its own scope, so the enclosing
+/// one must not harvest the inner one's state, which would count it twice. The root is
+/// exempt from `stop` because the scope handed in IS a record, and a walk that refused to
+/// enter it would return nothing.
+pub fn local_descendants<'t>(scope: Node<'t>, stop: &[&str]) -> Vec<Node<'t>> {
+    let mut out = Vec::new();
+    let mut stack = vec![(scope, true)];
+    while let Some((node, is_root)) = stack.pop() {
+        if !is_root && stop.contains(&node.kind()) {
+            continue;
+        }
+        out.push(node);
+        stack.extend(children(node).into_iter().rev().map(|c| (c, false)));
     }
     out
 }
