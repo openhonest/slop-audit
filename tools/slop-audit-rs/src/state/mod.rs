@@ -9,4 +9,5 @@
 //! worse than one declaring a gap, because the gap line is honest.
 
 pub mod census;
+pub mod partition;
 pub mod sites;
