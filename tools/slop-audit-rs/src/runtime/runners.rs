@@ -30,6 +30,60 @@ pub enum Ordering {
     NotRandomizable,
 }
 
+/// How a repository says which runner it uses, for a language that has more than one.
+///
+/// Declarative, so a variant is a row rather than a branch. Three signals, because Ruby
+/// needs all three and each answers a different question: a directory or file that only
+/// one runner creates, a pair that must BOTH be present, and a gem named in the lockfile.
+pub struct Detect {
+    /// Any one of these paths existing selects this variant.
+    pub any: &'static [&'static str],
+    /// ALL of these must exist. `test/` alone is not a Minitest project; `test/` beside a
+    /// Rakefile is.
+    pub all: &'static [&'static str],
+    /// A file that must contain a line matching this prefix, at any indent.
+    ///
+    /// The PREFIX of a gem entry, not the bare name anywhere in the file. The reference
+    /// matched the substring, which any project depending on rspec-expectations satisfies,
+    /// and that gem stands alone: a Minitest project can use RSpec's matchers without
+    /// RSpec. Such a project was read as an RSpec suite and the harness ran a binary that
+    /// is not installed there.
+    pub contains: Option<(&'static str, &'static str)>,
+}
+
+/// One way a language runs its suite, where the language has more than one.
+pub struct Variant {
+    pub name: &'static str,
+    pub detect: Detect,
+    pub command: &'static [&'static str],
+    pub ran_markers: &'static [&'static str],
+    pub nothing_ran: &'static str,
+}
+
+/// Whether this repository matches a variant's signals.
+pub fn matches(detect: &Detect, repo: &Path) -> bool {
+    if detect.any.iter().any(|path| repo.join(path).exists()) {
+        return true;
+    }
+    if !detect.all.is_empty() && detect.all.iter().all(|path| repo.join(path).exists()) {
+        return true;
+    }
+    match detect.contains {
+        Some((file, prefix)) => std::fs::read_to_string(repo.join(file))
+            .map(|text| text.lines().any(|line| line.trim_start().starts_with(prefix)))
+            .unwrap_or(false),
+        None => false,
+    }
+}
+
+/// The variant this repository uses, in the order the rows are written, or nothing.
+///
+/// ORDER IS THE RULE where signals overlap: a project with both a spec directory and a
+/// test directory is an RSpec project, and the row written first says so.
+pub fn variant_for(runner: &Runner, repo: &Path) -> Option<&'static Variant> {
+    runner.variants.iter().find(|v| matches(&v.detect, repo))
+}
+
 /// One language's determinism row.
 pub struct Runner {
     pub lang: &'static str,
@@ -64,6 +118,13 @@ pub struct Runner {
     pub no_runs: &'static str,
     /// The sentence for an attempt that executed nothing.
     pub nothing_ran: &'static str,
+    /// The ways this language's projects run their suites, where there is more than one.
+    ///
+    /// Empty for a language with one runner, which is most of them. A language with
+    /// variants and no match is REFUSED rather than run with the first row, because
+    /// running a binary a project does not use is how a Minitest project came to be handed
+    /// an RSpec command.
+    pub variants: &'static [Variant],
 }
 
 /// Every language, in the order the panel prints them.
@@ -82,6 +143,7 @@ pub const RUNNERS: &[Runner] = &[
         describe: "shuffled-order runs passed cleanly",
         no_runs: "no shuffled runs were made; determinism not measured",
         nothing_ran: "no test packages built or executed",
+        variants: &[],
     },
     Runner {
         lang: "csharp",
@@ -99,6 +161,7 @@ pub const RUNNERS: &[Runner] = &[
                    not seed-controlled)",
         no_runs: "no `dotnet test` runs were made; determinism not measured",
         nothing_ran: "no test project built or executed",
+        variants: &[],
     },
     Runner {
         lang: "rust",
@@ -113,6 +176,7 @@ pub const RUNNERS: &[Runner] = &[
         describe: "cargo-test runs passed cleanly (libtest varies order across runs)",
         no_runs: "no cargo-test runs were made; determinism not measured",
         nothing_ran: "cargo test collected no tests",
+        variants: &[],
     },
     Runner {
         lang: "c",
@@ -130,6 +194,49 @@ pub const RUNNERS: &[Runner] = &[
         describe: "",
         no_runs: "C has no standard test-order randomizer; determinism not measured",
         nothing_ran: "",
+        variants: &[],
+    },
+    Runner {
+        lang: "ruby",
+        tool: "bundle",
+        tool_missing: "needs Ruby and Bundler (ruby, bundle) in PATH",
+        // Chosen per repository: see the variants below.
+        command: &[],
+        ordering: Ordering::Seeded,
+        ran_markers: &[],
+        never_ran: &[],
+        unit: "seed",
+        describe: "randomized-order runs passed cleanly",
+        no_runs: "no randomized-order runs were made; determinism not measured",
+        nothing_ran: "the runner reported no tests",
+        variants: &[
+            // RSpec first: a project with both a spec directory and a test directory is an
+            // RSpec project, and order is what says so.
+            Variant {
+                name: "rspec",
+                detect: Detect {
+                    any: &["spec", ".rspec"],
+                    all: &[],
+                    contains: Some(("Gemfile.lock", "rspec (")),
+                },
+                command: &["bundle", "exec", "rspec", "--order", "random", "--seed", "{seed}"],
+                ran_markers: &[" example", " examples"],
+                nothing_ran: "rspec reported no examples",
+            },
+            Variant {
+                name: "minitest",
+                detect: Detect {
+                    any: &[],
+                    // A test directory ALONE is not a Minitest project; one beside a
+                    // Rakefile is.
+                    all: &["test", "Rakefile"],
+                    contains: None,
+                },
+                command: &["bundle", "exec", "rake", "test", "TESTOPTS=--seed={seed}"],
+                ran_markers: &[" runs, "],
+                nothing_ran: "the rake test task reported no runs",
+            },
+        ],
     },
 ];
 
@@ -196,6 +303,25 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
     if which(runner.tool).is_none() {
         return not_measured(runner.tool_missing);
     }
+    // A language with variants and no match is REFUSED rather than run with the first row.
+    // Running a binary a project does not use is how a Minitest project came to be handed
+    // an RSpec command, and the refusal names what it looked for.
+    let variant = if runner.variants.is_empty() {
+        None
+    } else {
+        match variant_for(runner, repo) {
+            Some(found) => Some(found),
+            None => {
+                let names: Vec<&str> = runner.variants.iter().map(|v| v.name).collect();
+                return not_measured(format!(
+                    "no {} suite detected ({}); determinism not measured",
+                    runner.lang, names.join(" or ")));
+            }
+        }
+    };
+    let command = variant.map(|v| v.command).unwrap_or(runner.command);
+    let markers = variant.map(|v| v.ran_markers).unwrap_or(runner.ran_markers);
+    let nothing_ran = variant.map(|v| v.nothing_ran).unwrap_or(runner.nothing_ran);
 
     let words = RunWords {
         unit: runner.unit,
@@ -209,15 +335,20 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
 
     // Lazy, so the tally's return on a timed-out or never-run attempt stops the rest.
     let attempts = (1..=runs).map(|attempt| {
-        let finished = run_untrusted(&command_for(runner, attempt), repo, &[], timeout_seconds);
+        let filled: Vec<String> = command.iter()
+            .map(|part| part.replace("{seed}", &attempt.to_string()))
+            .collect();
+        let finished = run_untrusted(&filled, repo, &[], timeout_seconds);
         let output = finished.output();
-        let ran = finished.status != TIMED_OUT && ran_tests(runner, &output);
+        let ran = finished.status != TIMED_OUT
+            && !runner.never_ran.iter().any(|m| output.contains(m))
+            && markers.iter().any(|m| output.contains(m));
         Attempt {
             status: finished.status,
             isolation: finished.isolation,
             ran_tests: ran,
             summary: first_line(&output),
-            why_it_did_not_run: format!("{} under {toolchain}", runner.nothing_ran),
+            why_it_did_not_run: format!("{nothing_ran} under {toolchain}"),
         }
     });
     tally(attempts, &words, timeout_seconds)
@@ -305,9 +436,22 @@ mod tests {
             if runner.ordering == Ordering::NotRandomizable {
                 continue;
             }
-            assert!(!runner.ran_markers.is_empty(), "{} has no marker", runner.lang);
-            assert!(!runner.command.is_empty(), "{} has no command", runner.lang);
-            assert!(!runner.nothing_ran.is_empty(), "{} cannot say why", runner.lang);
+            if runner.variants.is_empty() {
+                assert!(!runner.ran_markers.is_empty(), "{} has no marker", runner.lang);
+                assert!(!runner.command.is_empty(), "{} has no command", runner.lang);
+                assert!(!runner.nothing_ran.is_empty(), "{} cannot say why", runner.lang);
+                continue;
+            }
+            // A language whose command depends on the repository carries its markers and
+            // its sentence on each variant instead, and every variant needs all three.
+            for variant in runner.variants {
+                assert!(!variant.command.is_empty(),
+                        "{}/{} has no command", runner.lang, variant.name);
+                assert!(!variant.ran_markers.is_empty(),
+                        "{}/{} has no marker", runner.lang, variant.name);
+                assert!(!variant.nothing_ran.is_empty(),
+                        "{}/{} cannot say why", runner.lang, variant.name);
+            }
         }
     }
 
@@ -431,5 +575,155 @@ mod live {
         assert_eq!(reading.band, "n/a", "{}", reading.details);
         assert!(reading.details.contains("timed out"), "{}", reading.details);
         assert!(reading.details.contains("allowed 2s"), "{}", reading.details);
+    }
+}
+
+#[cfg(test)]
+mod variant_tests {
+    use super::*;
+
+    fn repo(name: &str, paths: &[(&str, &str)]) -> std::path::PathBuf {
+        let root = std::env::temp_dir()
+            .join(format!("slop-variant-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        for (path, body) in paths {
+            let full = root.join(path);
+            if body.is_empty() {
+                std::fs::create_dir_all(&full).unwrap();
+            } else {
+                if let Some(parent) = full.parent() {
+                    std::fs::create_dir_all(parent).unwrap();
+                }
+                std::fs::write(&full, body).unwrap();
+            }
+        }
+        root
+    }
+
+    #[test]
+    fn a_spec_directory_selects_the_rspec_variant() {
+        let root = repo("spec", &[("spec", "")]);
+        let ruby = runner_for("ruby").expect("ruby");
+        assert_eq!(variant_for(ruby, &root).map(|v| v.name), Some("rspec"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_test_directory_alone_is_not_a_minitest_project() {
+        // It needs a Rakefile beside it. A repository with a stray test directory and no
+        // task to run would otherwise be handed a rake command it has no task for.
+        let root = repo("testonly", &[("test", "")]);
+        let ruby = runner_for("ruby").expect("ruby");
+        assert_eq!(variant_for(ruby, &root).map(|v| v.name), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_test_directory_beside_a_rakefile_is_a_minitest_project() {
+        let root = repo("minitest", &[("test", ""), ("Rakefile", "task :test\n")]);
+        let ruby = runner_for("ruby").expect("ruby");
+        assert_eq!(variant_for(ruby, &root).map(|v| v.name), Some("minitest"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_lockfile_naming_the_rspec_gem_selects_rspec() {
+        let lock = "GEM\n  specs:\n    rspec (3.13.0)\n    rake (13.0)\n";
+        let root = repo("lockrspec", &[("Gemfile.lock", lock)]);
+        let ruby = runner_for("ruby").expect("ruby");
+        assert_eq!(variant_for(ruby, &root).map(|v| v.name), Some("rspec"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_lockfile_naming_only_rspec_expectations_is_not_an_rspec_project() {
+        // The defect this rule exists for. The reference matched the substring, which any
+        // project depending on rspec-expectations satisfies, and that gem stands alone: a
+        // Minitest project can use RSpec's matchers without RSpec. Such a project was read
+        // as an RSpec suite and handed a binary that is not installed there.
+        let lock = "GEM\n  specs:\n    rspec-expectations (3.13.0)\n    minitest (5.25)\n";
+        let root = repo("lockexp", &[("Gemfile.lock", lock),
+                                     ("test", ""), ("Rakefile", "task :test\n")]);
+        let ruby = runner_for("ruby").expect("ruby");
+        assert_eq!(variant_for(ruby, &root).map(|v| v.name), Some("minitest"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn rspec_wins_where_both_signals_are_present() {
+        // Order is the rule where signals overlap.
+        let root = repo("both", &[("spec", ""), ("test", ""), ("Rakefile", "task :test\n")]);
+        let ruby = runner_for("ruby").expect("ruby");
+        assert_eq!(variant_for(ruby, &root).map(|v| v.name), Some("rspec"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_repository_with_no_suite_shape_is_refused_and_names_what_it_looked_for() {
+        // Refused rather than run with the first row. Running a binary a project does not
+        // use is how a Minitest project came to be handed an RSpec command.
+        if which("bundle").is_none() {
+            eprintln!("skipped: bundle is not on PATH");
+            return;
+        }
+        let root = repo("bare", &[("README.md", "nothing here\n")]);
+        let reading = test_determinism(&root, "ruby", 3, 30.0, "a ruby");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a");
+        assert!(reading.details.contains("rspec or minitest"), "{}", reading.details);
+    }
+}
+
+#[cfg(test)]
+mod ruby_live {
+    //! The Ruby row against a real Minitest project the test builds and installs itself.
+
+    use super::*;
+
+    fn minitest_project() -> Option<std::path::PathBuf> {
+        if which("bundle").is_none() || which("ruby").is_none() {
+            return None;
+        }
+        let root = std::env::temp_dir().join(format!("slop-rbdet-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("lib")).ok()?;
+        std::fs::create_dir_all(root.join("test")).ok()?;
+        // rake and minitest are DECLARED. Bundler hides the default gems, so a project
+        // that names neither gets a load error that reads like a broken Ruby install.
+        std::fs::write(root.join("Gemfile"),
+            "source \"https://rubygems.org\"\ngem \"rake\"\ngem \"minitest\"\n").ok()?;
+        std::fs::write(root.join("Rakefile"),
+            "require \"rake/testtask\"\nRake::TestTask.new(:test) do |t|\n\
+             \x20 t.libs << \"lib\" << \"test\"\n\
+             \x20 t.test_files = FileList[\"test/**/*_test.rb\"]\nend\n").ok()?;
+        std::fs::write(root.join("lib").join("band.rb"),
+            "def band(n)\n  return \"neg\" if n < 0\n  \"pos\"\nend\n").ok()?;
+        std::fs::write(root.join("test").join("band_test.rb"),
+            "require \"minitest/autorun\"\nrequire \"band\"\n\
+             class BandTest < Minitest::Test\n\
+             \x20 def test_positive\n    assert_equal \"pos\", band(3)\n  end\nend\n").ok()?;
+        let installed = run_untrusted(
+            &["bundle".into(), "install".into(), "--path".into(), "vendor/bundle".into()],
+            &root, &[], 600.0);
+        if installed.status != 0 {
+            let _ = std::fs::remove_dir_all(&root);
+            return None;
+        }
+        Some(root)
+    }
+
+    #[test]
+    fn a_real_minitest_suite_that_passes_every_seed_is_the_whole_count() {
+        let Some(root) = minitest_project() else {
+            eprintln!("skipped: ruby or bundler is not on PATH, or the bundle would not install");
+            return;
+        };
+        let ruby = runner_for("ruby").expect("ruby");
+        assert_eq!(variant_for(ruby, &root).map(|v| v.name), Some("minitest"));
+        let reading = test_determinism(&root, "ruby", 3, 600.0, "ruby 2.6");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.value, "3/3", "{}", reading.details);
+        assert_eq!(reading.band, "Healthy");
     }
 }
