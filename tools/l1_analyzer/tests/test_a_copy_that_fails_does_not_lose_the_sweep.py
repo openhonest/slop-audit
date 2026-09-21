@@ -70,7 +70,7 @@ def test_a_sweep_that_could_copy_nothing_still_has_one_worker(tmp_path, monkeypa
     monkeypatch.setattr(sweep_pool, "copy_checkout", lambda *a: "")
     made = sweep_pool.checkouts_for(repo, 4, tmp_path / "work")
     assert made["paths"] == [repo]
-    assert made["copies"] == 0
+    assert made["copies"] is None, "every copy failed, which is not a copy count of zero"
 
 
 def test_the_report_says_it_asked_for_more_than_it_got(tmp_path, monkeypatch):
@@ -102,3 +102,37 @@ def test_the_real_copy_produces_a_working_checkout(tmp_path, workers):
     for path in made["paths"]:
         assert (path / "src" / "lib.rs").read_text() == "pub fn f() -> i32 { 1 }\n"
         assert (path / ".git").is_dir()
+
+
+def test_a_free_pool_and_a_broken_one_do_not_report_the_same_count(tmp_path, monkeypatch):
+    """One worker wanting no copy, and eight workers whose every copy failed, both end up
+    proving in the repository itself. The count used to be 0 for both, so a reader of the
+    number could not tell a sweep that cost nothing from a sweep that lost seven workers.
+
+    The count is absent in both, because a pool that made copies made at least one and zero
+    was never a real reading. What tells them apart is the reason beside it."""
+    repo = _repo(tmp_path)
+    wanted_none = sweep_pool.checkouts_for(repo, 1, tmp_path / "solo")
+    monkeypatch.setattr(sweep_pool, "copy_checkout", lambda *a: "")
+    got_none = sweep_pool.checkouts_for(repo, 8, tmp_path / "broken")
+
+    assert wanted_none["copies"] is None and got_none["copies"] is None
+    assert wanted_none["how"] != got_none["how"]
+    assert wanted_none["how"] == "no copy needed"
+    assert got_none["how"] == "no copy could be made"
+
+
+def test_the_sentence_says_which_of_the_two_it_was(tmp_path, monkeypatch):
+    """And the reader gets it in the report, not only in the dictionary. A sweep that asked
+    for eight and copied none says so; one that asked for one does not claim it lost any."""
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(sweep_pool, "copy_checkout", lambda *a: "")
+    broken = sweep_pool.checkouts_for(repo, 8, tmp_path / "broken")
+    solo = sweep_pool.checkouts_for(repo, 1, tmp_path / "solo")
+
+    said = sweep_pool.pool_detail(len(broken["paths"]), broken["copies"], broken["how"],
+                                  broken["asked"])
+    quiet = sweep_pool.pool_detail(len(solo["paths"]), solo["copies"], solo["how"],
+                                   solo["asked"])
+    assert "8 were asked for" in said
+    assert "asked for" not in quiet

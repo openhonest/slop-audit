@@ -41,7 +41,7 @@ def test_one_worker_proves_in_the_repository_itself(tmp_path):
     repo = _repo(tmp_path)
     made = sweep_pool.checkouts_for(repo, 1, tmp_path / "work")
     assert made["paths"] == [repo]
-    assert made["copies"] == 0
+    assert made["copies"] is None, "no copy was wanted, which is not a copy count of zero"
 
 
 def test_a_parallel_sweep_never_proves_in_the_repository_itself(tmp_path):

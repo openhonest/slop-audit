@@ -46,6 +46,7 @@ Feature: sweep_pool — how a whole-repository sweep runs on more than one core
     And every worker gets a copy once there is more than one, the first included, so a parallel sweep never edits the repository under audit
     And that is what makes an interrupt harmless: a module is proven by editing its own source file and putting it back, a hard kill skips the putting back, and a copy is disposable by construction while a repository is not
     But how the copies were made is recorded, because eight workers is nearly free on a filesystem that copies by reference and the full size of the checkout on one that does not, and a reader told only the number cannot tell them apart
+    And a pool that copied nothing has no count at all rather than a count of zero, because zero was never a real reading here and it was standing for two unlike things: one worker that wanted no copy, and eight workers whose every copy failed, which the recorded reason tells apart
 
   Scenario: copy_commands names each way of copying and what its success would prove
     Given where the copy comes from and where it goes

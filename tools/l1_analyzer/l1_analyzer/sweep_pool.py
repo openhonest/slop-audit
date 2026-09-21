@@ -62,7 +62,12 @@ def share_out(work: list[tuple[str, list[CoverageGap]]],
 class Checkouts(TypedDict):
     """The directories a sweep's workers will prove in, and what making them cost."""
     paths: list[Path]
-    copies: int
+    # How many copies exist, or None when none do. Absent rather than zero, because zero is
+    # never a real count here: a pool that made copies made at least one, so the only thing
+    # a 0 could mean is that none were made. It meant two unlike things, "one worker, so
+    # none were wanted" and "copies were wanted and every command failed", and a reader of
+    # the number could not tell a free pool from a broken one. `how` carries which.
+    copies: int | None
     how: str
     # How many were asked for. A sweep that wanted eight and got two must not read like one
     # that asked for two.
@@ -95,7 +100,7 @@ def checkouts_for(repo: Path, workers: int, root: Path) -> Checkouts:
     the first and a quarter of a terabyte on the second, and a reader told only the number
     cannot tell them apart."""
     if workers <= 1:
-        return {"paths": [repo], "copies": 0, "how": "no copy needed", "asked": workers}
+        return {"paths": [repo], "copies": None, "how": "no copy needed", "asked": workers}
     paths: list[Path] = []
     root.mkdir(parents=True, exist_ok=True)
     how = ""
@@ -115,7 +120,7 @@ def checkouts_for(repo: Path, workers: int, root: Path) -> Checkouts:
         # No workers would be a sweep that proved nothing and reported it as one that found
         # nothing. The floor is the repository itself, proven in place as a serial sweep
         # always was.
-        return {"paths": [repo], "copies": 0, "how": "no copy could be made", "asked": workers}
+        return {"paths": [repo], "copies": None, "how": "no copy could be made", "asked": workers}
     return {"paths": paths, "copies": len(paths), "how": how, "asked": workers}
 
 
@@ -183,16 +188,16 @@ def _copy_tree(repo: Path, destination: Path) -> str:
 def discard_checkouts(made: Checkouts) -> None:
     """Remove every checkout this sweep copied, and never the repository.
 
-    A single-worker sweep copied nothing and its one path is the repository, which is why
-    the count is what this reads rather than the list. A worker's copy left behind after a
-    32-hour sweep is 34 GB somebody has to find."""
-    if not made["copies"]:
+    A sweep that copied nothing has the repository as its one path, which is why the count
+    is what this reads rather than the list. A worker's copy left behind after a 32-hour
+    sweep is 34 GB somebody has to find."""
+    if made["copies"] is None:
         return
     for path in made["paths"]:
         shutil.rmtree(path, ignore_errors=True)
 
 
-def pool_detail(workers: int, copies: int, how: str, asked: int) -> str:
+def pool_detail(workers: int, copies: int | None, how: str, asked: int) -> str:
     """What the run says about the pool it used.
 
     Said whether or not it is one, because a sweep that wanted eight workers and got one
@@ -200,7 +205,7 @@ def pool_detail(workers: int, copies: int, how: str, asked: int) -> str:
     hands = "1 worker" if workers == 1 else f"{workers} workers"
     short = (f" {asked} were asked for and the rest could not be made." if asked > workers
              else "")
-    if not copies:
+    if copies is None:
         return f" Proven by {hands}, in the repository itself.{short}"
     made = "1 checkout" if copies == 1 else f"{copies} checkouts"
     return (f" Proven by {hands}, each in its own checkout: {made} copied {how}, and the "
