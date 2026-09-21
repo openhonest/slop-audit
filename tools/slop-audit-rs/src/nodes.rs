@@ -277,3 +277,98 @@ pub fn unwrap_unary<'t>(node: Option<Node<'t>>, sp: &LangSpec) -> Option<Node<'t
     }
     None
 }
+
+/// The first argument of a call, past any wrapper.
+pub fn first_arg<'t>(call: Option<Node<'t>>, sp: &LangSpec) -> Option<Node<'t>> {
+    arg_value(first_named(field(call, sp.call_args)))
+}
+
+/// The operand `node` writes WHERE IT STANDS, or nothing when it writes nothing.
+///
+/// `n++`, `++n`, `c.n++` and `@xs << x` are one runtime step spelled four ways, and not one
+/// involves an assignment node, so the assignment types cannot reach any of them. The
+/// reference is mutated in place and the node ALSO produces a value, which is why this
+/// hands back the operand rather than a verdict: the caller decides what the produced value
+/// then does.
+///
+/// The OPERATOR is checked and not only the node type, because two grammars reuse the node
+/// for things that write nothing: C# spells the null-forgiving `x!` as a postfix unary and
+/// `!b` as a prefix one, and Ruby spells every binary operator it has as one node. A node
+/// carrying an operator this language did not declare comes back absent, so a shift into a
+/// variable is not read as an append.
+///
+/// The operand is the declared assignment target field where the node has one, and the
+/// first named child where it does not. Both reach the same place; the field is preferred
+/// because a grammar that named it meant it.
+pub fn written_in_place<'t>(node: Option<Node<'t>>, sp: &LangSpec) -> Option<Node<'t>> {
+    let n = node?;
+    let ops = lookup(sp.write_in_place_ops, n.kind())?;
+    let carries = children(n)
+        .into_iter()
+        .any(|c| !c.is_named() && ops.contains(&c.kind()));
+    if !carries {
+        return None;
+    }
+    field(Some(n), sp.assign_left).or_else(|| first_named(Some(n)))
+}
+
+/// `node` is a unary operator this language does NOT let a value pass through.
+///
+/// Go's `<-ch` is a unary expression exactly as `-x` and `!b` are, and that node type is
+/// declared a transparent wrapper. So a channel receive walked through as if the channel
+/// itself flowed onward, when what happens is that an element is consumed. Only the
+/// operator separates the two, which is why the whole node type cannot be dropped from the
+/// wrapper list: that would take `-x` with it.
+pub fn is_opaque_unary(node: Option<Node>, sp: &LangSpec, src: &[u8]) -> bool {
+    let Some(n) = node else { return false };
+    if !sp.unary_types.contains(&n.kind()) {
+        return false;
+    }
+    sp.opaque_unary_ops.contains(&text(field(Some(n), "operator"), src).as_str())
+}
+
+/// The condition of a branch that holds it POSITIONALLY, or nothing.
+///
+/// Two positional forms, because two grammars need different ones. An INDEX names which
+/// named child is the condition, which is what Python's ternary needs: `X if C else Y`
+/// reads as three children and the first-named rule would take the consequence and test the
+/// value being returned.
+///
+/// The first-named-child rule with an exclusion list is what Go's `for` needs. It is the
+/// only one in the table, and it gives its condition no field at all, so reading the
+/// declared condition field returns nothing however the node type is declared: `for
+/// p.running {}` was a loop on a bool field no row could see. The condition is the first
+/// named child that is not one of the excluded types, which is what tells the three real
+/// forms apart.
+pub fn bare_condition<'t>(node: Option<Node<'t>>, sp: &LangSpec) -> Option<Node<'t>> {
+    let n = node?;
+    if let Some(index) = lookup(sp.cond_at_index, n.kind()) {
+        let named: Vec<Node<'t>> =
+            children(n).into_iter().filter(|c| c.is_named()).collect();
+        return named.get(index as usize).copied();
+    }
+    let excluded = lookup(sp.bare_cond_types, n.kind())?;
+    children(n)
+        .into_iter()
+        .find(|c| c.is_named() && !excluded.contains(&c.kind()))
+}
+
+/// The value `node` hands out as a MUTABLE alias, or nothing when it hands out none.
+///
+/// `let r = &mut self.v; r.push(1);` writes the field through a local whose name has no
+/// relation to it. Every rule in this analyzer argues from where a piece of state's OWN
+/// references sit, and from that line on there is a write those references do not contain,
+/// so no such rule is sound about it any more.
+///
+/// The MARKER is checked and not the node type, and that is the whole of the reading:
+/// Rust's reference expression is on the transparent-wrapper list because `&self.v`
+/// genuinely is a wrapper, since a shared borrow cannot be written through. Only the
+/// mutability marker separates the two, and it is a child rather than a field.
+pub fn mutable_alias_value<'t>(node: Option<Node<'t>>, sp: &LangSpec) -> Option<Node<'t>> {
+    let n = node?;
+    let value_field = lookup(sp.alias_types, n.kind())?;
+    if !children(n).into_iter().any(|c| c.kind() == sp.alias_marker) {
+        return None;
+    }
+    field(Some(n), value_field)
+}
