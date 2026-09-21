@@ -22,6 +22,7 @@
 //! executed, and no reading of it decides what runs next.
 
 pub mod determinism;
+pub mod runners;
 
 use std::path::Path;
 use std::process::{Command, Stdio};

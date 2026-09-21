@@ -36,6 +36,18 @@ from l1_analyzer.pytest_trace import (
 _TOTAL = re.compile(r"total:\s+\(statements\)\s+([\d.]+)%")
 _RAN = ("ok  ", "--- FAIL", "FAIL", "PASS")
 
+# What `go test` prints when a package never ran, even though one of the markers above
+# appears on the line. `FAIL\tfixture [build failed]` carries "FAIL", so a repository that
+# does not COMPILE was read as a suite that ran and failed, and three such runs graded the
+# repository Slop on test determinism. That is a claim about flakiness on code that never
+# executed a test, and this module's own docstring forbids it: "a run that does not build
+# or runs no tests is not a determinism result, so return n/a with the reason rather than a
+# misleading 0/5."
+#
+# Found on 2026-09-21 by driving the Rust port of this harness against a Go module with a
+# deliberate compile error, which is a fixture nothing here had.
+_NEVER_RAN = ("[build failed]", "[setup failed]")
+
 
 def _go() -> str | None:
     return shutil.which("go")
@@ -136,7 +148,13 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
 def _ran_tests(output: str) -> bool:
     """True when `go test` actually built and ran a package, false when nothing ran (a build
     error, or a module with no test files) - the difference between a real determinism data
-    point and the suite never executing."""
+    point and the suite never executing.
+
+    The exclusion is checked FIRST and beats every marker. Go reports a package that would
+    not compile as `FAIL\t<pkg> [build failed]`, which carries the `FAIL` marker, so a
+    repository that does not build read as a suite that ran and failed."""
+    if any(marker in output for marker in _NEVER_RAN):
+        return False
     return any(marker in output for marker in _RAN)
 
 
