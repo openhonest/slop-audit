@@ -13,6 +13,8 @@ pub mod coverage;
 pub mod panel;
 pub mod indicators;
 pub mod lang;
+pub mod lang_spec;
+mod lang_spec_check;
 pub mod nodes;
 pub mod state;
 

@@ -101,3 +101,19 @@ repos:
         language: system
         pass_filenames: false
         files: ^tools/l1_analyzer/.*\.py$
+
+      # The Rust port's language table is generated from l1_analyzer.lang_spec: 84 keys
+      # over nine languages, 756 values. Nobody checks that by eye, and one wrong
+      # node-type string would make the port disagree with the reference on one construct
+      # in one language and agree everywhere else, which is the hardest kind of difference
+      # to find. So the table is never edited and this proves it still matches.
+      #
+      # Triggered by BOTH sides, because either can make it stale: the reference changing
+      # is the case everyone thinks of, and somebody editing the generated file by hand is
+      # the case that leaves no trace anywhere else.
+      - id: slop-audit-rs-lang-spec
+        name: rust port's language table matches the reference
+        entry: uv run --project tools/slop-audit-rs python tools/slop-audit-rs/generate_lang_spec.py --check
+        language: system
+        pass_filenames: false
+        files: ^tools/(l1_analyzer/l1_analyzer/lang_spec\.py|slop-audit-rs/src/lang_spec\.rs|slop-audit-rs/generate_lang_spec\.py)$

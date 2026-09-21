@@ -124,6 +124,7 @@ fn plain(kind: &'static str, ordered: bool) -> Reach {
             silence: "", construct: String::new() }
 }
 
+// honest-code-allow: L1.21.1 - write, output and unbounded are three names the classifier reads at 35 call sites. The duplicated record they each built is gone: all three fill it through `plain` now, and what is left is the naming. The reference carries this same declaration for the same three functions
 /// A write reaches its own value, in order.
 pub fn write() -> Reach {
     plain(WRITE, true)
