@@ -4,7 +4,7 @@
 //! nothing could assert what the binary actually emits, which is how six indicators went
 //! missing from the output without a single test noticing.
 
-use crate::runtime::{determinism::Reading, runners};
+use crate::runtime::{coverage as runtime_cov, determinism::Reading, runners};
 use crate::{coverage, indicators, Indicator};
 use std::path::Path;
 
@@ -35,6 +35,29 @@ fn test_determinism(repo: &Path, language: &str) -> Reading {
                                            SUITE_TIMEOUT_SECONDS,
                                            &toolchain_name(repo, language)),
     }
+}
+
+/// L1.19's RUNTIME half for whichever language this repository is: the share of decisions
+/// the project's own tests actually reached.
+///
+/// Distinct from the static half already on the panel, which enumerates decision points
+/// without running anything. This one EXECUTES the audited project's code.
+///
+/// A language with no runtime runner is refused by name rather than falling back to the
+/// static count, because the two answer different questions and a reader told one number
+/// cannot tell which they were given.
+fn runtime_coverage(repo: &Path, language: &str) -> Option<Reading> {
+    let toolchain = toolchain_name(repo, language);
+    Some(match language {
+        "go" => runtime_cov::go_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
+        "csharp" => runtime_cov::csharp_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
+        "java" => runtime_cov::java_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
+        "ruby" => runtime_cov::ruby_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
+        "javascript" | "typescript" =>
+            runtime_cov::js_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
+        "python" => runtime_cov::python_coverage(repo, SUITE_TIMEOUT_SECONDS),
+        _ => return None,
+    })
 }
 
 /// The toolchain that took a reading, so a number always says what measured it.
@@ -79,7 +102,21 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
     panel.push(indicators::type_escapes::analyze(repo, language)); // L1.15
     panel.push(indicators::whitespace::analyze(repo)); // L1.16
     panel.push(indicators::god_files::analyze(repo)); // L1.17 (all languages)
-    panel.push(indicators::decision_space::analyze(repo, language)); // L1.19 (static half)
+    // L1.19. The runtime half where the run executes tests and a runner exists for the
+    // language; the static enumeration otherwise. The details line says which was taken,
+    // because a share of decisions REACHED and a count of decisions FOUND are different
+    // numbers and a reader given one cannot tell which.
+    let runtime = if exec_tests { runtime_coverage(repo, language) } else { None };
+    match runtime {
+        Some(reading) => panel.push(Indicator {
+            code: "L1.19".into(),
+            label: "decision-space".into(),
+            value: reading.value,
+            band: reading.band,
+            details: reading.details,
+        }),
+        None => panel.push(indicators::decision_space::analyze(repo, language)),
+    }
     panel.push(indicators::absolute_paths::analyze(repo)); // additive
     // L1.20, which RUNS the audited project's suite.
     //

@@ -174,7 +174,7 @@ mod tests {
 // Go: `go test -coverprofile`, totalled by `go tool cover -func`.
 // --------------------------------------------------------------------------
 
-use crate::runtime::runners::{first_line, ran_tests, runner_for, which};
+use crate::runtime::runners::{first_line, python_interpreter, ran_tests, runner_for, variant_for, which};
 use crate::runtime::run_untrusted;
 use std::path::Path;
 
@@ -953,5 +953,446 @@ mod c8_tests {
         let json = r#"{"/tmp/total/band.js": {"branches":{"total":9,"covered":9}},
                        "total": {"branches":{"total":4,"covered":2}}}"#;
         assert_eq!(c8_totals(json), Some(Totals { covered: 2, total: 4 }));
+    }
+}
+
+/// (covered, total) branches from a SimpleCov resultset, or nothing when it carries none.
+///
+/// SimpleCov nests them two deep: every file's `branches` object maps a branch to its
+/// LEAVES, and each leaf holds a hit count. A leaf is covered when its count is above
+/// zero, so the totals are a count of leaves rather than of branches.
+///
+/// Every `branches` object in the document is read, across every command and every file,
+/// because a resultset holds one entry per test command and a project can have several.
+///
+/// Files stored in the old line-only format contribute nothing: their entry is a list
+/// rather than an object and carries no branches at all. That is a file this reader cannot
+/// count, not a file with no branches, and it drops out of both halves rather than
+/// inflating the denominator.
+pub fn simplecov_totals(json: &str) -> Option<Totals> {
+    let mut covered = 0i64;
+    let mut total = 0i64;
+    let mut seen_any = false;
+    let mut at = 0usize;
+    while let Some(found) = json[at..].find("\"branches\":").map(|i| at + i) {
+        at = found + "\"branches\":".len();
+        let Some(open) = json[at..].find('{').map(|i| at + i) else { break };
+        let Some(close) = matching_close(json, open) else { break };
+        let body = &json[open + 1..close];
+        seen_any = true;
+        // Each entry of a branches object is one branch mapping its leaves to hit counts.
+        let mut inner = 0usize;
+        while let Some(leaf_open) = body[inner..].find('{').map(|i| inner + i) {
+            let Some(leaf_close) = matching_close(body, leaf_open) else { break };
+            for hits in json_numbers(&body[leaf_open + 1..leaf_close]) {
+                total += 1;
+                if hits > 0 {
+                    covered += 1;
+                }
+            }
+            inner = leaf_close + 1;
+        }
+        at = close + 1;
+    }
+    if !seen_any {
+        return None;
+    }
+    Some(Totals { covered, total })
+}
+
+/// Every numeric value in a flat JSON object body, in order.
+fn json_numbers(body: &str) -> Vec<i64> {
+    let mut found = Vec::new();
+    let mut at = 0usize;
+    let bytes = body.as_bytes();
+    while at < bytes.len() {
+        match bytes[at] {
+            b'"' => {
+                // A key, skipped whole: it can hold digits, and SimpleCov's do.
+                match read_json_string(body, at) {
+                    Some((_, next)) => at = next,
+                    None => break,
+                }
+                continue;
+            }
+            b':' => {
+                let tail = body[at + 1..].trim_start();
+                let end = tail.find(|c: char| c != '-' && !c.is_ascii_digit())
+                    .unwrap_or(tail.len());
+                if end > 0 {
+                    if let Ok(value) = tail[..end].parse::<i64>() {
+                        found.push(value);
+                    }
+                }
+            }
+            _ => {}
+        }
+        at += 1;
+    }
+    found
+}
+
+#[cfg(test)]
+mod simplecov_tests {
+    use super::*;
+
+    #[test]
+    fn a_real_resultset_counts_its_branch_leaves() {
+        // What SimpleCov wrote for a fixture with two conditionals: four leaves, two hit.
+        // The reference reads the same pair from this file.
+        let json = include_str!("../../tests/reports/simplecov-resultset.json");
+        assert_eq!(simplecov_totals(json), Some(Totals { covered: 2, total: 4 }));
+    }
+
+    #[test]
+    fn a_leaf_with_no_hits_is_counted_in_the_total_and_not_in_the_covered() {
+        let json = r#"{"Unit Tests": {"coverage": {"/a.rb": {"lines": [1],
+            "branches": {"[:if, 0]": {"[:then, 1]": 0, "[:else, 2]": 3}}}}}}"#;
+        assert_eq!(simplecov_totals(json), Some(Totals { covered: 1, total: 2 }));
+    }
+
+    #[test]
+    fn every_command_in_a_resultset_is_counted() {
+        // A resultset holds one entry per test command, and a project can have several.
+        let json = r#"{"A": {"coverage": {"/a.rb": {"branches": {"x": {"t": 1, "e": 0}}}}},
+                       "B": {"coverage": {"/b.rb": {"branches": {"y": {"t": 1, "e": 1}}}}}}"#;
+        assert_eq!(simplecov_totals(json), Some(Totals { covered: 3, total: 4 }));
+    }
+
+    #[test]
+    fn a_resultset_with_no_branch_data_yields_nothing_rather_than_zero() {
+        // SimpleCov writes line-only data unless the project enables branch coverage. That
+        // is a measurement nobody took, not a project with no branches, and reading it as
+        // zero would publish Slop for a repository whose branches were never counted.
+        let json = r#"{"Unit Tests": {"coverage": {"/a.rb": [1, 0, null]}}}"#;
+        assert_eq!(simplecov_totals(json), None);
+    }
+
+    #[test]
+    fn a_key_holding_digits_is_not_read_as_a_hit_count() {
+        // SimpleCov's branch keys are full of numbers: `[:if, 0, 2, 2, 2, 23]`. A reader
+        // that scanned for digits would count the key's own line numbers as coverage.
+        let json = r#"{"A": {"coverage": {"/a.rb": {"branches":
+            {"[:if, 0, 2, 2, 2, 23]": {"[:then, 1, 2, 2, 2, 14]": 0,
+                                       "[:else, 2, 2, 2, 2, 23]": 7}}}}}}"#;
+        assert_eq!(simplecov_totals(json), Some(Totals { covered: 1, total: 2 }));
+    }
+}
+
+/// L1.19 for Ruby: SimpleCov branch coverage from the suite's own resultset.
+///
+/// SimpleCov CANNOT BE INJECTED from outside. It has to be started in the project's own
+/// test helper, before anything it measures is required, so a project that has not done
+/// that is refused with the line a reader would add rather than measured at nought.
+pub fn ruby_coverage(repo: &Path, timeout_seconds: f64, version: &str) -> Reading {
+    if which("bundle").is_none() || which("ruby").is_none() {
+        return not_measured("needs Ruby and Bundler (ruby, bundle) in PATH");
+    }
+    let ruby = runner_for("ruby").expect("ruby has a row");
+    let Some(variant) = variant_for(ruby, repo) else {
+        return not_measured(
+            "no RSpec (spec/, .rspec, or rspec in Gemfile.lock) or Minitest \
+             (test/ + Rakefile) suite detected");
+    };
+    // The coverage run takes no seed: one run, and the resultset it leaves behind.
+    let command: Vec<String> = variant.command.iter()
+        .filter(|part| !part.contains("{seed}") && **part != "--seed" && **part != "--order"
+                       && **part != "random")
+        .map(|part| part.to_string())
+        .collect();
+    let resultset = repo.join("coverage").join(".resultset.json");
+    let _ = std::fs::remove_file(&resultset);
+    let run = run_untrusted(&command, repo, &[], timeout_seconds);
+
+    let words = CoverageWords {
+        no_report: "Ruby branch coverage needs SimpleCov started in the suite's test \
+                    helper (coverage/.resultset.json not produced)",
+        nothing_to_cover: "SimpleCov recorded no branch data; add \
+                           `SimpleCov.enable_coverage :branch` before `SimpleCov.start`",
+        how: "SimpleCov branches",
+        toolchain: version.to_string(),
+        substitution: "",
+    };
+    if run.status == TIMED_OUT || !resultset.exists() {
+        return verdict(None, run.status, &words, timeout_seconds);
+    }
+    let Ok(json) = std::fs::read_to_string(&resultset) else {
+        return not_measured("SimpleCov resultset was unreadable");
+    };
+    // Absent means the resultset carries no branch data at all, which is what SimpleCov
+    // writes when a project has not enabled branch coverage. Zero is the nothing-to-cover
+    // sentence, and the two send a reader to the same one line of their test helper.
+    let totals = simplecov_totals(&json).unwrap_or(Totals { covered: 0, total: 0 });
+    verdict(Some(totals), run.status, &words, timeout_seconds)
+}
+
+/// L1.19 for JavaScript and TypeScript: branch coverage from c8 over the project's own
+/// test command.
+pub fn js_coverage(repo: &Path, timeout_seconds: f64, runtime: &str) -> Reading {
+    if which("npx").is_none() || which("node").is_none() {
+        return not_measured("needs node and npx in PATH");
+    }
+    let Ok(manifest) = std::fs::read_to_string(repo.join("package.json")) else {
+        return not_measured("no package.json found");
+    };
+    let Some(scripts) = json_object(&manifest, "scripts") else {
+        return not_measured("no test command in package.json (scripts.test)");
+    };
+    let Some(test_command) = json_string(scripts, "test") else {
+        return not_measured("no test command in package.json (scripts.test)");
+    };
+    if !repo.join("node_modules").is_dir() {
+        return not_measured(
+            "node_modules is not installed; this harness runs a project's own suite and \
+             installs nothing");
+    }
+
+    let scratch = scratch_dir("jscov");
+    let reports = scratch.join("reports");
+    let _ = std::fs::create_dir_all(&reports);
+    let mut command: Vec<String> = vec![
+        "npx".into(), "--no-install".into(), "c8".into(),
+        "--reporter=json-summary".into(),
+        format!("--reports-dir={}", reports.display()),
+        format!("--temp-directory={}", scratch.join("tmp").display()),
+    ];
+    // The project's own test command, split the way a shell would split it.
+    command.extend(test_command.split_whitespace().map(str::to_string));
+    let run = run_untrusted(&command, repo, &[], timeout_seconds);
+
+    let words = CoverageWords {
+        no_report: "coverage produced no data",
+        nothing_to_cover: "c8 reported no branches to cover",
+        how: "c8 branch counters (V8)",
+        toolchain: runtime.to_string(),
+        substitution: "",
+    };
+    let summary = reports.join("coverage-summary.json");
+    if run.status == TIMED_OUT || !summary.exists() {
+        let status = run.status;
+        let output = run.output();
+        let _ = std::fs::remove_dir_all(&scratch);
+        if status == TIMED_OUT {
+            return verdict(None, status, &words, timeout_seconds);
+        }
+        // c8 writes the summary for every file that ran, even when some tests fail. No
+        // summary means the suite did not build or ran no tests.
+        return not_measured(format!(
+            "coverage produced no data (test command exit {status}): {}",
+            first_line(&output)));
+    }
+    let totals = std::fs::read_to_string(&summary).ok().and_then(|json| c8_totals(&json));
+    let _ = std::fs::remove_dir_all(&scratch);
+    match totals {
+        None => not_measured("coverage summary had no branch totals"),
+        some => verdict(some, run.status, &words, timeout_seconds),
+    }
+}
+
+/// L1.19 for Python: branch coverage from coverage.py over the project's own suite.
+///
+/// The suite runs under the PROJECT'S interpreter, because the package and its test
+/// dependencies live there.
+pub fn python_coverage(repo: &Path, timeout_seconds: f64) -> Reading {
+    let Some((interpreter, provenance)) = python_interpreter(repo) else {
+        return not_measured("needs a Python interpreter in PATH");
+    };
+    let scratch = scratch_dir("pycov");
+    let _ = std::fs::create_dir_all(&scratch);
+    let data_file = scratch.join(".coverage");
+    let report_file = scratch.join("coverage.json");
+    let env = [("COVERAGE_FILE".to_string(), data_file.display().to_string())];
+
+    let run = run_untrusted(
+        &[interpreter.clone(), "-m".into(), "coverage".into(), "run".into(),
+          "--branch".into(), "-m".into(), "pytest".into(), "-q".into(),
+          "-p".into(), "no:cacheprovider".into()],
+        repo, &env, timeout_seconds);
+
+    let words = CoverageWords {
+        no_report: "coverage produced no data",
+        nothing_to_cover: "coverage.py found no branches to cover",
+        how: "coverage.py branch totals",
+        toolchain: provenance.clone(),
+        substitution: "",
+    };
+    // pytest's own exit codes say whether the suite ran at all, and a percentage over a
+    // run that never happened reads as real-but-terrible coverage.
+    if run.status == TIMED_OUT {
+        let _ = std::fs::remove_dir_all(&scratch);
+        return verdict(None, TIMED_OUT, &words, timeout_seconds);
+    }
+    if run.status != 0 && run.status != 1 {
+        let why = match run.status {
+            2 => "the run was interrupted",
+            3 => "pytest hit an internal error",
+            4 => "pytest usage or collection error",
+            5 => "pytest collected no tests",
+            _ => "pytest exited with an unrecognised code",
+        };
+        let status = run.status;
+        let _ = std::fs::remove_dir_all(&scratch);
+        return not_measured(format!(
+            "the test suite did not complete a valid run ({why}, exit {status}); \
+             coverage not measured"));
+    }
+    // Our own step, over data the run wrote: fast, and not the audited project's code.
+    let _ = run_untrusted(
+        &[interpreter, "-m".into(), "coverage".into(), "json".into(),
+          "-o".into(), report_file.display().to_string()],
+        repo, &env, timeout_seconds.min(120.0));
+    let totals = std::fs::read_to_string(&report_file).ok()
+        .and_then(|json| coveragepy_totals(&json));
+    let _ = std::fs::remove_dir_all(&scratch);
+    match totals {
+        None => not_measured("coverage report was unreadable"),
+        some => verdict(some, run.status, &words, timeout_seconds),
+    }
+}
+
+#[cfg(test)]
+mod live_coverage {
+    //! The three remaining runners against real projects they build themselves.
+
+    use super::*;
+
+    #[test]
+    fn a_real_ruby_suite_measures_its_branches_through_simplecov() {
+        if which("bundle").is_none() || which("ruby").is_none() {
+            eprintln!("skipped: ruby or bundler is not on PATH");
+            return;
+        }
+        let root = scratch_dir("rbcov");
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::create_dir_all(root.join("test")).unwrap();
+        // rake, minitest and simplecov are DECLARED: bundler hides the default gems.
+        std::fs::write(root.join("Gemfile"),
+            "source \"https://rubygems.org\"\ngem \"rake\"\ngem \"minitest\"\ngem \"simplecov\"\n")
+            .unwrap();
+        std::fs::write(root.join("Rakefile"),
+            "require \"rake/testtask\"\nRake::TestTask.new(:test) do |t|\n\
+             \x20 t.libs << \"lib\" << \"test\"\n\
+             \x20 t.test_files = FileList[\"test/**/*_test.rb\"]\nend\n").unwrap();
+        std::fs::write(root.join("lib").join("band.rb"),
+            "def band(n)\n  return \"neg\" if n < 0\n  return \"zero\" if n == 0\n  \"pos\"\nend\n")
+            .unwrap();
+        // SimpleCov started BEFORE the library is required, which is the only way it can
+        // see the code it measures.
+        std::fs::write(root.join("test").join("band_test.rb"),
+            "require \"simplecov\"\nSimpleCov.enable_coverage :branch\nSimpleCov.start\n\
+             require \"minitest/autorun\"\nrequire \"band\"\n\
+             class BandTest < Minitest::Test\n\
+             \x20 def test_positive\n    assert_equal \"pos\", band(3)\n  end\nend\n").unwrap();
+        let installed = run_untrusted(
+            &["bundle".into(), "install".into(), "--path".into(), "vendor/bundle".into()],
+            &root, &[], 600.0);
+        if installed.status != 0 {
+            let _ = std::fs::remove_dir_all(&root);
+            eprintln!("skipped: the bundle would not install");
+            return;
+        }
+        let reading = ruby_coverage(&root, 600.0, "a ruby");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.value, "50.0", "{}", reading.details);
+        assert!(reading.details.contains("2/4 decision branches"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_ruby_suite_without_simplecov_is_refused_with_the_line_to_add() {
+        // SimpleCov cannot be injected from outside: it has to be started in the project's
+        // own test helper. Reporting nought would read as terrible coverage rather than as
+        // coverage nobody measured.
+        if which("bundle").is_none() || which("ruby").is_none() {
+            eprintln!("skipped: ruby or bundler is not on PATH");
+            return;
+        }
+        let root = scratch_dir("rbnocov");
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::create_dir_all(root.join("test")).unwrap();
+        std::fs::write(root.join("Gemfile"),
+            "source \"https://rubygems.org\"\ngem \"rake\"\ngem \"minitest\"\n").unwrap();
+        std::fs::write(root.join("Rakefile"),
+            "require \"rake/testtask\"\nRake::TestTask.new(:test) do |t|\n\
+             \x20 t.libs << \"lib\" << \"test\"\n\
+             \x20 t.test_files = FileList[\"test/**/*_test.rb\"]\nend\n").unwrap();
+        std::fs::write(root.join("lib").join("band.rb"),
+            "def band(n)\n  return \"neg\" if n < 0\n  \"pos\"\nend\n").unwrap();
+        std::fs::write(root.join("test").join("band_test.rb"),
+            "require \"minitest/autorun\"\nrequire \"band\"\n\
+             class BandTest < Minitest::Test\n\
+             \x20 def test_positive\n    assert_equal \"pos\", band(3)\n  end\nend\n").unwrap();
+        let installed = run_untrusted(
+            &["bundle".into(), "install".into(), "--path".into(), "vendor/bundle".into()],
+            &root, &[], 600.0);
+        if installed.status != 0 {
+            let _ = std::fs::remove_dir_all(&root);
+            eprintln!("skipped: the bundle would not install");
+            return;
+        }
+        let reading = ruby_coverage(&root, 600.0, "a ruby");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a", "{}", reading.details);
+        assert!(reading.details.contains("SimpleCov"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_real_python_suite_measures_its_branches() {
+        let Some(uv) = which("uv") else {
+            eprintln!("skipped: uv is not on PATH");
+            return;
+        };
+        let root = scratch_dir("pyruncov");
+        std::fs::create_dir_all(&root).unwrap();
+        // Three arms, a test reaching two, so the figure is short by construction.
+        std::fs::write(root.join("band.py"),
+            "def band(n):\n    if n < 0:\n        return \"neg\"\n\
+             \x20   if n == 0:\n        return \"zero\"\n    return \"pos\"\n").unwrap();
+        std::fs::write(root.join("test_band.py"),
+            "from band import band\n\n\ndef test_positive():\n    assert band(3) == \"pos\"\n")
+            .unwrap();
+        let made = run_untrusted(
+            &[uv.display().to_string(), "venv".into(), ".venv".into()], &root, &[], 300.0);
+        let installed = run_untrusted(
+            &[uv.display().to_string(), "pip".into(), "install".into(), "--quiet".into(),
+              "pytest".into(), "coverage".into()],
+            &root, &[("VIRTUAL_ENV".into(), root.join(".venv").display().to_string())],
+            600.0);
+        if made.status != 0 || installed.status != 0 {
+            let _ = std::fs::remove_dir_all(&root);
+            eprintln!("skipped: the environment would not build");
+            return;
+        }
+        let reading = python_coverage(&root, 600.0);
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.value, "50.0", "{}", reading.details);
+        assert!(reading.details.contains("2/4 decision branches"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_python_suite_that_collects_nothing_is_refused_rather_than_scored() {
+        // A percentage over a run that never happened reads as real-but-terrible coverage.
+        let Some(uv) = which("uv") else {
+            eprintln!("skipped: uv is not on PATH");
+            return;
+        };
+        let root = scratch_dir("pynocov");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("band.py"), "def band(n):\n    return n\n").unwrap();
+        let made = run_untrusted(
+            &[uv.display().to_string(), "venv".into(), ".venv".into()], &root, &[], 300.0);
+        let installed = run_untrusted(
+            &[uv.display().to_string(), "pip".into(), "install".into(), "--quiet".into(),
+              "pytest".into(), "coverage".into()],
+            &root, &[("VIRTUAL_ENV".into(), root.join(".venv").display().to_string())],
+            600.0);
+        if made.status != 0 || installed.status != 0 {
+            let _ = std::fs::remove_dir_all(&root);
+            eprintln!("skipped: the environment would not build");
+            return;
+        }
+        let reading = python_coverage(&root, 600.0);
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a", "{}", reading.details);
+        assert!(reading.details.contains("collected no tests"), "{}", reading.details);
     }
 }
