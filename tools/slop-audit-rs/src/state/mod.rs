@@ -15,4 +15,5 @@ pub mod enumerate;
 pub mod partition;
 pub mod python_module;
 pub mod records;
+pub mod references;
 pub mod sites;
