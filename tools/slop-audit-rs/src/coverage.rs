@@ -22,8 +22,6 @@ pub enum Coverage {
     Measured,
     /// Implemented in the Python reference, not yet ported to this binary.
     NotPorted,
-    /// Needs a third-party tool the single-file binary deliberately does not bundle.
-    NeedsTool(&'static str),
     /// Needs the target's own suite to run, which this binary does not do.
     NeedsTestRun,
 }
@@ -53,10 +51,6 @@ impl Coverage {
                 "not ported to the portable binary; run the Python reference for this indicator"
                     .into()
             }
-            Coverage::NeedsTool(tool) => format!(
-                "requires {tool}, which the single-file binary does not bundle; run the Python \
-                 reference for this indicator"
-            ),
             Coverage::NeedsTestRun => {
                 "requires executing the target's own test suite, which this binary does not do"
                     .into()
@@ -83,9 +77,17 @@ pub const CANONICAL: &[(&str, &str, Coverage)] = &[
     ("L1.9", "pre-commit hooks", Coverage::Measured),
     ("L1.10", "CI/CD pipelines", Coverage::Measured),
     ("L1.11", "containerization", Coverage::Measured),
-    ("L1.12", "dead-code", Coverage::NeedsTool("vulture")),
-    ("L1.13", "duplication", Coverage::NeedsTool("jscpd")),
-    ("L1.14", "secret-scan", Coverage::NeedsTool("gitleaks")),
+    // These three read NeedsTool("vulture"), NeedsTool("jscpd") and NeedsTool("gitleaks")
+    // until 2026-09-21, and the advice was four weeks stale. On 2026-08-19 the spec started
+    // defining each of them as an algorithm precise enough to reimplement, and the Python
+    // reference computes all three natively; the three tools are named there as
+    // cross-checks and nothing calls them. So a reader who installed vulture on this
+    // binary's advice got nothing for it, because the reference it was sent to does not use
+    // vulture either. They are in the same position as L1.18: this binary has not ported
+    // them.
+    ("L1.12", "dead-code", Coverage::NotPorted),
+    ("L1.13", "duplication", Coverage::NotPorted),
+    ("L1.14", "secret-scan", Coverage::NotPorted),
     ("L1.15", "type-escapes", Coverage::Measured),
     ("L1.16", "trailing-whitespace", Coverage::Measured),
     ("L1.17", "god-files", Coverage::Measured),
@@ -190,12 +192,18 @@ mod tests {
             panel.iter().find(|i| i.code == code).unwrap().details.clone()
         };
         let not_ported = reason("L1.18");
-        let needs_tool = reason("L1.14");
         let needs_run = reason("L1.20");
-        assert_ne!(not_ported, needs_tool);
-        assert_ne!(needs_tool, needs_run);
         assert_ne!(not_ported, needs_run);
-        assert!(needs_tool.contains("gitleaks"), "{needs_tool}");
+        assert!(not_ported.contains("not ported"), "{not_ported}");
+        assert!(needs_run.contains("test suite"), "{needs_run}");
+        // No canonical row names a tool any more. Every one that did was wrong about it,
+        // and a reason that sends a reader to install something is worth this check.
+        for ind in panel {
+            for tool in ["vulture", "jscpd", "gitleaks"] {
+                assert!(!ind.details.contains(tool),
+                        "{} still tells a reader to install {tool}", ind.code);
+            }
+        }
     }
 
     /// A measured indicator keeps its own row untouched.
