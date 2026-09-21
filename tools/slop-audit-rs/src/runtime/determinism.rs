@@ -48,6 +48,10 @@ pub struct RunWords {
 /// it looks says so without reading anything.
 pub struct Attempt {
     pub status: i32,
+    /// Whether the kill reached everything this attempt started. Read only on the timeout
+    /// path, where a reader is owed the difference between a suite that was stopped and
+    /// one whose children may still be running.
+    pub isolation: crate::runtime::Isolation,
     /// Whether this attempt executed any tests at all. A compilation failure and a module
     /// with no tests both answer false, and neither is a determinism data point.
     pub ran_tests: bool,
@@ -80,8 +84,9 @@ where
         made += 1;
         if attempt.status == TIMED_OUT {
             return not_measured(format!(
-                "{} ({} {made}); determinism not measured{}",
-                words.timed_out, words.unit, timeout_note(timeout_seconds)));
+                "{} ({} {made}); determinism not measured{}{}",
+                words.timed_out, words.unit, timeout_note(timeout_seconds),
+                attempt.isolation.note()));
         }
         if !attempt.ran_tests {
             return not_measured(format!(
@@ -124,12 +129,13 @@ mod tests {
     }
 
     fn clean() -> Attempt {
-        Attempt { status: 0, ran_tests: true, summary: "Tests run: 12".into(),
-                  why_it_did_not_run: String::new() }
+        Attempt { status: 0, isolation: crate::runtime::Isolation::Grouped, ran_tests: true,
+                  summary: "Tests run: 12".into(), why_it_did_not_run: String::new() }
     }
 
     fn failed() -> Attempt {
-        Attempt { status: 1, ran_tests: true, summary: "Tests run: 12, Failures: 2".into(),
+        Attempt { status: 1, isolation: crate::runtime::Isolation::Grouped, ran_tests: true,
+                  summary: "Tests run: 12, Failures: 2".into(),
                   why_it_did_not_run: String::new() }
     }
 
@@ -161,7 +167,8 @@ mod tests {
         // A compilation failure is not flakiness. Nought of five here would read as a
         // flaky suite, which is a claim about the audited code rather than about us.
         let attempts = vec![clean(), Attempt {
-            status: 1, ran_tests: false, summary: String::new(),
+            status: 1, isolation: crate::runtime::Isolation::Grouped, ran_tests: false,
+            summary: String::new(),
             why_it_did_not_run: "no tests executed under a runtime".into() }];
         let reading = tally(attempts, &words(), 300.0);
         assert_eq!(reading.band, "n/a");
@@ -172,12 +179,37 @@ mod tests {
     #[test]
     fn a_timed_out_run_names_its_seed_and_the_seconds_it_was_allowed() {
         let attempts = vec![clean(), Attempt {
-            status: TIMED_OUT, ran_tests: false, summary: String::new(),
+            status: TIMED_OUT, isolation: crate::runtime::Isolation::Grouped,
+            ran_tests: false, summary: String::new(),
             why_it_did_not_run: String::new() }];
         let reading = tally(attempts, &words(), 300.0);
         assert_eq!(reading.band, "n/a");
         assert!(reading.details.contains("seed 2"));
         assert!(reading.details.contains("allowed 300s"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_timeout_on_a_platform_with_no_process_group_says_children_may_survive() {
+        // The whole reason the isolation is a VALUE both halves return rather than a side
+        // effect one half performs. A suite that spawns a database and hangs leaves it
+        // running on a platform with no group, and a reader who is not told that cannot
+        // go and look for it.
+        let attempts = vec![Attempt {
+            status: TIMED_OUT, isolation: crate::runtime::Isolation::NotAvailable,
+            ran_tests: false, summary: String::new(),
+            why_it_did_not_run: String::new() }];
+        let reading = tally(attempts, &words(), 300.0);
+        assert!(reading.details.contains("may still be running"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_timeout_where_the_kill_reached_everything_adds_nothing() {
+        let attempts = vec![Attempt {
+            status: TIMED_OUT, isolation: crate::runtime::Isolation::Grouped,
+            ran_tests: false, summary: String::new(),
+            why_it_did_not_run: String::new() }];
+        let reading = tally(attempts, &words(), 300.0);
+        assert!(!reading.details.contains("may still be running"));
     }
 
     #[test]
@@ -196,7 +228,9 @@ mod tests {
         let attempts = (0..5).map(|n| {
             made.set(made.get() + 1);
             if n == 1 {
-                Attempt { status: TIMED_OUT, ran_tests: false, summary: String::new(),
+                Attempt { status: TIMED_OUT,
+                          isolation: crate::runtime::Isolation::Grouped,
+                          ran_tests: false, summary: String::new(),
                           why_it_did_not_run: String::new() }
             } else {
                 clean()

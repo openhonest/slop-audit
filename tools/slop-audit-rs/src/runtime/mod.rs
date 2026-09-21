@@ -37,6 +37,9 @@ pub struct Finished {
     pub status: i32,
     pub stdout: String,
     pub stderr: String,
+    /// Whether this run was isolated well enough that killing it reached its children.
+    /// Read by the timeout refusal, which owes a reader the difference.
+    pub isolation: Isolation,
 }
 
 impl Finished {
@@ -64,21 +67,23 @@ pub fn run_untrusted(command: &[String], cwd: &Path, env: &[(String, String)],
                      timeout_seconds: f64) -> Finished {
     let Some((program, args)) = command.split_first() else {
         return Finished { status: TIMED_OUT, stdout: String::new(),
-                          stderr: "no command to run".into() };
+                          stderr: "no command to run".into(),
+                          isolation: Isolation::Grouped };
     };
     let mut cmd = Command::new(program);
     cmd.args(args).current_dir(cwd).stdout(Stdio::piped()).stderr(Stdio::piped());
     for (key, value) in env {
         cmd.env(key, value);
     }
-    new_process_group(&mut cmd);
+    let isolation = new_process_group(&mut cmd);
 
     let mut child = match cmd.spawn() {
         Ok(child) => child,
         // A command that will not start is not a suite that failed. The caller's verdict
         // reads this as a run that produced nothing, which is what happened.
         Err(error) => {
-            return Finished { status: -1, stdout: String::new(), stderr: error.to_string() }
+            return Finished { status: -1, stdout: String::new(),
+                              stderr: error.to_string(), isolation }
         }
     };
 
@@ -97,16 +102,17 @@ pub fn run_untrusted(command: &[String], cwd: &Path, env: &[(String, String)],
                     status: status.code().unwrap_or(-1),
                     stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
                     stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+                    isolation,
                 };
             }
             Ok(None) => {}
             Err(error) => {
                 return Finished { status: -1, stdout: String::new(),
-                                  stderr: error.to_string() }
+                                  stderr: error.to_string(), isolation }
             }
         }
         if std::time::Instant::now() >= deadline {
-            kill_process_group(pid);
+            let reached = kill_process_group(pid, isolation);
             let out = child.wait_with_output().unwrap_or_else(|_| std::process::Output {
                 status: Default::default(),
                 stdout: Vec::new(),
@@ -116,9 +122,40 @@ pub fn run_untrusted(command: &[String], cwd: &Path, env: &[(String, String)],
                 status: TIMED_OUT,
                 stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
                 stderr: String::from_utf8_lossy(&out.stderr).into_owned() + "\ntimed out",
+                isolation: reached,
             };
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+/// Whether a run was isolated in a process group of its own, and so whether killing it
+/// reaches the children it spawned.
+///
+/// A VALUE both halves of the pair return, rather than a side effect one half performs and
+/// the other silently skips. On Windows there is no process group in this sense and
+/// nothing can be done about it, which is a real limit of a binary that now executes a
+/// client's code: a suite that spawns a database and hangs leaves it running. A caller that
+/// cannot tell an isolated run from an unisolated one cannot disclose that, and this
+/// instrument's whole argument is that an unstated limit is worse than a stated one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Isolation {
+    /// The run has its own process group, so the kill reaches everything it started.
+    Grouped,
+    /// This platform has no process group to put it in. Children outlive the kill.
+    NotAvailable,
+}
+
+impl Isolation {
+    /// What a reader is owed about a run that timed out, or nothing to add when the kill
+    /// reached everything.
+    pub fn note(self) -> &'static str {
+        match self {
+            Isolation::Grouped => "",
+            Isolation::NotAvailable =>
+                concat!(" This platform has no process group, so any process",
+                        " the suite started may still be running."),
+        }
     }
 }
 
@@ -129,18 +166,23 @@ pub fn run_untrusted(command: &[String], cwd: &Path, env: &[(String, String)],
 /// here more than usual: this binary is one self-contained file an auditor carries to a
 /// client site, and its only dependencies are the grammars it must parse with.
 #[cfg(unix)]
-fn new_process_group(cmd: &mut Command) {
+fn new_process_group(cmd: &mut Command) -> Isolation {
     use std::os::unix::process::CommandExt;
     cmd.process_group(0);
+    Isolation::Grouped
 }
 
-/// Windows has no process group in this sense, so the child is started as it is. A suite
-/// that spawns and hangs there leaves its children behind, which is a real limit and is
-/// written down rather than assumed away.
+/// Windows has no process group in this sense, so the child is started as it is.
+///
+/// It ANSWERS rather than doing nothing quietly. The caller reads the answer and the
+/// refusal carries it, so a suite that hangs on Windows tells a reader its children may
+/// have survived instead of leaving them to find out.
 #[cfg(not(unix))]
-fn new_process_group(_cmd: &mut Command) {}
+fn new_process_group(_cmd: &mut Command) -> Isolation {
+    Isolation::NotAvailable
+}
 
-/// Kill the whole group the suite ran in.
+/// Kill the whole group the suite ran in, and say whether the kill could reach it.
 ///
 /// Through `kill(1)` with a NEGATIVE pid, which is how POSIX spells a process group.
 /// Killing the pid alone leaves every child the suite started, which is the case the group
@@ -150,16 +192,21 @@ fn new_process_group(_cmd: &mut Command) {}
 /// path, which is already the slow one, and it keeps the crate free of a dependency it
 /// would otherwise carry for one line.
 #[cfg(unix)]
-fn kill_process_group(pid: u32) {
+fn kill_process_group(pid: u32, isolation: Isolation) -> Isolation {
     let _ = Command::new("kill")
         .args(["-9", &format!("-{pid}")])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status();
+    isolation
 }
 
+/// Nothing to kill the group with, because there is no group. The child itself is already
+/// being waited on; what this cannot do is reach its children, and it says so.
 #[cfg(not(unix))]
-fn kill_process_group(_pid: u32) {}
+fn kill_process_group(_pid: u32, isolation: Isolation) -> Isolation {
+    isolation
+}
 
 /// Name the time a run was given and the flag that gives it more.
 ///
