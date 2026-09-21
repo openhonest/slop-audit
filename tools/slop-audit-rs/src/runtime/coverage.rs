@@ -589,3 +589,170 @@ mod real_report_tests {
                    "the reference reads (covered 2, missed 2) from this file");
     }
 }
+
+// --------------------------------------------------------------------------
+// The runners that produce a report and read it.
+// --------------------------------------------------------------------------
+
+/// Every file under `root` whose name matches, deepest-first order not guaranteed.
+///
+/// Its own walk rather than the repository walker: a results directory is scratch space
+/// this run created, so none of the scope rules that decide what belongs to a repository
+/// apply to it.
+fn find_reports(root: &Path, filename: &str) -> Vec<std::path::PathBuf> {
+    let mut found = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.file_name().and_then(|n| n.to_str()) == Some(filename) {
+                found.push(path);
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
+/// L1.19 for C#: branch coverage from `dotnet test --collect:"XPlat Code Coverage"`.
+///
+/// EXECUTES THE AUDITED PROJECT'S CODE. The collector writes a Cobertura report into a
+/// results directory this run owns, so nothing is left in the repository.
+pub fn csharp_coverage(repo: &Path, timeout_seconds: f64, sdk: &str) -> Reading {
+    if which("dotnet").is_none() {
+        return not_measured("needs the dotnet SDK in PATH");
+    }
+    let results = scratch_dir("cscov");
+    let _ = std::fs::create_dir_all(&results);
+    let run = run_untrusted(
+        &["dotnet".into(), "test".into(), "--collect:XPlat Code Coverage".into(),
+          "--results-directory".into(), results.display().to_string()],
+        repo, &[], timeout_seconds);
+
+    let words = CoverageWords {
+        no_report: "C# branch coverage needs the XPlat Code Coverage collector \
+                    (no cobertura report was written)",
+        nothing_to_cover: "no enumerable decision branches found \
+                           (cobertura reported zero valid branches)",
+        how: "Cobertura branch counters",
+        toolchain: sdk.to_string(),
+        substitution: "",
+    };
+    let reports = find_reports(&results, "coverage.cobertura.xml");
+    let totals = reports.first()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|xml| cobertura_totals(&xml));
+    // A report that exists and carries no branch attributes is a schema this reader does
+    // not know, which is neither a missing collector nor a project with no branches.
+    let unreadable = !reports.is_empty() && totals.is_none() && run.status != TIMED_OUT;
+    let _ = std::fs::remove_dir_all(&results);
+    if unreadable {
+        return not_measured("cobertura report had no branch counts");
+    }
+    verdict(totals, run.status, &words, timeout_seconds)
+}
+
+/// L1.19 for Java: branch coverage from JaCoCo, via `mvn test jacoco:report`.
+///
+/// EXECUTES THE AUDITED PROJECT'S CODE. The report lands in the project's own build
+/// directory, because that is where the plugin puts it and the plugin is the project's.
+pub fn java_coverage(repo: &Path, timeout_seconds: f64, jdk: &str) -> Reading {
+    let maven = repo.join("mvnw");
+    let maven = if maven.exists() {
+        maven.display().to_string()
+    } else if which("mvn").is_some() {
+        "mvn".to_string()
+    } else {
+        return not_measured(
+            "needs Maven (mvn) on PATH or a ./mvnw wrapper in the repo");
+    };
+    if !repo.join("pom.xml").exists() {
+        if repo.join("build.gradle").exists() || repo.join("build.gradle.kts").exists() {
+            return not_measured("Gradle Java projects not yet supported by this harness");
+        }
+        return not_measured("needs a Maven build (no pom.xml found)");
+    }
+
+    let run = run_untrusted(
+        &[maven, "-q".into(), "test".into(), "jacoco:report".into()],
+        repo, &[], timeout_seconds);
+    let report = repo.join("target").join("site").join("jacoco").join("jacoco.xml");
+
+    let words = CoverageWords {
+        no_report: "Java branch coverage needs the JaCoCo plugin in the build \
+                    (jacoco.xml not produced)",
+        nothing_to_cover: "no enumerable decision branches found \
+                           (JaCoCo reported zero BRANCH counters)",
+        how: "JaCoCo BRANCH counters",
+        toolchain: jdk.to_string(),
+        substitution: "",
+    };
+    if run.status == TIMED_OUT || !report.exists() {
+        return verdict(None, run.status, &words, timeout_seconds);
+    }
+    let Ok(xml) = std::fs::read_to_string(&report) else {
+        return not_measured("JaCoCo report was unreadable");
+    };
+    // Absent here means the report carries no BRANCH counter at all, which JaCoCo writes
+    // for a project with no branches to cover. That is the nothing-to-cover case rather
+    // than a missing report, and the verdict tells them apart by the zero.
+    let totals = jacoco_totals(&xml).unwrap_or(Totals { covered: 0, total: 0 });
+    verdict(Some(totals), run.status, &words, timeout_seconds)
+}
+
+#[cfg(test)]
+mod runner_tests {
+    use super::*;
+
+    #[test]
+    fn a_gradle_project_is_named_as_unsupported_rather_than_measured_at_zero() {
+        let root = scratch_dir("gradle");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("build.gradle"), "plugins { id 'java' }\n").unwrap();
+        let reading = java_coverage(&root, 30.0, "a jdk");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a");
+        assert!(reading.details.contains("Gradle"), "{}", reading.details);
+    }
+
+    #[test]
+    fn a_directory_with_no_maven_build_is_told_what_it_needs() {
+        let root = scratch_dir("nomaven");
+        std::fs::create_dir_all(&root).unwrap();
+        let reading = java_coverage(&root, 30.0, "a jdk");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(reading.band, "n/a");
+        assert!(reading.details.contains("pom.xml") || reading.details.contains("mvnw"),
+                "{}", reading.details);
+    }
+
+    #[test]
+    fn a_real_maven_project_measures_its_own_branches() {
+        // The project built earlier in this session: four branches, two covered.
+        let repo = std::path::Path::new("/tmp/jvx");
+        if !repo.join("pom.xml").exists() || which("mvn").is_none() {
+            eprintln!("skipped: no Maven project at /tmp/jvx, or mvn is not on PATH");
+            return;
+        }
+        let reading = java_coverage(repo, 900.0, "a jdk");
+        assert_eq!(reading.value, "50.0", "{}", reading.details);
+        assert!(reading.details.contains("2/4 decision branches"), "{}", reading.details);
+    }
+
+    #[test]
+    fn the_report_walk_finds_a_file_nested_under_the_results_directory() {
+        // The collector writes into a run-id directory it names itself, so the report is
+        // never at a path this reader could have predicted.
+        let root = scratch_dir("walk");
+        let nested = root.join("some-guid").join("deeper");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(nested.join("coverage.cobertura.xml"), "<coverage/>").unwrap();
+        std::fs::write(root.join("other.xml"), "<x/>").unwrap();
+        let found = find_reports(&root, "coverage.cobertura.xml");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(found.len(), 1);
+    }
+}
