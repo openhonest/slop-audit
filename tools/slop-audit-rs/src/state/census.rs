@@ -680,3 +680,75 @@ pub fn parsed_files(repo: &Path, lang: &str) -> Vec<(String, tree_sitter::Tree, 
 /// scaffolding and test doubles, so it is production for neither the state meters nor the
 /// god-file count: nobody hand-piles logic into one.
 const CENSUS_IGNORE: &[&'static str] = &["tests", "test", "conformance"];
+
+/// What one walk of the parse trees counts on its own: how many declarations there are,
+/// how they split by kind, and how many files carried them.
+///
+/// `declared` is ABSENT, never zero, on a language this module has no vocabulary for. A
+/// confident zero is the failure this module exists to stop: it would let an unread
+/// repository report a full denominator and pass. Absence says "not counted here", which
+/// withholds the gap check rather than faking it.
+#[derive(Debug, Clone, Default)]
+pub struct Tally {
+    pub declared: Option<usize>,
+    pub by_kind: BTreeMap<String, usize>,
+    pub files: usize,
+}
+
+/// The tally beside what the classifier's own walk reached.
+///
+/// The reference held this as a mapping of names to anything, so the two fractions that
+/// decide whether a grade is issued at all were read through a declaration that said
+/// nothing about them. Both are absent when there is no denominator: nothing declared is
+/// not "we read none of it", and nothing reached is not "we judged none of what we
+/// reached".
+#[derive(Debug, Clone, Default)]
+pub struct Census {
+    pub tally: Tally,
+    pub admitted: usize,
+    pub visited: Option<usize>,
+    pub judged: Option<usize>,
+    /// The declaration kinds this repository spells that the enumerator reached nothing
+    /// of. Absent rather than empty on a language with no vocabulary, for the same reason
+    /// `declared` is.
+    pub unread_kinds: Option<Vec<String>>,
+    pub visited_fraction: Option<f64>,
+    pub judged_fraction: Option<f64>,
+}
+
+/// The census of a language this module has no vocabulary for. Every count is absent
+/// rather than zero.
+///
+/// A confident zero is exactly the failure this module exists to stop: it would let an
+/// unread repository report a full denominator and pass.
+pub fn uncounted(admitted: usize) -> Census {
+    Census {
+        tally: Tally { declared: None, by_kind: BTreeMap::new(), files: 0 },
+        admitted,
+        visited: None,
+        judged: None,
+        unread_kinds: None,
+        visited_fraction: None,
+        judged_fraction: None,
+    }
+}
+
+/// The counts one walk of the parse trees can produce on its own, rolled up per file.
+///
+/// Declarations only. Nothing here says whether anything READ them, because this walk has
+/// no access to the classifier's.
+pub fn tally(by_file: &BTreeMap<String, BTreeSet<Site>>) -> Tally {
+    let mut by_kind: BTreeMap<String, usize> = BTreeMap::new();
+    let mut declared = 0usize;
+    for sites in by_file.values() {
+        for site in sites {
+            declared += 1;
+            *by_kind.entry(site.kind.to_string()).or_insert(0) += 1;
+        }
+    }
+    Tally {
+        declared: Some(declared),
+        by_kind,
+        files: by_file.values().filter(|sites| !sites.is_empty()).count(),
+    }
+}
