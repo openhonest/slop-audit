@@ -21,8 +21,8 @@ _PY_MUTATING = frozenset({
     "clear", "setdefault", "popitem", "sort", "appendleft",
 })
 # Every method that mutates a Python container in place, which is _PY_MUTATING plus the
-# names the classifier has no use for. state_bounds_filters imports this as _IN_PLACE, and
-# derives python's write-only set from it below, so the two cannot drift: a name added to
+# names the classifier has no use for. It is python's `mutates_in_place`, and python's
+# write-only set is derived from it below, so the two cannot drift: a name added to
 # _PY_MUTATING is in both sets on the next line.
 _PY_IN_PLACE = _PY_MUTATING | frozenset({
     "reverse", "intersection_update", "difference_update", "symmetric_difference_update",

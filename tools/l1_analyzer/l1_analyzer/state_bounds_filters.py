@@ -65,7 +65,6 @@ from tree_sitter import Node
 
 from l1_analyzer import state_ref_reads as reads
 from l1_analyzer.lang_spec import (
-    _PY_IN_PLACE,
     COMPARISON_OPS,
     LangSpec,
 )
@@ -81,13 +80,7 @@ from l1_analyzer.ts_nodes import text as _text
 from l1_analyzer.ts_nodes import unwrap_unary as _unwrap_unary
 from l1_analyzer.ts_nodes import written_in_place as _written_in_place
 
-# Method names that mutate a container in place. The docstring used to CLAIM this was a
-# superset of the classifier's set and a hand-written list sat underneath, which drifted:
-# `appendleft` was in _PY_MUTATING and not here, so a deque assigned once and then grown
-# cleared as write-once. The claim is now the construction, so the two cannot part again,
-# and the derivation itself moved to lang_spec, where python's write-only set is taken from
-# it in the same breath.
-_IN_PLACE = _PY_IN_PLACE
+
 def _attr(key: str) -> str:
     """The bare attribute name from a state key: `self._rows` -> `_rows`. Ruby's sigil
     survives (`@hits` stays `@hits`), which is right: the sigil is part of the name the

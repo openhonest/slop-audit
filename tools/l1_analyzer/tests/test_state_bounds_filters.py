@@ -355,10 +355,13 @@ def test_a_tuple_assignment_target_is_unresolved_not_cleared():
 def test_the_in_place_set_is_a_superset_of_the_classifier_by_construction():
     """The docstring claimed this and a hand-written list sat underneath, which drifted:
     `appendleft` was in the classifier's set and not in the filter's. The claim is now the
-    construction, so this test fails only if someone replaces the derivation with a literal."""
-    from l1_analyzer.lang_spec import _PY_MUTATING
-    from l1_analyzer.state_bounds_filters import _IN_PLACE
-    assert _PY_MUTATING <= _IN_PLACE
+    construction, so this test fails only if someone replaces the derivation with a literal.
+
+    Asked of the TABLE KEY the filters actually read. It used to be asked of a name the
+    filters imported and never used, so the guarded fact and the used fact were two
+    different objects and the test would have passed with the used one wrong."""
+    from l1_analyzer.lang_spec import _PY_MUTATING, LANG_SPEC
+    assert _PY_MUTATING <= LANG_SPEC["python"]["mutates_in_place"]
 
 
 # --- The whitelist predicates, called directly ------------------------------------
