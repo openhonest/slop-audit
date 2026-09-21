@@ -383,3 +383,209 @@ mod go_tests {
         assert_eq!(reading.band, "n/a", "{}", reading.details);
     }
 }
+
+// --------------------------------------------------------------------------
+// Reading a report. Two schemas, two shapes of lie available to a careless reader.
+// --------------------------------------------------------------------------
+
+/// One element found by the scan below: its name, its depth, and its attributes as text.
+struct Element<'a> {
+    name: &'a str,
+    depth: usize,
+    attrs: &'a str,
+}
+
+/// Every element in an XML document, with the depth it sits at.
+///
+/// A scanner rather than a parser, and rather than a dependency. It reads tag names,
+/// attribute text and nesting depth, which is the whole of what the two report schemas
+/// below need, and this binary is one file an auditor carries: a full XML parser would be
+/// its first dependency that is not a grammar.
+///
+/// DEPTH IS THE POINT. JaCoCo writes a `counter` element at four levels, report, package,
+/// class and method, and the report-level ones are the grand total. A reader that matched
+/// every counter in the file would add the same branches four times over.
+fn elements(xml: &str) -> Vec<Element<'_>> {
+    let mut found = Vec::new();
+    let mut depth = 0usize;
+    let bytes = xml.as_bytes();
+    let mut at = 0usize;
+    while at < bytes.len() {
+        let Some(open) = xml[at..].find('<').map(|i| at + i) else { break };
+        let Some(close) = xml[open..].find('>').map(|i| open + i) else { break };
+        let inner = &xml[open + 1..close];
+        at = close + 1;
+        // Declarations, comments and doctypes carry no structure this reader wants.
+        if inner.starts_with('?') || inner.starts_with('!') {
+            continue;
+        }
+        if let Some(name) = inner.strip_prefix('/') {
+            let _ = name;
+            depth = depth.saturating_sub(1);
+            continue;
+        }
+        let self_closing = inner.ends_with('/');
+        let body = inner.trim_end_matches('/');
+        let (name, attrs) = match body.find(char::is_whitespace) {
+            Some(cut) => (&body[..cut], &body[cut..]),
+            None => (body, ""),
+        };
+        depth += 1;
+        found.push(Element { name, depth, attrs });
+        if self_closing {
+            depth -= 1;
+        }
+    }
+    found
+}
+
+/// One attribute's value, read out of an element's attribute text.
+fn attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
+    let key = format!("{name}=\"");
+    let start = attrs.find(&key)? + key.len();
+    let rest = &attrs[start..];
+    let end = rest.find('"')?;
+    Some(&rest[..end])
+}
+
+/// (covered, total) branches from a JaCoCo report, or nothing when it carries no branch
+/// counter.
+///
+/// JaCoCo reports covered and MISSED, so the total is their sum. Only the REPORT-LEVEL
+/// counter is read, which is the grand total across every package: the same element appears
+/// on each package, class and method, and adding them all would count every branch four
+/// times.
+///
+/// Nothing, never a pair of zeroes, for a report with no branch counter. A project with no
+/// branches to cover and a schema this reader does not know are different facts, and
+/// reading the second as zero would publish Slop for a repository whose coverage was never
+/// measured.
+pub fn jacoco_totals(xml: &str) -> Option<Totals> {
+    for element in elements(xml) {
+        if element.name != "counter" || element.depth != 2 {
+            continue;
+        }
+        if attr(element.attrs, "type") != Some("BRANCH") {
+            continue;
+        }
+        let covered: i64 = attr(element.attrs, "covered")?.parse().ok()?;
+        let missed: i64 = attr(element.attrs, "missed")?.parse().ok()?;
+        return Some(Totals { covered, total: covered + missed });
+    }
+    None
+}
+
+/// (covered, total) branches from a Cobertura report, or nothing when it carries no counts.
+///
+/// Covered first, then VALID, because the verdict takes covered-and-total and the report
+/// writes the pair the other way round. One transposition is a coverage of 105 per cent.
+///
+/// Nothing, never a pair of zeroes, for the reason the JaCoCo reader gives.
+pub fn cobertura_totals(xml: &str) -> Option<Totals> {
+    for element in elements(xml) {
+        if element.name != "coverage" {
+            continue;
+        }
+        let covered: i64 = attr(element.attrs, "branches-covered")?.parse().ok()?;
+        let valid: i64 = attr(element.attrs, "branches-valid")?.parse().ok()?;
+        return Some(Totals { covered, total: valid });
+    }
+    None
+}
+
+#[cfg(test)]
+mod report_tests {
+    use super::*;
+
+    const JACOCO: &str = r#"<?xml version="1.0"?>
+<report name="fixture">
+  <package name="band">
+    <class name="band/Band">
+      <counter type="BRANCH" missed="1" covered="1"/>
+    </class>
+    <counter type="BRANCH" missed="1" covered="1"/>
+  </package>
+  <counter type="INSTRUCTION" missed="3" covered="9"/>
+  <counter type="BRANCH" missed="2" covered="2"/>
+</report>"#;
+
+    #[test]
+    fn only_the_report_level_counter_is_read() {
+        // The same element appears on the report, each package, each class and each
+        // method. Adding them all would count every branch four times over.
+        assert_eq!(jacoco_totals(JACOCO), Some(Totals { covered: 2, total: 4 }));
+    }
+
+    #[test]
+    fn the_instruction_counter_is_not_the_branch_counter() {
+        // Reading the first counter rather than the branch one would report nine of twelve
+        // where two of four is the answer.
+        let totals = jacoco_totals(JACOCO).expect("a branch counter");
+        assert_ne!(totals.covered, 9);
+    }
+
+    #[test]
+    fn a_report_with_no_branch_counter_yields_nothing_rather_than_zero() {
+        // A project with no branches and a schema this reader does not know are different
+        // facts, and reading the second as zero publishes Slop for a repository whose
+        // coverage was never measured.
+        let xml = r#"<report name="x"><counter type="INSTRUCTION" missed="1" covered="9"/></report>"#;
+        assert_eq!(jacoco_totals(xml), None);
+    }
+
+    #[test]
+    fn cobertura_counts_are_read_covered_first_then_valid() {
+        // The report writes the pair the other way round from the verdict. One
+        // transposition is a coverage of 105 per cent.
+        let xml = r#"<?xml version="1.0"?>
+<coverage line-rate="0.8" branch-rate="0.5" branches-covered="2" branches-valid="4">
+  <packages/>
+</coverage>"#;
+        assert_eq!(cobertura_totals(xml), Some(Totals { covered: 2, total: 4 }));
+    }
+
+    #[test]
+    fn a_cobertura_report_with_no_branch_attributes_yields_nothing() {
+        let xml = r#"<coverage line-rate="0.8"><packages/></coverage>"#;
+        assert_eq!(cobertura_totals(xml), None);
+    }
+
+    #[test]
+    fn the_scan_tracks_depth_through_self_closing_and_paired_tags() {
+        let found = elements(r#"<a><b/><c><d/></c></a>"#);
+        let depths: Vec<(&str, usize)> = found.iter().map(|e| (e.name, e.depth)).collect();
+        assert_eq!(depths, vec![("a", 1), ("b", 2), ("c", 2), ("d", 3)]);
+    }
+
+    #[test]
+    fn a_declaration_or_comment_is_not_an_element() {
+        let found = elements(r#"<?xml version="1.0"?><!-- note --><a/>"#);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "a");
+    }
+}
+
+#[cfg(test)]
+mod real_report_tests {
+    //! The readers against a report a real tool wrote, not one this file made up.
+    //!
+    //! A parser proved only against its own fixture has been proved against the test's own
+    //! string. The reference met that exactly: its Cobertura reader was tested through a
+    //! stand-in that wrote the very report the module then read back.
+
+    use super::*;
+
+    #[test]
+    fn a_real_jacoco_report_reads_the_same_totals_the_reference_reads() {
+        // /tmp/jvx is a Maven project built earlier in this session, two of four branches
+        // covered. Skipped rather than failed when it is not there: a missing fixture is
+        // not a wrong reader, and pretending otherwise turns an absent file into a defect.
+        let path = std::path::Path::new("/tmp/jvx/target/site/jacoco/jacoco.xml");
+        let Ok(xml) = std::fs::read_to_string(path) else {
+            eprintln!("skipped: no JaCoCo report at {}", path.display());
+            return;
+        };
+        assert_eq!(jacoco_totals(&xml), Some(Totals { covered: 2, total: 4 }),
+                   "the reference reads (covered 2, missed 2) from this file");
+    }
+}
