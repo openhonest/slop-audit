@@ -277,13 +277,6 @@ fn c_module(root: Node, src: &[u8]) -> Cands {
     cands
 }
 
-/// Java, C# and Ruby keep module and static state out of this reader and rely on class
-/// scope. Named and dispatched to explicitly rather than defaulted: a language whose rule
-/// nobody wrote must be a refusal, not a silent nothing.
-fn no_module() -> Cands {
-    Vec::new()
-}
-
 /// Every top-level binding this language's reader walks, with the key each one yields.
 ///
 /// Dispatched on the language's own declared enumerator name, and refused for a name no
@@ -292,7 +285,10 @@ fn no_module() -> Cands {
 /// understood as one holding no state.
 pub fn module_cands(root: Node, sp: &LangSpec, src: &[u8]) -> Option<Cands> {
     match sp.module_enum {
-        "none" => Some(no_module()),
+        // Java, C# and Ruby keep module and static state out of this reader and rely on
+        // class scope. An arm of its own rather than a default, because a language whose
+        // rule nobody wrote must reach the refusal below and not this empty list.
+        "none" => Some(Vec::new()),
         "js" => Some(js_module(root, sp, src)),
         "rust" => Some(rust_module(root, src)),
         "go" => Some(go_module(root, src)),
@@ -346,6 +342,184 @@ pub fn record_owner(record: Node, src: &[u8]) -> String {
     owner_name(Some(record), src)
 }
 
+// --------------------------------------------------------------------------
+// Class scope. Member-style languages name state through a receiver (self.x / this.x) and
+// may also declare fields; identifier-style languages reference fields by bare name, so
+// the key is the field name itself.
+// --------------------------------------------------------------------------
+
+/// Fields a record DECLARES, for the languages whose fields are named the same way at
+/// their uses. The key carries the language's own prefix, so a field referenced by bare
+/// name and one referenced through a receiver are not two slots.
+fn field_decl_cands(cls: Node, sp: &LangSpec, src: &[u8]) -> Cands {
+    let mut cands: Cands = Vec::new();
+    let owner = owner_name(Some(cls), src);
+    for fd in local_of_types(cls, sp.field_decl_types, sp.class_types) {
+        let Some(kind) = crate::state::sites::decl_kind(fd.kind()) else { continue };
+        for name in crate::state::records::field_decl_names(fd, src) {
+            let key = format!("{}{name}", sp.key_prefix);
+            put(&mut cands, Site::new(kind, owner.clone(), name), &key);
+        }
+    }
+    cands
+}
+
+/// Receiver-assigned attributes, plus whatever fields the language also declares.
+///
+/// Both, because they are two spellings of one slot in these languages: a TypeScript class
+/// can declare `x` and assign `this.x`, and counting only one would report the other as a
+/// declaration nothing visited.
+fn member_cands(cls: Node, sp: &LangSpec, src: &[u8]) -> Cands {
+    let mut cands: Cands = Vec::new();
+    let owner = owner_name(Some(cls), src);
+    for n in local_of_types(cls, sp.assign_types, sp.class_types) {
+        let Some(left) = field(Some(n), sp.assign_left) else { continue };
+        if !sp.member_types.contains(&left.kind()) {
+            continue;
+        }
+        let (Some(obj), Some(attr)) =
+            (field(Some(left), sp.mem_object), field(Some(left), sp.mem_attr)) else { continue };
+        if !sp.this_idents.contains(&text(Some(obj), src).as_str()) {
+            continue;
+        }
+        put(&mut cands,
+            Site::new(crate::state::sites::RECEIVER_ATTRIBUTE, owner.clone(),
+                      text(Some(attr), src)),
+            &text(Some(left), src));
+    }
+    for (site, key) in field_decl_cands(cls, sp, src) {
+        put(&mut cands, site, &key);
+    }
+    cands
+}
+
+/// Ruby: state is `@instance_variables`, a node type of their own with no receiver.
+///
+/// Every mention counts as a visit, including a READ. The census counts only the ones a
+/// file assigns, so a read of an ivar written elsewhere drops out of the comparison rather
+/// than charging this file for another file's slot.
+fn ivar_cands(cls: Node, sp: &LangSpec, src: &[u8]) -> Cands {
+    let mut cands: Cands = Vec::new();
+    let owner = owner_name(Some(cls), src);
+    for iv in local_of_types(cls, &["instance_variable"], sp.class_types) {
+        let spelled = text(Some(iv), src);
+        put(&mut cands,
+            Site::new(crate::state::sites::INSTANCE_VARIABLE, owner.clone(), spelled.clone()),
+            &spelled);
+    }
+    cands
+}
+
+/// Every declaration inside one class that this language's reader walks.
+///
+/// Dispatched on the language's declared style and refused for a style no arm covers, for
+/// the reason the module enumerator gives: an empty candidate list reads as a class
+/// holding no state.
+pub fn instance_cands(cls: Node, sp: &LangSpec, src: &[u8]) -> Option<Cands> {
+    match sp.instance_enum {
+        // C and Go declare no class this walk enters: C's state is file scope and struct
+        // fields, Go's is grouped by receiver type, and both are read elsewhere here.
+        "none" => Some(Vec::new()),
+        "member" => Some(member_cands(cls, sp, src)),
+        "identifier" => Some(field_decl_cands(cls, sp, src)),
+        "self_usage" => Some(rust_self_usage_cands(cls, sp, src)),
+        "ruby_ivar" => Some(ivar_cands(cls, sp, src)),
+        _ => None,
+    }
+}
+
+// --------------------------------------------------------------------------
+// Go, whose state spans methods rather than a class body.
+// --------------------------------------------------------------------------
+
+/// The struct type a Go receiver binds to, unwrapping `*T` to `T`.
+///
+/// A loop rather than a call to itself: `**T` is one wrapper per star, and the depth is
+/// the audited file's business rather than anyone's choice here.
+fn go_type_name(typ: Option<Node>, src: &[u8]) -> String {
+    let mut current = typ;
+    while let Some(t) = current {
+        match t.kind() {
+            "pointer_type" => current = crate::nodes::first_named(Some(t)),
+            "type_identifier" => return text(Some(t), src),
+            _ => return String::new(),
+        }
+    }
+    String::new()
+}
+
+/// (receiver type, receiver variable name) for a Go method declaration.
+fn go_receiver(method: Node, src: &[u8]) -> (String, String) {
+    let Some(recv) = field(Some(method), "receiver") else { return (String::new(), String::new()) };
+    let Some(pd) = crate::nodes::first_named(Some(recv)) else {
+        return (String::new(), String::new());
+    };
+    (go_type_name(field(Some(pd), "type"), src), text(field(Some(pd), "name"), src))
+}
+
+/// One piece of state reached from its uses, with the site both walks name it by.
+#[derive(Debug, Clone)]
+pub struct Slot {
+    pub state: String,
+    pub refs: Vec<usize>,
+    pub writers_enumerable: bool,
+    pub site: Site,
+}
+
+/// Go state, grouped by receiver TYPE across all its methods, because the analysis scope
+/// is the type and not one method.
+///
+/// A field is `<recv>.<field>` inside a method, and the key is `<Type>.<field>` so it is
+/// stable across methods whose receivers are named differently.
+///
+/// Every slot here is reached from a USE, so the site's owner is the receiver's type name
+/// and the census names the same site from the type declaration the struct sits under. A
+/// field the type never touches in any method is not enumerated at all and reads as
+/// unvisited, which is the truth: nothing in this reading looked at it.
+pub fn go_slots(root: Node, src: &[u8]) -> Vec<Slot> {
+    // Insertion-ordered, because the classifier's sort ties for two slots on one line and
+    // a stable sort then keeps whatever order arrived here.
+    let mut by_type: Vec<(String, Vec<(Node, String)>)> = Vec::new();
+    for m in descendants(root).into_iter().filter(|n| n.kind() == "method_declaration") {
+        let (tname, rname) = go_receiver(m, src);
+        if tname.is_empty() || rname.is_empty() {
+            continue;
+        }
+        match by_type.iter_mut().find(|(held, _)| *held == tname) {
+            Some((_, methods)) => methods.push((m, rname)),
+            None => by_type.push((tname, vec![(m, rname)])),
+        }
+    }
+
+    let mut slots = Vec::new();
+    for (tname, methods) in by_type {
+        let mut field_refs: Vec<(String, Vec<usize>)> = Vec::new();
+        for (method, rname) in methods {
+            for sel in descendants(method).into_iter()
+                .filter(|n| n.kind() == "selector_expression") {
+                let Some(operand) = field(Some(sel), "operand") else { continue };
+                if operand.kind() != "identifier" || text(Some(operand), src) != rname {
+                    continue;
+                }
+                let name = text(field(Some(sel), "field"), src);
+                match field_refs.iter_mut().find(|(held, _)| *held == name) {
+                    Some((_, refs)) => refs.push(sel.id()),
+                    None => field_refs.push((name, vec![sel.id()])),
+                }
+            }
+        }
+        for (name, refs) in field_refs {
+            slots.push(Slot {
+                state: format!("{tname}.{name}"),
+                refs,
+                writers_enumerable: true,
+                site: Site::new(FIELD_DECLARATION, tname.clone(), name),
+            });
+        }
+    }
+    slots
+}
+
 /// The candidate sites of every file in scope, keyed by path.
 ///
 /// Scoped exactly as the census is, through the same helper, because the two counts are
@@ -353,13 +527,30 @@ pub fn record_owner(record: Node, src: &[u8]) -> String {
 /// and the same sites in each is a different defect from one that read the same files
 /// differently, and sharing the scope keeps those two questions apart.
 pub fn walk(repo: &std::path::Path, lang: &str)
-    -> std::collections::BTreeMap<String, Vec<(Site, String)>> {
+    -> std::collections::BTreeMap<String, Cands> {
     let mut out = std::collections::BTreeMap::new();
     let Some(sp) = crate::lang_spec::spec_for(lang) else { return out };
-    for (rel, root, src) in crate::state::census::parsed_files(repo, lang) {
-        if let Some(cands) = module_cands(root.root_node(), sp, &src) {
-            out.insert(rel, cands);
+    for (rel, tree, src) in crate::state::census::parsed_files(repo, lang) {
+        let root = tree.root_node();
+        // Both scopes, in the order the classifier reads them: module first, then every
+        // class in the file. A file whose module enumerator is not ported contributes
+        // nothing at all rather than its classes alone, because a partial reading of a
+        // file is the shape that reads as a clean one.
+        let Some(mut cands) = module_cands(root, sp, &src) else { continue };
+        for cls in descendants(root).into_iter().filter(|n| sp.class_types.contains(&n.kind())) {
+            let Some(inner) = instance_cands(cls, sp, &src) else { continue };
+            for (site, key) in inner {
+                put(&mut cands, site, &key);
+            }
         }
+        // Go's state spans methods rather than a class body, so its slots are reached
+        // here and nowhere else.
+        if sp.scope_by_receiver {
+            for slot in go_slots(root, &src) {
+                put(&mut cands, slot.site, &slot.state);
+            }
+        }
+        out.insert(rel, cands);
     }
     out
 }

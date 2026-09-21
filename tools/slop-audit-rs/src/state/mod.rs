@@ -11,4 +11,5 @@
 pub mod census;
 pub mod enumerate;
 pub mod partition;
+pub mod records;
 pub mod sites;
