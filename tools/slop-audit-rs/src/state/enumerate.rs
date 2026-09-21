@@ -90,6 +90,28 @@ pub fn visited(cands: &Cands) -> Vec<Site> {
 // function is a local and never reaches here.
 // --------------------------------------------------------------------------
 
+/// Python module bindings.
+///
+/// The mutability rule lives in `python_module` and L1.18 reads it too, so it is asked
+/// rather than re-implemented. What this walk takes is the CANDIDATE list, the set of
+/// bindings the rule was run over. A name the rule declined, a type alias, an uppercase
+/// constant, a dunder, was READ, and this is the only place that can still say so.
+fn py_module(root: Node, src: &[u8]) -> Cands {
+    let admitted = crate::state::python_module::module_mutable_names(root, src);
+    let mut cands: Cands = Vec::new();
+    for node in crate::state::python_module::shallow_candidates(root) {
+        // Subscripts, tuples and attributes are not a plain binding.
+        let Some(left) = field(Some(node), "left") else { continue };
+        if left.kind() != "identifier" {
+            continue;
+        }
+        let name = text(Some(left), src);
+        let key = if admitted.contains(&name) { name.clone() } else { String::new() };
+        put(&mut cands, Site::new(MODULE_BINDING, "", name), &key);
+    }
+    cands
+}
+
 /// The container literal types JavaScript and TypeScript bind writable values with. Taken
 /// from the generated language table rather than retyped, so the two cannot drift.
 ///
@@ -293,9 +315,9 @@ pub fn module_cands(root: Node, sp: &LangSpec, src: &[u8]) -> Option<Cands> {
         "rust" => Some(rust_module(root, src)),
         "go" => Some(go_module(root, src)),
         "c" => Some(c_module(root, src)),
-        // Python's module rule reads the mutability machinery L1.18 also reads, and that
-        // is not ported yet. Refused rather than emptied, so the gap is a refusal at the
-        // call site and never a clean reading.
+        "python" => Some(py_module(root, src)),
+        // Refused rather than emptied, so a language whose rule nobody wrote is a refusal
+        // at the call site and never a clean reading of a file holding no state.
         _ => None,
     }
 }
@@ -687,13 +709,11 @@ mod tests {
     }
 
     #[test]
-    fn a_language_whose_enumerator_is_not_ported_is_refused_rather_than_emptied() {
-        // An empty candidate list would read as a file holding no state. Python's module
-        // rule needs the mutability machinery L1.18 carries, which is not ported yet.
-        let mut parser = parser_for("python");
-        let bytes = b"cache = {}\n".to_vec();
-        let tree = parser.parse(&bytes, None).expect("a parse");
-        let sp = spec_for("python").expect("python");
-        assert!(module_cands(tree.root_node(), sp, &bytes).is_none());
+    fn a_python_binding_the_rule_declined_is_still_recorded_as_read() {
+        // Four bindings walked, one judged state. The other three are READ, and without
+        // that record the census counts them as declarations nobody looked at.
+        let source = "cache = {}\nLIMIT = 5\nReading = dict[str, int]\n__all__ = ['x']\n";
+        assert_eq!(admitted(source, "python"), vec!["cache"]);
+        assert_eq!(reached(source, "python"), 4);
     }
 }
