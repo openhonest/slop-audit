@@ -21,6 +21,7 @@
 //! Everything a run writes is untrusted input. Output is read for a number and never
 //! executed, and no reading of it decides what runs next.
 
+pub mod coverage;
 pub mod determinism;
 pub mod runners;
 
