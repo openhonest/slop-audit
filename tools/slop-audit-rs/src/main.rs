@@ -43,6 +43,7 @@ fn main() {
     let mut census = false;
     let mut exec_tests = true;
     let mut enumerate = false;
+    let mut reads = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -63,6 +64,12 @@ fn main() {
             // string where it read a declaration and declined. The declines are the half
             // that matters: they are the only evidence the reader was there at all.
             "--enum" => enumerate = true,
+            // The third of the same family. It dumps what the POSITION predicates say
+            // about every node: is this a test expression, a presence test, a keyed read,
+            // a call whose result nobody reads. Those readings are where the nine
+            // grammars diverge most, and a rule that composes them is only as sound as
+            // they are.
+            "--reads" => reads = true,
             // Before the repository check: it answers a question about the binary rather
             // than about a tree.
             "--version" => {
@@ -101,6 +108,16 @@ fn main() {
         for (path, cands) in state::enumerate::walk(repo, &language) {
             for (site, key) in cands {
                 println!("{path}\t{}\t{}\t{}\t{key}", site.kind, site.owner, site.name);
+            }
+        }
+        return;
+    }
+
+    if reads {
+        for (path, rows) in state::ref_reads::walk(repo, &language) {
+            for row in rows {
+                println!("{path}\t{}\t{}\t{}\t{}",
+                         row.start, row.end, row.kind, row.flags.join(","));
             }
         }
         return;

@@ -16,11 +16,22 @@ use tree_sitter::Node;
 /// Invalid UTF-8 is dropped rather than raised, matching the reference's
 /// `errors="ignore"`. A source file this analyzer cannot decode is still a file it must
 /// report on, and a decode error would take the whole run down over one byte.
+///
+/// The node and the bytes are two owners of one fact, and nothing in the type system makes
+/// them agree: a caller without the source in scope can hand over an empty slice and the
+/// signature accepts it. One did, and the slice panicked with a message about an index,
+/// which says nothing about the two arguments that did not belong together. The check
+/// below names the real problem instead.
 pub fn text(node: Option<Node>, src: &[u8]) -> String {
     match node {
         None => String::new(),
-        Some(n) => String::from_utf8_lossy(&src[n.byte_range()])
-            .replace('\u{FFFD}', ""),
+        Some(n) => {
+            assert!(n.end_byte() <= src.len(),
+                    "a {} node ending at byte {} was read against {} bytes of source: \
+                     these are not the same file",
+                    n.kind(), n.end_byte(), src.len());
+            String::from_utf8_lossy(&src[n.byte_range()]).replace('\u{FFFD}', "")
+        }
     }
 }
 

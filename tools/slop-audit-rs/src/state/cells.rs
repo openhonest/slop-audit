@@ -64,7 +64,10 @@ pub fn contains(scope: Node, node: Node) -> bool {
     scope.start_byte() <= node.start_byte() && node.end_byte() <= scope.end_byte()
 }
 
-const MEMBERSHIP_TOKENS: &[&str] = &["in", "not in"];
+/// Every spelling of a membership operator, as tree-sitter TOKENISES it. `not in` is one
+/// token of type "not in", not a `not` wrapping an `in`, so matching only "in" misses the
+/// negated form entirely, which once inverted a whole verdict.
+pub const MEMBERSHIP_TOKENS: &[&str] = &["in", "not in"];
 
 /// (left, right) for an `in` / `not in` membership test, else nothing.
 ///
@@ -86,8 +89,14 @@ pub fn membership_operands<'t>(node: Option<Node<'t>>, sp: &LangSpec)
                 None
             }
         }
+        // The operator is read by NODE TYPE and not by text, because reading its text
+        // needs the source bytes and this function is not given them. It was handed an
+        // empty slice instead, and slicing a byte range out of nothing panicked on the
+        // first JavaScript file carrying any binary expression at all. A keyword token's
+        // type is the keyword, so the type answers the same question with nothing to get
+        // wrong.
         "binary_in" if node.kind() == "binary_expression"
-            && text(field(Some(node), "operator"), &[]) == "in" => {
+            && field(Some(node), "operator").map(|op| op.kind()) == Some("in") => {
             // Both halves or neither. A membership test missing one side is not a
             // membership test, and handing back a pair with a hole in it made every
             // caller's unpacking a promise this function never made.
@@ -391,5 +400,27 @@ mod tests {
             .filter(|n| n.kind() == "identifier" && text(Some(*n), &src) == "CACHE")
             .collect();
         assert_eq!(write_key_bound(&refs, sp, &ClosedSets::new(), &src), Some(2));
+    }
+
+    #[test]
+    fn a_javascript_addition_is_read_without_reaching_for_source_that_is_not_there() {
+        // `a + b` is not a membership test, and finding that out used to take the whole
+        // run down: the operator was read as text against an empty source slice, and
+        // slicing a byte range out of nothing panics. Every JavaScript file with any
+        // binary expression in it hit this.
+        let sp = spec_for("javascript").expect("javascript");
+        let (tree, _src) = parse("const n = a + b;\n", "javascript");
+        let sum = first_of(&tree, "binary_expression");
+        assert_eq!(membership_operands(Some(sum), sp), None);
+    }
+
+    #[test]
+    fn a_javascript_membership_test_hands_back_both_of_its_halves() {
+        let sp = spec_for("javascript").expect("javascript");
+        let (tree, src) = parse("const hit = k in d;\n", "javascript");
+        let test = first_of(&tree, "binary_expression");
+        let (left, right) = membership_operands(Some(test), sp).expect("both halves");
+        assert_eq!(text(Some(left), &src), "k");
+        assert_eq!(text(Some(right), &src), "d");
     }
 }
