@@ -13,6 +13,8 @@ pub mod coverage;
 pub mod panel;
 pub mod indicators;
 pub mod lang;
+pub mod nodes;
+pub mod state;
 
 pub use lang::parser_for;
 
