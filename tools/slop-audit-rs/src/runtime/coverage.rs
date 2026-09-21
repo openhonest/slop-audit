@@ -178,6 +178,38 @@ use crate::runtime::runners::{first_line, ran_tests, runner_for, which};
 use crate::runtime::run_untrusted;
 use std::path::Path;
 
+/// A JaCoCo-instrumented pom, used by the live test below.
+#[cfg(test)]
+const JACOCO_POM: &str = r#"<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>fixture</groupId>
+  <artifactId>band</artifactId>
+  <version>1.0</version>
+  <properties>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.10.2</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+  <build><plugins>
+    <plugin>
+      <groupId>org.jacoco</groupId>
+      <artifactId>jacoco-maven-plugin</artifactId>
+      <version>0.8.12</version>
+      <executions>
+        <execution><goals><goal>prepare-agent</goal></goals></execution>
+        <execution><id>report</id><phase>test</phase><goals><goal>report</goal></goals></execution>
+      </executions>
+    </plugin>
+  </plugins></build>
+</project>"#;
+
 /// A scratch directory no other run will use.
 ///
 /// Named per CALL, not per process. Naming it per process made two runs in one process
@@ -565,31 +597,6 @@ mod report_tests {
     }
 }
 
-#[cfg(test)]
-mod real_report_tests {
-    //! The readers against a report a real tool wrote, not one this file made up.
-    //!
-    //! A parser proved only against its own fixture has been proved against the test's own
-    //! string. The reference met that exactly: its Cobertura reader was tested through a
-    //! stand-in that wrote the very report the module then read back.
-
-    use super::*;
-
-    #[test]
-    fn a_real_jacoco_report_reads_the_same_totals_the_reference_reads() {
-        // /tmp/jvx is a Maven project built earlier in this session, two of four branches
-        // covered. Skipped rather than failed when it is not there: a missing fixture is
-        // not a wrong reader, and pretending otherwise turns an absent file into a defect.
-        let path = std::path::Path::new("/tmp/jvx/target/site/jacoco/jacoco.xml");
-        let Ok(xml) = std::fs::read_to_string(path) else {
-            eprintln!("skipped: no JaCoCo report at {}", path.display());
-            return;
-        };
-        assert_eq!(jacoco_totals(&xml), Some(Totals { covered: 2, total: 4 }),
-                   "the reference reads (covered 2, missed 2) from this file");
-    }
-}
-
 // --------------------------------------------------------------------------
 // The runners that produce a report and read it.
 // --------------------------------------------------------------------------
@@ -731,13 +738,37 @@ mod runner_tests {
 
     #[test]
     fn a_real_maven_project_measures_its_own_branches() {
-        // The project built earlier in this session: four branches, two covered.
-        let repo = std::path::Path::new("/tmp/jvx");
-        if !repo.join("pom.xml").exists() || which("mvn").is_none() {
-            eprintln!("skipped: no Maven project at /tmp/jvx, or mvn is not on PATH");
+        // Builds its OWN project rather than pointing at one an earlier step left behind.
+        // A test pinned to a path only one machine has always skips everywhere else, which
+        // is a test that looks present and proves nothing.
+        if which("mvn").is_none() {
+            eprintln!("skipped: mvn is not on PATH");
             return;
         }
-        let reading = java_coverage(repo, 900.0, "a jdk");
+        let root = scratch_dir("mvncov");
+        let main = root.join("src").join("main").join("java").join("band");
+        let test = root.join("src").join("test").join("java").join("band");
+        std::fs::create_dir_all(&main).unwrap();
+        std::fs::create_dir_all(&test).unwrap();
+        std::fs::write(root.join("pom.xml"), JACOCO_POM).unwrap();
+        // Four branches, a test reaching two, so the figure is short by construction and a
+        // reader can check it against the fixture.
+        std::fs::write(main.join("Band.java"),
+            "package band;\n\npublic final class Band {\n\
+             \x20   public static String classify(int n) {\n\
+             \x20       if (n < 0) { return \"neg\"; }\n\
+             \x20       if (n == 0) { return \"zero\"; }\n\
+             \x20       return \"pos\";\n\
+             \x20   }\n}\n").unwrap();
+        std::fs::write(test.join("BandTest.java"),
+            "package band;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\
+             import org.junit.jupiter.api.Test;\n\n\
+             class BandTest {\n\
+             \x20   @Test void positive() { assertEquals(\"pos\", Band.classify(3)); }\n}\n")
+            .unwrap();
+
+        let reading = java_coverage(&root, 900.0, "a jdk");
+        let _ = std::fs::remove_dir_all(&root);
         assert_eq!(reading.value, "50.0", "{}", reading.details);
         assert!(reading.details.contains("2/4 decision branches"), "{}", reading.details);
     }
@@ -754,5 +785,125 @@ mod runner_tests {
         let found = find_reports(&root, "coverage.cobertura.xml");
         let _ = std::fs::remove_dir_all(&root);
         assert_eq!(found.len(), 1);
+    }
+}
+
+/// (covered, total) branches from a c8 json-summary, or nothing when it carries none.
+///
+/// The summary holds a `total` object beside one entry per FILE, and every one of those
+/// entries carries a `branches` object of its own. So the reader cannot search for the
+/// first `branches` it sees: it has to find the `total` key at the top level and read the
+/// branches inside that. Depth is what tells them apart, the same rule the XML scan uses.
+///
+/// Strings are skipped rather than scanned, because a file path is a key in this document
+/// and a path can contain a brace or the word total.
+pub fn c8_totals(json: &str) -> Option<Totals> {
+    let bytes = json.as_bytes();
+    let mut depth = 0usize;
+    let mut at = 0usize;
+    // Where the top-level `total` object begins, once its key has been seen.
+    let mut in_total_at: Option<usize> = None;
+    while at < bytes.len() {
+        match bytes[at] {
+            b'"' => {
+                let (text, next) = read_json_string(json, at)?;
+                at = next;
+                // A key at depth one names a section; `total` is the one this reads.
+                if depth == 1 && text == "total" {
+                    in_total_at = Some(at);
+                }
+                continue;
+            }
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => {
+                depth -= 1;
+                // Left the top-level `total` object without finding branches in it.
+                if depth == 1 && in_total_at.is_some() {
+                    in_total_at = None;
+                }
+            }
+            _ => {}
+        }
+        at += 1;
+        // Inside the `total` object, the `branches` key is the one to read.
+        if let Some(_) = in_total_at {
+            if depth == 2 && json[at..].starts_with("\"branches\"") {
+                return read_counter_object(&json[at + "\"branches\"".len()..]);
+            }
+        }
+    }
+    None
+}
+
+/// A JSON string starting at `at`, and the index just past it.
+fn read_json_string(json: &str, at: usize) -> Option<(String, usize)> {
+    let bytes = json.as_bytes();
+    let mut out = String::new();
+    let mut index = at + 1;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\\' => {
+                index += 2;
+                continue;
+            }
+            b'"' => return Some((out, index + 1)),
+            byte => out.push(byte as char),
+        }
+        index += 1;
+    }
+    None
+}
+
+/// `covered` and `total` out of a `{"total":N,"covered":M,...}` object.
+fn read_counter_object(rest: &str) -> Option<Totals> {
+    let open = rest.find('{')?;
+    let close = rest[open..].find('}')? + open;
+    let body = &rest[open + 1..close];
+    let number = |key: &str| -> Option<i64> {
+        let needle = format!("\"{key}\":");
+        let start = body.find(&needle)? + needle.len();
+        let tail = &body[start..];
+        let end = tail.find(|c: char| c != '-' && !c.is_ascii_digit()).unwrap_or(tail.len());
+        tail[..end].parse().ok()
+    };
+    Some(Totals { covered: number("covered")?, total: number("total")? })
+}
+
+#[cfg(test)]
+mod c8_tests {
+    use super::*;
+
+    /// What c8 10.1 actually wrote for a fixture with four branches and two covered.
+    const REAL: &str = r#"{"total": {"lines":{"total":5,"covered":5,"skipped":0,"pct":100},"statements":{"total":5,"covered":5,"skipped":0,"pct":100},"functions":{"total":1,"covered":1,"skipped":0,"pct":100},"branches":{"total":4,"covered":2,"skipped":0,"pct":50},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":"Unknown"}}
+,"/tmp/fixture/band.js": {"lines":{"total":5,"covered":5,"skipped":0,"pct":100},"functions":{"total":1,"covered":1,"skipped":0,"pct":100},"statements":{"total":5,"covered":5,"skipped":0,"pct":100},"branches":{"total":4,"covered":2,"skipped":0,"pct":50}}
+}"#;
+
+    #[test]
+    fn the_branches_read_are_the_ones_in_the_total_section() {
+        // Taken from a summary c8 wrote, not one this file made up. Every per-file entry
+        // carries a branches object of its own, so a reader that took the first one it
+        // saw would be right by luck and wrong on a document ordered differently.
+        assert_eq!(c8_totals(REAL), Some(Totals { covered: 2, total: 4 }));
+    }
+
+    #[test]
+    fn a_summary_with_no_total_section_yields_nothing_rather_than_zero() {
+        let json = r#"{"/tmp/f.js": {"branches":{"total":4,"covered":2}}}"#;
+        assert_eq!(c8_totals(json), None);
+    }
+
+    #[test]
+    fn a_total_section_with_no_branches_yields_nothing() {
+        let json = r#"{"total": {"lines":{"total":5,"covered":5}}}"#;
+        assert_eq!(c8_totals(json), None);
+    }
+
+    #[test]
+    fn a_file_path_containing_the_word_total_is_not_read_as_the_section() {
+        // A path is a key in this document, and depth is what tells a key naming a section
+        // from a key naming a file.
+        let json = r#"{"/tmp/total/band.js": {"branches":{"total":9,"covered":9}},
+                       "total": {"branches":{"total":4,"covered":2}}}"#;
+        assert_eq!(c8_totals(json), Some(Totals { covered: 2, total: 4 }));
     }
 }
