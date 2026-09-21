@@ -22,8 +22,11 @@
 //! executed, and no reading of it decides what runs next.
 
 pub mod coverage;
+pub mod coverage_runners;
 pub mod determinism;
 pub mod runners;
+pub mod runners_java;
+pub mod runners_js;
 
 use std::path::Path;
 use std::process::{Command, Stdio};

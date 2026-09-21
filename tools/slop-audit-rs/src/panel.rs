@@ -4,7 +4,7 @@
 //! nothing could assert what the binary actually emits, which is how six indicators went
 //! missing from the output without a single test noticing.
 
-use crate::runtime::{coverage as runtime_cov, determinism::Reading, runners};
+use crate::runtime::{coverage_runners as runtime_cov, determinism::Reading, runners};
 use crate::{coverage, indicators, Indicator};
 use std::path::Path;
 
@@ -26,10 +26,10 @@ const DETERMINISM_RUNS: usize = 5;
 /// rest go through the table.
 fn test_determinism(repo: &Path, language: &str) -> Reading {
     match language {
-        "java" => runners::java_determinism(repo, DETERMINISM_RUNS, SUITE_TIMEOUT_SECONDS,
+        "java" => crate::runtime::runners_java::java_determinism(repo, DETERMINISM_RUNS, SUITE_TIMEOUT_SECONDS,
                                             &toolchain_name(repo, language)),
         "javascript" | "typescript" =>
-            runners::js_determinism(repo, DETERMINISM_RUNS, SUITE_TIMEOUT_SECONDS,
+            crate::runtime::runners_js::js_determinism(repo, DETERMINISM_RUNS, SUITE_TIMEOUT_SECONDS,
                                     &toolchain_name(repo, language)),
         other => runners::test_determinism(repo, other, DETERMINISM_RUNS,
                                            SUITE_TIMEOUT_SECONDS,
