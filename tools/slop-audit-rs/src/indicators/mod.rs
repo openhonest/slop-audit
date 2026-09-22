@@ -7,5 +7,7 @@ pub mod git_ratios;
 pub mod god_files;
 pub mod mutable_state;
 pub mod path_cover;
+pub mod thread_scanners;
+pub mod thread_surface;
 pub mod type_escapes;
 pub mod whitespace;
