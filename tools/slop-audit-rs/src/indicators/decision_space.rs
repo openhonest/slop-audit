@@ -13,7 +13,6 @@ use std::path::Path;
 use tree_sitter::Node;
 
 // _read_source_bytes(..., extra_ignore=("tests", "test")).
-const EXTRA_IGNORE: &[&str] = &["tests", "test"];
 
 /// _DECISION_NODE_TYPES: control-flow branch node types across the supported grammars.
 /// Exact-type matches (not substring) so short Ruby types like "if"/"case"/"when" are
@@ -118,6 +117,8 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
     };
 
     let has_packages = repo_has_packages(repo);
+    // What the project itself says is not part of it, read once per repository.
+    let disowned = crate::ignored_paths(repo);
     let mut parser = parser_for(language);
     let mut decision_points = 0usize;
     let mut files = 0usize;
@@ -137,7 +138,8 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
         if !cfg.extensions.iter().any(|ext| name.ends_with(ext)) {
             continue;
         }
-        if bucket_reason(path, repo, has_packages, EXTRA_IGNORE).is_some() {
+        if bucket_reason(path, repo, has_packages, crate::PRODUCTION,
+                         crate::PRODUCTION_BUCKETS, &disowned).is_some() {
             continue;
         }
         let src = match std::fs::read(path) {
@@ -153,10 +155,13 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
         }
     }
 
+    // The reference's own sentence, word for word. This said "not run by this reference
+    // implementation", which is a phrase the reference never printed and which this binary
+    // is not in any case, so the parity harness read a wording difference as a
+    // disagreement about the number.
     let mut details = format!(
         "{decision_points} finite decision points enumerated across {files} files; \
-         exercised-coverage fraction requires a test-execution trace (not run by this \
-         reference implementation)"
+         the share a test exercises is a different number and needs a test-execution trace"
     );
     if skipped != 0 {
         details = format!("{details}; {skipped} file(s) unreadable and excluded");

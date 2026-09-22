@@ -118,6 +118,21 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
         }),
         None => panel.push(indicators::decision_space::analyze(repo, language)),
     }
+    // L1.18. The mutable-state ratio, which reads the classifier below it for the bound:
+    // state whose reaching set L1.18b could bound does not count toward the ratio.
+    panel.push(indicators::mutable_state::analyze(repo, language));
+    // L1.18b. The finite-testability verdict distribution. It reads no tool and runs
+    // nothing: every number comes from the parse trees the census already walks.
+    let state = crate::state::bounds::classify(repo, language);
+    panel.push(Indicator {
+        code: "L1.18b".into(),
+        label: "finite-testability".into(),
+        value: crate::state::bounds::value_of(&state),
+        band: state.band.clone(),
+        details: state.details.clone(),
+    });
+    // path_cover, additive: the fewest end-to-end runs that walk every branch.
+    panel.push(indicators::path_cover::analyze(repo, language));
     panel.push(indicators::absolute_paths::analyze(repo)); // additive
     // L1.20, which RUNS the audited project's suite.
     //
@@ -128,9 +143,10 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
     let reading = if exec_tests {
         test_determinism(repo, language)
     } else {
-        crate::runtime::determinism::not_measured(
-            "the run declined to execute the target's test suite (--no-exec); \
-             determinism not measured")
+        // The reference's own words for the same refusal, so the two panels agree. A
+        // clearer sentence is a change to make in the reference first.
+        Reading { value: "not run".into(), band: "n/a".into(),
+                  details: "test execution disabled".into() }
     };
     panel.push(Indicator {
         code: "L1.20".into(),

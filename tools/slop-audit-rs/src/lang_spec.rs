@@ -917,3 +917,28 @@ pub fn spec_for(key: &str) -> Option<&'static LangSpec> {
 pub fn lookup<'a, V: Copy>(table: &'a [(&'static str, V)], node_type: &str) -> Option<V> {
     table.iter().find(|(name, _)| *name == node_type).map(|(_, value)| *value)
 }
+
+/// The declaration kinds the census can count for one language, in the capability table's
+/// own order.
+///
+/// The census seeds its per-kind counts from this list, so a kind a language can spell but
+/// this repository does not appears at zero rather than going missing from the denominator.
+pub const CENSUS_KINDS: &[(&str, &[&str])] = &[
+    ("python", &["module_binding", "class_body_binding", "receiver_attribute"]),
+    ("javascript", &["module_binding", "field_declaration", "receiver_attribute"]),
+    ("typescript", &["module_binding", "field_declaration", "receiver_attribute"]),
+    ("java", &["field_declaration"]),
+    ("csharp", &["field_declaration", "property_declaration"]),
+    ("rust", &["module_binding", "field_declaration"]),
+    ("go", &["module_binding", "field_declaration"]),
+    ("c", &["module_binding", "field_declaration"]),
+    ("ruby", &["instance_variable"]),
+];
+
+/// The kinds one language can spell, or nothing for a language the census has no row for.
+///
+/// Refused rather than emptied, for the reason `spec_for` gives: an empty kind list is a
+/// full denominator over a repository nobody counted.
+pub fn census_kinds_for(lang: &str) -> Option<&'static [&'static str]> {
+    CENSUS_KINDS.iter().find(|(name, _)| *name == lang).map(|(_, kinds)| *kinds)
+}

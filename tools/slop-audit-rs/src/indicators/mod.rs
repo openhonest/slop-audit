@@ -5,5 +5,7 @@ pub mod config_presence;
 pub mod decision_space;
 pub mod git_ratios;
 pub mod god_files;
+pub mod mutable_state;
+pub mod path_cover;
 pub mod type_escapes;
 pub mod whitespace;

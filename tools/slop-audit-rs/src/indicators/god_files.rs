@@ -8,31 +8,13 @@
 //! line count, exactly as the reference's `_code_line_count` fallback does.
 
 use crate::lang;
-use crate::{band, bucket_reason, Indicator, is_file_entry, is_generated, parser_for, py_round2, repo_has_packages, splitlines_len, walk_repo};
+use crate::{band, bucket_reason, Indicator, is_file_entry, parser_for, py_round2, repo_has_packages, splitlines_len, walk_repo};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use tree_sitter::{Node, Parser};
 
-// _GOD_FILE_IGNORE = ("tests", "test", "conformance"); extra scope-out beyond vendored.
-const GOD_FILE_IGNORE: &[&str] = &["tests", "test", "conformance"];
-
 // _MIN_TABLE_LINES: a literal must span at least this many lines to count as a table.
 const MIN_TABLE_LINES: usize = 12;
-
-/// _god_file_reason: shared production scoping plus the L1.17-specific generated
-/// exclusion. Generated-exclusion lives here, NOT in the shared bucket_reason, so it
-/// never changes the L1.18 or finite-testability measurements that flow through that
-/// function.
-fn god_file_reason(path: &Path, repo: &Path, has_packages: bool) -> Option<&'static str> {
-    if let Some(reason) = bucket_reason(path, repo, has_packages, GOD_FILE_IGNORE) {
-        return Some(reason);
-    }
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    if name.ends_with(".min.js") || name.ends_with(".min.css") || is_generated(path) {
-        return Some("generated");
-    }
-    None
-}
 
 /// _data_literal_lines: lines spanned by large container literals under `node`. A
 /// counted literal is not recursed into, so nested literals are counted once.
@@ -101,6 +83,8 @@ pub fn analyze(repo: &Path) -> Indicator {
         }
     }
     let has_packages = repo_has_packages(repo);
+    // What the project itself says is not part of it, read once per repository.
+    let disowned = crate::ignored_paths(repo);
 
     let mut parsers: HashMap<&'static str, Parser> = HashMap::new();
     let mut prod_files = 0i64;
@@ -110,7 +94,12 @@ pub fn analyze(repo: &Path) -> Indicator {
     let mut scoped: BTreeMap<&'static str, i64> = BTreeMap::new();
 
     for (path, ext) in &candidates {
-        let reason = god_file_reason(path, repo, has_packages);
+        // The shared scope rule and nothing else. It carried a second, local copy of
+        // the machine-output test, which is now in that rule where the reference
+        // keeps it.
+        let reason = bucket_reason(path, repo, has_packages,
+                                   crate::PRODUCTION_WITHOUT_CONFORMANCE,
+                                   crate::PRODUCTION_BUCKETS, &disowned);
         let src = match std::fs::read(path) {
             Ok(bytes) => bytes,
             Err(_) => {
@@ -119,8 +108,11 @@ pub fn analyze(repo: &Path) -> Indicator {
             }
         };
         if let Some(reason) = reason {
-            // Raw size: disclose that a large file was scoped out.
-            if splitlines_len(&src) > 1000 {
+            // Raw size: disclose that a large file was scoped out. Not for a DISOWNED file,
+            // because the reference never sees one: it drops what the project's own
+            // `.gitignore` excludes before any bucket rule runs, so a disclosure here would
+            // announce a scope-out of a file that is not part of the repository at all.
+            if reason != crate::DISOWNED && splitlines_len(&src) > 1000 {
                 *scoped.entry(reason).or_insert(0) += 1;
             }
             continue;

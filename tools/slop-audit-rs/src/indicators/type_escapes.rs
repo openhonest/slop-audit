@@ -15,7 +15,6 @@ use tree_sitter::Node;
 // _COMMENT_TYPE_ESCAPES (language agnostic; substring match on a comment node).
 const COMMENT_ESCAPES: &[&str] = &["# type: ignore", "// @ts-ignore", "/* @ts-ignore"];
 // _read_source_bytes(..., extra_ignore=("tests", "test")).
-const EXTRA_IGNORE: &[&str] = &["tests", "test"];
 
 /// True if any ancestor is a string node. A leaf inside a string is data, not an
 /// annotation: `("Any",)` in a pattern table, an "object" key in a C# message, a
@@ -119,31 +118,63 @@ fn count_cast_type_strings(node: Node, src: &[u8], cfg: &lang::LangCfg) -> usize
     count
 }
 
-fn count_escapes_in_tree(node: Node, src: &[u8], cfg: &lang::LangCfg) -> usize {
+/// Whether this node names a container without saying what it holds.
+///
+/// `dict` means `dict[Any, Any]`, the least precise mapping Python has. It carries no escape
+/// token, so a counter reading tokens scores it clean while scoring the better
+/// `dict[str, Any]` as an escape. An adopter found that by writing out six annotations they
+/// already meant and watching the number get worse. An author who watches the number learns
+/// to write `dict`, which is worse and which the meter could not see at all.
+///
+/// Told apart from `dict[str, str]` by where it sits rather than by reading its text: a
+/// parameterised generic hangs under a generic type node and a bare one hangs directly in
+/// the type. A `dict()` call and an `isinstance(x, dict)` sit somewhere else again and are
+/// not annotations at all.
+///
+/// This rule was never ported. Java's raw `Collection c = null;` counted as one escape in the
+/// reference and none here, which is one escape in gson and a whole rule anywhere raw
+/// generics are common.
+fn is_a_bare_generic(node: Node, cfg: &lang::LangCfg, text: &str) -> bool {
+    if !cfg.bare_generics.contains(&text) || node.named_child_count() > 0 {
+        return false;
+    }
+    match node.parent() {
+        Some(parent) => cfg.type_position_types.contains(&parent.kind()),
+        None => false,
+    }
+}
+
+/// Every escape in one parsed tree.
+///
+/// An explicit stack, not recursion: parse-tree depth is set by the file being audited,
+/// which is unbounded input, and the reference's own walk was rewritten for exactly this.
+fn count_escapes_in_tree(root: Node, src: &[u8], cfg: &lang::LangCfg) -> usize {
     let mut count = 0usize;
-    if node.child_count() == 0 {
-        let text = String::from_utf8_lossy(&src[node.byte_range()]);
-        if cfg.type_escape_patterns.contains(&text.as_ref())
-            && !in_string(node)
-            && !in_non_type_position(node, cfg.type_escape_nonpositions)
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if node.child_count() == 0 {
+            let text = String::from_utf8_lossy(&src[node.byte_range()]);
+            let token = cfg.type_escape_patterns.contains(&text.as_ref())
+                && !in_string(node)
+                && !in_non_type_position(node, cfg.type_escape_nonpositions);
+            let bare = is_a_bare_generic(node, cfg, text.as_ref()) && !in_string(node);
+            if token || bare {
+                count += 1;
+            }
+        }
+        if node.kind().contains("comment") {
+            let text = String::from_utf8_lossy(&src[node.byte_range()]);
+            if COMMENT_ESCAPES.iter().any(|p| text.trim_start().starts_with(p)) {
+                count += 1;
+            }
+        }
+        if cfg.annotation_escape_nodes.contains(&node.kind())
+            && cfg.annotation_escape_names.contains(&annotation_name(node, src).as_str())
         {
             count += 1;
         }
-    }
-    if node.kind().contains("comment") {
-        let text = String::from_utf8_lossy(&src[node.byte_range()]);
-        if COMMENT_ESCAPES.iter().any(|p| text.trim_start().starts_with(p)) {
-            count += 1;
-        }
-    }
-    if cfg.annotation_escape_nodes.contains(&node.kind())
-        && cfg.annotation_escape_names.contains(&annotation_name(node, src).as_str())
-    {
-        count += 1;
-    }
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        count += count_escapes_in_tree(child, src, cfg);
+        let mut cursor = node.walk();
+        stack.extend(node.children(&mut cursor));
     }
     count
 }
@@ -169,6 +200,8 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
     }
 
     let has_packages = repo_has_packages(repo);
+    // What the project itself says is not part of it, read once per repository.
+    let disowned = crate::ignored_paths(repo);
     let mut parser = parser_for(language);
     let mut escape_count = 0usize;
     let mut total_loc = 0usize;
@@ -188,7 +221,8 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
         if !cfg.extensions.iter().any(|ext| name.ends_with(ext)) {
             continue;
         }
-        if bucket_reason(path, repo, has_packages, EXTRA_IGNORE).is_some() {
+        if bucket_reason(path, repo, has_packages, crate::PRODUCTION,
+                         crate::PRODUCTION_BUCKETS, &disowned).is_some() {
             continue;
         }
         let src = match std::fs::read(path) {

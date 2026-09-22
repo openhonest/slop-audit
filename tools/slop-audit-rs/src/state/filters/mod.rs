@@ -158,30 +158,6 @@ pub fn is_false_positive(key: &str, refs: &[Node], verdict: &str, sp: &LangSpec,
 
 // --- the parity dump -------------------------------------------------------------
 
-/// Every reference to one piece of INSTANCE state inside its own class.
-///
-/// Never descends into a nested class: an inner one owns its own fields and is analysed as
-/// its own scope, so the enclosing class must not harvest the inner one's state.
-pub fn state_refs<'t>(scope: Node<'t>, key: &str, sp: &LangSpec, src: &[u8]) -> Vec<Node<'t>> {
-    let found: Vec<Node<'t>> = crate::nodes::local_descendants(scope, sp.class_types)
-        .into_iter()
-        .filter(|n| {
-            if sp.instance_enum == "ruby_ivar" {
-                n.kind() == "instance_variable"
-            } else if sp.instance_ref_style == "member" {
-                sp.member_types.contains(&n.kind())
-            } else {
-                n.kind() == "identifier"
-            }
-        })
-        .filter(|n| crate::nodes::text(Some(*n), src) == key)
-        .collect();
-    if sp.instance_enum == "ruby_ivar" || sp.instance_ref_style == "member" {
-        return found;
-    }
-    crate::state::references::bound_to(&found, key, sp, src)
-}
-
 /// What every rule and guard above said about one piece of state.
 ///
 /// The verdict the classifier reached is not available here, because the classifier itself
@@ -252,7 +228,7 @@ pub fn file_verdicts(root: Node, sp: &LangSpec, src: &[u8]) -> Vec<Verdicts> {
         .filter(|n| sp.class_types.contains(&n.kind())) {
         let Some(cands) = crate::state::enumerate::instance_cands(cls, sp, src) else { continue };
         for key in crate::state::enumerate::keys_of(&cands) {
-            let refs = state_refs(cls, &key, sp, src);
+            let refs = crate::state::bounds::state_refs(cls, &key, sp, src);
             if refs.is_empty() {
                 continue;
             }

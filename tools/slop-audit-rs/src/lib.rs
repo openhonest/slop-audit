@@ -13,6 +13,7 @@ pub mod coverage;
 pub mod panel;
 pub mod indicators;
 pub mod lang;
+pub mod lang_cfg;
 pub mod lang_spec;
 mod lang_spec_check;
 pub mod nodes;
@@ -92,10 +93,20 @@ pub fn walk_repo(repo: &Path) -> impl Iterator<Item = walkdir::DirEntry> + '_ {
 /// dir, read as text with invalid bytes replaced (mirrors read_text(errors="ignore")).
 pub fn source_files(repo: &Path, exts: &[&str]) -> Vec<(PathBuf, String)> {
     let want: HashSet<&str> = exts.iter().copied().collect();
+    // What the project's own `.gitignore` excludes, read once. The whole-repository scope
+    // removes no directory by name, and this walk is what L1.8 and L1.16 read; without it
+    // a checkout that had once been built counted its generated output as the repository's
+    // own lines, and on one corpus entry that was 5,913 lines of production code.
+    let disowned = ignored_paths(repo);
+    let has_packages = repo_has_packages(repo);
     let mut out = Vec::new();
     for entry in walk_repo(repo) {
         let path = entry.path();
-        if in_ignored_dir(path) {
+        // Through the SHARED scope rule, with the whole-repository scope's empty exclude and
+        // bucket lists, so this walk cannot drift from the production ones about what a
+        // vendored tree, a disowned tree or machine output is.
+        if bucket_reason(path, repo, has_packages, &[], WHOLE_REPO_BUCKETS,
+                         &disowned).is_some() {
             continue;
         }
         let ext = match path.extension().and_then(|e| e.to_str()) {
@@ -142,6 +153,23 @@ pub fn is_generated(path: &Path) -> bool {
     };
     let head = String::from_utf8_lossy(&bytes[..bytes.len().min(2048)]).into_owned();
     GENERATED_MARKERS.iter().any(|m| head.contains(m))
+}
+
+/// True when a tool wrote this file rather than a person: it declares itself generated in
+/// its header, or it is a minified bundle.
+///
+/// ONE function, as the reference has it, so the call sites cannot drift into disagreeing
+/// about what machine output is. They had: the god-file count asked about a minified name
+/// AND a generated header, the shared scope rule asked only about the header, and a
+/// seventeen-line minified script counted as somebody's production code in the
+/// test-to-production ratio.
+pub fn is_machine_output(path: &Path) -> bool {
+    let minified = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.ends_with(".min.js") || n.ends_with(".min.css"))
+        .unwrap_or(false);
+    minified || is_generated(path)
 }
 
 /// Must equal l1_analyzer.indicators._TEST_DIR_MARKERS. The two markers that name a test
@@ -257,15 +285,67 @@ pub fn extra_reason(path: &Path, extra: &[&'static str]) -> Option<&'static str>
     None
 }
 
+/// scope.PRODUCTION: the code under audit. A test tree is not the artifact being graded,
+/// and a check that fires on its own fixtures measures the fixtures.
+///
+/// ONE OWNER. Four readers each held their own copy of this two-word list, which is four
+/// chances for one of them to measure a scope nobody wrote down. The reference routes every
+/// reader through one table for the same reason.
+pub const PRODUCTION: &[&str] = &["tests", "test"];
+
+/// The judgment-call exclusions the production scopes make beyond a directory name: docs,
+/// conventional tooling files, and a loose script at the repository root.
+///
+/// A PARAMETER, because the whole-repository scope makes none of them. The reference gates
+/// each on this list and the port applied all three unconditionally, which was invisible
+/// only because the whole-repository walk did not call the shared rule at all.
+pub const PRODUCTION_BUCKETS: &[&str] = &["docs", "tooling", "root-script"];
+
+/// The whole-repository scope removes no directory and makes no judgment call: for L1.8 and
+/// L1.16 the test tree IS the subject, and a reading that skipped the docs, the tooling
+/// files and the loose scripts would answer a narrower question under the wider one's name.
+pub const WHOLE_REPO_BUCKETS: &[&str] = &[];
+
+/// scope.PRODUCTION_WITHOUT_CONFORMANCE: the same, and a conformance tree as well.
+///
+/// A conformance directory holds law and spec scaffolding and test doubles, so it is
+/// production for neither the state meters nor the god-file count: nobody hand-piles logic
+/// into an append-only conformance table.
+pub const PRODUCTION_WITHOUT_CONFORMANCE: &[&str] = &["tests", "test", "conformance"];
+
 /// _bucket_reason: why this source file is scoped out of the audit, or None to keep
 /// it. General and structural: it references no specific project. Disclosed, never
 /// silent.
+/// The reason a file is out of scope because the project's own `.gitignore` excludes it.
+///
+/// Named, because it is the one reason a reader must never be TOLD about: the reference
+/// drops these files before any bucket rule runs, so it has no bucket for them and cannot
+/// disclose one.
+pub const DISOWNED: &str = "disowned";
+
+/// `disowned` is what the project's own `.gitignore` excludes, resolved once per repository
+/// by `ignored_paths`. It is a PARAMETER of the shared scope reader rather than a filter each
+/// walk remembers to apply, because five of the eight walks did not: a corpus checkout that
+/// had once been built carried 198 generated C# files under `obj/`, and the binary read all
+/// of them as production while the reference read none, reporting 249 files where the
+/// reference reported 135 and three god-files where it found none.
 pub fn bucket_reason(
     path: &Path,
     repo: &Path,
     has_packages: bool,
     extra: &[&'static str],
+    buckets: &[&str],
+    disowned: &HashSet<PathBuf>,
 ) -> Option<&'static str> {
+    // What the project itself says is not part of it. Checked before anything structural,
+    // because a disowned tree is disowned whatever its directory names say.
+    if !disowned.is_empty() {
+        if let Ok(resolved) = path.canonicalize() {
+            if disowned.contains(&resolved) {
+                return Some(DISOWNED);
+            }
+        }
+    }
     let parts: HashSet<&str> = path
         .components()
         .filter_map(|c| match c {
@@ -280,18 +360,31 @@ pub fn bucket_reason(
     if let Some(reason) = extra_reason(path, extra) {
         return Some(reason);
     }
-    if parts.contains("docs") {
+    if buckets.contains(&"docs") && parts.contains("docs") {
         return Some("docs");
     }
-    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-        if TOOLING_FILES.contains(&name) {
-            return Some("tooling");
+    if buckets.contains(&"tooling") {
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            if TOOLING_FILES.contains(&name) {
+                return Some("tooling");
+            }
         }
+    }
+    // Machine output is not the author's code. Measuring its mutable state, its type escapes
+    // or its conformity reports on a code generator nobody in this repository wrote. The
+    // marker is the toolchain's own declaration, read from the header only.
+    //
+    // In the SHARED rule, as the reference has it, rather than added on by the one reader
+    // that remembered: a minified script carrying a generator banner counted as seventeen
+    // lines of somebody's production code in the test-to-production ratio.
+    if is_machine_output(path) {
+        return Some("generated");
     }
     // A loose top-level source file sitting beside packages (the repo has packages and
     // its root is not itself one) is a dev/entry-point script, not the library. A flat,
     // script-only repo keeps its root scripts: they are the code.
-    if has_packages && path.parent() == Some(repo) && !repo.join("__init__.py").exists() {
+    if buckets.contains(&"root-script") && has_packages && path.parent() == Some(repo)
+        && !repo.join("__init__.py").exists() {
         return Some("root-script");
     }
     None
@@ -451,7 +544,9 @@ mod tests {
         fs::write(root.join("Src/Contests/Entry.cs"), "class Entry {}\n").unwrap();
 
         const EXTRA: &[&str] = &["tests", "test"];
-        let scoped = |rel: &str| bucket_reason(&root.join(rel), &root, false, EXTRA);
+        let nothing = HashSet::new();
+        let scoped =
+            |rel: &str| bucket_reason(&root.join(rel), &root, false, EXTRA, PRODUCTION_BUCKETS, &nothing);
         assert_eq!(scoped("Src/Newtonsoft.Json.Tests/Schema/T.cs"), Some("tests"));
         assert_eq!(scoped("Src/Newtonsoft.Json/Serializer.cs"), None);
         assert_eq!(scoped("Src/Contests/Entry.cs"), None);
@@ -471,11 +566,17 @@ mod tests {
         fs::write(root.join("Core.Tests/app.py"), "from typing import Any\nCACHE = {}\n").unwrap();
 
         const EXTRA: &[&str] = &["tests", "test"];
-        assert_eq!(bucket_reason(&root.join("Core.Tests/app.py"), &root, false, EXTRA), None);
+        let nothing = HashSet::new();
+        assert_eq!(
+            bucket_reason(&root.join("Core.Tests/app.py"), &root, false, EXTRA,
+                          PRODUCTION_BUCKETS, &nothing), None);
 
         // The same directory, with one real test file in it, is believed.
         fs::write(root.join("Core.Tests/test_app.py"), "def test_x(): pass\n").unwrap();
-        assert_eq!(bucket_reason(&root.join("Core.Tests/app.py"), &root, false, EXTRA), Some("tests"));
+        assert_eq!(
+            bucket_reason(&root.join("Core.Tests/app.py"), &root, false, EXTRA,
+                          PRODUCTION_BUCKETS, &nothing),
+            Some("tests"));
 
         let _ = fs::remove_dir_all(&root);
     }

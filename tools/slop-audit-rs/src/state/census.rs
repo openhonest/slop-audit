@@ -661,10 +661,9 @@ pub fn parsed_files(repo: &Path, lang: &str) -> Vec<(String, tree_sitter::Tree, 
         if !cfg.extensions.contains(&format!(".{}", ext.to_lowercase()).as_str()) {
             continue;
         }
-        if crate::bucket_reason(path, repo, has_packages, CENSUS_IGNORE).is_some() {
-            continue;
-        }
-        if path.canonicalize().map(|p| disowned.contains(&p)).unwrap_or(false) {
+        if crate::bucket_reason(path, repo, has_packages,
+                             crate::PRODUCTION_WITHOUT_CONFORMANCE,
+                             crate::PRODUCTION_BUCKETS, &disowned).is_some() {
             continue;
         }
         let Ok(src) = std::fs::read(path) else { continue };
@@ -675,11 +674,6 @@ pub fn parsed_files(repo: &Path, lang: &str) -> Vec<(String, tree_sitter::Tree, 
     out
 }
 
-/// The directory names the census scope removes beyond the vendored ones, matching the
-/// reference's production-without-conformance. A conformance table is append-only
-/// scaffolding and test doubles, so it is production for neither the state meters nor the
-/// god-file count: nobody hand-piles logic into one.
-const CENSUS_IGNORE: &[&'static str] = &["tests", "test", "conformance"];
 
 /// What one walk of the parse trees counts on its own: how many declarations there are,
 /// how they split by kind, and how many files carried them.
@@ -737,8 +731,16 @@ pub fn uncounted(admitted: usize) -> Census {
 ///
 /// Declarations only. Nothing here says whether anything READ them, because this walk has
 /// no access to the classifier's.
-pub fn tally(by_file: &BTreeMap<String, BTreeSet<Site>>) -> Tally {
-    let mut by_kind: BTreeMap<String, usize> = BTreeMap::new();
+pub fn tally(by_file: &BTreeMap<String, BTreeSet<Site>>, lang: &str) -> Tally {
+    // Seeded from the capability table, so every kind this language can spell appears with
+    // its count even at zero. A kind missing from the map and a kind counted zero read the
+    // same to anything that iterates it, and only one of them means the language cannot
+    // spell the construct.
+    let mut by_kind: BTreeMap<String, usize> = crate::lang_spec::census_kinds_for(lang)
+        .unwrap_or(&[])
+        .iter()
+        .map(|kind| (kind.to_string(), 0usize))
+        .collect();
     let mut declared = 0usize;
     for sites in by_file.values() {
         for site in sites {
@@ -746,9 +748,86 @@ pub fn tally(by_file: &BTreeMap<String, BTreeSet<Site>>) -> Tally {
             *by_kind.entry(site.kind.to_string()).or_insert(0) += 1;
         }
     }
-    Tally {
-        declared: Some(declared),
-        by_kind,
-        files: by_file.values().filter(|sites| !sites.is_empty()).count(),
+    // Every file the walk opened, not every file that held a declaration. The two differ by
+    // the files holding no state at all, which are still files this reading covered: on one
+    // corpus repository the counts were 31 and 21.
+    Tally { declared: Some(declared), by_kind, files: by_file.len() }
+}
+
+/// Declared sites that the classifier's walk also named, counted per declaration kind.
+///
+/// Per kind rather than as one total, because a refusal owes a reader the name of what went
+/// unread and a bare number cannot give it. The totals are sums of this, so the count that
+/// withholds a grade and the kinds the card prints beside it come from one pass and cannot
+/// disagree about the same repository.
+///
+/// Matched file by file, since a site name is unique only within a file. A file the
+/// classifier never opened contributes nothing rather than raising: the two walks read the
+/// same directory with the same scope and should agree on the file list, and if they ever do
+/// not, the honest reading of the difference is that those declarations went unread. The
+/// error direction is the safe one, since a file missing here lowers coverage and never
+/// raises it.
+fn hit_by_kind(by_file: &BTreeMap<String, BTreeSet<Site>>,
+               reached: &BTreeMap<String, BTreeSet<Site>>) -> BTreeMap<String, usize> {
+    let mut out: BTreeMap<String, usize> = BTreeMap::new();
+    for (rel, sites) in by_file {
+        let Some(seen) = reached.get(rel) else { continue };
+        for site in sites.intersection(seen) {
+            *out.entry(site.kind.to_string()).or_insert(0) += 1;
+        }
     }
+    out
+}
+
+/// The census beside what the classifier's own walk reached, which is the only comparison
+/// that can see non-enumeration.
+///
+/// TWO FRACTIONS, BECAUSE THERE WERE ALWAYS TWO QUESTIONS. The visited fraction is declared
+/// sites the enumerator reached over declared sites: how much of what this code spells did
+/// the reader look at. The judged fraction is sites that yielded a verdict over sites
+/// reached: of what it looked at, how much held state there was anything to conclude about.
+/// A site the reader reached and declined is not a gap; a site it never reached is, and only
+/// the first fraction can see one.
+///
+/// `visited` and `judged` come from the enumerators' own walk. Nothing here re-derives where
+/// the classifier went: a second traversal written to work out where the first one probably
+/// looked is a guess with a measurement's name, which is the class of defect this number
+/// replaced.
+// honest-code-allow: L1.21.13 - `declared` is a STRUCT FIELD, not module state. The reader counts a field written through Rust's init shorthand in one function and read as a local in another as one hidden name shared between them; the reproduction is in slop-audit-qb7. Nothing here is written outside a value the caller is handed back
+pub fn compare(repo: &Path, lang: &str, admitted: usize,
+               visited: &BTreeMap<String, BTreeSet<Site>>,
+               judged: &BTreeMap<String, BTreeSet<Site>>) -> Census {
+    if crate::lang_spec::census_kinds_for(lang).is_none() || crate::lang::cfg(lang).is_none() {
+        return uncounted(admitted);
+    }
+    let by_file = walk(repo, lang);
+    let counted = tally(&by_file, lang);
+    let seen_by_kind = hit_by_kind(&by_file, visited);
+    let decided_by_kind = hit_by_kind(&by_file, judged);
+    let seen: usize = seen_by_kind.values().sum();
+    let decided: usize = decided_by_kind.values().sum();
+    let unread: Vec<String> = counted.by_kind.iter()
+        .filter(|(kind, n)| **n > 0 && seen_by_kind.get(*kind).copied().unwrap_or(0) == 0)
+        .map(|(kind, _)| kind.clone())
+        .collect();
+    let declared = counted.declared;
+    Census {
+        tally: counted,
+        admitted,
+        visited: Some(seen),
+        judged: Some(decided),
+        unread_kinds: Some(unread),
+        // Absent, not nought, when there is no denominator. Nothing declared is not "we
+        // read none of it", and nothing reached is not "we judged none of what we reached".
+        visited_fraction: match declared {
+            Some(d) if d > 0 => Some(round3(seen as f64 / d as f64)),
+            _ => None,
+        },
+        judged_fraction: if seen > 0 { Some(round3(decided as f64 / seen as f64)) } else { None },
+    }
+}
+
+/// Three decimal places, which is what the reference publishes.
+fn round3(value: f64) -> f64 {
+    (value * 1000.0).round() / 1000.0
 }

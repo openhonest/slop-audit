@@ -178,6 +178,63 @@ mod tests {
 // language table, which is a table of node types and field names.
 
 use crate::lang_spec::{lookup, LangSpec};
+use std::collections::BTreeSet;
+
+/// Whether this opaque region is one whose contract says it only READS what it is given.
+///
+/// The override below exists to catch an unseen WRITE. A region that cannot perform one
+/// hides nothing, so a name inside it is a name the reading reached, and forcing the state
+/// unresolved would report a complete reading as a partial one.
+///
+/// Read from a NAMED list, never a general rule, because a macro expands to anything. The
+/// name is matched on its last segment, so `tracing::info` and a bare `info` are one entry,
+/// and a region whose name this reader does not know keeps the override.
+fn only_reads(region: Node, sp: &LangSpec, src: &[u8]) -> bool {
+    if sp.reading_macros.is_empty() {
+        return false;
+    }
+    let Some(first) = children(region).into_iter().find(|c| c.is_named()) else {
+        return false;
+    };
+    let spelling = text(Some(first), src);
+    let last = spelling.rsplit("::").next().unwrap_or(&spelling);
+    sp.reading_macros.contains(&last)
+}
+
+/// Every name that appears inside a region this grammar leaves unparsed, under `scope`.
+///
+/// Rust's macro invocation swallows its arguments into a token tree:
+/// `format!("{}", self.v.len())` holds no field expression and no call expression, and the
+/// flat token sequence does not even keep the field name attached to `self`. So a walk that
+/// looks for references finds none there, and a state used only inside macros reads as state
+/// nothing touches: an invisible reference reported as an absence, which is the failure this
+/// analyzer exists to name.
+///
+/// Names, not references, because names are all that survive: the tokens carry `self`, `v`
+/// and `len` as three unrelated identifiers. Matching a state's bare name against them
+/// over-refuses, since a local called `v` inside a macro refuses a field called `v`, and
+/// that is the direction to be wrong in, because the alternative is to clear a state on a
+/// reading that skipped part of it. A language whose grammar parses everything declares no
+/// region type and gets the empty set without a walk.
+pub fn hidden_names(scope: Node, sp: &LangSpec, src: &[u8]) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    if sp.opaque_region_types.is_empty() {
+        return names;
+    }
+    for region in descendants(scope)
+        .into_iter()
+        .filter(|n| sp.opaque_region_types.contains(&n.kind())) {
+        if only_reads(region, sp, src) {
+            continue;
+        }
+        for leaf in descendants(region)
+            .into_iter()
+            .filter(|n| n.is_named() && n.child_count() == 0) {
+            names.insert(text(Some(leaf), src));
+        }
+    }
+    names
+}
 
 /// Node identity. A field lookup hands back a fresh wrapper each call, so two values that
 /// name the same node are not the same value; the stable id is what compares them.

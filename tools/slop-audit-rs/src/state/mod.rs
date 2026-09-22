@@ -8,6 +8,7 @@
 //! and disagree with the reference on every repository, and a binary that disagrees is
 //! worse than one declaring a gap, because the gap line is honest.
 
+pub mod bounds;
 pub mod cells;
 pub mod census;
 pub mod constants;
@@ -18,6 +19,7 @@ pub mod python_module;
 pub mod reach;
 pub mod reading;
 pub mod records;
+pub mod verdict;
 pub mod ref_reads;
 pub mod references;
 pub mod sites;

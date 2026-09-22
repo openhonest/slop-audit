@@ -8,145 +8,19 @@
 use std::path::Path;
 use tree_sitter::{Language, Parser};
 
-/// The subset of LANG_CFG the ported indicators read. Fields are added as the
-/// indicators that need them land; a row carries an empty slice for what it lacks.
-pub struct LangCfg {
-    /// LANG_CFG key. Also the name the CLI accepts for --lang.
-    pub key: &'static str,
-    /// LANG_CFG["extensions"], leading dot, lowercase.
-    pub extensions: &'static [&'static str],
-    /// LANG_CFG["type_escape_patterns"]. Empty means L1.15 is n/a for the language
-    /// (untyped, or no configured escape hatch): Ruby, JavaScript, Rust, C.
-    pub type_escape_patterns: &'static [&'static str],
-    /// LANG_CFG["annotation_escape_nodes"]: the grammar's annotation node types, where
-    /// a language writes its suppressions as an annotation rather than a comment.
-    pub annotation_escape_nodes: &'static [&'static str],
-    /// LANG_CFG["annotation_escape_names"]: the annotation names that suppress a type
-    /// diagnostic. Java only for now; see
-    /// research/amendments/amendment-2026-08-14-java-suppression-marker.md.
-    pub annotation_escape_names: &'static [&'static str],
-    /// LANG_CFG["type_escape_nonpositions"]: node types under which a matching token is
-    /// NOT a type. `from typing import Any` makes a symbol available and types nothing,
-    /// so every statically-typed Python file carried a floor of one escape without this.
-    ///
-    /// Stated as a refusal rather than an allow-list of type positions, because Go and C#
-    /// put a bare type straight into a declaration with no node to key on. An empty
-    /// vocabulary refuses nothing, which is the counted direction.
-    pub type_escape_nonpositions: &'static [&'static str],
-    /// LANG_CFG["type_cast_calls"]: calls whose first argument IS a type, so a STRING
-    /// there is counted like the annotation it is. `cast("dict[str, Any]", ctx)` is the
-    /// ordinary way to write the one acknowledged escape at a framework seam, and the
-    /// leaf walk drops it with every other string: the same code scored 2 unquoted and 1
-    /// quoted, so a reader could move the number by adding quotation marks.
-    pub type_cast_calls: &'static [&'static str],
-    /// _LITERAL_NODES[lang]: container-literal node types that read as a data table,
-    /// discounted from the L1.17 code-line count.
-    pub literal_nodes: &'static [&'static str],
-}
+/// The generated per-language configuration, re-exported so every reader imports it from
+/// here, which is where it has always been imported from.
+///
+/// The table itself moved to a generated file on 2026-09-21. It was transcribed by hand, and
+/// it had drifted in the one field whose value is its ORDER: the reference appends TypeScript
+/// after every other language, the copy had it fifth, and the detector below breaks a count
+/// tie by that order.
+pub use crate::lang_cfg::{cfg, LangCfg, LANGS};
 
-/// LANG_CFG in its Python declaration order. The order is load-bearing:
-/// detect_primary_language breaks a count tie by it, exactly as Counter.most_common
-/// breaks a tie by insertion order.
-pub const LANGS: &[LangCfg] = &[
-    LangCfg {
-        key: "python",
-        extensions: &[".py"],
-        type_escape_patterns: &["Any"],
-        type_escape_nonpositions: &["import_statement", "import_from_statement"],
-        type_cast_calls: &["cast"],
-        annotation_escape_nodes: &[],
-        annotation_escape_names: &[],
-        literal_nodes: &["dictionary", "list", "set", "tuple"],
-    },
-    LangCfg {
-        key: "rust",
-        extensions: &[".rs"],
-        type_escape_patterns: &[],
-        type_escape_nonpositions: &[],
-        type_cast_calls: &[],
-        annotation_escape_nodes: &[],
-        annotation_escape_names: &[],
-        literal_nodes: &["array_expression"],
-    },
-    LangCfg {
-        key: "c",
-        extensions: &[".c", ".h"],
-        type_escape_patterns: &[],
-        type_escape_nonpositions: &[],
-        type_cast_calls: &[],
-        annotation_escape_nodes: &[],
-        annotation_escape_names: &[],
-        literal_nodes: &["initializer_list"],
-    },
-    LangCfg {
-        key: "java",
-        extensions: &[".java"],
-        type_escape_patterns: &["Object"],
-        type_escape_nonpositions: &["import_declaration"],
-        type_cast_calls: &[],
-        annotation_escape_nodes: &["annotation", "marker_annotation"],
-        annotation_escape_names: &["SuppressWarnings"],
-        literal_nodes: &["array_initializer"],
-    },
-    LangCfg {
-        key: "typescript",
-        extensions: &[".ts", ".tsx"],
-        type_escape_patterns: &["any", "unknown"],
-        type_escape_nonpositions: &["import_statement", "pair"],
-        type_cast_calls: &[],
-        annotation_escape_nodes: &[],
-        annotation_escape_names: &[],
-        literal_nodes: &["object", "array"],
-    },
-    LangCfg {
-        key: "csharp",
-        extensions: &[".cs"],
-        type_escape_patterns: &["object", "dynamic"],
-        type_escape_nonpositions: &["using_directive"],
-        type_cast_calls: &[],
-        annotation_escape_nodes: &[],
-        annotation_escape_names: &[],
-        literal_nodes: &["initializer_expression", "collection_expression"],
-    },
-    LangCfg {
-        key: "javascript",
-        extensions: &[".js", ".jsx", ".mjs", ".cjs"],
-        type_escape_patterns: &[],
-        type_escape_nonpositions: &[],
-        type_cast_calls: &[],
-        annotation_escape_nodes: &[],
-        annotation_escape_names: &[],
-        literal_nodes: &["object", "array"],
-    },
-    LangCfg {
-        key: "ruby",
-        extensions: &[".rb"],
-        type_escape_patterns: &[],
-        type_escape_nonpositions: &[],
-        type_cast_calls: &[],
-        annotation_escape_nodes: &[],
-        annotation_escape_names: &[],
-        literal_nodes: &["hash", "array"],
-    },
-    LangCfg {
-        key: "go",
-        extensions: &[".go"],
-        type_escape_patterns: &["any"],
-        type_escape_nonpositions: &["import_declaration", "import_spec"],
-        type_cast_calls: &[],
-        annotation_escape_nodes: &[],
-        annotation_escape_names: &[],
-        literal_nodes: &["literal_value", "composite_literal"],
-    },
-];
 
 /// _LANGUAGE_UNKNOWN: the repo holds no recognised source, so callers report n/a
 /// rather than guess.
 pub const UNKNOWN: &str = "unknown";
-
-pub fn cfg(key: &str) -> Option<&'static LangCfg> {
-    LANGS.iter().find(|l| l.key == key)
-}
 
 /// _GOD_FILE_LANG: the extension-to-grammar map L1.17 uses. It is its own table in
 /// the reference, not a reverse of `extensions`: L1.17 scans a fixed ten-extension
@@ -284,6 +158,37 @@ mod tests {
         let detected = detect_primary_language(&root);
         let _ = std::fs::remove_dir_all(&root);
         assert_eq!(detected, "rust", "a build artifact outvoted the source");
+    }
+
+    /// The tie-break order, stated here because it is a VALUE and not a formatting
+    /// choice, and because the hand-copied table had it wrong.
+    ///
+    /// The reference builds TypeScript's row out of JavaScript's and appends it, so
+    /// TypeScript is last. The copy had it fifth, ahead of C#, and the detector breaks a
+    /// count tie by this order: a repository with as many .ts files as .cs files detected
+    /// as TypeScript here and as C# in the reference, and every indicator below that
+    /// followed a different grammar in the two tools.
+    #[test]
+    fn the_language_order_is_the_reference_s_and_typescript_is_last() {
+        let keys: Vec<&str> = LANGS.iter().map(|row| row.key).collect();
+        assert_eq!(keys, vec!["python", "rust", "c", "java", "csharp", "javascript",
+                              "ruby", "go", "typescript"]);
+    }
+
+    #[test]
+    fn a_tie_between_typescript_and_csharp_breaks_the_way_the_reference_breaks_it() {
+        let root = std::env::temp_dir().join(format!("slop-audit-tie-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("make the fixture");
+        for n in 0..3 {
+            std::fs::write(root.join(format!("a{n}.ts")), "export const x = 1;\n")
+                .expect("write ts");
+            std::fs::write(root.join(format!("a{n}.cs")), "class A { int x; }\n")
+                .expect("write cs");
+        }
+        let detected = detect_primary_language(&root);
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(detected, "csharp", "the tie broke the wrong way");
     }
 
     /// Every extension L1.17 scans maps to a grammar, and every mapped grammar is a

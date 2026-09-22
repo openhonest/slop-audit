@@ -115,8 +115,9 @@ fn count_line(line: &str) -> usize {
 /// A test that proves a path detector fires has to contain the path it detects, so
 /// scanning the test tree measures the fixtures, not the code.
 fn production_files(repo: &Path) -> Vec<(std::path::PathBuf, String)> {
-    const EXTRA_IGNORE: &[&str] = &["tests", "test"];
     let mut out = Vec::new();
+    // What the project itself says is not part of it, read once.
+    let disowned = crate::ignored_paths(repo);
     for entry in walk_repo(repo) {
         if !is_file_entry(&entry) {
             continue;
@@ -132,7 +133,11 @@ fn production_files(repo: &Path) -> Vec<(std::path::PathBuf, String)> {
         if in_ignored_dir(path) {
             continue;
         }
-        if crate::extra_reason(path, EXTRA_IGNORE).is_some() {
+        if !disowned.is_empty()
+            && path.canonicalize().map(|p| disowned.contains(&p)).unwrap_or(false) {
+            continue;
+        }
+        if crate::extra_reason(path, crate::PRODUCTION).is_some() {
             continue;
         }
         if let Ok(bytes) = std::fs::read(path) {

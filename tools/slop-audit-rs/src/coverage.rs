@@ -85,8 +85,8 @@ pub const CANONICAL: &[(&str, &str, Coverage)] = &[
     ("L1.15", "type-escapes", Coverage::Measured),
     ("L1.16", "trailing-whitespace", Coverage::Measured),
     ("L1.17", "god-files", Coverage::Measured),
-    ("L1.18", "mutable-state", Coverage::NotPorted),
-    ("L1.18b", "finite-testability", Coverage::NotPorted),
+    ("L1.18", "mutable-state", Coverage::Measured),
+    ("L1.18b", "finite-testability", Coverage::Measured),
     ("L1.19", "decision-space", Coverage::Measured),
     // Measured since 2026-09-21, when the decision was taken that this binary runs the
     // audited project's own suite. The panel always produces the row: either a reading, or
@@ -96,7 +96,7 @@ pub const CANONICAL: &[(&str, &str, Coverage)] = &[
     // contract: leaving them out of this table is how they stayed invisible while the
     // differ compared only the intersection of the two key sets.
     ("abs-paths", "absolute-paths", Coverage::Measured),
-    ("path_cover", "path-cover", Coverage::NotPorted),
+    ("path_cover", "path-cover", Coverage::Measured),
     ("thread_surface", "thread-surface", Coverage::NotPorted),
     ("interleaving_robustness", "interleaving-robustness", Coverage::NotPorted),
 ];
@@ -160,14 +160,19 @@ mod tests {
         assert_eq!(panel.len(), CANONICAL.len());
     }
 
-    /// L1.18 is the one that made this a P1 rather than a formatting complaint.
+    /// An indicator this binary does not compute still gets a row saying so.
+    ///
+    /// L1.18 is the one that made this a P1 rather than a formatting complaint: it went
+    /// missing from the printed panel and nothing noticed. It is measured now, so the check
+    /// moved to thread_surface, which is not. The rule it guards is about the shape of the
+    /// panel and not about which indicator happens to be unported this week.
     #[test]
-    fn the_headline_indicator_is_never_silently_absent() {
+    fn an_unported_indicator_is_never_silently_absent() {
         let panel = reconcile(vec![]);
-        let l18 = panel.iter().find(|i| i.code == "L1.18").expect("L1.18 row");
-        assert_eq!(l18.value, "not measured");
-        assert_eq!(l18.band, "not measured");
-        assert!(l18.details.contains("not ported"), "{}", l18.details);
+        let row = panel.iter().find(|i| i.code == "thread_surface").expect("thread_surface row");
+        assert_eq!(row.value, "not measured");
+        assert_eq!(row.band, "not measured");
+        assert!(row.details.contains("not ported"), "{}", row.details);
     }
 
     /// An unmeasured row must never look like a grade. "not measured" is not a band, and a
@@ -192,7 +197,7 @@ mod tests {
         // to install, and a fourth, saying this binary does not run tests, were both
         // removed when they stopped being true: the tools were replaced by algorithms, and
         // the binary now runs the suite.
-        let not_ported = reason("L1.18");
+        let not_ported = reason("thread_surface");
         let defect = reason("L1.20");
         assert_ne!(not_ported, defect);
         assert!(not_ported.contains("not ported"), "{not_ported}");
@@ -224,7 +229,8 @@ mod tests {
             assert!(seen.insert(*code), "{code} declared twice");
         }
         assert_eq!(CANONICAL[0].0, "L1.1");
-        assert_eq!(declared("L1.18").unwrap().2, Coverage::NotPorted);
+        assert_eq!(declared("thread_surface").unwrap().2, Coverage::NotPorted);
+        assert_eq!(declared("L1.18").unwrap().2, Coverage::Measured);
         assert!(declared("L1.99").is_none());
     }
 }

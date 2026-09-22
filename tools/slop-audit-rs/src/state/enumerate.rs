@@ -480,10 +480,15 @@ fn go_receiver(method: Node, src: &[u8]) -> (String, String) {
 }
 
 /// One piece of state reached from its uses, with the site both walks name it by.
+///
+/// `refs` holds the NODES, not their ids. It held ids, and the classifier that needed the
+/// nodes reconstructed them by walking the tree again and matching each id against a byte
+/// offset, which are two different numbers: Go's verdict distribution came out 234 neutral
+/// where the reference reads 176, over the same 241 pieces of state.
 #[derive(Debug, Clone)]
-pub struct Slot {
+pub struct Slot<'t> {
     pub state: String,
-    pub refs: Vec<usize>,
+    pub refs: Vec<Node<'t>>,
     pub writers_enumerable: bool,
     pub site: Site,
 }
@@ -498,7 +503,7 @@ pub struct Slot {
 /// and the census names the same site from the type declaration the struct sits under. A
 /// field the type never touches in any method is not enumerated at all and reads as
 /// unvisited, which is the truth: nothing in this reading looked at it.
-pub fn go_slots(root: Node, src: &[u8]) -> Vec<Slot> {
+pub fn go_slots<'t>(root: Node<'t>, src: &[u8]) -> Vec<Slot<'t>> {
     // Insertion-ordered, because the classifier's sort ties for two slots on one line and
     // a stable sort then keeps whatever order arrived here.
     let mut by_type: Vec<(String, Vec<(Node, String)>)> = Vec::new();
@@ -515,7 +520,7 @@ pub fn go_slots(root: Node, src: &[u8]) -> Vec<Slot> {
 
     let mut slots = Vec::new();
     for (tname, methods) in by_type {
-        let mut field_refs: Vec<(String, Vec<usize>)> = Vec::new();
+        let mut field_refs: Vec<(String, Vec<Node<'t>>)> = Vec::new();
         for (method, rname) in methods {
             for sel in descendants(method).into_iter()
                 .filter(|n| n.kind() == "selector_expression") {
@@ -525,8 +530,8 @@ pub fn go_slots(root: Node, src: &[u8]) -> Vec<Slot> {
                 }
                 let name = text(field(Some(sel), "field"), src);
                 match field_refs.iter_mut().find(|(held, _)| *held == name) {
-                    Some((_, refs)) => refs.push(sel.id()),
-                    None => field_refs.push((name, vec![sel.id()])),
+                    Some((_, refs)) => refs.push(sel),
+                    None => field_refs.push((name, vec![sel])),
                 }
             }
         }
