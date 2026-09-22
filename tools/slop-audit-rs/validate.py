@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from parity_harness import binary_is_stale, boundary
+
 HERE = Path(__file__).resolve().parent
 # One indicator's reading from either tool. The panels were typed `dict[str, dict]`, which
 # pins the outer key and leaves the inner mapping completely open: our own escape counter
@@ -26,35 +28,33 @@ Reading = dict[str, object]
 
 
 
-def boundary(fn):
-    """Mark a function as one of this script's edges, and change nothing about it.
-
-    The analyzer package declares its edges with a decorator of this name and its clause
-    reads it. This script sits beside that package rather than inside it, so it says the
-    same thing in its own words rather than importing across the boundary between a Rust
-    crate's helper and the Python tool it validates."""
-    return fn
-
-
 REFERENCE = HERE.parent / "l1_analyzer"
 BINARY = HERE / "target" / "release" / "slop-audit-rs"
 
 
 @boundary
-def python_panel(repo: Path, lang: str) -> dict[str, Reading]:
+def python_panel(repo: Path, lang: str, exec_tests: bool) -> dict[str, Reading]:
     """The reference panel, keyed L1.x. Run from the reference package so `uv run`
-    resolves that project's environment, not this directory's."""
-    out = subprocess.run(
-        ["uv", "run", "slop-audit-l1", str(repo), "--no-exec", "--format", "json", "--lang", lang],
-        cwd=REFERENCE, capture_output=True, text=True, check=True,
-    ).stdout
+    resolves that project's environment, not this directory's.
+
+    BOTH SIDES ARE ASKED THE SAME QUESTION. This passed `--no-exec` while the binary was
+    invoked without it, so from the day the binary started running the audited suite the
+    harness compared a run that executed tests against one that did not, and reported the
+    difference as a disagreement about L1.19 and L1.20."""
+    args = ["uv", "run", "slop-audit-l1", str(repo), "--format", "json", "--lang", lang]
+    if not exec_tests:
+        args.insert(4, "--no-exec")
+    out = subprocess.run(args, cwd=REFERENCE, capture_output=True, text=True,
+                         check=True).stdout
     return json.loads(out)["results"]
 
 
 @boundary
-def rust_panel(repo: Path, lang: str) -> dict[str, Reading]:
-    """The portable panel, parsed from --tsv."""
+def rust_panel(repo: Path, lang: str, exec_tests: bool) -> dict[str, Reading]:
+    """The portable panel, parsed from --tsv. Run the same way the reference was."""
     args = [str(BINARY), str(repo), "--tsv"]
+    if not exec_tests:
+        args.append("--no-exec")
     if lang != "auto":
         args += ["--lang", lang]
     return panel_from_tsv(subprocess.run(args, capture_output=True, text=True, check=True).stdout)
@@ -87,10 +87,20 @@ def render(value) -> str:
 
 
 @boundary
-def diff_panels(repo: Path, lang: str, *, quiet: bool) -> tuple[int, int]:
+def diff_panels(repo: Path, lang: str, *, quiet: bool,
+                exec_tests: bool) -> tuple[int, int, str]:
     """Run both tools on `repo` and report each shared indicator EQUAL or DIFF.
-    Returns (diffs, compared). `quiet` prints only the disagreements, which is what a
-    corpus run wants when it is walking several repositories."""
+    Returns (diffs, compared, detected language). The language is handed back rather than
+    left for a caller to ask for: the corpus walk ran the binary a SECOND time to read that
+    one field, with its own flags, and those flags did not carry --no-exec, so every
+    repository in the corpus had its test suite executed by a line that wanted a string.
+
+    `quiet` prints only the disagreements, which is what a corpus run wants when it is
+    walking several repositories.
+
+    `exec_tests` has no default, and the missing default is the point: whether both tools
+    run the audited project's own suite changes two indicators, and a caller that forgot to
+    say must not read as one that chose not to."""
     @boundary
     def say(line: str) -> None:
         """The output half of `quiet`, which is the only reason this closure exists: a
@@ -98,9 +108,10 @@ def diff_panels(repo: Path, lang: str, *, quiet: bool) -> tuple[int, int]:
         if not quiet:
             print(line)
 
-    reference = python_panel(repo, lang)
-    ported = rust_panel(repo, lang)
+    reference = python_panel(repo, lang, exec_tests)
+    ported = rust_panel(repo, lang, exec_tests)
 
+    detected_rs = ""
     if "lang" in reference:
         detected_py = reference.pop("lang")
         detected_rs = ported.pop("lang", {}).get("value", "")
@@ -159,7 +170,7 @@ def diff_panels(repo: Path, lang: str, *, quiet: bool) -> tuple[int, int]:
     if unmeasured:
         say(f"\n{len(unmeasured)} indicator(s) the binary does not measure: "
             f"{', '.join(unmeasured)}")
-    return diffs, len(codes)
+    return diffs, len(codes), detected_rs
 
 
 @boundary
@@ -194,16 +205,31 @@ def main() -> int:
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
-    repo = Path(sys.argv[1]).resolve()
-    lang = sys.argv[2] if len(sys.argv) > 2 else "auto"
+    argv = [a for a in sys.argv[1:] if a != "--exec"]
+    # Both tools run the audited project's suite, or neither does. Off by default, because
+    # a parity run over a corpus must not execute thirteen strangers' test suites without
+    # being asked.
+    exec_tests = "--exec" in sys.argv
+    repo = Path(argv[0]).resolve()
+    lang = argv[1] if len(argv) > 1 else "auto"
     # WHICH two builds. This job's verdict is that two implementations agree, and it used to
     # name neither, so a green run could not be cited afterwards and a disagreement could not
     # be attributed to a change in either side.
     print(f"reference: {_reference_version()}")
     print(f"ported:    {_ported_version()}\n")
+    # THE AGE OF THE BUILD, checked before a word of the comparison is printed. This script
+    # reads the RELEASE binary while the four beside it read the debug one, and it had no
+    # age check at all, so on 2026-09-21 it reported three indicators as needing tools the
+    # binary had stopped needing and one newly ported indicator as not ported. Every line
+    # was about a build from another day, and the run said EQUAL.
+    stale = binary_is_stale(BINARY, HERE / "src")
+    if stale:
+        print(stale)
+        return 2
     # Stated: one repository, and a reader wants every line of the comparison. The
     # corpus walker asks for quiet because it is walking several.
-    diffs, compared = diff_panels(repo, lang, quiet=False)
+    diffs, compared, _detected = diff_panels(repo, lang, quiet=False,
+                                             exec_tests=exec_tests)
     # "16/16" on its own reads as a complete audit. It is a statement about the indicators
     # that were compared, and saying so is the whole lesson of this differ's own blind spot.
     print(f"\n{compared - diffs}/{compared} COMPARED indicators equal on {repo}")

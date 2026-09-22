@@ -20,6 +20,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from parity_harness import binary_is_stale, boundary
+
 HERE = Path(__file__).resolve().parent
 REFERENCE = HERE.parent / "l1_analyzer"
 BINARY = HERE / "target" / "debug" / "slop-audit-rs"
@@ -27,16 +29,6 @@ BINARY = HERE / "target" / "debug" / "slop-audit-rs"
 # One candidate, as both sides name it: the file, then (kind, owner, name), then the state
 # key the walk yielded, which is empty where it declined.
 Row = tuple[str, str, str, str, str]
-
-
-def boundary(fn):
-    """Mark a function as one of this script's edges, and change nothing about it.
-
-    The analyzer package declares its edges with a decorator of this name. This script sits
-    beside that package rather than inside it, so it says the same thing in its own words
-    rather than importing across the boundary between a Rust crate's helper and the Python
-    tool it validates."""
-    return fn
 
 
 @boundary
@@ -115,29 +107,6 @@ def report(missing: set[Row], extra: set[Row], shown: int) -> None:
             print(f"   ... and {len(rows) - shown} more")
 
 
-@boundary
-def binary_is_stale() -> str:
-    """Why this run would report on code nobody is looking at, or the empty string.
-
-    The port's Python arm read as failing for a whole parity sweep after it was written,
-    and the cause was a binary older than the source. The harness compared an old build
-    against a current reference and called the difference a defect in the port, which is
-    the same failure the port exists to catch, committed by the thing checking it.
-
-    Refused rather than rebuilt here. A harness that quietly rebuilds hides which build
-    produced a number, and the answer a reader wants is "run cargo build", not a number
-    from a binary they did not ask for."""
-    if not BINARY.exists():
-        return f"no binary at {BINARY}; run `cargo build` first"
-    built = BINARY.stat().st_mtime
-    newer = [path for path in (HERE / "src").rglob("*.rs") if path.stat().st_mtime > built]
-    if newer:
-        names = ", ".join(sorted(p.name for p in newer)[:3])
-        return (f"{BINARY.name} is older than {len(newer)} source file(s) ({names}); "
-                "run `cargo build` first, or this run reports on the previous build")
-    return ""
-
-
 def main(argv: list[str]) -> int:
     if not 2 <= len(argv) <= 3:
         print(__doc__)
@@ -147,7 +116,7 @@ def main(argv: list[str]) -> int:
     if lang == "auto":
         print("name the language; the enumerator reads one grammar per run")
         return 2
-    stale = binary_is_stale()
+    stale = binary_is_stale(BINARY, HERE / "src")
     if stale:
         print(stale)
         return 2

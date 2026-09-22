@@ -21,15 +21,8 @@ import sys
 import tomllib
 from pathlib import Path
 
-from validate import diff_panels
-
-def boundary(fn):
-    """Mark a function as one of this script's edges, and change nothing about it.
-
-    Spelled here rather than imported, for the same reason `validate.py` spells it: this is
-    a Rust crate's helper, not part of the Python package whose clause reads the name."""
-    return fn
-
+from parity_harness import binary_is_stale, boundary
+from validate import BINARY, diff_panels
 
 HERE = Path(__file__).resolve().parent
 MANIFEST = HERE / "corpus.toml"
@@ -66,6 +59,14 @@ def main() -> int:
             print(f"nothing in corpus.toml matches {args}")
             return 2
 
+    # THE AGE OF THE BUILD, before a repository is cloned or a tool is run. This walk had
+    # no check, and neither did the script it imports from, so a corpus sweep could report
+    # thirteen repositories EQUAL about a build from another day.
+    stale = binary_is_stale(BINARY, HERE / "src")
+    if stale:
+        print(stale)
+        return 2
+
     failures: list[str] = []
     for entry in entries:
         slug, lang, commit = entry["slug"], entry["lang"], entry["commit"]
@@ -73,10 +74,12 @@ def main() -> int:
         repo = clone_at(slug, commit)
         # --lang auto on purpose: detection is part of what is being validated, and the
         # manifest's `lang` is the expectation it is checked against.
-        diffs, compared = diff_panels(repo, "auto", quiet=not verbose)
-        detected = subprocess.run(
-            [str(HERE / "target" / "release" / "slop-audit-rs"), str(repo), "--tsv"],
-            capture_output=True, text=True, check=True).stdout.splitlines()[0].split("\t")[1]
+        # exec_tests=False on a corpus walk, always: this would otherwise execute thirteen
+        # strangers' test suites. The detected language comes back from the same run, which
+        # is the fix for a second invocation that ran the whole binary to read one string
+        # and carried no --no-exec while doing it.
+        diffs, compared, detected = diff_panels(repo, "auto", quiet=not verbose,
+                                                exec_tests=False)
         if detected != lang:
             print(f"  DIFF  language: manifest says {lang}, both tools detect {detected}")
             failures.append(f"{slug}: detected {detected}, manifest says {lang}")
