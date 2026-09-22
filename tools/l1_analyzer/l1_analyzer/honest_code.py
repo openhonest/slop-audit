@@ -33,6 +33,7 @@ from l1_analyzer import honest_code_edges as edges
 from l1_analyzer import honest_code_markers as markers
 from l1_analyzer import honest_code_references as references
 from l1_analyzer import honest_code_rules as rules
+from l1_analyzer.boundary import boundary
 from l1_analyzer.honest_code_embedded import Block, Unexamined, unexamined_blocks
 from l1_analyzer.honest_code_read import Source, read_tree
 from l1_analyzer.honest_code_rules import BROWSER_LANGUAGES, Finding
@@ -725,6 +726,7 @@ def _bases_from_elsewhere(text: str, path: str) -> bool:
     return False
 
 
+@boundary
 def _tree_root(path: Path) -> Path:
     """The directory this file's tree starts at.
 

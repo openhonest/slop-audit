@@ -56,6 +56,7 @@ _SUREFIRE = re.compile(r"(Tests run: \d+[^\n]*)")
 _NO_MAVEN = "needs Maven (mvn) on PATH or a ./mvnw wrapper in the repo"
 
 
+@boundary
 def _maven(repo: Path) -> str | None:
     """The Maven command for this project: its own wrapper `./mvnw` (which pins the Maven
     version) when present, else a system `mvn`. None when neither is available. This is what
@@ -67,6 +68,7 @@ def _maven(repo: Path) -> str | None:
     return shutil.which("mvn")
 
 
+@boundary
 def _unsupported_reason(repo: Path, maven: str | None) -> str | None:
     """The specific, actionable reason this project cannot be measured by the Maven harness,
     or None when it can. A Gradle project is named as not-yet-supported rather than silently

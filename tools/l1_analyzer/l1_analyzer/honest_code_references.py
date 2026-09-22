@@ -130,6 +130,7 @@ def classes_named_in(text: str) -> list[str]:
     return named
 
 
+@boundary
 def a_template_exists(named: str, page: Path, repo: Path) -> bool:
     """Whether a named template is somewhere a template engine would find it.
 

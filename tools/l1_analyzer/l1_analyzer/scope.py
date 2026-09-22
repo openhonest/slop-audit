@@ -265,6 +265,7 @@ def _in_ignored_dir(path: Path, extra: tuple[str, ...]) -> bool:
     return bool(parts & _IGNORE_DIRS) or _extra_reason(parts, extra, path) is not None
 
 
+@boundary
 def under_symlinked_dir(path: Path, root: Path) -> bool:
     """True when `path` is, or sits under, a symlinked directory below `root`.
 
@@ -319,6 +320,7 @@ def _rglob_files(repo: Path, pattern: str) -> Iterator[Path]:
     root_resolved = repo.resolve()
     inside_nested: dict[Path, bool] = {}
 
+    @boundary
     def under_nested_checkout(directory: Path) -> bool:
         """True when `directory` is, or sits under, a nested checkout. Memoised per call
         so each directory is stat-ed once however many files it holds."""
@@ -438,6 +440,7 @@ def _repo_has_packages(repo: Path) -> bool:
     return any(not _in_ignored_dir(f, ()) for f in _rglob_files(repo, "__init__.py"))
 
 
+@boundary
 def _bucket_reason(path: Path, repo: Path, has_packages: bool, scope: str) -> str | None:
     """Why this source file is scoped out of the audit, or None to keep it. General
     and structural: it references no specific project. Disclosed, never silent."""

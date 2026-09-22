@@ -474,6 +474,7 @@ def _exception_facets(fn: ast.FunctionDef, expecting: set[str]) -> list[Facet]:
     return out
 
 
+@boundary
 def import_root(module: Path) -> Path:
     """The directory the module's package is importable FROM.
 

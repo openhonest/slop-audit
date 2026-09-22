@@ -112,6 +112,7 @@ def _lock_has_rspec(repo: Path) -> bool:
     return bool(_RSPEC_GEM.search(text_or_empty(repo / "Gemfile.lock")))
 
 
+@boundary
 def _detect_runner(repo: Path) -> str | None:
     """'rspec', 'minitest', or None. RSpec is preferred: a spec/ directory, a .rspec file,
     or rspec in Gemfile.lock. Otherwise a test/ directory with a Rakefile signals Minitest.

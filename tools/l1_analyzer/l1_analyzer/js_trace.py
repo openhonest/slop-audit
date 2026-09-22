@@ -125,6 +125,7 @@ def pin_in(text: str) -> str:
 
 
 
+@boundary
 def _node_modules_present(repo: Path) -> bool:
     return (repo / "node_modules").is_dir()
 

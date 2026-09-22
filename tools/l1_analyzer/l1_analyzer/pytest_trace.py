@@ -98,6 +98,7 @@ _VENV_PYTHONS = (
 )
 
 
+@boundary
 def detect_target_interpreter(repo: Path) -> str | None:
     """The target repo's own venv interpreter, or None when it has none. This is what makes
     the audit directory-insensitive: the runtime result depends on the target's environment,

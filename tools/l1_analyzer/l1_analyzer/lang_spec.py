@@ -659,12 +659,19 @@ LANG_SPEC: dict[str, LangSpec] = {
         # of them was a function the edge reader was told reached nothing outside the
         # process. Found when a declared boundary that walks a source tree was reported as
         # declaring an edge it does not have.
+        # ASKING THE FILESYSTEM A QUESTION IS READING IT. `exists`, `stat`, `is_file` and
+        # `is_dir` went in on 2026-09-21, and twelve functions in this package that stat a
+        # path in the interior had read as pure until then: the scope rules that decide
+        # which files an audit even opens, every tracer's runner detection, and the
+        # staleness refusal in the port's own parity harness. Each one reaches outside the
+        # process and each was invisible, which is the silence this clause exists to name.
         "io_calls": frozenset({
-                          "Popen", "chmod", "check_output", "commit", "execute", "fetchall",
-                          "fetchone", "glob", "hardlink_to", "input", "iterdir", "listdir",
-                          "makedirs", "mkdir", "open", "print", "read_bytes", "read_text",
-                          "remove", "rename", "replace_file", "rglob", "rmdir", "symlink_to",
-                          "touch", "unlink", "urlopen", "write_bytes", "write_text"}),
+                          "Popen", "chmod", "check_output", "commit", "execute", "exists",
+                          "fetchall", "fetchone", "glob", "hardlink_to", "input", "is_dir",
+                          "is_file", "iterdir", "listdir", "makedirs", "mkdir", "open",
+                          "print", "read_bytes", "read_text", "remove", "rename",
+                          "replace_file", "rglob", "rmdir", "stat", "symlink_to", "touch",
+                          "unlink", "urlopen", "write_bytes", "write_text"}),
         # A module matches on its full dotted text as written, or on its last segment. That
         # is what lets `urllib.request` and `http.client` be named without also naming every
         # `self.request` and every `self.client` in every codebase.

@@ -30,6 +30,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from l1_analyzer import budget, coverage_prove, python_coverage_prove
+from l1_analyzer.boundary import boundary
 
 _KEY = "ANTHROPIC_API_KEY"
 
@@ -93,6 +94,7 @@ def fair_share(ceiling: int, repos: int) -> int:
     return -(-ceiling // repos)
 
 
+@boundary
 def language_of(repo: Path) -> str | None:
     """Which sweep to run, from what the repository is built of. None when neither applies,
     which is a reportable outcome rather than a skip."""

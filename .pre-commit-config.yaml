@@ -123,3 +123,13 @@ repos:
         language: system
         pass_filenames: false
         files: ^tools/(l1_analyzer/l1_analyzer/lang_spec\.py|slop-audit-rs/src/lang_spec\.rs|slop-audit-rs/generate_lang_spec\.py)$
+
+      # The second generated table, and the one whose hand-copied version had already
+      # drifted: the reference appends TypeScript after every other language and the copy
+      # had it fifth, which decides a detection tie.
+      - id: slop-audit-rs-lang-cfg
+        name: rust port's language config matches the reference
+        entry: uv run --project tools/slop-audit-rs python tools/slop-audit-rs/generate_lang_cfg.py --check
+        language: system
+        pass_filenames: false
+        files: ^tools/(l1_analyzer/l1_analyzer/(lang_cfg|indicators)\.py|slop-audit-rs/src/lang_cfg\.rs|slop-audit-rs/generate_lang_cfg\.py)$
