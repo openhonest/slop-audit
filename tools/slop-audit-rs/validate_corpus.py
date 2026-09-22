@@ -49,6 +49,33 @@ def clone_at(slug: str, commit: str) -> Path:
     return target
 
 
+@boundary
+def not_pinned(repo: Path) -> str:
+    """What this checkout holds that its commit does not, or the empty string.
+
+    The manifest pins every entry to a commit so a sweep is reproducible and a failure is
+    about the tools rather than about upstream moving. A checkout that has been BUILT is no
+    longer that commit: on 2026-09-21 the RestSharp clone carried 198 generated C# files
+    under `obj/`, left by a parity run that executed the project's own test suite inside it,
+    and the binary read them as production code while a fresh clone has none.
+
+    Ignored files are what this looks for, and untracked ones with them. Both are outside
+    the commit, and both change what an audit reads.
+    """
+    run = subprocess.run(
+        ["git", "status", "--porcelain", "--ignored"],
+        cwd=repo, capture_output=True, text=True, check=False)
+    if run.returncode != 0:
+        return ""
+    strays = [line[3:] for line in run.stdout.splitlines() if line]
+    if not strays:
+        return ""
+    shown = ", ".join(sorted(strays)[:3])
+    return (f"{len(strays)} path(s) outside the pinned commit ({shown}); "
+            "run `git clean -xdf` in the checkout, or this sweep measures a tree nobody "
+            "can reproduce")
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     verbose = "--verbose" in sys.argv or "-v" in sys.argv
@@ -72,6 +99,14 @@ def main() -> int:
         slug, lang, commit = entry["slug"], entry["lang"], entry["commit"]
         print(f"\n=== {slug} ({lang}) @ {commit[:12]}")
         repo = clone_at(slug, commit)
+        # REFUSED, not cleaned. A harness that quietly deletes files in somebody's cache
+        # decides for them; the answer a reader wants is which tree is dirty and the one
+        # command that fixes it.
+        dirty = not_pinned(repo)
+        if dirty:
+            print(f"  NOT PINNED: {dirty}")
+            failures.append(f"{slug}: {dirty}")
+            continue
         # --lang auto on purpose: detection is part of what is being validated, and the
         # manifest's `lang` is the expectation it is checked against.
         # exec_tests=False on a corpus walk, always: this would otherwise execute thirteen
