@@ -410,8 +410,14 @@ def _coverage_verdict(returncode: int, totals: BranchTotals, provenance: str,
     return {
         "value": round(pct, 1),
         "band": coverage_band(pct),
+        # The tool that produced the numbers, named, as every other language's line names
+        # its own. This path builds its sentence rather than going through the shared
+        # `_coverage_verdict` above, and that is where the omission lived: Java, C#,
+        # JavaScript and Ruby all say what measured them and Python did not. Found on
+        # 2026-09-23 by the first corpus that executes anything, where the Rust port had been
+        # naming it all along.
         "details": f"{covered}/{num_branches} decision branches exercised by tests "
-                   f"({suite}; ran under {provenance})",
+                   f"(coverage.py branch totals; {suite}; ran under {provenance})",
     }
 
 

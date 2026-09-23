@@ -114,7 +114,7 @@ def main() -> int:
         # is the fix for a second invocation that ran the whole binary to read one string
         # and carried no --no-exec while doing it.
         diffs, compared, detected = diff_panels(repo, "auto", quiet=not verbose,
-                                                exec_tests=False)
+                                                exec_tests=False, ported_repo=repo)
         if detected != lang:
             print(f"  DIFF  language: manifest says {lang}, both tools detect {detected}")
             failures.append(f"{slug}: detected {detected}, manifest says {lang}")

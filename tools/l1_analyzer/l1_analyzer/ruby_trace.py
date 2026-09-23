@@ -86,6 +86,7 @@ ResultSet = dict[str, Command]
 
 
 
+@boundary
 def _on_path(tool: str) -> str | None:
     """Where a tool is on PATH, or nothing.
 

@@ -276,6 +276,7 @@ def parse_panic(output: str) -> list[PanicFinding]:
     return findings
 
 
+@boundary
 def _cargo_available() -> str | None:
     """Stress needs only cargo (stable), no rustup/nightly - that is the point."""
     return None if shutil.which("cargo") is not None else "needs cargo on PATH"

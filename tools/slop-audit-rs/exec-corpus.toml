@@ -1,0 +1,101 @@
+# The projects `validate_exec.py` runs BOTH tools against with execution turned on.
+#
+# Ours, not somebody else's. The pinned corpus in corpus.toml is thirteen real repositories
+# and the sweep over it never executes anything, on purpose: running thirteen strangers'
+# test suites is slow, it is not reproducible, and it is not a thing to do to somebody's
+# code without asking. That decision left L1.19's runtime half and the whole of L1.20
+# compared by nothing, in nine languages.
+#
+# These projects are about ten lines each and we wrote them, so none of that objection
+# applies. Each is a plain directory of files, copied into a temp directory and given one
+# git commit before either tool reads it: a fixture cannot carry its own .git inside this
+# repository, and every indicator from L1.1 to L1.8 reads a history.
+#
+# Each one has a branch a test reaches and a branch it does not, so coverage lands strictly
+# between nought and one. A fixture that scores 100% or 0% would agree by construction on
+# any reader that can count at all.
+#
+# `needs` names the executables that must be on PATH. A project whose toolchain is missing is
+# SKIPPED BY NAME, never counted equal, and a run that compared nothing exits 2.
+#
+# `prepare` is the commands that install the project's own test dependencies, run once in the
+# copy before the comparison. Empty where a language needs none, which is why the two
+# languages that need none came first.
+
+[[project]]
+lang = "rust"
+dir = "exec-corpus/rust"
+needs = ["cargo"]
+prepare = []
+
+[[project]]
+lang = "go"
+dir = "exec-corpus/go"
+needs = ["go"]
+prepare = []
+
+# C needs no install either, and on a machine without lcov it compares the REFUSAL instead of
+# a number. That is worth as much: a refusal is a sentence both tools print, and nothing has
+# ever compared two of those either.
+[[project]]
+lang = "c"
+dir = "exec-corpus/c"
+needs = ["cc", "make"]
+prepare = []
+
+# The first project that installs anything. uv builds the environment in the copy, so nothing
+# is installed on the machine and the project's own interpreter is the one both tools find.
+[[project]]
+lang = "python"
+dir = "exec-corpus/python"
+needs = ["uv"]
+prepare = [
+    ["uv", "venv", "--quiet", ".venv"],
+    # --python names the environment, rather than trusting uv to find the .venv beside it.
+    # Without it the first run installed nothing there, pytest was not importable, and the
+    # two tools disagreed about a project this harness had failed to build.
+    ["uv", "pip", "install", "--quiet", "--python", ".venv/bin/python",
+     "pytest", "pytest-randomly", "coverage"],
+]
+
+# npm installs into the copy, so the machine keeps nothing and node_modules is where both
+# tools look for it. The harness installs nothing itself: the runners refuse a project whose
+# dependencies are absent, on purpose, and preparing the project is the operator's job.
+[[project]]
+lang = "javascript"
+dir = "exec-corpus/javascript"
+needs = ["node", "npx", "npm"]
+prepare = [["npm", "install", "--silent", "--no-audit", "--no-fund"]]
+
+# Bundler installs into the copy's own vendor directory, so the machine's gems are untouched
+# and both tools find the same versions.
+[[project]]
+lang = "ruby"
+dir = "exec-corpus/ruby"
+needs = ["ruby", "bundle"]
+prepare = [["bundle", "install", "--quiet", "--path", "vendor/bundle"]]
+
+# The same runner as JavaScript, on TypeScript sources, because the two languages share a
+# coverage reader and a determinism runner and nothing had ever compared either.
+[[project]]
+lang = "typescript"
+dir = "exec-corpus/typescript"
+needs = ["node", "npx", "npm"]
+prepare = [["npm", "install", "--silent", "--no-audit", "--no-fund"]]
+
+# Maven downloads into ~/.m2 rather than into the copy, which is the one project here that
+# touches the machine. It is also the slowest, so a run that only wants the fast languages
+# names them on the command line.
+[[project]]
+lang = "java"
+dir = "exec-corpus/java"
+needs = ["mvn", "java"]
+prepare = [["mvn", "--quiet", "--batch-mode", "test-compile"]]
+
+# dotnet restores into the copy's obj/ directory and into ~/.nuget. The ninth project, and
+# the last language that had never had its executing path compared against anything.
+[[project]]
+lang = "csharp"
+dir = "exec-corpus/csharp"
+needs = ["dotnet"]
+prepare = [["dotnet", "restore", "--verbosity", "quiet"]]

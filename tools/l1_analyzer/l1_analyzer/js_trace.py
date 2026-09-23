@@ -74,6 +74,7 @@ class Branches(TypedDict):
 
 
 
+@boundary
 def _node() -> str | None:
     return shutil.which("node")
 

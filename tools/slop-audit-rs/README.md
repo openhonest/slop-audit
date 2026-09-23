@@ -10,19 +10,11 @@ The Python `l1_analyzer` stays the **canonical** instrument. This crate is a cer
 
 All nine supported languages are linked and driven off one table (`src/lang.rs`, ported from `LANG_CFG`): Python, Rust, C, Java, TypeScript, C#, JavaScript, Ruby, Go.
 
-Ported and validated equal to the Python reference:
+Every indicator the panel carries is ported and validated equal to the Python reference: L1.1 through L1.20, L1.18b, and the four additive checks (absolute paths, thread surface, path cover, interleaving robustness). Twenty-five of twenty-five, across thirteen pinned repositories in nine languages, and across nine projects of our own whose tests are actually executed.
 
-- **L1.1 through L1.8** (git-log commit ratios)
-- **L1.9 through L1.11** (config presence)
-- **L1.15** type-escape density, **L1.16** trailing whitespace, **L1.17** god-file concentration
-- **L1.19** static half: the decision-point enumeration
-- the `absolute_paths` additive check
+**L1.12, L1.13 and L1.14 changed shape, by decision of 2026-08-13 and done on 2026-08-19.** The Python reference delegated them to vulture, jscpd and gitleaks and reported `n/a` when the tool was absent, which was most of the time and, for L1.13, every time: it returned `n/a` on every repository this methodology had ever measured. Three ecosystems' worth of tooling cannot be asked of an auditor at a client site, so all three are now native on tree-sitter in both tools, and `spec/03-layer1-indicators.md` defines each as an algorithm precisely enough to reimplement rather than deferring to whichever tool happens to be installed.
 
-Still to come: L1.18 and L1.18b (the state analysis) with the additive `thread_surface` and `path_cover`; L1.12, L1.13 and L1.14; and the L1.19/L1.20 runtime harnesses.
-
-**L1.12, L1.13 and L1.14 changed shape, by decision of 2026-08-13 and done on 2026-08-19.** The Python reference delegated them to vulture, jscpd and gitleaks and reported `n/a` when the tool was absent, which was most of the time and, for L1.13, every time: it returned `n/a` on every repository this methodology had ever measured. Three ecosystems' worth of tooling cannot be asked of an auditor at a client site, so all three are now native on tree-sitter in `l1_analyzer`, and `spec/03-layer1-indicators.md` defines each as an algorithm precisely enough to reimplement rather than deferring to whichever tool happens to be installed. This port has not caught up: it reports all three as declared GAP lines naming why.
-
-The runtime indicators, when added, drive the target repo's own toolchain to run its tests, exactly as the Python tool does; that part cannot be bundled, because it is the target's build environment. A developer who has the repo and its tests has that toolchain. Four cases need one extra install beyond it, and each reports why rather than guessing: `cargo-llvm-cov` for Rust coverage, `coverage.py` and `pytest-randomly` for Python, `c8` for JavaScript, `lcov` for C.
+The runtime indicators drive the target repository's own toolchain to run its tests, exactly as the Python tool does; that part cannot be bundled, because it is the target's build environment. A developer who has the repository and its tests has that toolchain. Four cases need one extra install beyond it, and each reports why rather than guessing: `cargo-llvm-cov` for Rust coverage, `coverage.py` and `pytest-randomly` for Python, `c8` for JavaScript, `lcov` for C.
 
 ## Validating a port
 
@@ -46,6 +38,17 @@ uv run validate_corpus.py csharp     # one language, or one slug
 Real repositories are the point. A synthetic fixture agrees on zeros; these do not. Measured 2026-08-19: 2,452 type escapes and 16,807 decision points across the corpus, L1.15 spanning 6.4% on RestSharp to 26.2% on requests, and L1.17 spanning zero to 15.1% on libuv. An indicator that only ever ran against a hand-written fixture has not been validated, it has been rehearsed.
 
 The current panel is equal on every indicator, across every repository in the manifest and all nine languages. There are no GAP lines left: L1.14, the secret scan, was the last indicator the binary did not measure, and it was ported on 2026-09-23. The GAP machinery stays in the differ, because the next indicator the canon adds will arrive here after it arrives in the reference.
+
+`validate_exec.py` is the second sweep, and it is the one that EXECUTES. `corpus.toml` is thirteen real repositories and the sweep over it runs neither tool's execution path, on purpose, so L1.19's runtime half and the whole of L1.20 were compared by nothing in nine languages. `exec-corpus.toml` names nine projects of about ten lines each that we wrote, so the objection does not apply:
+
+```
+uv run validate_exec.py              # every project
+uv run validate_exec.py rust go      # only these languages
+```
+
+Each project is copied into a temp directory and given one commit, and it is planted TWICE, once per tool: a suite writes into the tree it ran in, so the second tool would otherwise audit the first one's leftovers. A language whose toolchain is not installed is skipped by name, and a run that compared nothing exits 2.
+
+It found nine disagreements in its first afternoon, among them a language with no coverage runner at all, a whole-number float spelled two ways, and a project graded Slop for flaky tests whose suite had never run.
 
 Two of the indicators ship a harness of their own, because a corpus sweep is a weak test of them. `validate_secrets.py --specimens` plants one credential per rule in a throwaway tree and diffs both readings of it: eleven of the thirteen corpus repositories commit no credentials at all, so a scanner missing fifteen of its seventeen rules would sweep clean. `validate_defs.py` and `validate_corpus_names.py` do the same job for dead code, one definition and one reference at a time.
 

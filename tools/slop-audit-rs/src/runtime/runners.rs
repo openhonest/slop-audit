@@ -237,7 +237,11 @@ pub const RUNNERS: &[Runner] = &[
         never_ran: &[],
         unit: "run",
         describe: "",
-        no_runs: "C has no standard test-order randomizer; determinism not measured",
+        // The whole sentence, placeholder and all, because the reference names the
+        // COMPILER here and the generic refusal below names the row's `tool`. Those two
+        // words are "compiler" and "cc", and a C project on any machine read one of each.
+        no_runs: "C has no standard test-order randomizer; determinism not measured \
+                  (compiler: {toolchain})",
         nothing_ran: "",
         incomplete: &[],
         collected_nothing: &[],
@@ -420,7 +424,7 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
              this indicator"));
     };
     if runner.ordering == Ordering::NotRandomizable {
-        return not_measured(format!("{} ({}: {toolchain})", runner.no_runs, runner.tool));
+        return not_measured(runner.no_runs.replace("{toolchain}", toolchain));
     }
     if runner.read_by == ReadBy::Reports {
         return not_measured(format!(
@@ -449,9 +453,28 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
     };
     let command = variant.map(|v| v.command).unwrap_or(runner.command);
     // A row whose command names an interpreter needs the project's own, resolved once.
+    //
+    // AND THE MODULE IT NEEDS IS ASKED FOR BEFORE ANY RUN. Five runs of an interpreter that
+    // cannot import pytest all exit non-zero, and the tally counted them: a project whose
+    // environment was never built scored 0 of 5 and banded Slop, which is a claim that its
+    // tests are flaky made about tests that never ran. The reference refuses by name and the
+    // port graded, and no check in this repository compared the two until a corpus with
+    // execution in it existed.
+    // A row whose command names an interpreter is ALSO named by it. The reference says which
+    // environment ran the suite, and the port said which Python version: a version string
+    // does not say which of a machine's environments produced the reading, which is the whole
+    // reason the reference resolves the project's own venv first.
+    let mut toolchain = toolchain.to_string();
     let interpreter = if command.iter().any(|part| part.contains("{python}")) {
         match python_interpreter(repo) {
-            Some((path, _provenance)) => path,
+            Some((path, provenance)) => {
+                if let Some(why) = module_missing(&path, "pytest") {
+                    return not_measured(format!(
+                        "needs pytest in the target environment ({provenance}): {why}"));
+                }
+                toolchain = provenance;
+                path
+            }
             None => return not_measured(runner.tool_missing),
         }
     } else {
@@ -517,6 +540,21 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
 /// The layouts are tried in the order a project is most likely to use. None of them
 /// present falls back to the interpreter on PATH, and the details line names which was
 /// used so a reading always says what took it.
+/// Why `module` cannot be imported by this interpreter, or nothing when it can.
+///
+/// The reason travels with the answer because a bare no conflates two repairs: a package that
+/// is not installed and an interpreter that will not start at all send a reader to different
+/// places.
+pub fn module_missing(interpreter: &str, module: &str) -> Option<String> {
+    let probe = run_untrusted(
+        &[interpreter.to_string(), "-c".into(), format!("import {module}")],
+        Path::new("."), &[], 30.0);
+    if probe.status == 0 {
+        return None;
+    }
+    Some(format!("{module} is not importable in {interpreter}"))
+}
+
 pub fn python_interpreter(repo: &Path) -> Option<(String, String)> {
     const LAYOUTS: &[&str] = &[
         ".venv/bin/python", ".venv/bin/python3", "venv/bin/python", "venv/bin/python3",
@@ -525,7 +563,11 @@ pub fn python_interpreter(repo: &Path) -> Option<(String, String)> {
     for layout in LAYOUTS {
         let candidate = repo.join(layout);
         if candidate.is_file() {
-            return Some((candidate.display().to_string(), format!("the repo's {layout}")));
+            // The reference's own words. The port said "the repo's .venv/bin/python",
+            // which names the same file and reads differently, and the details line it
+            // lands in is compared against the reference's.
+            return Some((candidate.display().to_string(),
+                         format!("target venv {}", candidate.display())));
         }
     }
     which("python3").map(|path| (path.display().to_string(), "python3 on PATH".into()))

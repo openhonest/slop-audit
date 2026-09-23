@@ -32,6 +32,7 @@ from l1_analyzer import (
     ruby_trace,
     rust_trace,
 )
+from l1_analyzer.boundary import boundary
 
 # tracer, the binary its harness needs, and a source file that compiles but has no test.
 LANGUAGES = [
@@ -48,6 +49,7 @@ LANGUAGES = [
 BANDS = ("Healthy", "Not Healthy", "Slop")
 
 
+@boundary
 def _skip_unless(binary: str) -> None:
     if shutil.which(binary) is None:
         pytest.skip(f"{binary} is not on PATH")

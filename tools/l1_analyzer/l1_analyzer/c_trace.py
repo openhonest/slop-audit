@@ -47,10 +47,12 @@ _COVERAGE_FLAGS = "-O0 -g -fprofile-arcs -ftest-coverage"
 _LCOV_LINES = re.compile(r"lines\.+:\s+([\d.]+)%\s+\((\d+)\s+of\s+(\d+)\s+lines\)")
 
 
+@boundary
 def _cc() -> str | None:
     return shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
 
 
+@boundary
 def _lcov() -> str | None:
     return shutil.which("lcov")
 

@@ -37,6 +37,37 @@ fn test_determinism(repo: &Path, language: &str) -> Reading {
     }
 }
 
+/// L1.19, composed the way the reference composes it.
+///
+/// THE RULE, and it is the reference's rather than an invention here. The static enumeration
+/// is computed first, always. With execution off it carries "(test execution disabled)". With
+/// execution on, a runtime reading that produced a band REPLACES it, and a runtime reading
+/// that refused is appended to the static row as the reason coverage was not measured.
+///
+/// The port published the bare refusal and lost the static count with it, so a C repository
+/// on a machine without lcov reported n/a where the reference reported three decision points
+/// and the name of the missing tool. It also invented a sentence for a language with no
+/// runner, which is a case the reference does not have and this binary no longer has either.
+fn decision_space_row(repo: &Path, language: &str, exec_tests: bool) -> Indicator {
+    let mut row = indicators::decision_space::analyze(repo, language);
+    if !exec_tests {
+        row.details.push_str("; coverage not measured (test execution disabled)");
+        return row;
+    }
+    let reading = runtime_coverage(repo, language);
+    if reading.band != "n/a" {
+        return Indicator {
+            code: "L1.19".into(),
+            label: "decision-space".into(),
+            value: reading.value,
+            band: reading.band,
+            details: reading.details,
+        };
+    }
+    row.details.push_str(&format!("; coverage not measured: {}", reading.details));
+    row
+}
+
 /// L1.19's RUNTIME half for whichever language this repository is: the share of decisions
 /// the project's own tests actually reached.
 ///
@@ -46,9 +77,9 @@ fn test_determinism(repo: &Path, language: &str) -> Reading {
 /// A language with no runtime runner is refused by name rather than falling back to the
 /// static count, because the two answer different questions and a reader told one number
 /// cannot tell which they were given.
-fn runtime_coverage(repo: &Path, language: &str) -> Option<Reading> {
+fn runtime_coverage(repo: &Path, language: &str) -> Reading {
     let toolchain = toolchain_name(repo, language);
-    Some(match language {
+    match language {
         "go" => runtime_cov::go_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
         "csharp" => runtime_cov::csharp_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
         "java" => runtime_cov::java_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
@@ -63,8 +94,12 @@ fn runtime_coverage(repo: &Path, language: &str) -> Option<Reading> {
         // says so rather than leaving the denominator unnamed.
         "rust" => crate::runtime::coverage_rust::rust_coverage(repo, SUITE_TIMEOUT_SECONDS, &[]),
         "c" => runtime_cov::c_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
-        _ => return None,
-    })
+        // The reference's own sentence for a language its table has no row for. All nine
+        // have a row on both sides now, so this is reachable only by a language neither
+        // tool supports.
+        other => crate::runtime::determinism::not_measured(
+            format!("runtime decision-coverage harness not implemented for {other}")),
+    }
 }
 
 /// The toolchain that took a reading, so a number always says what measured it.
@@ -95,8 +130,12 @@ fn toolchain_name(repo: &Path, language: &str) -> String {
     let run = crate::runtime::run_untrusted(&command, repo, &[], 30.0);
     // Some print their version to stderr, which is why both streams are read.
     let output = run.output();
+    // `dotnet --version` prints the bare number, so the name says what the number is OF.
+    // The reference does the same, and the port printed "under 10.0.302" where the reference
+    // printed "under dotnet 10.0.302".
+    let prefix = if language == "csharp" { "dotnet " } else { "" };
     output.lines().map(str::trim).find(|line| !line.is_empty())
-        .map(|line| line.chars().take(120).collect())
+        .map(|line| format!("{prefix}{}", line.chars().take(120).collect::<String>()))
         .unwrap_or_else(|| format!("an unnamed {language} toolchain"))
 }
 
@@ -128,24 +167,7 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
     // language; the static enumeration otherwise. The details line says which was taken,
     // because a share of decisions REACHED and a count of decisions FOUND are different
     // numbers and a reader given one cannot tell which.
-    let runtime = if exec_tests { runtime_coverage(repo, language) } else { None };
-    match runtime {
-        Some(reading) => panel.push(Indicator {
-            code: "L1.19".into(),
-            label: "decision-space".into(),
-            value: reading.value,
-            band: reading.band,
-            details: reading.details,
-        }),
-        // The static enumeration, and the row says which of the two reasons put it there.
-        // It used to end with "test execution disabled" whatever had happened, so a Rust
-        // repository audited WITH execution enabled was told the run had declined to execute
-        // when the truth is that this binary has no coverage runner for Rust.
-        None => panel.push(indicators::decision_space::analyze(
-            repo, language,
-            if exec_tests { indicators::decision_space::NoCoverage::NoRunner }
-            else { indicators::decision_space::NoCoverage::ExecutionDisabled })),
-    }
+    panel.push(decision_space_row(repo, language, exec_tests));
     // L1.18. The mutable-state ratio, which reads the classifier below it for the bound:
     // state whose reaching set L1.18b could bound does not count toward the ratio.
     panel.push(indicators::mutable_state::analyze(repo, language));

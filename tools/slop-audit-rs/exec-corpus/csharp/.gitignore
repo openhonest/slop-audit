@@ -1,0 +1,5 @@
+# Every real .NET project ignores these, and this project has to look like a real one: the
+# build writes generated C# into obj/, and a tool that reads it counts a code generator's
+# output as somebody's production code.
+bin/
+obj/

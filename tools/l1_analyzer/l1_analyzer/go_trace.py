@@ -24,6 +24,7 @@ import tempfile
 from pathlib import Path
 
 from l1_analyzer import disclosure, toolchain
+from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -49,6 +50,7 @@ _RAN = ("ok  ", "--- FAIL", "FAIL", "PASS")
 _NEVER_RAN = ("[build failed]", "[setup failed]")
 
 
+@boundary
 def _go() -> str | None:
     return shutil.which("go")
 
@@ -111,9 +113,20 @@ def _coverage_verdict(func_output: str, profile_written: bool, run_returncode: i
     return {
         "value": round(pct, 1),
         "band": result_band,
+        # TWO substitutions, not one. The figure is statements where every other language
+        # carries branches, and it is a PERCENTAGE where every other language carries a pair
+        # of counts: the Go toolchain reports the share and nothing else, so reconstructing
+        # counts from it would put numbers in this sentence that nothing measured.
+        #
+        # The second clause was in the Rust port and not here, which is the direction nobody
+        # looks: the port had disclosed more than the reference since it was written, and the
+        # first run of the executing corpus on 2026-09-23 was the first thing ever to compare
+        # the two sentences.
         "details": f"{pct}% STATEMENT coverage from `go test -coverprofile` ({suite}; ran under "
                    f"{toolchain}); Go instruments statements rather than branches, so this field "
-                   f"carries statement coverage where other languages carry branch coverage",
+                   f"carries statement coverage where other languages carry branch coverage, and "
+                   f"the toolchain reports a percentage rather than the counts every other "
+                   f"language supplies",
     }
 
 

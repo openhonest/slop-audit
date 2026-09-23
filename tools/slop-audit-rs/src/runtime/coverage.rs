@@ -31,6 +31,11 @@ pub struct Totals {
 /// handed a generic sentence nobody can act on.
 pub struct CoverageWords {
     /// Why there is no report, and what would produce one.
+    ///
+    /// `{toolchain}` is replaced with the toolchain below, where a language names it here.
+    /// Ruby does: the reference says which ruby produced no resultset, because a gem that is
+    /// missing from one ruby is present in another and the version is the first thing a
+    /// reader checks.
     pub no_report: &'static str,
     /// Why a report exists and carries nothing to cover.
     pub nothing_to_cover: &'static str,
@@ -61,7 +66,9 @@ pub fn verdict(totals: Option<Totals>, status: i32, words: &CoverageWords,
             "test suite timed out before coverage could be measured{}",
             timeout_note(timeout_seconds)));
     }
-    let Some(totals) = totals else { return not_measured(words.no_report) };
+    let Some(totals) = totals else {
+        return not_measured(words.no_report.replace("{toolchain}", &words.toolchain));
+    };
     if totals.total == 0 {
         return not_measured(words.nothing_to_cover);
     }

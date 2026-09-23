@@ -28,6 +28,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from l1_analyzer import toolchain
+from l1_analyzer.boundary import boundary
 from l1_analyzer.pytest_trace import (
     L1Result,
     _first_line,
@@ -65,6 +66,7 @@ def _branch_totals(xml_text: str) -> tuple[int, int] | None:
     return int(covered.group(1)), int(valid.group(1))
 
 
+@boundary
 def _dotnet() -> str | None:
     return shutil.which("dotnet")
 

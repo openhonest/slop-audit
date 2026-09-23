@@ -86,38 +86,7 @@ fn count_decisions(node: Node, types: &[&str]) -> usize {
     count
 }
 
-/// Why the run has no coverage share to report, in the reader's words.
-///
-/// The static enumeration counts decision points FOUND, and the runtime half reports the share
-/// REACHED. A reader given one cannot tell which without being told, so the row always says
-/// why it is the count and not the share.
-///
-/// Two reasons, and the second is the one that was missing. The row ended with "test execution
-/// disabled" whatever had happened, so on a Rust repository run WITH execution enabled the
-/// sentence was false: the suite ran, and the binary simply has no coverage runner for Rust.
-/// It reads eight of the nine languages, and Rust is the one it is written in.
-pub enum NoCoverage {
-    /// The run was told not to execute the audited project's suite.
-    ExecutionDisabled,
-    /// The suite could have run, and this binary has no coverage runner for the language.
-    NoRunner,
-}
-
-impl NoCoverage {
-    fn sentence(&self, language: &str) -> String {
-        match self {
-            // The reference's own wording, word for word. A paraphrase read as a
-            // disagreement about the number to the parity harness.
-            NoCoverage::ExecutionDisabled =>
-                "; coverage not measured (test execution disabled)".to_string(),
-            NoCoverage::NoRunner => format!(
-                "; coverage not measured: this binary has no coverage runner for {language}, \
-                 so the share a test exercises was not read even though the suite could run"),
-        }
-    }
-}
-
-pub fn analyze(repo: &Path, language: &str, absent: NoCoverage) -> Indicator {
+pub fn analyze(repo: &Path, language: &str) -> Indicator {
     let cfg = match lang::cfg(language) {
         Some(cfg) => cfg,
         None => {
@@ -197,7 +166,6 @@ pub fn analyze(repo: &Path, language: &str, absent: NoCoverage) -> Indicator {
     if skipped != 0 {
         details = format!("{details}; {skipped} file(s) unreadable and excluded");
     }
-    details.push_str(&absent.sentence(language));
 
     Indicator {
         code: "L1.19".into(),
@@ -205,29 +173,5 @@ pub fn analyze(repo: &Path, language: &str, absent: NoCoverage) -> Indicator {
         value: decision_points.to_string(),
         band: "n/a".into(),
         details,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The reference prints this sentence, word for word, when a run declines to execute.
-    /// A paraphrase reads as a disagreement about the number to the parity harness.
-    #[test]
-    fn a_run_that_declined_to_execute_says_so_in_the_references_own_words() {
-        assert_eq!(NoCoverage::ExecutionDisabled.sentence("rust"),
-                   "; coverage not measured (test execution disabled)");
-    }
-
-    /// The sentence that was missing, and the one that was false. A Rust repository audited
-    /// WITH execution enabled was told the run had declined to execute. The suite could run;
-    /// this binary has no coverage runner for Rust, which is a different fact and a reader
-    /// acts on it differently.
-    #[test]
-    fn a_language_with_no_runner_says_that_and_not_that_execution_was_declined() {
-        let said = NoCoverage::NoRunner.sentence("rust");
-        assert!(said.contains("no coverage runner for rust"), "{said}");
-        assert!(!said.contains("execution disabled"), "{said}");
     }
 }

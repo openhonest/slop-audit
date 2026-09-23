@@ -88,7 +88,7 @@ def render(value) -> str:
 
 @boundary
 def diff_panels(repo: Path, lang: str, *, quiet: bool,
-                exec_tests: bool) -> tuple[int, int, str]:
+                exec_tests: bool, ported_repo: Path) -> tuple[int, int, str]:
     """Run both tools on `repo` and report each shared indicator EQUAL or DIFF.
     Returns (diffs, compared, detected language). The language is handed back rather than
     left for a caller to ask for: the corpus walk ran the binary a SECOND time to read that
@@ -100,16 +100,36 @@ def diff_panels(repo: Path, lang: str, *, quiet: bool,
 
     `exec_tests` has no default, and the missing default is the point: whether both tools
     run the audited project's own suite changes two indicators, and a caller that forgot to
-    say must not read as one that chose not to."""
+    say must not read as one that chose not to.
+
+    `ported_repo` is the tree the BINARY reads, and it is separate from the reference's for
+    one reason: with execution on, running a suite leaves things behind. A Ruby project whose
+    suite starts SimpleCov writes a `coverage/` directory, so the reference ran first over a
+    clean tree, the port ran second over a tree with a report in it, and the two disagreed
+    about how many production files the project has. The number neither tool got wrong.
+
+    A caller measuring a tree nothing writes to passes the same path twice, which says out
+    loud that it knows the two readings share a tree."""
+    reference = python_panel(repo, lang, exec_tests)
+    ported = rust_panel(ported_repo, lang, exec_tests)
+    return compare_panels(reference, ported, quiet=quiet)
+
+
+@boundary
+def compare_panels(reference: dict[str, Reading], ported: dict[str, Reading], *,
+                   quiet: bool) -> tuple[int, int, str]:
+    """Two panels already read, marked EQUAL or DIFF one indicator at a time.
+
+    Split out of the runner above so a caller can decide WHEN each tool reads its tree. The
+    executing corpus needs that: a suite writes into the tree it ran in, so the two readings
+    have to be taken from two pristine copies at the same PATH, one after the other, or the
+    absolute paths in a details line differ for a reason that is not a disagreement."""
     @boundary
     def say(line: str) -> None:
-        """The output half of `quiet`, which is the only reason this closure exists: a
-        corpus run walking several repositories wants the disagreements and nothing else."""
+        """The output half of `quiet`: a run walking several projects wants the
+        disagreements and nothing else."""
         if not quiet:
             print(line)
-
-    reference = python_panel(repo, lang, exec_tests)
-    ported = rust_panel(repo, lang, exec_tests)
 
     detected_rs = ""
     if "lang" in reference:
@@ -228,8 +248,10 @@ def main() -> int:
         return 2
     # Stated: one repository, and a reader wants every line of the comparison. The
     # corpus walker asks for quiet because it is walking several.
+    # One tree, said twice. This script measures whatever the caller points it at, and a
+    # caller pointing at their own checkout wants both tools to read that checkout.
     diffs, compared, _detected = diff_panels(repo, lang, quiet=False,
-                                             exec_tests=exec_tests)
+                                             exec_tests=exec_tests, ported_repo=repo)
     # "16/16" on its own reads as a complete audit. It is a statement about the indicators
     # that were compared, and saying so is the whole lesson of this differ's own blind spot.
     print(f"\n{compared - diffs}/{compared} COMPARED indicators equal on {repo}")

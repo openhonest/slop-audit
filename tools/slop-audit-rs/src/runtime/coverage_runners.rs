@@ -257,8 +257,10 @@ pub fn csharp_coverage(repo: &Path, timeout_seconds: f64, sdk: &str) -> Reading 
         repo, &[], timeout_seconds);
 
     let words = CoverageWords {
-        no_report: "C# branch coverage needs the XPlat Code Coverage collector \
-                    (no cobertura report was written)",
+        // The reference names the PACKAGE a reader has to add. "the XPlat Code Coverage
+        // collector" is the switch you pass; `coverlet.collector` is the thing you install.
+        no_report: "C# branch coverage needs coverlet.collector in the test project \
+                    (coverage.cobertura.xml not produced)",
         nothing_to_cover: "no enumerable decision branches found \
                            (cobertura reported zero valid branches)",
         how: "Cobertura branch counters",
@@ -431,8 +433,11 @@ pub fn ruby_coverage(repo: &Path, timeout_seconds: f64, version: &str) -> Readin
     let run = run_untrusted(&command, repo, &[], timeout_seconds);
 
     let words = CoverageWords {
-        no_report: "Ruby branch coverage needs SimpleCov started in the suite's test \
-                    helper (coverage/.resultset.json not produced)",
+        // The reference's own sentence, "spec_helper" and version and all. The port said
+        // "test helper" and named no ruby at all, and a reader chasing a missing gem checks
+        // the version first.
+        no_report: "Ruby branch coverage needs SimpleCov started in the suite's spec_helper \
+                    (coverage/.resultset.json not produced under {toolchain})",
         nothing_to_cover: "SimpleCov recorded no branch data; add \
                            `SimpleCov.enable_coverage :branch` before `SimpleCov.start`",
         how: "SimpleCov branches",
@@ -488,7 +493,11 @@ pub fn js_coverage(repo: &Path, timeout_seconds: f64, runtime: &str) -> Reading 
 
     let words = CoverageWords {
         no_report: "coverage produced no data",
-        nothing_to_cover: "c8 reported no branches to cover",
+        // The reference's own sentence. The port said "c8 reported no branches to
+        // cover", which names the same fact and reads differently, and this is the
+        // line a default vitest project actually reaches: c8 sees the runner process
+        // and not the workers the tests run in, so both tools measure nothing here.
+        nothing_to_cover: "no enumerable decision branches found in the measured tree",
         how: "c8 branch counters (V8)",
         toolchain: runtime.to_string(),
         substitution: "",

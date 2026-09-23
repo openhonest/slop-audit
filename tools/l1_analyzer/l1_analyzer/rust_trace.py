@@ -84,6 +84,7 @@ class RepoUncovered(Uncovered, total=False):
 
 
 
+@boundary
 def _cargo() -> str | None:
     return shutil.which("cargo")
 

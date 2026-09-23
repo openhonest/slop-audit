@@ -720,6 +720,14 @@ LANG_SPEC: dict[str, LangSpec] = {
                           "os.spawnlpe", "os.spawnv", "os.spawnve", "os.spawnvp",
                           "os.spawnvpe", "os.system", "os.walk", "os.write", "shutil.copy",
                           "shutil.copyfile", "shutil.move", "shutil.rmtree",
+                          # ASKING PATH WHERE A TOOL IS, IS READING THE FILESYSTEM.
+                          # `shutil.which` walks every directory on PATH and stats the
+                          # candidates, which is the act `exists` and `stat` joined
+                          # this table for. It was left out as collateral when the
+                          # whole of a module was declined, and nine functions that ask
+                          # whether a toolchain is installed read as pure interior for
+                          # as long as it was. All nine are declared now.
+                          "shutil.which",
                           "socket.create_connection", "socket.create_server",
                           "socket.getaddrinfo", "socket.getfqdn", "socket.gethostbyaddr",
                           "socket.gethostbyname", "socket.gethostname", "socket.socket",
