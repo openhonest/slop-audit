@@ -278,9 +278,27 @@ def _files_measured(report: Report) -> int | None:
         return None
 
 
+def _scope_words(cargo_args: tuple[str, ...]) -> str:
+    """The words that chose which packages cargo measured, or a sentence saying there were
+    none.
+
+    THE SECOND HALF OF THE 7,137. Two runs of one commit on one compiler reported 66.9 and
+    65.1, the numerators agreeing within four regions and the denominators 7,137 apart. The
+    file count answered part of it. The rest is that `--cargo-arg` hands cargo `-p`,
+    `--exclude` and `--workspace` untouched, so the operator chooses the denominator and the
+    figure never said what they chose. Two people can run the same commit, pass different
+    words, and publish two honest percentages that are not comparable and do not look
+    different.
+
+    Printed as cargo's own vocabulary rather than paraphrased, so a reader can rerun it."""
+    if not cargo_args:
+        return "cargo's own default at the repository root, no package arguments given"
+    return " ".join(cargo_args)
+
+
 def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
                       toolchain: str, timeout_seconds: float, output: str,
-                      files: int | None) -> L1Result:
+                      files: int | None, cargo_args: tuple[str, ...]) -> L1Result:
     """L1.19 from a finished run and cargo-llvm-cov's region totals. No I/O, so it can be
     asserted.
 
@@ -336,7 +354,8 @@ def _coverage_verdict(totals: tuple[int, int] | None, returncode: int,
         "value": round(pct, 1),
         "band": coverage_band(pct),
         "details": f"{covered}/{count} llvm-cov regions exercised by tests across {scope}, "
-                   f"region coverage ({suite}; ran under {toolchain})",
+                   f"region coverage ({suite}; ran under {toolchain}; "
+                   f"package scope: {_scope_words(cargo_args)})",
     }
 
 
@@ -375,7 +394,8 @@ def decision_space_coverage(repo: Path, timeout_seconds: float,
 
     return _coverage_verdict(_region_totals(report), run.returncode,
                              _toolchain(repo, timeout_seconds), timeout_seconds,
-                             (run.stdout or "") + (run.stderr or ""), _files_measured(report))
+                             (run.stdout or "") + (run.stderr or ""), _files_measured(report),
+                             build_args)
 
 
 # ---------------------------------------------------------------------------

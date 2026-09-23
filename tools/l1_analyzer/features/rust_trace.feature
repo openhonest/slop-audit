@@ -111,6 +111,13 @@ Feature: rust_trace — running a Rust crate's own test suite to measure coverag
     Then it answers with what the run measured rather than with what the repository holds
     But a report whose shape it cannot read answers nothing rather than a count nobody took
 
+  Scenario: _scope_words names the packages cargo was told to measure
+    Given the cargo arguments the operator chose
+    When _scope_words writes them for the details line
+    Then they appear as cargo's own words, so a reader can run the same scope again
+    But a run that passed none says so in a sentence, because a blank cannot be told from a scope nobody recorded
+    And this is the rest of turso's 7,137: the operator picks the denominator with -p and --exclude, and two honest percentages of two different denominators looked like one comparison
+
   Scenario: _coverage_verdict turns finished region totals into the published reading
     Given the region totals, how the run exited, the toolchain that measured it, what cargo said about the tests, and how many files the report covered
     When _coverage_verdict applies the published band table
