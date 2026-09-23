@@ -128,7 +128,14 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
             band: reading.band,
             details: reading.details,
         }),
-        None => panel.push(indicators::decision_space::analyze(repo, language)),
+        // The static enumeration, and the row says which of the two reasons put it there.
+        // It used to end with "test execution disabled" whatever had happened, so a Rust
+        // repository audited WITH execution enabled was told the run had declined to execute
+        // when the truth is that this binary has no coverage runner for Rust.
+        None => panel.push(indicators::decision_space::analyze(
+            repo, language,
+            if exec_tests { indicators::decision_space::NoCoverage::NoRunner }
+            else { indicators::decision_space::NoCoverage::ExecutionDisabled })),
     }
     // L1.18. The mutable-state ratio, which reads the classifier below it for the bound:
     // state whose reaching set L1.18b could bound does not count toward the ratio.
