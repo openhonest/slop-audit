@@ -18,7 +18,7 @@
 //!
 //! Arguments are parsed by hand: a CLI parser crate would add weight to a binary whose
 //! whole purpose is to be one small self-contained file.
-use slop_audit_rs::{lang, panel, state};
+use slop_audit_rs::{indicators, lang, panel, state};
 use std::path::Path;
 
 fn usage() -> ! {
@@ -45,6 +45,7 @@ fn main() {
     let mut enumerate = false;
     let mut reads = false;
     let mut filters = false;
+    let mut unreachable = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -76,6 +77,9 @@ fn main() {
             // only ever CLEAR a finding, so a port that got them wrong reports more than
             // it measured, which is the one direction this instrument must not fail in.
             "--filters" => filters = true,
+            // The fifth of the family: every statement that follows a terminator in the
+            // same block, which is the half of L1.12 decidable from syntax alone.
+            "--unreachable" => unreachable = true,
             // Before the repository check: it answers a question about the binary rather
             // than about a tree.
             "--version" => {
@@ -134,6 +138,15 @@ fn main() {
             for row in rows {
                 println!("{path}\t{}\t{}\t{}\t{}",
                          row.scope, row.key, row.refs, row.answers);
+            }
+        }
+        return;
+    }
+
+    if unreachable {
+        for (path, rows) in indicators::unreachable::walk(repo, &language) {
+            for row in rows {
+                println!("{path}\t{}\t{}", row.line, row.end_line);
             }
         }
         return;

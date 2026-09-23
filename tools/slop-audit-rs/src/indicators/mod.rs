@@ -14,3 +14,4 @@ pub mod thread_scanners;
 pub mod thread_surface;
 pub mod type_escapes;
 pub mod whitespace;
+pub mod unreachable;
