@@ -15,6 +15,11 @@ tree-sitter-python = "0.23"
 tree-sitter-ruby = "0.23.1"
 tree-sitter-rust = "0.24.2"
 tree-sitter-typescript = "0.23.2"
+# A manifest is somebody else's JSON, escapes and nesting and all, and a
+# hand-rolled reader of it is a source of quiet wrong answers rather than loud
+# ones. The crate is pure Rust and adds a fraction of one of the nine grammars
+# this binary already links.
+serde_json = "1"
 walkdir = "2.5"
 
 [profile.release]

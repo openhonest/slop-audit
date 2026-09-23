@@ -46,6 +46,7 @@ fn main() {
     let mut reads = false;
     let mut filters = false;
     let mut unreachable = false;
+    let mut defs = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -80,6 +81,9 @@ fn main() {
             // The fifth of the family: every statement that follows a terminator in the
             // same block, which is the half of L1.12 decidable from syntax alone.
             "--unreachable" => unreachable = true,
+            // The sixth: every definition the collectors find, with the status that says
+            // whether the reference scan may judge it at all.
+            "--defs" => defs = true,
             // Before the repository check: it answers a question about the binary rather
             // than about a tree.
             "--version" => {
@@ -148,6 +152,18 @@ fn main() {
             for row in rows {
                 println!("{path}\t{}\t{}", row.line, row.end_line);
             }
+        }
+        return;
+    }
+
+    if defs {
+        // The facts a single file cannot answer are read once, the way the driver reads
+        // them. A collector handed the wrong ones reports a different status, not a
+        // different definition, which is the harder difference to see.
+        let facts = indicators::dead_code_facts::repo_facts(repo, &language);
+        for (path, d) in indicators::dead_code_defs::walk(repo, &language, &facts) {
+            println!("{path}\t{}\t{}\t{}\t{}\t{}\t{}",
+                     d.name, d.kind, d.line, d.end_line, d.status, d.reason);
         }
         return;
     }
