@@ -37,9 +37,11 @@ Layer 2 dimensions scoring *Present*: ≥ 14 of 18. Layer 3 markers in aggregate
 
 **If the result deviates from the expected outcome:** investigate before changing the methodology. The deviation may be a real finding (the branch has actually drifted), or it may be a methodology calibration problem. Determine which before adjusting anything.
 
-### Negative control: TBD
+### Negative control: `Iddadvisor` at `main`
 
-**Status:** to be selected.
+**Status: SELECTED AND RUN, 2026-08-17.** Tip `1239d08`, 2026-04-13, cloned rather than checked out. It scored 10 slop signals of 17, which reaches the spec's high-confidence threshold, and the run is recorded in `results/2026-08-17-negative-control.md`. This heading read "TBD, to be selected" until 2026-09-23, a month after the selection was made and the run recorded, so a reader of this document was told the instrument had no negative control while the result sat two directories away.
+
+The first attempt, `idd develop`, scored 5 of 17 and did NOT reach the threshold. That was a fact about `develop` rather than about the instrument: it is a better codebase than this document assumed in April. The criteria and candidates below are kept as the record of how the second choice was made.
 
 **Selection criteria.** The negative control should be a codebase that:
 
@@ -55,7 +57,7 @@ Layer 2 dimensions scoring *Present*: ≥ 14 of 18. Layer 3 markers in aggregate
 - An open-source repository identified through hotspot analysis (a project with high churn, low delete-to-add ratio, and visible signs of unsupervised AI assistance). This is the most ecologically valid choice but selection is delicate.
 - The `idd` repository on a pre-conversion branch (e.g., `develop` before the `honest-conversion` work began). This is the cleanest comparison because the same codebase is its own positive and negative control on different branches.
 
-**Decision deadline.** Negative control must be selected before the v1 methodology is finalized. Recommendation: use the `idd develop` branch as the first negative control because it is the cleanest comparison; add a synthetic or open-source negative control in v2.
+**Decision, 2026-08-17.** `idd develop` was tried first, on this document's own recommendation, and did not score as unstructured. `Iddadvisor main` was selected in its place and does. A synthetic or open-source negative control is still wanted for v2, because one control cannot show that the separation generalises beyond one pair of repositories.
 
 **Expected outcome (once selected).** Layer 1 slop signal count ≥ 11 of 20, which is the spec's own high-confidence threshold (see the note below). Layer 2 dimensions scoring *Present*: ≤ 4 of 18. Layer 3 markers in aggregate scoring *Present*: ≤ 30%.
 
@@ -118,22 +120,21 @@ A second qualified assessor (when available — initially this is unlikely to ha
 
 ## Validation results location
 
-Results live in `methodology/validation/results/` as a set of dated directories:
+Results live in `validation/results/`, one dated file per run:
 
 ```
-methodology/validation/
+validation/
 ├── protocol.md                            ← this file
-└── results/
-    ├── 2026-04-DD-positive-control/
-    │   ├── layer1.md
-    │   ├── layer2.md
-    │   ├── layer3.md
-    │   ├── combined.md
-    │   └── deviations.md
-    ├── 2026-04-DD-negative-control/
-    │   └── ...
-    └── 2026-04-DD-discrimination-analysis.md
+├── results/
+│   ├── 2026-08-17-layer1.md               positive control, and the first negative attempt
+│   ├── 2026-08-17-negative-control.md     the negative control that separates
+│   ├── 2026-08-18-layer1-rerun.md
+│   ├── 2026-08-19-runtime-indicators.md
+│   └── 2026-08-19-live-prove-sweep.md
+└── tests/
 ```
+
+This section described a different path and a different shape until 2026-09-23. It said the results lived under `methodology/validation/`, which the restructure had already moved to `validation/` at the repository root, and it drew a dated DIRECTORY per control holding one file per layer, where every run actually written is a single dated file. So the section that tells a reader where to find the evidence pointed at a tree that does not exist, while five real results sat outside the layout it described. The steps below still name per-layer files for the Layer 2 and Layer 3 runs, which have not happened; those names are intended, not present.
 
 Each run is dated to support the eventual cross-rater comparison and the year-over-year stability check (does the methodology produce stable results when re-run on the same codebase a year later?).
 
@@ -158,9 +159,17 @@ Each run is dated to support the eventual cross-rater comparison and the year-ov
 
 ## Status
 
+Corrected 2026-09-23. Every line below said "not yet" while the runs it describes were a month old and recorded in `results/`. A status block that contradicts the evidence beside it is worse than none, because a reader trusts the summary and never opens the directory.
+
 - v0 protocol drafted (this document)
-- Positive control identified (`idd honest-conversion`)
-- Negative control: not yet selected; recommendation pending
-- v0 methodology run against positive control: not yet performed
-- v0 methodology run against negative control: not yet performed
+- Positive control identified (`idd honest-conversion`), and SUSPENDED part-converted on 2026-08-19
+- Negative control SELECTED: `Iddadvisor` at `main`, tip `1239d08`
+- **Layer 1 against the positive control: DONE 2026-08-17.** 2 slop signals of 17
+- **Layer 1 against the negative control: DONE 2026-08-17.** 10 of 17, which reaches the threshold
+- **Layer 1 separates the controls.** The process cluster carries it, all three absent on
+  the negative control and present on the positive, with five git-history indicators
+  following. Two indicators run the other way and the run says so
+- Layer 2 against either control: not yet performed
+- Layer 3 against either control: not yet performed
+- **So the instrument is validated at Layer 1 and at no other layer.** The Layer 2 and Layer 3 thresholds in this document remain PROPOSED VALUES that nothing has measured, and anyone citing the instrument at those layers is citing an uncalibrated one
 - v1 methodology: not yet produced
