@@ -327,7 +327,6 @@ fn c_struct_field<'t>(root: Node<'t>, sp: &LangSpec, src: &[u8]) -> RecordRead<'
 /// Refused for a rule name no arm covers. A language whose record rule nobody wrote would
 /// otherwise read no record fields and say nothing about it, which is the silence this
 /// module exists to break.
-// honest-code-allow: L1.21.13 - `slots` is a STRUCT FIELD, not module state. The reader counts a field written through Rust's init shorthand in one function and read as a local in another as one hidden name shared between them; the reproduction is in slop-audit-qb7. Nothing here is written outside a value the caller is handed back
 pub fn slots<'t, F>(root: Node<'t>, sp: &LangSpec, src: &[u8], already: &F)
     -> Option<RecordRead<'t>>
 where

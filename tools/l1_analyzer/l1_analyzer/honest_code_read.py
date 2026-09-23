@@ -16,6 +16,7 @@ from typing import TypedDict
 from tree_sitter import Node
 
 from l1_analyzer.lang_spec import COMPARISON_OPS, LANG_SPEC, LangSpec
+from l1_analyzer.state_sites import DECL_KIND
 from l1_analyzer.ts_nodes import sub_key
 
 
@@ -430,10 +431,25 @@ def module_level_bindings(root: Node, spec: LangSpec, raw: bytes) -> dict[str, N
     it is not reaching past a signature. The walk therefore stops at every function and
     class body: a function definition IS a top-level statement, so walking each statement
     to its leaves made every local variable in the file read as module scope, and reported
-    three of this package's own locals as configuration somebody turns."""
+    three of this package's own locals as configuration somebody turns.
+
+    A RECORD'S OWN SLOTS ARE NOT MODULE BINDINGS EITHER, and in three languages the walk had
+    no way of knowing. C, Go and Rust declare a struct at the top of a file and spell each of
+    its members `field_declaration`, which is also a binding site, so every field name in
+    those languages read as a name bound at module scope. In Rust the consequence was
+    visible: `T { declared }` inside one function is the init shorthand writing a FIELD, and
+    a local called `declared` in another function then read as the same hidden name shared
+    between them. Seven functions in the port carried an allow comment for it. The three
+    languages whose records sit inside a class body were never affected, because the walk
+    already stopped at the class.
+
+    `DECL_KIND` decides, rather than a fourth table: it exists to say which node types
+    declare a slot inside a record, and that is exactly the question here."""
     bound: dict[str, Node] = {}
     for statement in root.named_children:
         for node in _walk_own_scope(statement, spec):
+            if node.type in DECL_KIND:
+                continue
             site = spec["binding_sites"].get(node.type)
             if site is not None:
                 name = node.child_by_field_name(site)

@@ -637,6 +637,37 @@ def test_a_name_bound_inside_a_function_is_not_bound_at_module_level(language):
     assert rules.hidden_configuration(tree) == []
 
 
+# A record declared at the top of a file, one function writing a field through whatever
+# shorthand the language offers, and another binding a local of the same name. In C, Go and
+# Rust the record sits at module level and its members are binding sites, so every field name
+# read as a name bound at module scope; the three languages whose records live inside a class
+# body were never affected, because the walk already stops at the class.
+RECORD_AT_MODULE_SCOPE = {
+    "rust": ("pub struct T { pub declared: usize }\n\n"
+             "pub fn a() -> T { let mut declared = 0usize; declared += 1; T { declared } }\n\n"
+             "pub fn b() -> usize { let t = a(); let declared = t.declared; declared * 2 }\n"),
+    "go": ("package p\n\ntype T struct {\n\tdeclared int\n}\n\n"
+           "func a() T {\n\tdeclared := 0\n\tdeclared++\n\treturn T{declared}\n}\n\n"
+           "func b() int {\n\tt := a()\n\tdeclared := t.declared\n\treturn declared * 2\n}\n"),
+    "c": ("struct T { int declared; };\n\n"
+          "struct T a(void) { int declared = 0; declared++; struct T t = {declared}; return t; }\n\n"
+          "int b(void) { struct T t = a(); int declared = t.declared; return declared * 2; }\n"),
+}
+
+
+@pytest.mark.parametrize("language", sorted(RECORD_AT_MODULE_SCOPE))
+def test_a_records_own_slot_is_not_a_name_bound_at_module_level(language):
+    """Rust's init shorthand made a field and a local look alike to a reader matching bare
+    identifiers, and the clause read the pair as one hidden name shared between two
+    functions. Renaming the local in either function made the finding go away, which is how
+    it was caught. Seven functions in this project's Rust port carried an allow comment for
+    it, and C and Go have the same shape."""
+    tree = read.read_tree(RECORD_AT_MODULE_SCOPE[language], language, "")
+    bound = read.module_level_bindings(tree["root"], tree["spec"], tree["raw"])
+    assert "declared" not in bound, bound
+    assert rules.hidden_configuration(tree) == []
+
+
 # --------------------------------------------------------------------------
 # Clause 8, the swallowed exception
 #

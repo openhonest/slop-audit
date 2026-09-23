@@ -54,7 +54,6 @@ pub struct CoverageWords {
 ///
 /// `timeout_seconds` is required for the same reason the words are: the refusal below names
 /// the number it allowed, and a runner that did not say what it allowed cannot be quoted.
-// honest-code-allow: L1.21.13 - `covered` and `total` are the Totals struct's FIELD names. This function reads them off a value in its own signature, or binds a local of the same name; neither is state outside the signature. Rust's shorthand struct init makes a field and a local look alike to a reader matching bare identifiers. Filed as slop-audit-qb7
 pub fn verdict(totals: Option<Totals>, status: i32, words: &CoverageWords,
                timeout_seconds: f64) -> Reading {
     if status == TIMED_OUT {
@@ -258,7 +257,6 @@ pub fn xml_attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
 /// branches to cover and a schema this reader does not know are different facts, and
 /// reading the second as zero would publish Slop for a repository whose coverage was never
 /// measured.
-// honest-code-allow: L1.21.13 - `covered` and `total` are the Totals struct's FIELD names. This function reads them off a value in its own signature, or binds a local of the same name; neither is state outside the signature. Rust's shorthand struct init makes a field and a local look alike to a reader matching bare identifiers. Filed as slop-audit-qb7
 pub fn jacoco_totals(xml: &str) -> Option<Totals> {
     for element in xml_elements(xml) {
         if element.name != "counter" || element.depth != 2 {
@@ -280,7 +278,6 @@ pub fn jacoco_totals(xml: &str) -> Option<Totals> {
 /// writes the pair the other way round. One transposition is a coverage of 105 per cent.
 ///
 /// Nothing, never a pair of zeroes, for the reason the JaCoCo reader gives.
-// honest-code-allow: L1.21.13 - `covered` and `total` are the Totals struct's FIELD names. This function reads them off a value in its own signature, or binds a local of the same name; neither is state outside the signature. Rust's shorthand struct init makes a field and a local look alike to a reader matching bare identifiers. Filed as slop-audit-qb7
 pub fn cobertura_totals(xml: &str) -> Option<Totals> {
     for element in xml_elements(xml) {
         if element.name != "coverage" {
@@ -485,7 +482,6 @@ pub fn json_object<'a>(json: &'a str, key: &str) -> Option<&'a str> {
 /// entries carries a `branches` object of its own. So the reader cannot search for the
 /// first `branches` it sees: it reads the top-level `total` section and takes the branches
 /// from inside that.
-// honest-code-allow: L1.21.13 - `covered` and `total` are the Totals struct's FIELD names. This function reads them off a value in its own signature, or binds a local of the same name; neither is state outside the signature. Rust's shorthand struct init makes a field and a local look alike to a reader matching bare identifiers. Filed as slop-audit-qb7
 pub fn c8_totals(json: &str) -> Option<Totals> {
     let total = json_section(json, "total")?;
     // Wrapped back into an object so the same depth rule applies one level in: inside the

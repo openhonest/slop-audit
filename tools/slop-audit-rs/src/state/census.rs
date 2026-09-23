@@ -785,7 +785,6 @@ fn hit_by_kind(by_file: &BTreeMap<String, BTreeSet<Site>>,
 /// the classifier went: a second traversal written to work out where the first one probably
 /// looked is a guess with a measurement's name, which is the class of defect this number
 /// replaced.
-// honest-code-allow: L1.21.13 - `declared` is a STRUCT FIELD, not module state. The reader counts a field written through Rust's init shorthand in one function and read as a local in another as one hidden name shared between them; the reproduction is in slop-audit-qb7. Nothing here is written outside a value the caller is handed back
 pub fn compare(repo: &Path, lang: &str, admitted: usize,
                visited: &BTreeMap<String, BTreeSet<Site>>,
                judged: &BTreeMap<String, BTreeSet<Site>>) -> Census {
