@@ -452,7 +452,7 @@ fn js(root: Node, src: &[u8], relpath: &str, facts: &RepoFacts) -> Vec<Definitio
     let is_entry = facts.js_entry_files.contains(relpath);
     let mut out = Vec::new();
 
-    let mut add = |name_node: Option<Node>, item: Node, kind: &'static str, exported: bool,
+    let add = |name_node: Option<Node>, item: Node, kind: &'static str, exported: bool,
                    default: bool, out: &mut Vec<Definition>| {
         let Some(name_node) = name_node else { return };
         out.push(if default {
@@ -466,7 +466,7 @@ fn js(root: Node, src: &[u8], relpath: &str, facts: &RepoFacts) -> Vec<Definitio
         });
     };
 
-    let mut declaration = |node: Node, exported: bool, default: bool, item: Node,
+    let declaration = |node: Node, exported: bool, default: bool, item: Node,
                            out: &mut Vec<Definition>| {
         if let Some(kind) = crate::lang_spec::lookup(JS_DECLS, node.kind()) {
             let name = field(Some(node), "name")

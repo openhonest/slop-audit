@@ -65,11 +65,18 @@ pub fn repo_facts(repo: &Path, lang: &str) -> RepoFacts {
     let mut js_entry_files: BTreeSet<String> = BTreeSet::new();
     let mut ruby_metaprogramming = String::new();
 
-    for entry in crate::walk_repo(repo) {
-        let path = entry.path();
-        if !crate::is_file_entry(&entry) || crate::in_ignored_dir(path) {
-            continue;
-        }
+    // SORTED, because the marker named in the refusal is whichever file the walk reaches
+    // first, and neither walk yields in a specified order. Two machines could name different
+    // markers for the same repository; this port named a third. The refusal itself never
+    // moved, only the evidence it cites, which is the kind of number nobody checks because it
+    // looks like a detail. The reference sorts here too.
+    let mut paths: Vec<std::path::PathBuf> = crate::walk_repo(repo)
+        .filter(|entry| crate::is_file_entry(entry) && !crate::in_ignored_dir(entry.path()))
+        .map(|entry| entry.path().to_path_buf())
+        .collect();
+    paths.sort();
+    for path in &paths {
+        let path = path.as_path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if name == "lib.rs" {
             rust_is_library = true;

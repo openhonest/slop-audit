@@ -3,6 +3,7 @@
 pub mod absolute_paths;
 pub mod config_presence;
 pub mod data_tables;
+pub mod dead_code;
 pub mod dead_code_corpus;
 pub mod dead_code_grammars;
 pub mod dead_code_defs;

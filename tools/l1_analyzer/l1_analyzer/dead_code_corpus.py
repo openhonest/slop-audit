@@ -235,7 +235,13 @@ def _repo_facts(repo: Path, lang: str) -> RepoFacts:
         entries |= entry_paths_in(data, manifest.parent, repo)
     marker = ""
     if lang == "ruby":
-        for path in _rglob_files(repo, "*.rb"):
+        # SORTED, because the marker named in the refusal is whichever file the walk reaches
+        # first, and `rglob` yields in the filesystem's own order. Two machines, or one
+        # machine before and after a clean checkout, could name different markers for the same
+        # repository, and the Rust port named a third. The refusal itself never moved; only
+        # the evidence it cites did, which is the kind of number nobody checks because it
+        # looks like a detail.
+        for path in sorted(_rglob_files(repo, "*.rb")):
             if _in_ignored_dir(path, ()):
                 continue
             try:
