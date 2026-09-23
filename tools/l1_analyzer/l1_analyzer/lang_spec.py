@@ -665,13 +665,35 @@ LANG_SPEC: dict[str, LangSpec] = {
         # which files an audit even opens, every tracer's runner detection, and the
         # staleness refusal in the port's own parity harness. Each one reaches outside the
         # process and each was invisible, which is the silence this clause exists to name.
+        #
+        # THEN THE WHOLE OF `pathlib.Path` WAS READ, on 2026-09-23, rather than waited for.
+        # Both gaps above were found by accident, when a function that obviously does I/O was
+        # reported as declaring an edge it does not have, and accident is not a method. The
+        # sixteen names added in that pass are the remaining Path methods that reach the
+        # filesystem and whose bare name belongs to nothing else in common use. They cost two
+        # findings across 423 files here, both of them functions that run a subprocess and
+        # had never been declared.
+        #
+        # FIVE PATH METHODS ARE STILL MISSING, deliberately, and they are the argument for
+        # reading a receiver's type instead of its call's name. `resolve`, `walk`, `replace`
+        # and `group` reach the filesystem on a Path and mean something else everywhere else:
+        # this package alone spells `.resolve(` 87 times, `.walk(` 73, `.replace(` 53 and
+        # `.group(` 49, and almost none of the last three are a Path. Naming them would trade
+        # a silent miss for a loud false positive, which is the failure that makes an auditor
+        # stop believing the number. `tests/test_the_io_vocabulary_accounts_for_every_path_
+        # method.py` holds that ruling as data and fails when a new method appears in no
+        # table at all.
         "io_calls": frozenset({
-                          "Popen", "chmod", "check_output", "commit", "execute", "exists",
-                          "fetchall", "fetchone", "glob", "hardlink_to", "input", "is_dir",
-                          "is_file", "iterdir", "listdir", "makedirs", "mkdir", "open",
-                          "print", "read_bytes", "read_text", "remove", "rename",
-                          "replace_file", "rglob", "rmdir", "stat", "symlink_to", "touch",
-                          "unlink", "urlopen", "write_bytes", "write_text"}),
+                          "Popen", "absolute", "chmod", "check_output", "commit", "cwd",
+                          "execute", "exists", "expanduser", "fetchall", "fetchone", "glob",
+                          "hardlink_to", "home", "input", "is_block_device",
+                          "is_char_device", "is_dir", "is_fifo", "is_file", "is_junction",
+                          "is_mount", "is_socket", "is_symlink", "iterdir", "lchmod",
+                          "listdir", "lstat", "makedirs", "mkdir", "open", "owner", "print",
+                          "read_bytes", "read_text", "readlink", "remove", "rename",
+                          "replace_file", "rglob", "rmdir", "samefile", "stat",
+                          "symlink_to", "touch", "unlink", "urlopen", "write_bytes",
+                          "write_text"}),
         # A module matches on its full dotted text as written, or on its last segment. That
         # is what lets `urllib.request` and `http.client` be named without also naming every
         # `self.request` and every `self.client` in every codebase.

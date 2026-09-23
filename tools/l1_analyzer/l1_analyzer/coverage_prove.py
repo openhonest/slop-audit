@@ -149,9 +149,14 @@ def model_available() -> bool:
     return llm.model_available(llm.anthropic_sdk)
 
 
+@boundary
 def host_cfg() -> frozenset[str]:
     """The host target's cfg set from `rustc --print cfg` - the I/O the cfg gate needs to
-    prove a branch is host-dead. An empty set (no rustc) excludes nothing, never guesses."""
+    prove a branch is host-dead. An empty set (no rustc) excludes nothing, never guesses.
+
+    Declared on 2026-09-23, when `Path.cwd` joined the I/O vocabulary. It runs a compiler and
+    reads the working directory, and it had read as pure interior because the vocabulary
+    named neither of those calls."""
     cargo = rust_trace._cargo()
     if cargo is None:
         return frozenset()

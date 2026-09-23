@@ -103,7 +103,13 @@ def _toolchain(repo: Path, timeout_seconds: float) -> str:
     return toolchain.named(probe.stdout, probe.returncode, unknown=unknown)
 
 
+@boundary
 def _llvm_cov_available() -> bool:
+    """Whether `cargo llvm-cov` is installed, asked of the tool itself.
+
+    Declared on 2026-09-23, when `Path.cwd` joined the I/O vocabulary. It runs a subprocess
+    and reads the working directory, and it had read as pure interior because the vocabulary
+    named neither of those calls."""
     cargo = _cargo()
     if cargo is None:
         return False
