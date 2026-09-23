@@ -48,6 +48,7 @@ fn main() {
     let mut unreachable = false;
     let mut defs = false;
     let mut corpus = false;
+    let mut secrets = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -89,6 +90,10 @@ fn main() {
             // decides whether a definition nothing calls is dead or merely unreachable from
             // here.
             "--corpus" => corpus = true,
+            // The eighth: every credential-shaped match, by its SHAPE rather than its value.
+            // A harness that diffed the values would copy each leak into a second place,
+            // which is the one thing this indicator's own findings never do.
+            "--secrets" => secrets = true,
             // Before the repository check: it answers a question about the binary rather
             // than about a tree.
             "--version" => {
@@ -169,6 +174,17 @@ fn main() {
         for (path, d) in indicators::dead_code_defs::walk(repo, &language, &facts) {
             println!("{path}\t{}\t{}\t{}\t{}\t{}\t{}",
                      d.name, d.kind, d.line, d.end_line, d.status, d.reason);
+        }
+        return;
+    }
+
+    if secrets {
+        let (hits, scanned, skipped, is_git) = indicators::secret_scan::walk(repo);
+        println!("# {scanned} scanned\t{skipped} refused\t{}",
+                 if is_git { "git-tracked" } else { "whole-tree" });
+        for hit in hits {
+            println!("{}\t{}\t{}\t{}\t{}\t{}", hit.file, hit.rule, hit.line,
+                     indicators::secret_scan::excerpt(&hit.value), hit.in_tests, hit.in_docs);
         }
         return;
     }

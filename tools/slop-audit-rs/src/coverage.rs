@@ -16,42 +16,23 @@
 
 use crate::Indicator;
 
-/// Why an indicator carries no measurement. `Measured` means this binary computes it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Coverage {
-    Measured,
-    /// Implemented in the Python reference, not yet ported to this binary.
-    NotPorted,
-}
+/// The reason a canonical row is missing from a run, and there is only one of them.
+///
+/// A `Coverage` enum used to stand here with a second case, NotPorted, which was the honest
+/// thing to carry while six indicators were implemented only in the Python reference. L1.14
+/// was the last of them, and with every member of the table measured the second case became
+/// unreachable. It is deleted rather than kept: a type with two cases and one reachable case
+/// is a decision space of one wearing the clothes of two, which is the shape this binary's
+/// own L1.19 counts.
+///
+/// Saying this beats an empty cell. The first version of the fix left it blank and
+/// reintroduced the same silence in miniature, which is what the band test caught.
+const NO_ROW: &str = "declared measured but this run produced no row; this is a defect in the \
+                      binary, please report it";
 
-impl Coverage {
-    /// The `band` cell for an unmeasured row. Kept distinct from a real band so a reader
-    /// never mistakes "not measured" for a grade. Every fallback row gets it, including the
-    /// `Measured` case below, because a row with no band is exactly the silence this
-    /// module exists to remove.
-    pub fn band(self) -> &'static str {
-        "not measured"
-    }
-
-    /// The `details` cell for an unmeasured row: the reason, in the reader's words.
-    pub fn details(self) -> String {
-        match self {
-            // Reached only when an indicator declared Measured produced no row, which is a
-            // defect in this binary rather than a known gap. Saying so beats an empty cell:
-            // the first version of this fix left it blank and reintroduced the same silence
-            // in miniature, which is what the band test caught.
-            Coverage::Measured => {
-                "declared measured but this run produced no row; this is a defect in the binary, \
-                 please report it"
-                    .into()
-            }
-            Coverage::NotPorted => {
-                "not ported to the portable binary; run the Python reference for this indicator"
-                    .into()
-            }
-        }
-    }
-}
+/// The `band` cell for a row no run produced. Kept apart from every real band so a reader
+/// never mistakes a missing indicator for a passing one.
+const NO_BAND: &str = "not measured";
 
 /// Every indicator the Slop Audit Layer 1 panel is defined to carry, in report order.
 ///
@@ -59,54 +40,56 @@ impl Coverage {
 /// the key set before any question about agreeing on values is meaningful. Parity read
 /// 16/16 for weeks across a set that silently excluded L1.18, because nothing compared the
 /// key sets themselves.
-pub const CANONICAL: &[(&str, &str, Coverage)] = &[
-    ("L1.1", "commit-message-quality", Coverage::Measured),
-    ("L1.2", "commit-size", Coverage::Measured),
-    ("L1.3", "revert-ratio", Coverage::Measured),
-    ("L1.4", "doc-line-ratio", Coverage::Measured),
-    ("L1.5", "delete-add-ratio", Coverage::Measured),
-    ("L1.6", "churn", Coverage::Measured),
-    ("L1.7", "high-delete-commits", Coverage::Measured),
-    ("L1.8", "test-to-prod-ratio", Coverage::Measured),
-    ("L1.9", "pre-commit hooks", Coverage::Measured),
-    ("L1.10", "CI/CD pipelines", Coverage::Measured),
-    ("L1.11", "containerization", Coverage::Measured),
+///
+/// Every member is measured here, as of 2026-09-23. The table used to carry a third column
+/// saying which were not, and the column is gone because the answer became "none".
+pub const CANONICAL: &[(&str, &str)] = &[
+    ("L1.1", "commit-message-quality"),
+    ("L1.2", "commit-size"),
+    ("L1.3", "revert-ratio"),
+    ("L1.4", "doc-line-ratio"),
+    ("L1.5", "delete-add-ratio"),
+    ("L1.6", "churn"),
+    ("L1.7", "high-delete-commits"),
+    ("L1.8", "test-to-prod-ratio"),
+    ("L1.9", "pre-commit hooks"),
+    ("L1.10", "CI/CD pipelines"),
+    ("L1.11", "containerization"),
     // These three read NeedsTool("vulture"), NeedsTool("jscpd") and NeedsTool("gitleaks")
     // until 2026-09-21, and the advice was four weeks stale. On 2026-08-19 the spec started
     // defining each of them as an algorithm precise enough to reimplement, and the Python
-    // reference computes all three natively; the three tools are named there as
-    // cross-checks and nothing calls them. So a reader who installed vulture on this
-    // binary's advice got nothing for it, because the reference it was sent to does not use
-    // vulture either. They are in the same position as L1.18: this binary has not ported
-    // them.
-    ("L1.12", "dead-code", Coverage::Measured),
-    ("L1.13", "duplication", Coverage::Measured),
-    ("L1.14", "secret-scan", Coverage::NotPorted),
-    ("L1.15", "type-escapes", Coverage::Measured),
-    ("L1.16", "trailing-whitespace", Coverage::Measured),
-    ("L1.17", "god-files", Coverage::Measured),
-    ("L1.18", "mutable-state", Coverage::Measured),
-    ("L1.18b", "finite-testability", Coverage::Measured),
-    ("L1.19", "decision-space", Coverage::Measured),
+    // reference computes all three natively; the three tools are named there as cross-checks
+    // and nothing calls them. So a reader who installed vulture on this binary's advice got
+    // nothing for it, because the reference it was sent to does not use vulture either. All
+    // three are measured here now, and no row names a tool to install.
+    ("L1.12", "dead-code"),
+    ("L1.13", "duplication"),
+    ("L1.14", "secret-scan"),
+    ("L1.15", "type-escapes"),
+    ("L1.16", "trailing-whitespace"),
+    ("L1.17", "god-files"),
+    ("L1.18", "mutable-state"),
+    ("L1.18b", "finite-testability"),
+    ("L1.19", "decision-space"),
     // Measured since 2026-09-21, when the decision was taken that this binary runs the
     // audited project's own suite. The panel always produces the row: either a reading, or
     // the reason the run did not take one.
-    ("L1.20", "test-determinism", Coverage::Measured),
+    ("L1.20", "test-determinism"),
     // The additive checks. They are part of the reference panel, so they are part of the
     // contract: leaving them out of this table is how they stayed invisible while the
     // differ compared only the intersection of the two key sets.
-    ("abs-paths", "absolute-paths", Coverage::Measured),
-    ("path_cover", "path-cover", Coverage::Measured),
-    ("thread_surface", "thread-surface", Coverage::Measured),
-    ("interleaving_robustness", "interleaving-robustness", Coverage::Measured),
+    ("abs-paths", "absolute-paths"),
+    ("path_cover", "path-cover"),
+    ("thread_surface", "thread-surface"),
+    ("interleaving_robustness", "interleaving-robustness"),
 ];
 
 /// The canonical row for a code, or `None` if the code is not canonical.
-pub fn declared(code: &str) -> Option<(&'static str, &'static str, Coverage)> {
+pub fn declared(code: &str) -> Option<(&'static str, &'static str)> {
     CANONICAL
         .iter()
-        .find(|(candidate, _, _)| *candidate == code)
-        .map(|(c, label, cov)| (*c, *label, *cov))
+        .find(|(candidate, _)| *candidate == code)
+        .map(|(c, label)| (*c, *label))
 }
 
 /// One row per canonical indicator, in report order, whatever the run produced.
@@ -118,7 +101,7 @@ pub fn declared(code: &str) -> Option<(&'static str, &'static str, Coverage)> {
 pub fn reconcile(produced: Vec<Indicator>) -> Vec<Indicator> {
     CANONICAL
         .iter()
-        .map(|(code, label, cov)| {
+        .map(|(code, label)| {
             produced
                 .iter()
                 .find(|ind| ind.code == *code)
@@ -126,9 +109,9 @@ pub fn reconcile(produced: Vec<Indicator>) -> Vec<Indicator> {
                 .unwrap_or_else(|| Indicator {
                     code: (*code).into(),
                     label: (*label).into(),
-                    value: "not measured".into(),
-                    band: cov.band().into(),
-                    details: cov.details(),
+                    value: NO_BAND.into(),
+                    band: NO_BAND.into(),
+                    details: NO_ROW.into(),
                 })
         })
         .collect()
@@ -148,31 +131,33 @@ mod tests {
         }
     }
 
-    /// The regression test for the defect: every canonical indicator gets a row, including
-    /// the six this binary cannot compute. Before the fix the panel simply omitted them.
+    /// The regression test for the defect: every canonical indicator gets a row, whatever
+    /// the run produced. Before the fix the panel carried 15 of 22 and said nothing about
+    /// the other seven.
     #[test]
     fn every_canonical_indicator_gets_a_row() {
         let panel = reconcile(vec![indicator("L1.1")]);
         let codes: Vec<&str> = panel.iter().map(|i| i.code.as_str()).collect();
-        for (code, _, _) in CANONICAL {
+        for (code, _) in CANONICAL {
             assert!(codes.contains(code), "{code} missing from the panel");
         }
         assert_eq!(panel.len(), CANONICAL.len());
     }
 
-    /// An indicator this binary does not compute still gets a row saying so.
+    /// An indicator that produced nothing still gets a row, and the row says the binary is
+    /// at fault.
     ///
     /// L1.18 is the one that made this a P1 rather than a formatting complaint: it went
-    /// missing from the printed panel and nothing noticed. It is measured now, so the check
-    /// moved to L1.14, which is not. The rule it guards is about the shape of the
-    /// panel and not about which indicator happens to be unported this week.
+    /// missing from the printed panel and nothing noticed. Every canonical indicator is
+    /// measured now, so a missing row can only be a defect, and the row says so rather than
+    /// leaving a reader to guess.
     #[test]
-    fn an_unported_indicator_is_never_silently_absent() {
+    fn an_indicator_that_produced_nothing_is_never_silently_absent() {
         let panel = reconcile(vec![]);
         let row = panel.iter().find(|i| i.code == "L1.14").expect("L1.14 row");
         assert_eq!(row.value, "not measured");
         assert_eq!(row.band, "not measured");
-        assert!(row.details.contains("not ported"), "{}", row.details);
+        assert!(row.details.contains("defect in the binary"), "{}", row.details);
     }
 
     /// An unmeasured row must never look like a grade. "not measured" is not a band, and a
@@ -185,26 +170,16 @@ mod tests {
         }
     }
 
-    /// The three reasons stay distinguishable. Collapsing them back into one string would
-    /// reintroduce the defect in a form that still passes the other tests.
+    /// No row sends a reader to install a tool.
+    ///
+    /// Four reasons used to live here: not ported, install this tool, this binary does not
+    /// run tests, and a defect. Three of them stopped being true one at a time, and one
+    /// remains. Every one that named a tool was wrong about it, and a reason that sends a
+    /// reader off to install something is worth a standing check.
     #[test]
-    fn each_reason_reads_differently() {
-        let panel = reconcile(vec![]);
-        let reason = |code: &str| {
-            panel.iter().find(|i| i.code == code).unwrap().details.clone()
-        };
-        // Two reasons remain, and they must stay distinguishable. A third, naming a tool
-        // to install, and a fourth, saying this binary does not run tests, were both
-        // removed when they stopped being true: the tools were replaced by algorithms, and
-        // the binary now runs the suite.
-        let not_ported = reason("L1.14");
-        let defect = reason("L1.20");
-        assert_ne!(not_ported, defect);
-        assert!(not_ported.contains("not ported"), "{not_ported}");
-        assert!(defect.contains("defect in the binary"), "{defect}");
-        // No canonical row names a tool any more. Every one that did was wrong about it,
-        // and a reason that sends a reader to install something is worth this check.
-        for ind in panel {
+    fn no_reason_names_a_tool_to_install() {
+        for ind in reconcile(vec![]) {
+            assert!(ind.details.contains("defect in the binary"), "{}", ind.details);
             for tool in ["vulture", "jscpd", "gitleaks"] {
                 assert!(!ind.details.contains(tool),
                         "{} still tells a reader to install {tool}", ind.code);
@@ -225,13 +200,12 @@ mod tests {
     #[test]
     fn canonical_order_is_stable_and_unique() {
         let mut seen = std::collections::HashSet::new();
-        for (code, _, _) in CANONICAL {
+        for (code, _) in CANONICAL {
             assert!(seen.insert(*code), "{code} declared twice");
         }
         assert_eq!(CANONICAL[0].0, "L1.1");
-        assert_eq!(declared("L1.14").unwrap().2, Coverage::NotPorted);
-        assert_eq!(declared("L1.12").unwrap().2, Coverage::Measured);
-        assert_eq!(declared("L1.18").unwrap().2, Coverage::Measured);
+        assert_eq!(declared("L1.14").unwrap().1, "secret-scan");
+        assert_eq!(declared("L1.12").unwrap().1, "dead-code");
         assert!(declared("L1.99").is_none());
     }
 }

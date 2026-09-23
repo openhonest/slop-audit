@@ -109,20 +109,21 @@ uv run slop-audit-l1 path/to/repo --honest-code-clauses    # the per-clause pane
 
 ### What each one measures today
 
+Both tools measure all twenty-five indicators, as of 2026-09-23. The table that used to stand here listed which ones the portable binary had not reached yet, and the last of them, L1.14, was ported on that date.
+
 | | Portable binary | Python reference |
 |---|---|---|
 | L1.1 to L1.11 git history and config | yes | yes |
+| L1.12 dead code, L1.13 duplication, L1.14 secrets | yes | yes |
 | L1.15, L1.16, L1.17 source density | yes | yes |
-| L1.19 decision-point enumeration | yes | yes |
-| L1.18, L1.18b finite testability | not yet | yes |
-| L1.19 coverage, L1.20 determinism (runtime) | not yet | yes |
-| L1.12, L1.13, L1.14 | not yet | yes, natively |
-| Additive: absolute paths | yes | yes |
-| Additive: thread surface, path cover, interleaving robustness | not yet | yes |
+| L1.18, L1.18b finite testability | yes | yes |
+| L1.19 decision points, statically and at run time | yes | yes |
+| L1.20 test determinism | yes | yes |
+| Additive: absolute paths, thread surface, path cover, interleaving robustness | yes | yes |
 
-The portable binary is a certified-equivalent redistribution, not a second opinion. Each ported indicator is validated equal to the Python reference on a real repository in each of the nine languages, and [`.github/workflows/parity.yml`](.github/workflows/parity.yml) fails the build if the two ever disagree. Where they differ in coverage, the Python instrument is canonical.
+The portable binary is a certified-equivalent redistribution, not a second opinion. Every indicator is validated equal to the Python reference across thirteen pinned open-source repositories covering all nine languages, and [`.github/workflows/parity.yml`](.github/workflows/parity.yml) fails the build if the two ever disagree. Where they ever differ, the Python instrument is canonical.
 
-Requiring `vulture`, `jscpd` and `gitleaks` for three indicators was a defect, not a design, and it cost the instrument a whole indicator: L1.13 returned `n/a` on every repository this methodology had measured, because jscpd was installed on none of the machines that ran it, and `n/a` is excluded from both halves of the slop-signal fraction. All three are native in the Python reference as of 2026-08-19, and the canon defines each as an algorithm rather than as a tool invocation. The port still carries L1.12, L1.13 and L1.14 as declared gaps.
+Requiring `vulture`, `jscpd` and `gitleaks` for three indicators was a defect, not a design, and it cost the instrument a whole indicator: L1.13 returned `n/a` on every repository this methodology had measured, because jscpd was installed on none of the machines that ran it, and `n/a` is excluded from both halves of the slop-signal fraction. All three are native in the Python reference as of 2026-08-19, and the canon defines each as an algorithm rather than as a tool invocation. Neither tool asks you to install anything for them.
 
 ## What one run produces
 

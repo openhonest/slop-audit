@@ -15,6 +15,8 @@ pub mod god_files;
 pub mod interleaving;
 pub mod mutable_state;
 pub mod path_cover;
+pub mod secret_rules;
+pub mod secret_scan;
 pub mod thread_scanners;
 pub mod thread_surface;
 pub mod type_escapes;

@@ -45,7 +45,9 @@ uv run validate_corpus.py csharp     # one language, or one slug
 
 Real repositories are the point. A synthetic fixture agrees on zeros; these do not. Measured 2026-08-19: 2,452 type escapes and 16,807 decision points across the corpus, L1.15 spanning 6.4% on RestSharp to 26.2% on requests, and L1.17 spanning zero to 15.1% on libuv. An indicator that only ever ran against a hand-written fixture has not been validated, it has been rehearsed.
 
-The current panel is equal on every compared indicator, across every repository in the manifest and all nine languages. The indicators the binary does not measure are reported as GAP lines naming why, which is the honest half of a port that is not finished.
+The current panel is equal on every indicator, across every repository in the manifest and all nine languages. There are no GAP lines left: L1.14, the secret scan, was the last indicator the binary did not measure, and it was ported on 2026-09-23. The GAP machinery stays in the differ, because the next indicator the canon adds will arrive here after it arrives in the reference.
+
+Two of the indicators ship a harness of their own, because a corpus sweep is a weak test of them. `validate_secrets.py --specimens` plants one credential per rule in a throwaway tree and diffs both readings of it: eleven of the thirteen corpus repositories commit no credentials at all, so a scanner missing fifteen of its seventeen rules would sweep clean. `validate_defs.py` and `validate_corpus_names.py` do the same job for dead code, one definition and one reference at a time.
 
 ## Build
 

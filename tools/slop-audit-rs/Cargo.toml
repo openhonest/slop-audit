@@ -21,6 +21,12 @@ tree-sitter-typescript = "0.23.2"
 # this binary already links.
 serde_json = "1"
 walkdir = "2.5"
+# The credential patterns, which are regular expressions in the reference and stay
+# regular expressions here. This engine has no lookaround and runs in time linear in the
+# subject, which is the trade this scanner wants: the reference's own comments record two
+# occasions when a backtracking engine did not finish on a bundled stylesheet. One rule
+# needs a lookaround and gets its boundary checked by hand, in secret_rules.rs.
+regex = "1"
 
 [profile.release]
 strip = true

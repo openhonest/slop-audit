@@ -108,6 +108,10 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
     // has: the reference used to call one, and it was installed on no machine that ever ran
     // the panel, so this column reported n/a on every repository ever measured.
     panel.push(indicators::duplication::analyze(repo, language));
+    // L1.14. Committed credentials, over the files git tracks. Every rule is a regular
+    // expression over the file's text, so a file counted as scanned WAS scanned end to end,
+    // and a scan that opened no file refuses rather than reporting a clean bill of health.
+    panel.push(indicators::secret_scan::analyze(repo, language));
     panel.push(indicators::type_escapes::analyze(repo, language)); // L1.15
     panel.push(indicators::whitespace::analyze(repo)); // L1.16
     panel.push(indicators::god_files::analyze(repo)); // L1.17 (all languages)
@@ -190,7 +194,7 @@ mod tests {
     fn the_printed_panel_covers_the_canonical_set() {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
         let codes: Vec<String> = analyze(repo, "rust", false).iter().map(|i| i.code.clone()).collect();
-        for (code, _, _) in coverage::CANONICAL {
+        for (code, _) in coverage::CANONICAL {
             assert!(codes.iter().any(|c| c == code), "{code} missing from the printed panel");
         }
     }
@@ -211,19 +215,21 @@ mod tests {
         }
     }
 
-    /// Coverage::Measured is a claim about this binary, and a claim that drifts is worse
-    /// than no claim. Anything declared Measured must actually turn up in a real run.
+    /// The canonical table is a claim about this binary, and a claim that drifts is worse
+    /// than no claim. Every member of it must actually turn up in a real run.
+    ///
+    /// The table used to carry a per-indicator coverage flag and this test checked only the
+    /// members flagged Measured. With L1.14 ported the flag has one value left, so it is
+    /// gone and every member is checked.
     #[test]
-    fn declared_measured_indicators_are_actually_measured() {
+    fn every_canonical_indicator_is_actually_produced() {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
         let produced: Vec<String> = measured(repo, "rust", false).iter().map(|i| i.code.clone()).collect();
-        for (code, _, cov) in coverage::CANONICAL {
-            if *cov == coverage::Coverage::Measured {
-                assert!(
-                    produced.iter().any(|c| c == code),
-                    "{code} is declared Measured but no run produced it"
-                );
-            }
+        for (code, _) in coverage::CANONICAL {
+            assert!(
+                produced.iter().any(|c| c == code),
+                "{code} is declared canonical but no run produced it"
+            );
         }
     }
 }
