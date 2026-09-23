@@ -620,7 +620,7 @@ pub fn collect(root: Node, lang: &str, relpath: &str, facts: &RepoFacts,
 /// cannot give and the third is a refusal about the whole tree.
 pub fn walk(repo: &std::path::Path, lang: &str, facts: &RepoFacts)
     -> Vec<(String, Definition)> {
-    let (parsed, _skipped) = crate::production_files(repo, lang);
+    let (parsed, _skipped) = crate::indicators::dead_code_grammars::parsed_files(repo, lang);
     let mut out = Vec::new();
     for (rel, tree, src) in parsed {
         if tree.root_node().has_error() {

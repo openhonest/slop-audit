@@ -13,8 +13,10 @@ use tree_sitter::Node;
 
 /// ts_nodes.text: a node's source, or the empty string when there is no node.
 ///
-/// Invalid UTF-8 is dropped rather than raised, matching the reference's
-/// `errors="ignore"`. A source file this analyzer cannot decode is still a file it must
+/// Invalid UTF-8 is dropped rather than raised, matching the reference's decode with errors
+/// ignored. Dropped where it sits, which is not the same as a lossy conversion with the
+/// replacement characters stripped afterwards: that removes a replacement character the file
+/// legitimately contains, joining two words into one nothing wrote. A source file this analyzer cannot decode is still a file it must
 /// report on, and a decode error would take the whole run down over one byte.
 ///
 /// The node and the bytes are two owners of one fact, and nothing in the type system makes
@@ -30,7 +32,7 @@ pub fn text(node: Option<Node>, src: &[u8]) -> String {
                     "a {} node ending at byte {} was read against {} bytes of source: \
                      these are not the same file",
                     n.kind(), n.end_byte(), src.len());
-            String::from_utf8_lossy(&src[n.byte_range()]).replace('\u{FFFD}', "")
+            crate::decode_ignoring_invalid(&src[n.byte_range()])
         }
     }
 }

@@ -328,6 +328,43 @@ pub fn production_files(repo: &Path, lang: &str)
     parsed_files(repo, lang, PRODUCTION)
 }
 
+/// Bytes as text, with invalid sequences DROPPED rather than replaced.
+///
+/// This is what the reference's decode with errors ignored does, and the difference from a
+/// lossy conversion is not cosmetic in either direction. A lossy conversion puts a
+/// replacement character where the invalid bytes were, which SPLITS a word that the reference
+/// joins: prose carrying a typographic apostrophe gave thirteen words the reference records
+/// and three the port invented. Stripping every replacement character afterwards fixes that
+/// and breaks the other way, because a document may legitimately CONTAIN one: one file holds
+/// `S` and `L` either side of a real replacement character, and stripping it joined them into
+/// a word neither the file nor the reference has.
+///
+/// So the invalid bytes are skipped where they sit, and every valid character is kept
+/// whatever it is.
+pub fn decode_ignoring_invalid(raw: &[u8]) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut rest = raw;
+    loop {
+        match std::str::from_utf8(rest) {
+            Ok(valid) => {
+                out.push_str(valid);
+                return out;
+            }
+            Err(error) => {
+                let (valid, after) = rest.split_at(error.valid_up_to());
+                out.push_str(std::str::from_utf8(valid).expect("the valid prefix"));
+                // One byte when the error does not say how many, which is what an
+                // unexpected end of input reports.
+                let skip = error.error_len().unwrap_or(1);
+                if after.len() <= skip {
+                    return out;
+                }
+                rest = &after[skip..];
+            }
+        }
+    }
+}
+
 /// scope.PRODUCTION: the code under audit. A test tree is not the artifact being graded,
 /// and a check that fires on its own fixtures measures the fixtures.
 ///

@@ -47,6 +47,7 @@ fn main() {
     let mut filters = false;
     let mut unreachable = false;
     let mut defs = false;
+    let mut corpus = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -84,6 +85,10 @@ fn main() {
             // The sixth: every definition the collectors find, with the status that says
             // whether the reference scan may judge it at all.
             "--defs" => defs = true,
+            // The seventh: where every name in the repository is written, which is what
+            // decides whether a definition nothing calls is dead or merely unreachable from
+            // here.
+            "--corpus" => corpus = true,
             // Before the repository check: it answers a question about the binary rather
             // than about a tree.
             "--version" => {
@@ -164,6 +169,14 @@ fn main() {
         for (path, d) in indicators::dead_code_defs::walk(repo, &language, &facts) {
             println!("{path}\t{}\t{}\t{}\t{}\t{}\t{}",
                      d.name, d.kind, d.line, d.end_line, d.status, d.reason);
+        }
+        return;
+    }
+
+    if corpus {
+        let read = indicators::dead_code_corpus::read_corpus(repo);
+        for row in indicators::dead_code_corpus::dump(&read) {
+            println!("{row}");
         }
         return;
     }

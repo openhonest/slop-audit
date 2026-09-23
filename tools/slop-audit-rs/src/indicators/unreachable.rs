@@ -187,7 +187,7 @@ pub fn unreachable_statements(root: Node, lang: &str) -> Option<Vec<Unreachable>
 /// nodes and the statements around them read as unreachable, sixteen of them.
 pub fn walk(repo: &std::path::Path, lang: &str)
     -> std::collections::BTreeMap<String, Vec<Unreachable>> {
-    let (parsed, _skipped) = crate::production_files(repo, lang);
+    let (parsed, _skipped) = crate::indicators::dead_code_grammars::parsed_files(repo, lang);
     let mut out = std::collections::BTreeMap::new();
     for (rel, tree, _src) in parsed {
         if tree.root_node().has_error() {
