@@ -363,11 +363,12 @@ pub fn classify(repo: &Path, lang: &str) -> StateReading {
 
     let details = format!(
         "finite-testability: {} neutral, {} promiscuous, {} unresolved across {total} \
-         pieces of state; resolvable fraction {resolvable}; silence {}; {} of {} deciding \
+         pieces of state; resolvable fraction {}; silence {}; {} of {} deciding \
          partitions uncounted. Cardinality is per state and does not compose: two states \
          that decide the same branch multiply, and this version reports each separately \
          rather than guessing the product.",
-        counts[NEUTRAL], counts[PROMISCUOUS], counts[UNRESOLVED], silence.fraction,
+        counts[NEUTRAL], counts[PROMISCUOUS], counts[UNRESOLVED],
+        crate::py_float(resolvable), crate::py_float(silence.fraction),
         partition_counts.uncounted, partition_counts.deciding_states);
 
     StateReading {

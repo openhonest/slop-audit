@@ -56,6 +56,12 @@ fn runtime_coverage(repo: &Path, language: &str) -> Option<Reading> {
         "javascript" | "typescript" =>
             runtime_cov::js_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
         "python" => runtime_cov::python_coverage(repo, SUITE_TIMEOUT_SECONDS),
+        // Rust was the ninth language and the last gap, which is a strange one in a tool
+        // written in Rust: the static enumeration stood in, and it counts decision points
+        // FOUND where this reports the share REACHED. No package arguments are passed,
+        // which is what the reference does when nobody gives it any, and the details line
+        // says so rather than leaving the denominator unnamed.
+        "rust" => crate::runtime::coverage_rust::rust_coverage(repo, SUITE_TIMEOUT_SECONDS, &[]),
         "c" => runtime_cov::c_coverage(repo, SUITE_TIMEOUT_SECONDS, &toolchain),
         _ => return None,
     })
@@ -70,7 +76,10 @@ fn runtime_coverage(repo: &Path, language: &str) -> Option<Reading> {
 fn toolchain_name(repo: &Path, language: &str) -> String {
     let probe: &[&str] = match language {
         "go" => &["go", "version"],
-        "rust" => &["cargo", "--version"],
+        // rustc, not cargo, because the reference names the COMPILER that measured the
+        // run and a reader comparing two figures compares compilers. The port probed
+        // cargo and printed a cargo version where the reference printed a rustc one.
+        "rust" => &["rustc", "--version"],
         "csharp" => &["dotnet", "--version"],
         "java" => &["java", "-version"],
         "ruby" => &["ruby", "--version"],

@@ -23,6 +23,7 @@
 
 pub mod coverage;
 pub mod coverage_runners;
+pub mod coverage_rust;
 pub mod determinism;
 pub mod runners;
 pub mod runners_java;

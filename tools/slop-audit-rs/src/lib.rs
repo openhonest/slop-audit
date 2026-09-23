@@ -562,6 +562,24 @@ pub fn count_kind(node: Node, kind: &str) -> usize {
     n
 }
 
+/// A float written the way Python writes one, for any details line the two tools compare.
+///
+/// The two languages already agree on every fraction: both print the shortest text that reads
+/// back as the same number. They disagree on ONE shape, a value with nothing after the point,
+/// where Python writes `1.0` and Rust writes `1`.
+///
+/// It went unseen for as long as it did because it needs a repository with NO state at all:
+/// the resolvable fraction is then exactly one and the silence exactly nought, and every
+/// corpus repository has state, so every fraction came out with digits after the point and the
+/// two spellings agreed. A one-file crate with no mutable state found it in a second.
+pub fn py_float(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value}.0")
+    } else {
+        format!("{value}")
+    }
+}
+
 /// Pure value-to-band map, identical to l1_analyzer.indicators.band.
 pub fn band(value: f64, healthy: f64, slop: f64, higher_is_better: bool) -> &'static str {
     if higher_is_better {

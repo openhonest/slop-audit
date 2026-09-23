@@ -210,7 +210,12 @@ pub const RUNNERS: &[Runner] = &[
         // cargo prints `error[...]` and no test-result line when a crate will not build.
         never_ran: &[],
         unit: "run",
-        describe: "cargo-test runs passed cleanly (libtest varies order across runs)",
+        // The toolchain goes INSIDE this parenthesis, which is why the row carries a
+        // placeholder where the others let it be appended. The reference writes one
+        // bracket here, and the port wrote two: "(libtest varies order across runs)
+        // (under cargo ...)". Nothing saw it, because the corpus sweep never executes.
+        describe: "cargo-test runs passed cleanly (libtest varies order across runs; \
+                   ran under {toolchain})",
         no_runs: "no cargo-test runs were made; determinism not measured",
         nothing_ran: "cargo test collected no tests",
         incomplete: &[],
@@ -373,6 +378,18 @@ pub fn first_line(output: &str) -> String {
         .unwrap_or_else(|| "no output".to_string())
 }
 
+/// One run's sentence, with the toolchain in the place the language's own wording puts it.
+///
+/// Eight rows let it be appended, and Rust names it inside a parenthesis it opened itself. A
+/// row says which by carrying the placeholder or not, so there is one rule rather than a
+/// special case beside the eight.
+fn described(describe: &str, toolchain: &str) -> String {
+    if describe.contains("{toolchain}") {
+        return describe.replace("{toolchain}", toolchain);
+    }
+    format!("{describe} (under {toolchain})")
+}
+
 /// The command for one attempt, with the placeholders filled in.
 ///
 /// `{seed}` where the runner takes one, and `{python}` where the row names an interpreter.
@@ -450,7 +467,7 @@ pub fn test_determinism(repo: &Path, lang: &str, runs: usize, timeout_seconds: f
             _ => "a run timed out",
         },
         no_runs: runner.no_runs,
-        describe: format!("{} (under {toolchain})", runner.describe),
+        describe: described(runner.describe, &toolchain),
     };
 
     // Lazy, so the tally's return on a timed-out or never-run attempt stops the rest.
