@@ -221,7 +221,20 @@ _FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], tupl
     # an enum field are declaration sites too, and with only class_declaration listed they
     # got no owner at all. A site with no owner cannot be matched against a walk that
     # names one, so it read as unvisited whether or not anything had looked at it.
-    "java": (("field_declaration",), (), ("variable_declarator",),
+    #
+    # The owner half landed first and the declaration half did not, so for two years the
+    # comment above described an intent this tuple did not carry out. The Java grammar
+    # spells an interface constant `constant_declaration`, a node type no table here named,
+    # so `interface Limits { int MAX = 5; }` produced no site: the census shared the
+    # classifier's blindness, and the ratio of nothing to nothing is silence nobody can see.
+    # That is this module's own founding defect, one language over. An interface constant
+    # holding a mutable collection is state by any definition, and the classifier still
+    # cannot reach it, which is now a gap the census reports rather than one it hides.
+    #
+    # `enum_constant` is deliberately absent. It is a name with no slot behind it, so it
+    # declares a value rather than a place to keep one; an enum's own static fields are
+    # already `field_declaration` and are already counted.
+    "java": (("field_declaration", "constant_declaration"), (), ("variable_declarator",),
              ("class_declaration", "interface_declaration", "enum_declaration",
               "record_declaration", "annotation_type_declaration")),
     # C# properties hold state as surely as fields do, and field_decl_types named only

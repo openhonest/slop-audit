@@ -371,6 +371,32 @@ _DECLARATION_SAMPLES: dict[str, tuple[str, str, int]] = {
 _COUNTED_BY_A_DEDICATED_TEST = frozenset({"c", "python"})
 
 
+def test_a_java_interface_constant_is_a_declaration_site_the_classifier_cannot_reach(tmp_path):
+    """The census's own founding defect, one language over.
+
+    The Java grammar spells an interface constant `constant_declaration`, and no field
+    vocabulary named that node, so the census counted none of them. The classifier cannot
+    reach one either, and a census that shares the classifier's blind spot cannot report the
+    blind spot: the ratio of nothing to nothing is silence nobody can see.
+
+    An interface constant holding a mutable collection is state by any definition. It is
+    counted now, and the classifier still does not visit it, which is the gap being
+    disclosed rather than hidden."""
+    (tmp_path / "Limits.java").write_text(
+        "interface Limits { java.util.Map<String, Integer> CACHE = new java.util.HashMap<>(); }\n")
+    counted = state_census.count(tmp_path, "java")
+    assert counted["declared"] == 1
+    assert counted["by_kind"] == {"field_declaration": 1}
+
+
+def test_a_java_enum_constant_is_a_value_and_not_a_place_to_keep_one(tmp_path):
+    """Deliberately excluded where the interface constant is included: an enum constant is a
+    name with no slot behind it. The enum's own static field is counted, and it is counted as
+    the `field_declaration` the grammar already spells it."""
+    (tmp_path / "E.java").write_text("enum E { A, B; static int n = 1; }\n")
+    assert state_census.count(tmp_path, "java")["declared"] == 1
+
+
 def test_the_sample_set_covers_every_language_the_analyzer_declares():
     """The tenth language. Without this, adding a row to LANG_CFG leaves its census
     uncounted and every test in this file still passes."""

@@ -77,6 +77,7 @@ Site = tuple[str, str, str]
 # files a new construct under an existing capability answer and hides it there.
 DECL_KIND: dict[str, str] = {
     "field_declaration": FIELD_DECLARATION,
+    "constant_declaration": FIELD_DECLARATION,       # Java, inside an interface
     "public_field_definition": FIELD_DECLARATION,    # TypeScript
     "field_definition": FIELD_DECLARATION,           # JavaScript
     "property_declaration": PROPERTY_DECLARATION,    # C#

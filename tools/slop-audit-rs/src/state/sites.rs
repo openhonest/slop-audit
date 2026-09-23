@@ -78,6 +78,7 @@ impl Site {
 pub fn decl_kind(node_type: &str) -> Option<&'static str> {
     match node_type {
         "field_declaration" => Some(FIELD_DECLARATION),
+        "constant_declaration" => Some(FIELD_DECLARATION),    // Java, inside an interface
         "public_field_definition" => Some(FIELD_DECLARATION), // TypeScript
         "field_definition" => Some(FIELD_DECLARATION),        // JavaScript
         "property_declaration" => Some(PROPERTY_DECLARATION), // C#

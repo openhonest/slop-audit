@@ -129,7 +129,16 @@ fn fields_of(lang: &str) -> Option<Fields> {
         // listed they got no owner at all. A site with no owner cannot be matched against
         // a walk that names one, so it read as unvisited whether or not anything had
         // looked at it.
-        "java" => Fields { decl: &["field_declaration"], names: &[],
+        //
+        // The owner half landed first and the declaration half did not. The Java grammar
+        // spells an interface constant `constant_declaration`, a node type no table named,
+        // so the census shared the classifier's blindness and the ratio of nothing to
+        // nothing is silence nobody can see. The classifier still cannot reach one, which
+        // is now a gap the census reports rather than one it hides.
+        //
+        // `enum_constant` is deliberately absent: it is a name with no slot behind it, and
+        // an enum's own static fields are already `field_declaration`.
+        "java" => Fields { decl: &["field_declaration", "constant_declaration"], names: &[],
                            declarators: &["variable_declarator"],
                            records: &["class_declaration", "interface_declaration",
                                       "enum_declaration", "record_declaration",
@@ -589,16 +598,27 @@ mod tests {
     }
 
     #[test]
-    fn a_java_interface_constant_is_counted_by_neither_side_and_this_is_the_reference() {
-        // The Java grammar spells it `constant_declaration`, which is not in the field
-        // vocabulary, so the census does not count it. The reference agrees, and parity is
-        // what this port owes first, so the behaviour is matched rather than improved.
-        //
-        // It is still a gap. An interface constant holding a mutable collection is state,
-        // and neither walk sees it, which means the census cannot report the classifier's
-        // blindness to it either. Filed as slop-audit-18a.
+    fn a_java_interface_constant_is_a_declaration_site_the_classifier_cannot_reach() {
+        // The Java grammar spells it `constant_declaration`. No field vocabulary named that
+        // node, so neither walk saw it, and a census that shares the classifier's blind spot
+        // cannot report the blind spot: the ratio of nothing to nothing is silence nobody
+        // can see. Both walks count it now, and the classifier still does not visit it,
+        // which is the gap being disclosed rather than hidden.
         let sites = census("interface Limits { int MAX = 5; }\n", "java");
-        assert!(sites.is_empty(), "the reference counts none of these: {sites:?}");
+        assert_eq!(sites.len(), 1, "{sites:?}");
+        let site = sites.iter().next().expect("the one site");
+        assert_eq!(site.owner, "Limits");
+        assert_eq!(site.name, "MAX");
+    }
+
+    #[test]
+    fn a_java_enum_constant_is_a_value_and_not_a_place_to_keep_one() {
+        // Deliberately excluded where the interface constant is included: an enum constant
+        // is a name with no slot behind it. The enum's own static field is counted, and it
+        // is counted as the `field_declaration` the grammar already spells it.
+        let sites = census("enum E { A, B; static int n = 1; }\n", "java");
+        assert_eq!(sites.len(), 1, "{sites:?}");
+        assert_eq!(sites.iter().next().expect("the one site").name, "n");
     }
 
     #[test]
