@@ -643,35 +643,7 @@ pub fn walk(repo: &Path, lang: &str) -> BTreeMap<String, BTreeSet<Site>> {
 /// and conformance tables are excluded, and no scope may decline a vendored tree or
 /// machine output, because neither is anybody's code here whatever the question.
 pub fn parsed_files(repo: &Path, lang: &str) -> Vec<(String, tree_sitter::Tree, Vec<u8>)> {
-    let Some(cfg) = crate::lang::cfg(lang) else { return Vec::new() };
-    let has_packages = crate::repo_has_packages(repo);
-    // What the project itself says is not part of it. Without this the port read two
-    // generated bindings in a gitignored build file as state this repository keeps, and a
-    // 262 MB disowned tree elsewhere once carried the only unbounded state in a whole
-    // measurement.
-    let disowned = crate::ignored_paths(repo);
-    let mut parser = crate::parser_for(lang);
-    let mut out = Vec::new();
-    for entry in crate::walk_repo(repo) {
-        let path = entry.path();
-        if !crate::is_file_entry(&entry) {
-            continue;
-        }
-        let Some(ext) = path.extension().and_then(|e| e.to_str()) else { continue };
-        if !cfg.extensions.contains(&format!(".{}", ext.to_lowercase()).as_str()) {
-            continue;
-        }
-        if crate::bucket_reason(path, repo, has_packages,
-                             crate::PRODUCTION_WITHOUT_CONFORMANCE,
-                             crate::PRODUCTION_BUCKETS, &disowned).is_some() {
-            continue;
-        }
-        let Ok(src) = std::fs::read(path) else { continue };
-        let Some(tree) = parser.parse(&src, None) else { continue };
-        let rel = path.strip_prefix(repo).unwrap_or(path).to_string_lossy().into_owned();
-        out.push((rel, tree, src));
-    }
-    out
+    crate::parsed_files(repo, lang, crate::PRODUCTION_WITHOUT_CONFORMANCE).0
 }
 
 

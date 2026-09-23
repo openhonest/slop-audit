@@ -353,26 +353,10 @@ pub fn analyze(repo: &std::path::Path, language: &str) -> Indicator {
     let Some(cfg) = lang::cfg("python") else {
         return row("n/a".into(), "no tree-sitter config for python".into());
     };
-    let has_packages = crate::repo_has_packages(repo);
-    let disowned = crate::ignored_paths(repo);
-    let mut parser = crate::parser_for("python");
+    let (parsed, _skipped) = crate::production_files(repo, "python");
     let mut total = 0i64;
     let mut functions = 0i64;
-    for entry in crate::walk_repo(repo) {
-        let path = entry.path();
-        if !crate::is_file_entry(&entry) {
-            continue;
-        }
-        let Some(ext) = path.extension().and_then(|e| e.to_str()) else { continue };
-        if !cfg.extensions.contains(&format!(".{}", ext.to_lowercase()).as_str()) {
-            continue;
-        }
-        if crate::bucket_reason(path, repo, has_packages, crate::PRODUCTION,
-                             crate::PRODUCTION_BUCKETS, &disowned).is_some() {
-            continue;
-        }
-        let Ok(src) = std::fs::read(path) else { continue };
-        let Some(tree) = parser.parse(&src, None) else { continue };
+    for (_rel, tree, _src) in &parsed {
         for n in descendants(tree.root_node()) {
             if !cfg.function_types.contains(&n.kind()) {
                 continue;

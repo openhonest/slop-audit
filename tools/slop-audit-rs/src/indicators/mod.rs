@@ -2,7 +2,9 @@
 //! the pre-registered Python l1_analyzer and validated equal to it.
 pub mod absolute_paths;
 pub mod config_presence;
+pub mod data_tables;
 pub mod decision_space;
+pub mod duplication;
 pub mod git_ratios;
 pub mod god_files;
 pub mod mutable_state;

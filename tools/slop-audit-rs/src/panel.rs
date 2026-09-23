@@ -100,6 +100,10 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
     panel.push(indicators::config_presence::l1_10(repo)); // L1.10
     panel.push(indicators::config_presence::present_at(
         repo, &indicators::config_presence::CONTAINER)); // L1.11
+    // L1.13. Near-duplicate code, measured here rather than shelled out to a tool nobody
+    // has: the reference used to call one, and it was installed on no machine that ever ran
+    // the panel, so this column reported n/a on every repository ever measured.
+    panel.push(indicators::duplication::analyze(repo, language));
     panel.push(indicators::type_escapes::analyze(repo, language)); // L1.15
     panel.push(indicators::whitespace::analyze(repo)); // L1.16
     panel.push(indicators::god_files::analyze(repo)); // L1.17 (all languages)

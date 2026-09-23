@@ -285,6 +285,49 @@ pub fn extra_reason(path: &Path, extra: &[&'static str]) -> Option<&'static str>
     None
 }
 
+/// Every source file of one language that the named scope keeps, parsed once, with the path
+/// findings are reported against and the count that could not be read.
+///
+/// ONE WALK. Four readers had written their own by the time the state analysis landed, and
+/// each was a chance to scope differently from the others: the census and the classifier
+/// must read the same FILES or their counts are not comparable, and a port that scoped them
+/// separately would make a scoping difference look like a reading difference.
+pub fn parsed_files(repo: &Path, lang: &str, extra: &[&'static str])
+    -> (Vec<(String, tree_sitter::Tree, Vec<u8>)>, usize) {
+    let Some(cfg) = lang::cfg(lang) else { return (Vec::new(), 0) };
+    let has_packages = repo_has_packages(repo);
+    // What the project itself says is not part of it.
+    let disowned = ignored_paths(repo);
+    let mut parser = parser_for(lang);
+    let mut out = Vec::new();
+    let mut skipped = 0usize;
+    for entry in walk_repo(repo) {
+        let path = entry.path();
+        if !is_file_entry(&entry) {
+            continue;
+        }
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else { continue };
+        if !cfg.extensions.contains(&format!(".{}", ext.to_lowercase()).as_str()) {
+            continue;
+        }
+        if bucket_reason(path, repo, has_packages, extra, PRODUCTION_BUCKETS, &disowned)
+            .is_some() {
+            continue;
+        }
+        let Ok(src) = std::fs::read(path) else { skipped += 1; continue };
+        let Some(tree) = parser.parse(&src, None) else { skipped += 1; continue };
+        let rel = path.strip_prefix(repo).unwrap_or(path).to_string_lossy().into_owned();
+        out.push((rel, tree, src));
+    }
+    (out, skipped)
+}
+
+/// The production scope's parsed files, which is what every indicator below L1.17 reads.
+pub fn production_files(repo: &Path, lang: &str)
+    -> (Vec<(String, tree_sitter::Tree, Vec<u8>)>, usize) {
+    parsed_files(repo, lang, PRODUCTION)
+}
+
 /// scope.PRODUCTION: the code under audit. A test tree is not the artifact being graded,
 /// and a check that fires on its own fixtures measures the fixtures.
 ///

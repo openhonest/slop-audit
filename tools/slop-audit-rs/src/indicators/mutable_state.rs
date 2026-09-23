@@ -534,35 +534,6 @@ fn bounded_state_keys(root: Node, rel: &str, lang: &str, immutable_ctors: &[Stri
         .collect()
 }
 
-/// Every production file of this language, parsed once, with its repository-relative path.
-fn parsed_roots(repo: &Path, lang: &str)
-    -> (Vec<(String, tree_sitter::Tree, Vec<u8>)>, usize) {
-    let Some(cfg) = lang::cfg(lang) else { return (Vec::new(), 0) };
-    let has_packages = crate::repo_has_packages(repo);
-    let disowned = crate::ignored_paths(repo);
-    let mut parser = crate::parser_for(lang);
-    let mut out = Vec::new();
-    let mut skipped = 0usize;
-    for entry in crate::walk_repo(repo) {
-        let path = entry.path();
-        if !crate::is_file_entry(&entry) {
-            continue;
-        }
-        let Some(ext) = path.extension().and_then(|e| e.to_str()) else { continue };
-        if !cfg.extensions.contains(&format!(".{}", ext.to_lowercase()).as_str()) {
-            continue;
-        }
-        if crate::bucket_reason(path, repo, has_packages, crate::PRODUCTION,
-                             crate::PRODUCTION_BUCKETS, &disowned).is_some() {
-            continue;
-        }
-        let Ok(src) = std::fs::read(path) else { skipped += 1; continue };
-        let Some(tree) = parser.parse(&src, None) else { skipped += 1; continue };
-        let rel = path.strip_prefix(repo).unwrap_or(path).to_string_lossy().into_owned();
-        out.push((rel, tree, src));
-    }
-    (out, skipped)
-}
 
 /// One file's (total functions, functions touching unbounded external mutable state).
 ///
@@ -607,7 +578,7 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
         return row("n/a".into(), "n/a".into(),
                    format!("no tree-sitter config for {language}"));
     };
-    let (roots, skipped) = parsed_roots(repo, language);
+    let (roots, skipped) = crate::production_files(repo, language);
 
     // The repository's immutable constructors, which the classifier needs before it can
     // resolve a constant built by one. Two passes, matching the classifier's own contract: a

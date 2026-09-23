@@ -80,7 +80,7 @@ pub const CANONICAL: &[(&str, &str, Coverage)] = &[
     // vulture either. They are in the same position as L1.18: this binary has not ported
     // them.
     ("L1.12", "dead-code", Coverage::NotPorted),
-    ("L1.13", "duplication", Coverage::NotPorted),
+    ("L1.13", "duplication", Coverage::Measured),
     ("L1.14", "secret-scan", Coverage::NotPorted),
     ("L1.15", "type-escapes", Coverage::Measured),
     ("L1.16", "trailing-whitespace", Coverage::Measured),
