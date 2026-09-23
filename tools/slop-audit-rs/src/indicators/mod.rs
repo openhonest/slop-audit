@@ -7,6 +7,7 @@ pub mod decision_space;
 pub mod duplication;
 pub mod git_ratios;
 pub mod god_files;
+pub mod interleaving;
 pub mod mutable_state;
 pub mod path_cover;
 pub mod thread_scanners;

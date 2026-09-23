@@ -139,6 +139,10 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
     // guarantee is overridden by hand or is simply absent. A fact about the syntax, never a
     // claim that a race exists.
     panel.push(indicators::thread_surface::analyze(repo, language));
+    // interleaving_robustness, additive: of the concurrency surface flagged above, which
+    // files no model checker touches. It reads the surface meter's own refusal rather than
+    // inheriting a clean verdict from a reading that never happened.
+    panel.push(indicators::interleaving::analyze(repo, language));
     // path_cover, additive: the fewest end-to-end runs that walk every branch.
     panel.push(indicators::path_cover::analyze(repo, language));
     panel.push(indicators::absolute_paths::analyze(repo)); // additive

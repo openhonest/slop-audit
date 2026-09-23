@@ -166,9 +166,7 @@ Corrected 2026-09-23. Every line below said "not yet" while the runs it describe
 - Negative control SELECTED: `Iddadvisor` at `main`, tip `1239d08`
 - **Layer 1 against the positive control: DONE 2026-08-17.** 2 slop signals of 17
 - **Layer 1 against the negative control: DONE 2026-08-17.** 10 of 17, which reaches the threshold
-- **Layer 1 separates the controls.** The process cluster carries it, all three absent on
-  the negative control and present on the positive, with five git-history indicators
-  following. Two indicators run the other way and the run says so
+- **Layer 1 separates the controls.** The process cluster carries it, all three absent on the negative control and present on the positive, with five git-history indicators following. Two indicators run the other way and the run says so
 - Layer 2 against either control: not yet performed
 - Layer 3 against either control: not yet performed
 - **So the instrument is validated at Layer 1 and at no other layer.** The Layer 2 and Layer 3 thresholds in this document remain PROPOSED VALUES that nothing has measured, and anyone citing the instrument at those layers is citing an uncalibrated one

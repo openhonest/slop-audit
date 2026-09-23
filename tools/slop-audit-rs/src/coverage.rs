@@ -98,7 +98,7 @@ pub const CANONICAL: &[(&str, &str, Coverage)] = &[
     ("abs-paths", "absolute-paths", Coverage::Measured),
     ("path_cover", "path-cover", Coverage::Measured),
     ("thread_surface", "thread-surface", Coverage::Measured),
-    ("interleaving_robustness", "interleaving-robustness", Coverage::NotPorted),
+    ("interleaving_robustness", "interleaving-robustness", Coverage::Measured),
 ];
 
 /// The canonical row for a code, or `None` if the code is not canonical.
@@ -164,13 +164,12 @@ mod tests {
     ///
     /// L1.18 is the one that made this a P1 rather than a formatting complaint: it went
     /// missing from the printed panel and nothing noticed. It is measured now, so the check
-    /// moved to interleaving_robustness, which is not. The rule it guards is about the shape of the
+    /// moved to L1.12, which is not. The rule it guards is about the shape of the
     /// panel and not about which indicator happens to be unported this week.
     #[test]
     fn an_unported_indicator_is_never_silently_absent() {
         let panel = reconcile(vec![]);
-        let row = panel.iter().find(|i| i.code == "interleaving_robustness")
-            .expect("interleaving_robustness row");
+        let row = panel.iter().find(|i| i.code == "L1.12").expect("L1.12 row");
         assert_eq!(row.value, "not measured");
         assert_eq!(row.band, "not measured");
         assert!(row.details.contains("not ported"), "{}", row.details);
@@ -198,7 +197,7 @@ mod tests {
         // to install, and a fourth, saying this binary does not run tests, were both
         // removed when they stopped being true: the tools were replaced by algorithms, and
         // the binary now runs the suite.
-        let not_ported = reason("interleaving_robustness");
+        let not_ported = reason("L1.12");
         let defect = reason("L1.20");
         assert_ne!(not_ported, defect);
         assert!(not_ported.contains("not ported"), "{not_ported}");
@@ -230,7 +229,7 @@ mod tests {
             assert!(seen.insert(*code), "{code} declared twice");
         }
         assert_eq!(CANONICAL[0].0, "L1.1");
-        assert_eq!(declared("interleaving_robustness").unwrap().2, Coverage::NotPorted);
+        assert_eq!(declared("L1.12").unwrap().2, Coverage::NotPorted);
         assert_eq!(declared("L1.18").unwrap().2, Coverage::Measured);
         assert!(declared("L1.99").is_none());
     }
