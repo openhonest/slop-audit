@@ -3,9 +3,6 @@ package band;
 /** Two branches, one of them exercised, so coverage is a fraction rather than nought or one. */
 // honest-code-allow: L1.21.2 - this is a FIXTURE standing in for a project under audit, not this project's code. It is written the way ordinary Java is written, because a fixture that follows Honest Code would not exercise the readers that measure ordinary code. Java has no free functions, so a holder class is the only place a static method can live
 public final class Band {
-    private Band() {
-    }
-
     public static String band(int n) {
         if (n < 0) {
             return "neg";
