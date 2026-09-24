@@ -163,11 +163,6 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
     panel.push(indicators::type_escapes::analyze(repo, language)); // L1.15
     panel.push(indicators::whitespace::analyze(repo)); // L1.16
     panel.push(indicators::god_files::analyze(repo)); // L1.17 (all languages)
-    // L1.19. The runtime half where the run executes tests and a runner exists for the
-    // language; the static enumeration otherwise. The details line says which was taken,
-    // because a share of decisions REACHED and a count of decisions FOUND are different
-    // numbers and a reader given one cannot tell which.
-    panel.push(decision_space_row(repo, language, exec_tests));
     // L1.18. The mutable-state ratio, which reads the classifier below it for the bound:
     // state whose reaching set L1.18b could bound does not count toward the ratio.
     panel.push(indicators::mutable_state::analyze(repo, language));
@@ -192,6 +187,25 @@ fn measured(repo: &Path, language: &str, exec_tests: bool) -> Vec<Indicator> {
     // path_cover, additive: the fewest end-to-end runs that walk every branch.
     panel.push(indicators::path_cover::analyze(repo, language));
     panel.push(indicators::absolute_paths::analyze(repo)); // additive
+
+    // NOTHING ABOVE THIS LINE RUNS THE AUDITED PROJECT'S CODE, and nothing below it reads
+    // the source. The order is the fix for a defect the executing corpus found on
+    // 2026-09-23: a suite writes into the tree it runs in, and a reading taken afterwards is
+    // a reading of a tree the run changed. A Ruby project that starts SimpleCov writes its
+    // report into the repository, and the report carries the rendered SOURCE of the file
+    // under audit, so a function nothing referenced stopped looking dead and L1.12 went from
+    // Slop to Healthy because the tests had run. Java's target/, C's .gcda files and
+    // JavaScript's coverage output are the same shape; Ruby is only the one that writes
+    // readable source.
+    //
+    // Six readings sat below the coverage run before this: L1.18, L1.18b, thread surface,
+    // interleaving robustness, path cover and the absolute-path check.
+
+    // L1.19. The runtime half where the run executes tests; the static enumeration
+    // otherwise. The details line says which was taken, because a share of decisions REACHED
+    // and a count of decisions FOUND are different numbers and a reader given one cannot
+    // tell which.
+    panel.push(decision_space_row(repo, language, exec_tests));
     // L1.20, which RUNS the audited project's suite.
     //
     // A row is pushed either way, and the two reasons are DIFFERENT. A caller that
@@ -251,6 +265,40 @@ mod tests {
                 ind.code
             );
         }
+    }
+
+    /// A suite writes into the tree it runs in, so nothing static may be read after it.
+    ///
+    /// MEASURED 2026-09-23 on a four-file Ruby project. It starts SimpleCov, as every Ruby
+    /// project must for coverage to be measurable at all, and SimpleCov writes its report
+    /// into the repository; the report carries the rendered SOURCE of the file under audit,
+    /// so the dead-code corpus read the name of an unreferenced function out of the report
+    /// about that function. L1.12 went from 38.46 and Slop to 0.0 and Healthy because the
+    /// tests had run.
+    ///
+    /// Six readings sat below the coverage run in this binary: L1.18, L1.18b, the thread
+    /// surface, interleaving robustness, the path cover and the absolute-path scan.
+    ///
+    /// The fix is an ORDER, and nothing measures an order from outside, so it is measured
+    /// from the panel itself: the two rows that execute the project's code are the last two
+    /// pushed, which is the same statement. The reference carries the same test.
+    #[test]
+    fn the_two_rows_that_execute_are_last() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let codes: Vec<String> = measured(repo, "rust", false).iter()
+            .map(|i| i.code.clone()).collect();
+        let executing = ["L1.19", "L1.20"];
+        assert_eq!(&codes[codes.len() - 2..], &executing,
+                   "every static reading must be taken before anything runs, and these are \
+                    the last rows pushed: {:?}", &codes[codes.len().saturating_sub(4)..]);
+        // The same rule the other way round, because the check above would still pass if a
+        // new static row were pushed at the very end and the two executing rows moved up.
+        let first = codes.iter().position(|c| executing.contains(&c.as_str()))
+            .expect("the panel carries the executing rows");
+        let after: Vec<&String> = codes[first..].iter()
+            .filter(|c| !executing.contains(&c.as_str())).collect();
+        assert!(after.is_empty(),
+                "these rows are read from a tree a run may have changed: {after:?}");
     }
 
     /// The canonical table is a claim about this binary, and a claim that drifts is worse

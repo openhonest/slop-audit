@@ -948,6 +948,19 @@ def main(argv: list[str] | None) -> int:
         config_results = indicators.compute_config_indicators(args.repo)
         results.update(config_results)
 
+    # Interleaving robustness (static, cheap): of the flagged concurrency surface, which
+    # files no loom/shuttle model touches. Named for what it measures rather than for
+    # silence, which this instrument reserves for what the analyzer could not read.
+    #
+    # BEFORE the source pass, because the source pass ends by running the project's suite
+    # and a suite writes into the tree it runs in. It used to sit after, which made it the
+    # one static reading in the panel taken from a tree a run had changed. The language is
+    # settled by detection here rather than read off a panel that does not exist yet, which
+    # is what `_audited_language` does when no source pass has run.
+    if inds is None or inds & _SOURCE_INDICATORS:
+        results["interleaving_robustness"] = interleaving_robustness.analyze(
+            args.repo, _audited_language(results, args.lang, args.repo))
+
     # L1.12-20: source based -> tree-sitter, plus the runtime L1.19/L1.20 harness
     if inds is None or inds & _SOURCE_INDICATORS:
         source_results = indicators.compute_source_indicators(
@@ -956,12 +969,6 @@ def main(argv: list[str] | None) -> int:
             build_args=tuple(args.cargo_arg)
         )
         results.update(source_results)
-        # Interleaving robustness (static, cheap): of the flagged concurrency surface,
-        # which files no loom/shuttle model touches. Named for what it measures rather
-        # than for silence, which this instrument reserves for what the analyzer could
-        # not read.
-        results["interleaving_robustness"] = interleaving_robustness.analyze(
-            args.repo, _audited_language(results, args.lang, args.repo))
 
     # L1.21 (opt-in): nineteen clauses of Honest Code conformity. Off by default because
     # nineteen clauses over a large tree is a cost a caller chooses rather than one imposed

@@ -1,7 +1,15 @@
-# SimpleCov is NOT started here, and its absence is the point rather than an oversight.
-# Both tools refuse a Ruby suite that does not start it, because it cannot be injected from
-# outside, so this project compares the REFUSAL. Starting it writes a coverage report INTO
-# the tree, and a report in the tree moves a static indicator: see slop-audit-n7r.
+# SimpleCov has to start before the code under test is loaded, and it cannot be injected
+# from outside, so both tools refuse a suite that does not start it. Starting it here is
+# what makes this project exercise the MEASUREMENT rather than the refusal.
+#
+# It also writes a coverage report INTO the repository, and the report carries the rendered
+# source of the file under audit. That used to move a static indicator, because both tools
+# read some of their source rows after running the suite. Both read every static row first
+# now, so this project is the one that would catch it coming back.
+require "simplecov"
+SimpleCov.enable_coverage :branch
+SimpleCov.start
+
 require "minitest/autorun"
 require "band"
 

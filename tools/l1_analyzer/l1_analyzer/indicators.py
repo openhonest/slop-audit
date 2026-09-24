@@ -294,8 +294,6 @@ def compute_source_indicators(
     results["L1.17"] = _measure(_god_files, repo)
     results["L1.18"] = _measure(analyze_mutable_state, repo, lang)
     results["L1.15"] = _compute_type_escapes(repo, lang)
-    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds,
-                                           python_executable, build_args)
     # L1.12 and L1.14, native on tree-sitter. Both were external-tool delegations that
     # reported n/a on any machine without vulture or gitleaks, and reported a fabricated
     # zero on any machine that had gitleaks and a real leak (see ExternalRun).
@@ -307,7 +305,6 @@ def compute_source_indicators(
     # One row, written by name. `update` from another panel would let this builder be
     # handed any row the panel knows and pass it through without saying which.
     results["L1.13"] = _compute_external_indicators(repo, lang)["L1.13"]
-    results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds, python_executable)
     if classify_state_bounds:
         from l1_analyzer import state_bounds
         results["L1.18b"] = state_bounds.classify(repo, lang)
@@ -329,6 +326,27 @@ def compute_source_indicators(
         # `Scan` carries its two extra fields as absent rather than empty for exactly that,
         # so both paths are one type and a reader can tell them apart.
         results["absolute_paths"] = _measure(absolute_paths.scan, repo, lang)
+
+    # NOTHING ABOVE THIS LINE RUNS THE AUDITED PROJECT'S CODE, and nothing below it reads
+    # the source. The order is the fix for a defect the executing corpus found on
+    # 2026-09-23: a suite writes into the tree it runs in, and every reading taken afterwards
+    # is a reading of a tree the run changed.
+    #
+    # A four-file Ruby project measured it. The project starts SimpleCov, as every Ruby
+    # project must for coverage to be measurable at all, and SimpleCov writes its report into
+    # the repository. The report carries the rendered SOURCE of the file under audit, so the
+    # dead-code corpus read the name of an unreferenced function out of the report about that
+    # function, stopped calling it dead, and L1.12 went from 38.46 and Slop to 0.0 and
+    # Healthy because the tests had run. Java's target/, C's .gcda files, JavaScript's
+    # coverage output and Python's .coverage are the same shape; Ruby is only the one that
+    # writes readable source.
+    #
+    # Seven readings sat below the coverage run before this: L1.12, L1.13, L1.14, L1.18b,
+    # the path cover, the thread surface and the absolute-path scan.
+    results["L1.19"] = _decision_space_l19(repo, lang, exec_tests, timeout_seconds,
+                                           python_executable, build_args)
+    results["L1.20"] = _test_determinism_l20(repo, lang, exec_tests, timeout_seconds,
+                                             python_executable)
     return results
 
 _WHITESPACE_EXTS = frozenset({".py", ".rs", ".c", ".h", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".java", ".cs", ".rb", ".go"})
