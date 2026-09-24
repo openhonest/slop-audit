@@ -457,8 +457,48 @@ pub fn ruby_coverage(repo: &Path, timeout_seconds: f64, version: &str) -> Readin
     verdict(Some(totals), run.status, &words, timeout_seconds)
 }
 
-/// L1.19 for JavaScript and TypeScript: branch coverage from c8 over the project's own
-/// test command.
+/// How this project is asked for coverage, and what to call the thing that produced the
+/// numbers.
+///
+/// C8 CANNOT SEE A VITEST SUITE, which is why this exists. c8 wraps a command and reads V8's
+/// coverage of the process it started; vitest runs the tests in workers, so c8 measured the
+/// runner and reported zero branches. Every JavaScript and TypeScript repository audited with
+/// execution on was told "no enumerable decision branches found in the measured tree", which
+/// reads as a fact about their code and was a fact about the harness. Measured 2026-09-23 on a
+/// three-file vitest project: c8 reported 0 branches and vitest's own provider reported 2.
+///
+/// Both drivable runners write the same `coverage-summary.json` c8 writes, so only the command
+/// changes. Anything else keeps the c8 wrapper, which is the only route that needs c8.
+fn js_coverage_command(manifest: &str, reports: &Path, temp: &Path, test_command: &str)
+    -> (Vec<String>, &'static str) {
+    match crate::runtime::runners_js::js_runner(manifest) {
+        crate::runtime::runners_js::JsRunner::Drivable("vitest") => (vec![
+            "npx".into(), "--no-install".into(), "vitest".into(), "run".into(),
+            "--coverage".into(), "--coverage.provider=v8".into(),
+            "--coverage.reporter=json-summary".into(),
+            format!("--coverage.reportsDirectory={}", reports.display()),
+        ], "vitest v8 coverage"),
+        crate::runtime::runners_js::JsRunner::Drivable("jest") => (vec![
+            "npx".into(), "--no-install".into(), "jest".into(), "--coverage".into(),
+            "--coverageReporters=json-summary".into(),
+            format!("--coverageDirectory={}", reports.display()),
+        ], "jest coverage"),
+        _ => {
+            let mut command: Vec<String> = vec![
+                "npx".into(), "--no-install".into(), "c8".into(),
+                "--reporter=json-summary".into(),
+                format!("--reports-dir={}", reports.display()),
+                format!("--temp-directory={}", temp.display()),
+            ];
+            // The project's own test command, split the way a shell would split it.
+            command.extend(test_command.split_whitespace().map(str::to_string));
+            (command, "c8 branch counters (V8)")
+        }
+    }
+}
+
+/// L1.19 for JavaScript and TypeScript: branch coverage, from the project's own runner where
+/// this harness can drive one and from c8 over the project's test command otherwise.
 pub fn js_coverage(repo: &Path, timeout_seconds: f64, runtime: &str) -> Reading {
     if which("npx").is_none() || which("node").is_none() {
         return not_measured("needs node and npx in PATH");
@@ -481,14 +521,8 @@ pub fn js_coverage(repo: &Path, timeout_seconds: f64, runtime: &str) -> Reading 
     let scratch = scratch_dir("jscov");
     let reports = scratch.join("reports");
     let _ = std::fs::create_dir_all(&reports);
-    let mut command: Vec<String> = vec![
-        "npx".into(), "--no-install".into(), "c8".into(),
-        "--reporter=json-summary".into(),
-        format!("--reports-dir={}", reports.display()),
-        format!("--temp-directory={}", scratch.join("tmp").display()),
-    ];
-    // The project's own test command, split the way a shell would split it.
-    command.extend(test_command.split_whitespace().map(str::to_string));
+    let (command, how) = js_coverage_command(&manifest, &reports, &scratch.join("tmp"),
+                                             &test_command);
     let run = run_untrusted(&command, repo, &[], timeout_seconds);
 
     let words = CoverageWords {
@@ -498,7 +532,7 @@ pub fn js_coverage(repo: &Path, timeout_seconds: f64, runtime: &str) -> Reading 
         // line a default vitest project actually reaches: c8 sees the runner process
         // and not the workers the tests run in, so both tools measure nothing here.
         nothing_to_cover: "no enumerable decision branches found in the measured tree",
-        how: "c8 branch counters (V8)",
+        how,
         toolchain: runtime.to_string(),
         substitution: "",
     };

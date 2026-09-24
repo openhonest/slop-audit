@@ -39,7 +39,7 @@ from l1_analyzer.pytest_trace import (
     _first_line,
     _na,
     _run_untrusted,
-    coverage_band,
+    coverage_verdict,
     determinism_tally,
 )
 
@@ -203,7 +203,7 @@ def _c8_available(repo: Path, timeout_seconds: float) -> bool:
 
 
 def _coverage_verdict(branches: Branches | None, returncode: int, runtime: str,
-                      timeout_seconds: float) -> L1Result:
+                      timeout_seconds: float, how: str) -> L1Result:
     """L1.19 from a finished run and c8's branch totals. No I/O, so it can be asserted.
 
     Extracted because it could not be reached otherwise. `decision_space_coverage` probes node,
@@ -229,13 +229,16 @@ def _coverage_verdict(branches: Branches | None, returncode: int, runtime: str,
         return _na("the coverage run wrote no summary to read")
     if int(branches["total"]) == 0:
         return _na("no enumerable decision branches found in the measured tree")
-    pct = float(branches["pct"])
-    suite = "suite passed" if returncode == 0 else f"suite exit {returncode}"
-    return {
-        "value": round(pct, 1),
-        "band": coverage_band(pct),
-        "details": f"{pct}% branch coverage from c8 (V8) ({suite}; ran under {runtime})",
-    }
+    # THE SHARED SENTENCE, as seven of the nine languages already print it. This one built
+    # its own, so it published a percentage and threw away the counts the report had handed
+    # it, and it named c8 whatever had actually measured the run. A reader comparing a
+    # JavaScript figure with a Java one was comparing two shapes.
+    return coverage_verdict(
+        covered=int(branches["covered"]), total=int(branches["total"]),
+        returncode=returncode, timeout_seconds=timeout_seconds,
+        no_report="the coverage run wrote no summary to read",
+        nothing_to_cover="no enumerable decision branches found in the measured tree",
+        how=how, toolchain=runtime)
 
 
 class Refused(TypedDict):
@@ -279,10 +282,41 @@ def _toolchain(repo: Path) -> Refused | Resolved:
     return {"ok": True, "manifest": pkg}
 
 
+# How each runner is asked for coverage, and what to call the thing that produced the numbers.
+#
+# C8 CANNOT SEE A VITEST SUITE, which is why this table exists. c8 wraps a command and reads
+# V8's coverage of the process it started; vitest runs the tests in workers, so c8 measured the
+# runner and reported zero branches. Every JavaScript and TypeScript repository audited with
+# execution on was told "no enumerable decision branches found in the measured tree", which
+# reads as a fact about their code and was a fact about the harness. Measured 2026-09-23 on a
+# three-file vitest project: c8 reported 0 branches and vitest's own provider reported 2.
+#
+# Both runners write the same `coverage-summary.json` c8 writes, so only the command changes.
+_COVERAGE_ROUTES = {
+    "vitest": (lambda reports, _tmp, _test_cmd: [
+        "npx", "--no-install", "vitest", "run", "--coverage",
+        "--coverage.provider=v8", "--coverage.reporter=json-summary",
+        f"--coverage.reportsDirectory={reports}"],
+        "vitest v8 coverage"),
+    "jest": (lambda reports, _tmp, _test_cmd: [
+        "npx", "--no-install", "jest", "--coverage",
+        "--coverageReporters=json-summary", f"--coverageDirectory={reports}"],
+        "jest coverage"),
+}
+
+# The route for a project on any other runner, or none this harness recognises: wrap whatever
+# the project calls its test command. It is the only route that needs c8 installed.
+_C8_ROUTE = (lambda reports, tmp, test_cmd: [
+    "npx", "--no-install", "c8", "--reporter=json-summary",
+    f"--reports-dir={reports}", f"--temp-directory={tmp}", *shlex.split(test_cmd)],
+    "c8 branch counters (V8)")
+
+
 def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override: str | None) -> L1Result:
-    """L1.19 for JS/TS: branch coverage from c8 (V8). Bands match the spec: >90% Healthy,
-    60-90% Not Healthy, <60% Slop. `runtime_override` is accepted for a uniform harness
-    signature and ignored: `node` on PATH is the runtime."""
+    """L1.19 for JS/TS: branch coverage, from the project's own runner where this harness can
+    drive one and from c8 otherwise. Bands match the spec: >90% Healthy, 60-90% Not Healthy,
+    <60% Slop. `runtime_override` is accepted for a uniform harness signature and ignored:
+    `node` on PATH is the runtime."""
     answer = _toolchain(repo)
     if answer["ok"] is False:
         return answer["refusal"]
@@ -290,21 +324,28 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
     test_cmd = _test_command(pkg)
     if test_cmd is None:
         return _na("no test command in package.json (scripts.test)")
-    if not _c8_available(repo, timeout_seconds):
-        return _na("needs c8 for coverage (npm i -D c8)")
+    # TWO CASES, named, rather than a table read with a fallback. A runner this harness can
+    # drive is asked for its own coverage; every other project, and every project on no runner
+    # this harness knows, is wrapped in c8. The second is the answer for the rest of the world
+    # rather than the default for a key nobody wrote a rule for.
+    runner = _detect_runner(pkg)
+    if runner in _COVERAGE_ROUTES:
+        build, how = _COVERAGE_ROUTES[runner]
+    else:
+        build, how = _C8_ROUTE
+        if not _c8_available(repo, timeout_seconds):
+            return _na("needs c8 for coverage (npm i -D c8)")
 
     with tempfile.TemporaryDirectory(prefix="l1-jscov-") as directory:
         reports = Path(directory) / "reports"
         summary = reports / "coverage-summary.json"
         run = _run_untrusted(
-            _wrap(repo, ["npx", "--no-install", "c8", "--reporter=json-summary",
-                         f"--reports-dir={reports}", f"--temp-directory={Path(directory) / 'tmp'}",
-                         *shlex.split(test_cmd)]),
+            _wrap(repo, build(reports, Path(directory) / "tmp", test_cmd)),
             cwd=repo, env={}, timeout_seconds=timeout_seconds,
         )
         runtime = _runtime_name(repo, timeout_seconds)
         if run.returncode == 124:
-            return _coverage_verdict(None, run.returncode, runtime, timeout_seconds)
+            return _coverage_verdict(None, run.returncode, runtime, timeout_seconds, how)
         # c8 writes the summary for every file that ran, even when some tests fail. No summary
         # means the suite did not build or ran no tests: n/a with the reason, never a 0.0 that
         # reads as real-but-terrible coverage (a silent failure is a lie).
@@ -316,7 +357,7 @@ def decision_space_coverage(repo: Path, timeout_seconds: float, runtime_override
         except (OSError, json.JSONDecodeError, KeyError, TypeError):
             return _na("coverage summary had no branch totals")
 
-    return _coverage_verdict(branches, run.returncode, runtime, timeout_seconds)
+    return _coverage_verdict(branches, run.returncode, runtime, timeout_seconds, how)
 
 
 # ---------------------------------------------------------------------------

@@ -201,51 +201,75 @@ def test_l20_jest_below_30_is_na(tmp_path):
 # parse a file the test had written moments earlier. The claim they were defending is real and
 # is restated here as `assert f(input) == expected`.
 
-def _c8_branches(covered: int, total: int, pct: float) -> dict:
-    """The `total.branches` object c8 writes into its json-summary report. Every field is
-    named at every call site: a default here would hide which number the band actually read."""
-    return {"total": total, "covered": covered, "skipped": total - covered, "pct": pct}
+def _c8_branches(covered: int, total: int) -> dict:
+    """The `total.branches` object a coverage summary carries. Every field is named at every
+    call site: a default here would hide which number the band actually read.
+
+    No `pct`. The report writes one and the verdict stopped reading it on 2026-09-23, when
+    this language joined the shared verdict the other seven use: the share is computed from
+    the counts, so a report whose own percentage disagreed with its own counts could no longer
+    publish the percentage."""
+    return {"total": total, "covered": covered, "skipped": total - covered}
 
 
-def test_a_finished_run_yields_the_branch_share_c8_measured():
-    r = js_trace._coverage_verdict(_c8_branches(38, 40, 95.0), 0, "v22.3.0 via nvm", 300.0)
+def test_a_finished_run_yields_the_branch_share_the_runner_measured():
+    r = js_trace._coverage_verdict(_c8_branches(38, 40), 0, "v22.3.0 via nvm", 300.0,
+                                   "c8 branch counters (V8)")
     assert r["value"] == 95.0 and r["band"] == "Healthy"
-    assert "95.0% branch coverage from c8 (V8)" in r["details"]
+    assert "38/40 decision branches exercised by tests" in r["details"]
+    assert "c8 branch counters (V8)" in r["details"]
     assert "suite passed" in r["details"] and "v22.3.0 via nvm" in r["details"]
 
 
-def test_a_failing_but_valid_run_is_still_measured():
+def test_the_line_names_whatever_actually_measured_the_run():
+    """Three routes reach this verdict and only one of them is c8. The sentence said c8
+    whatever had run, which is a claim about the measurement rather than about the code."""
+    r = js_trace._coverage_verdict(_c8_branches(1, 2), 0, "v22.3.0", 300.0,
+                                   "vitest v8 coverage")
+    assert "vitest v8 coverage" in r["details"]
+    assert "c8" not in r["details"]
+
+
+@pytest.mark.parametrize("covered,total,returncode,value,band,says", [
     # A non-zero exit means the suite ran and some tests failed. The branches they took are
     # real, so this is a measurement, and the exit is named so the reader knows the shape.
-    r = js_trace._coverage_verdict(_c8_branches(7, 10, 70.0), 1, "v22.3.0", 300.0)
-    assert r["value"] == 70.0 and r["band"] == "Not Healthy"
-    assert "suite exit 1" in r["details"]
-
-
-@pytest.mark.parametrize("pct,band", [
-    (100.0, "Healthy"),
-    (90.01, "Healthy"),
-    (90.0, "Not Healthy"),      # exactly 90 is not above 90
-    (60.0, "Not Healthy"),      # exactly 60 is the floor of the middle band
-    (59.99, "Slop"),
-    (0.0, "Slop"),              # a measured zero: branches exist and none were taken
+    pytest.param(7, 10, 1, 70.0, "Not Healthy", "suite exit 1",
+                 id="a-failing-but-valid-run-is-still-measured"),
+    # Zero branches is an absence, not a zero per cent: a tree with nothing to cover has not
+    # been measured badly, it has not been measured.
+    pytest.param(0, 0, 0, "n/a", "n/a", "no enumerable decision branches",
+                 id="zero-countable-branches-is-absent-not-zero-per-cent"),
 ])
-def test_the_coverage_bands_are_decided_at_the_exact_edges(pct, band):
-    assert js_trace._coverage_verdict(_c8_branches(1, 2, pct), 0, "node", 300.0)["band"] == band
+def test_the_verdict_reads_each_shape_of_finished_run(covered, total, returncode, value,
+                                                      band, says):
+    r = js_trace._coverage_verdict(_c8_branches(covered, total), returncode, "v22.3.0", 300.0,
+                                   "c8 branch counters (V8)")
+    assert r["value"] == value and r["band"] == band
+    assert says in r["details"]
+
+
+@pytest.mark.parametrize("covered,total,band", [
+    (1, 1, "Healthy"),
+    (9001, 10000, "Healthy"),
+    (9, 10, "Not Healthy"),        # exactly 90 is not above 90
+    (6, 10, "Not Healthy"),        # exactly 60 is the floor of the middle band
+    (5999, 10000, "Slop"),
+    (0, 2, "Slop"),                # a measured zero: branches exist and none were taken
+])
+def test_the_coverage_bands_are_decided_at_the_exact_edges(covered, total, band):
+    r = js_trace._coverage_verdict(_c8_branches(covered, total), 0, "node", 300.0,
+                                   "c8 branch counters (V8)")
+    assert r["band"] == band
 
 
 def test_a_timed_out_run_is_named_rather_than_scored():
     # Decided before any total is read: a killed run wrote no summary, so there is nothing to
     # hand over but an empty object, and the verdict must reach its answer without it.
-    r = js_trace._coverage_verdict(None, 124, "node", 300.0)
+    r = js_trace._coverage_verdict(None, 124, "node", 300.0, "c8 branch counters (V8)")
     assert r["band"] == "n/a" and r["value"] == "n/a"
     assert "timed out" in r["details"]
 
 
-def test_zero_countable_branches_is_absent_not_zero_percent():
-    r = js_trace._coverage_verdict(_c8_branches(0, 0, 0.0), 0, "node", 300.0)
-    assert r["band"] == "n/a" and r["value"] == "n/a"
-    assert "no enumerable decision branches" in r["details"]
 
 
 # --- the L1.20 verdict, extracted so the per-seed outcomes can be handed over as values ---
