@@ -223,7 +223,12 @@ LANG_CFG: dict[str, LangCfg] = {
         "member_op": ".",
         "receiver_scan": "fixed",
         "module_scan": "class_fields",
-        "field_decl_types": ("field_declaration",),
+        # A PROPERTY HOLDS STATE AS SURELY AS A FIELD DOES. This row named only
+        # `field_declaration`, so `public int Count { get; set; }` was state nobody counted,
+        # while the Honest Code reader's own table had named both since the day an
+        # auto-property was added to it. One fact, two tables, and they disagreed for as long
+        # as both existed; the census carried a comment saying so.
+        "field_decl_types": ("field_declaration", "property_declaration"),
         "immutable_modifiers": frozenset({"readonly", "const"}),
         # No annotation can suppress a type check in this language.
         "annotation_escape_names": (),

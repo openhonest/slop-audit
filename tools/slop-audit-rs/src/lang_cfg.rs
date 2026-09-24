@@ -207,7 +207,7 @@ pub const LANGS: &[LangCfg] = &[
         type_position_types: &[],
         bare_generics: &[],
         const_keywords: &[],
-        field_decl_types: &["field_declaration"],
+        field_decl_types: &["field_declaration", "property_declaration"],
         function_types: &["method_declaration", "constructor_declaration"],
         immutable_modifiers: &["const", "readonly"],
         instance_field_types: &[],

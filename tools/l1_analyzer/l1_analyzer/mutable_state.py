@@ -232,11 +232,56 @@ def _module_mutables_class_fields(root: Node, cfg: LangCfg) -> set[str]:
     for field in _deep_nodes(root, cfg["field_decl_types"]):
         if _declared_modifiers(field) & immutable:
             continue
-        for vd in _deep_nodes(field, ("variable_declarator",)):
-            named = vd.child_by_field_name("name") or next((c for c in vd.children if c.type == "identifier"), None)
-            if named is not None and _text(named) not in cfg["this_ident"]:
-                mutables.add(_text(named))
+        # A PROPERTY WITH NO SETTER CANNOT BE REASSIGNED, which is what `readonly` says
+        # about a field. C# spells the same fact two ways and the modifier check above can
+        # only read one of them.
+        if not _is_settable(field):
+            continue
+        for name in _declared_names(field):
+            if name not in cfg["this_ident"]:
+                mutables.add(name)
     return mutables
+
+
+# The accessor that makes a C# property assignable after construction. `init` is absent on
+# purpose: an init-only property can be set while the object is being built and never again,
+# which is what `readonly` means for a field.
+_SETTER = "set"
+
+
+def _is_settable(field: Node) -> bool:
+    """Whether this declaration can be assigned after the object exists.
+
+    True for anything with no accessor list, which is every field in both languages and
+    every construct in every other language that reaches here. A C# property declares its
+    accessors, so it is the one shape that can answer no."""
+    accessors = [n for n in field.children if n.type == "accessor_list"]
+    if not accessors:
+        return True
+    return any(child.type == _SETTER
+               for accessor in accessors
+               for declaration in accessor.children
+               for child in declaration.children)
+
+
+def _declared_names(field: Node) -> list[str]:
+    """Every name one field or property declaration binds.
+
+    A field carries its names in `variable_declarator` children, one per name, because a
+    single declaration may bind several. A C# property has no declarator at all and carries
+    its one name in its own `name` field, which is why reading only declarators counted no
+    auto-property at all: `public int Count { get; set; }` is state by any definition and was
+    state nobody counted."""
+    declared = []
+    for vd in _deep_nodes(field, ("variable_declarator",)):
+        named = vd.child_by_field_name("name") or next(
+            (c for c in vd.children if c.type == "identifier"), None)
+        if named is not None:
+            declared.append(_text(named))
+    if declared:
+        return declared
+    named = field.child_by_field_name("name")
+    return [_text(named)] if named is not None else []
 
 
 def _module_mutables_text(root: Node, cfg: LangCfg) -> set[str]:

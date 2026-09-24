@@ -69,7 +69,20 @@ Feature: mutable_state — L1.18, the share of functions that reference unbounde
     When _module_mutables_class_fields walks to any depth for field declarations only and reads each one's declared modifiers
     Then it returns the names of the fields not declared immutable, taken from the declarators so one declaration of several slots yields several names
     And mutability is read from the keyword the source already carries, never guessed from the name's casing
-    But the walk never covers the wider assignment vocabulary, which is what keeps method locals out, and it never reaches a C# property, so state written with accessors is not counted at all
+    But the walk never covers the wider assignment vocabulary, which is what keeps method locals out
+
+  Scenario: _is_settable asks whether a declaration can be assigned after the object exists
+    Given a field or property declaration from a parsed class body
+    When _is_settable looks for an accessor list and, inside it, a set accessor
+    Then a declaration with no accessor list answers yes, which is every field in both languages and every construct in every other language that reaches here
+    And a C# property answers yes only where it declares a setter, because a property with no setter cannot be reassigned and that is what readonly says about a field
+    But an init-only property answers no, since it can be set while the object is being built and never again
+
+  Scenario: _declared_names reads every name one declaration binds
+    Given a field declaration with one or several declarators, or a C# property with none
+    When _declared_names reads the declarators first and the declaration's own name field after
+    Then a field yields one name per declarator, because a single declaration may bind several slots
+    And a C# property yields the one name it carries in its own field, which is why reading only declarators counted no auto-property at all
 
   # A declaration with no initialiser is invisible: the line must contain an equals sign, so an uninitialised package-level variable never enters the set.
   Scenario: _module_mutables_c_scan reads C file-scope declarations from the parse tree

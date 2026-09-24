@@ -227,18 +227,57 @@ fn module_mutables_class_fields(root: Node, cfg: &LangCfg, src: &[u8]) -> BTreeS
             .any(|w| cfg.immutable_modifiers.contains(&w.as_str())) {
             continue;
         }
-        for vd in deep_nodes(decl, &["variable_declarator"]) {
-            let named = field(Some(vd), "name")
-                .or_else(|| children(vd).into_iter().find(|c| c.kind() == "identifier"));
-            if let Some(named) = named {
-                let spelling = text(Some(named), src);
-                if !cfg.this_ident.contains(&spelling.as_str()) {
-                    mutables.insert(spelling);
-                }
+        // A PROPERTY WITH NO SETTER CANNOT BE REASSIGNED, which is what `readonly` says about
+        // a field. C# spells the same fact two ways and the modifier check above reads one.
+        if !is_settable(decl) {
+            continue;
+        }
+        for spelling in declared_names(decl, src) {
+            if !cfg.this_ident.contains(&spelling.as_str()) {
+                mutables.insert(spelling);
             }
         }
     }
     mutables
+}
+
+/// Whether this declaration can be assigned after the object exists.
+///
+/// True for anything with no accessor list, which is every field in both languages and every
+/// construct in every other language that reaches here. A C# property declares its accessors,
+/// so it is the one shape that can answer no. `init` is not a setter: an init-only property
+/// can be set while the object is being built and never again, which is what `readonly` means
+/// for a field.
+fn is_settable(decl: Node) -> bool {
+    let lists: Vec<Node> = children(decl).into_iter()
+        .filter(|c| c.kind() == "accessor_list").collect();
+    if lists.is_empty() {
+        return true;
+    }
+    lists.into_iter().any(|list| children(list).into_iter()
+        .any(|accessor| children(accessor).into_iter().any(|c| c.kind() == "set")))
+}
+
+/// Every name one field or property declaration binds.
+///
+/// A field carries its names in `variable_declarator` children, one per name, because a single
+/// declaration may bind several. A C# property has no declarator at all and carries its one
+/// name in its own `name` field, which is why reading only declarators counted no
+/// auto-property: `public int Count { get; set; }` is state by any definition and was state
+/// nobody counted.
+fn declared_names(decl: Node, src: &[u8]) -> Vec<String> {
+    let mut declared: Vec<String> = Vec::new();
+    for vd in deep_nodes(decl, &["variable_declarator"]) {
+        let named = field(Some(vd), "name")
+            .or_else(|| children(vd).into_iter().find(|c| c.kind() == "identifier"));
+        if let Some(named) = named {
+            declared.push(text(Some(named), src));
+        }
+    }
+    if !declared.is_empty() {
+        return declared;
+    }
+    field(Some(decl), "name").map(|named| vec![text(Some(named), src)]).unwrap_or_default()
 }
 
 /// The text heuristic, for the languages with no structural scan yet.
