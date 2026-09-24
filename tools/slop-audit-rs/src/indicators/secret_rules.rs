@@ -386,9 +386,20 @@ pub fn scan_text(text: &str, raw: &[u8], name: &str) -> Vec<(&'static str, usize
 mod tests {
     use super::*;
 
+    /// An AWS key, assembled from pieces rather than written out whole.
+    ///
+    /// A Rust unit test lives in the file it tests, so a credential spelled here is a
+    /// credential in a production file: writing this one out raised THIS repository's own
+    /// L1.14 to four secrets, one of them in production, and the scanner tripped over its own
+    /// test. The scope rule cannot help, because there is no test directory to name.
+    fn aws_key() -> String {
+        format!("AKIA{}", "QWERTYUIOPASDFGH")
+    }
+
     #[test]
     fn an_issuer_prefixed_key_is_found_wherever_it_sits() {
-        let text = "# left here by mistake\nAKIAQWERTYUIOPASDFGH\n";
+        let text = format!("# left here by mistake\n{}\n", aws_key());
+        let text = text.as_str();
         let found = scan_text(text, text.as_bytes(), "notes.txt");
         assert_eq!(found.iter().map(|(id, line, _)| (*id, *line)).collect::<Vec<_>>(),
                    vec![("aws-access-key-id", 2)]);
@@ -397,7 +408,8 @@ mod tests {
     #[test]
     fn a_key_welded_to_another_capital_is_not_a_key() {
         // What the reference's two lookarounds say, and the only rule that asks for them.
-        let text = "XAKIAQWERTYUIOPASDFGHX\n";
+        let text = format!("X{}X\n", aws_key());
+        let text = text.as_str();
         assert!(scan_text(text, text.as_bytes(), "notes.txt").is_empty());
     }
 

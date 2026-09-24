@@ -285,6 +285,16 @@ mod tests {
     use super::*;
     use std::fs;
 
+    /// An AWS key, assembled from pieces rather than written out whole.
+    ///
+    /// A Rust unit test lives in the file it tests, so a credential spelled here is a
+    /// credential in a production file: writing this one out raised THIS repository's own
+    /// L1.14 to four secrets, one of them in production, and the scanner tripped over its own
+    /// test. The scope rule cannot help, because there is no test directory to name.
+    fn aws_key() -> String {
+        format!("AKIA{}", "QWERTYUIOPASDFGH")
+    }
+
     /// A tree under the system temp directory. No dev-dependency: adding one to reach
     /// `analyze`, which is the only function here that does I/O, would put a crate in the
     /// lockfile of a binary whose whole claim is that it is portable.
@@ -329,7 +339,7 @@ mod tests {
 
     #[test]
     fn one_credential_in_three_places_is_one_leaked_credential() {
-        let key = "AKIAQWERTYUIOPASDFGH";
+        let key = aws_key();
         let root = repo_with("repeated", &[
             ("a.py", &format!("KEY = \"{key}\"\n")),
             ("b.py", &format!("KEY = \"{key}\"\n")),
@@ -346,7 +356,7 @@ mod tests {
     fn a_credential_only_in_the_test_tree_is_counted_apart_from_production() {
         let root = repo_with("fixture", &[
             ("app.py", "def main():\n    return 1\n"),
-            ("tests/conftest.py", "import pytest\nKEY = \"AKIAQWERTYUIOPASDFGH\"\n"),
+            ("tests/conftest.py", &format!("import pytest\nKEY = \"{}\"\n", aws_key())),
         ]);
         let row = analyze(&root, "python");
         assert!(row.details.contains("0 of the secret(s) are in production code"),
@@ -362,7 +372,7 @@ mod tests {
     fn a_lock_file_and_a_binary_are_not_read() {
         let root = repo_with("skipped", &[
             ("app.py", "x = 1\n"),
-            ("package-lock.json", "{\"integrity\": \"AKIAQWERTYUIOPASDFGH\"}\n"),
+            ("package-lock.json", &format!("{{\"integrity\": \"{}\"}}\n", aws_key())),
         ]);
         fs::write(root.join("logo.png"), [0x89u8, 0x50, 0x4e, 0x47, 0x00, 0x0d])
             .expect("the binary file");
