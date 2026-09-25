@@ -39,6 +39,7 @@ from typing import TypedDict
 
 from l1_analyzer import disclosure, incomplete
 from l1_analyzer.boundary import boundary
+from l1_analyzer.environment import child_environment
 
 
 class L1Result(TypedDict):
@@ -60,7 +61,10 @@ def _run_untrusted(command: list[str], cwd: Path, env: dict[str, str], timeout_s
     """Run untrusted test code in a new process group; kill the whole group on
     timeout. Mirrors umbra.process.run_untrusted. Returncode 124 signals timeout.
     """
-    full_env = {**os.environ, **env}
+    # WHAT A STRANGER'S SUITE SEES OF THIS MACHINE. This read `{**os.environ, **env}` until
+    # 2026-09-25, so every API key in the auditor's shell was one `os.environ` away from the
+    # code being audited. See l1_analyzer.environment for what passes and why.
+    full_env = child_environment(os.environ, env)
     process = subprocess.Popen(
         command,
         cwd=str(cwd),

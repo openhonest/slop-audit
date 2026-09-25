@@ -133,3 +133,13 @@ repos:
         language: system
         pass_filenames: false
         files: ^tools/(l1_analyzer/l1_analyzer/(lang_cfg|indicators)\.py|slop-audit-rs/src/lang_cfg\.rs|slop-audit-rs/generate_lang_cfg\.py)$
+
+      # The third, and the one whose two copies decide what a stranger's test suite sees of
+      # this machine. Two tools running a suite in two different environments would disagree
+      # about that suite's result, and neither would be wrong.
+      - id: slop-audit-rs-env
+        name: rust port's environment allowlist matches the reference
+        entry: uv run --project tools/slop-audit-rs python tools/slop-audit-rs/generate_env.py --check
+        language: system
+        pass_filenames: false
+        files: ^tools/(l1_analyzer/l1_analyzer/environment\.py|slop-audit-rs/src/runtime/environment\.rs|slop-audit-rs/generate_env\.py)$

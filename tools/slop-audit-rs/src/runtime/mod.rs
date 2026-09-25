@@ -25,6 +25,7 @@ pub mod coverage;
 pub mod coverage_runners;
 pub mod coverage_rust;
 pub mod determinism;
+pub mod environment;
 pub mod runners;
 pub mod runners_java;
 pub mod runners_js;
@@ -78,7 +79,12 @@ pub fn run_untrusted(command: &[String], cwd: &Path, env: &[(String, String)],
     };
     let mut cmd = Command::new(program);
     cmd.args(args).current_dir(cwd).stdout(Stdio::piped()).stderr(Stdio::piped());
-    for (key, value) in env {
+    // WHAT A STRANGER'S SUITE SEES OF THIS MACHINE. The parent's environment was inherited
+    // whole until 2026-09-25, so every API key on the machine running the audit was readable
+    // by the code being audited. `env_clear` first, then the allowlist, then the caller's own
+    // settings; see runtime::environment for what passes and why.
+    cmd.env_clear();
+    for (key, value) in environment::child_environment(env) {
         cmd.env(key, value);
     }
     let isolation = new_process_group(&mut cmd);
