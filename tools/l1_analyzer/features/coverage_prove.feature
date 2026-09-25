@@ -110,24 +110,12 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
     Then the proof compiles inside the module under test, so private and crate-internal functions are callable
     And no assertion is added here: the body carries its own, with the explanation as the panic message
 
-  Scenario: _classify_run reads one cargo run as pass, fail or error, checking failure before build breakage
-    Given the combined cargo output and the exit code
-    When _classify_run tests the failure markers before the compile markers
-    Then a failed assertion is a fail, even though cargo also prints its own error: test failed line
-    And a non-zero exit after the harness started running is a fail rather than an error, so an abort with no panic message still reaches the gates
-    But a zero exit with no test line at all is reported as a pass
-
-  Scenario: _fail_bucket hands one failing run to the gates and returns their verdict
-    Given one proof's output and label, its test body, and the function's return type
-    When _fail_bucket parses that proof's panic and passes it to the failure classifier
-    Then it returns the retention bucket for this failure
-    And it decides nothing on its own, so the retention rule lives in one place and this is only the seam
-
   Scenario: _append_and_run runs a proof inside the real crate and always puts the file back
     Given a repository, the module path, a rendered proof and a test filter
     When _append_and_run appends the proof, runs cargo test with that filter, then restores the file
     Then it returns the exit code and the combined output
     And the module is written back byte for byte whether the run passed, failed, or raised partway through
+    And the original bytes are recorded outside the tree before the file is touched, so a run killed between the write and the restore can be undone by the next one
     But with no cargo on PATH it returns a failure code and the words no cargo, without touching the file
 
   Scenario: _run_in_crate turns one rendered proof into a single in-crate verdict
@@ -219,15 +207,8 @@ Feature: coverage_prove — the Rust coverage-gap prove loop, where execution de
     Then a sweep that located nothing says so, and a sweep whose tests ran reports the retained count
     But a sweep that located gaps and ran none of them says that instead, naming how many the model declined, because it used to fall through to the nothing-located sentence and tell a reader there were no uncovered branches over a module with 154
 
-  Scenario: body_asserts decides whether a proof body will evaluate an assertion
-    Given the body a model proposed for one gap
-    When body_asserts parses it
-    Then a body whose assertion runs is usable, including one inside a loop, a branch or a with-block, since those execute what they hold
-    But a body whose only assertion sits inside a nested function nobody calls is not, because that function is defined and never entered, so the proof passes having measured nothing
-
   Scenario: _rust_sources reads the text of every Rust file coverage measured
     Given the crate and the files a coverage build reported on
     When _rust_sources reads each Rust one
     Then the choosing that follows needs no reader of its own, which is what keeps I/O out of the function that decides what to spend on
     But a file that will not open is left out rather than given back empty, since an empty module has no gaps and would read as a file with nothing to prove instead of a file nobody could read
-

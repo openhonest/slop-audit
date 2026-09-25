@@ -28,6 +28,7 @@ round cap per gap and can be switched off (repair_rounds=0).
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -46,6 +47,8 @@ from l1_analyzer.coverage_words import (
     PROPOSE_MANY_INSTRUCTION,
     REPAIR_INSTRUCTION,
 )
+from l1_analyzer.proof_outcomes import _classify_run, _fail_bucket, body_asserts
+from l1_analyzer.proof_recovery import recovery_record
 from l1_analyzer.rust_facets import CoverageGap
 from l1_analyzer.sweep_pool import (
     checkouts_for,
@@ -171,6 +174,100 @@ def _live_gaps(gaps: list[CoverageGap], host: frozenset[str]) -> list[CoverageGa
     return [g for g in gaps if not coverage_gates.cfg_excluded(g.get("cfg"), host)]
 
 
+
+
+def pack_gaps(gaps: list[CoverageGap], budget: int) -> list[list[CoverageGap]]:
+    """The gaps of one sweep, grouped into the requests that will carry them.
+
+    One gap per request was the shape until 2026-09-06, which is 425 requests for a
+    176-module sweep before a single line is compiled. The compile was batched long before
+    the ask was, and `render_batch`'s docstring says why: N tests, one build. This is the
+    same move one step earlier.
+
+    In source order and greedy, which is deliberate on both counts. Order, because a reader
+    following the run's progress should see it move through the codebase rather than through
+    a sort nobody asked for. Greedy, because a packing that reordered gaps to fill requests
+    more tightly would buy a few per cent and cost the ability to say which request a gap was
+    in.
+
+    A gap whose own source is over the budget travels alone rather than being dropped. It is
+    the case that matters: turso's largest proof-ready function is 145,605 characters, and a
+    sweep that quietly skipped its largest functions would report the same number over a
+    smaller question. Whether the model can answer about it is the model's to say, and it
+    says so by answering or not.
+
+    A budget of nothing raises. Zero would put every gap in its own request, which is exactly
+    the shape this replaces, arrived at silently."""
+    if budget <= 0:
+        raise ValueError(f"a pack budget of {budget} would send every gap on its own, "
+                         "which is the shape packing replaces")
+    packs: list[list[CoverageGap]] = []
+    current: list[CoverageGap] = []
+    used = 0
+    for gap in gaps:
+        size = len(gap["function_source"])
+        if current and used + size > budget:
+            packs.append(current)
+            current, used = [], 0
+        current.append(gap)
+        used += size
+    if current:
+        packs.append(current)
+    return packs
+
+def answers_for(gaps: list[CoverageGap], reply: llm.ModelReply) -> list[Answer | None]:
+    """One answer per gap, in the order the gaps were sent, or None where there is none.
+
+    A batched ask has one failure the single ask cannot have: the answers arrive together and
+    something has to say which is which. An answer compiled against the wrong function would
+    either fail to build or, worse, build and assert the wrong thing about code nobody read.
+
+    So the model keys each answer by the index it was given, and an index that is missing,
+    repeated or outside the pack is dropped rather than guessed at. A dropped answer is a gap
+    nobody proposed for, which the sweep already counts; a misplaced one would be a finding
+    about a function nobody read.
+
+    The first answer for an index wins. Two answers for one gap is the model contradicting
+    itself, something has to be kept, and letting the second overwrite the first would be a
+    silent choice rather than a stated one."""
+    if reply["text"] is None:
+        LAST_REFUSAL["reason"] = reply["reason"]
+        LAST_REFUSAL["cause"] = reply["cause"]
+        return [None] * len(gaps)
+    data = read_json_object(reply["text"])
+    if data is None:
+        return [None] * len(gaps)
+    proofs = data.get("proofs")
+    if not isinstance(proofs, list):
+        # A model that answered in a shape nobody asked for is not a model that declined,
+        # and the sweep has to be able to say which it met.
+        LAST_REFUSAL["reason"] = llm.DECLINED
+        LAST_REFUSAL["cause"] = ("the reply carries no proofs list; its keys are "
+                                 f"{sorted(data)[:5]}")
+        return [None] * len(gaps)
+    out: list[Answer | None] = [None] * len(gaps)
+    # Which indices the reply has already spoken for, valid or not. Tracked apart from the
+    # answers themselves so that a second entry for one index is always dropped: an index
+    # answered badly and then answered again is the model contradicting itself, and quietly
+    # taking the second reading would be a choice made rather than stated.
+    spoken: set[int] = set()
+    for entry in proofs:
+        if not isinstance(entry, dict) or not isinstance(entry.get("index"), int):
+            continue
+        at = entry["index"]
+        if not 0 <= at < len(gaps) or at in spoken:
+            continue
+        spoken.add(at)
+        body = entry.get("body")
+        if not isinstance(body, str):
+            continue
+        # Rebuilt field by field rather than handed on whole, so the index the model was
+        # keying by cannot travel any further than this loop.
+        out[at] = _valid({"body": body, "explanation": str(entry.get("explanation", ""))},
+                         body_asserts)
+    return out
+
+
 def read_json_object(text: str) -> dict[str, object] | None:
     """The JSON object a reply carries, or nothing when it carries none.
 
@@ -281,44 +378,6 @@ def _valid(data: Answer | None, asserts: Callable[[str], bool]) -> Answer | None
 PACK_BUDGET_CHARS = 200_000
 
 
-def pack_gaps(gaps: list[CoverageGap], budget: int) -> list[list[CoverageGap]]:
-    """The gaps of one sweep, grouped into the requests that will carry them.
-
-    One gap per request was the shape until 2026-09-06, which is 425 requests for a
-    176-module sweep before a single line is compiled. The compile was batched long before
-    the ask was, and `render_batch`'s docstring says why: N tests, one build. This is the
-    same move one step earlier.
-
-    In source order and greedy, which is deliberate on both counts. Order, because a reader
-    following the run's progress should see it move through the codebase rather than through
-    a sort nobody asked for. Greedy, because a packing that reordered gaps to fill requests
-    more tightly would buy a few per cent and cost the ability to say which request a gap was
-    in.
-
-    A gap whose own source is over the budget travels alone rather than being dropped. It is
-    the case that matters: turso's largest proof-ready function is 145,605 characters, and a
-    sweep that quietly skipped its largest functions would report the same number over a
-    smaller question. Whether the model can answer about it is the model's to say, and it
-    says so by answering or not.
-
-    A budget of nothing raises. Zero would put every gap in its own request, which is exactly
-    the shape this replaces, arrived at silently."""
-    if budget <= 0:
-        raise ValueError(f"a pack budget of {budget} would send every gap on its own, "
-                         "which is the shape packing replaces")
-    packs: list[list[CoverageGap]] = []
-    current: list[CoverageGap] = []
-    used = 0
-    for gap in gaps:
-        size = len(gap["function_source"])
-        if current and used + size > budget:
-            packs.append(current)
-            current, used = [], 0
-        current.append(gap)
-        used += size
-    if current:
-        packs.append(current)
-    return packs
 
 
 # What one answer is allowed to cost, in output tokens. The single ask has always allowed
@@ -333,57 +392,6 @@ _TOKENS_PER_ANSWER = 2048
 _MAX_OUTPUT_TOKENS = 64_000
 
 
-def answers_for(gaps: list[CoverageGap], reply: llm.ModelReply) -> list[Answer | None]:
-    """One answer per gap, in the order the gaps were sent, or None where there is none.
-
-    A batched ask has one failure the single ask cannot have: the answers arrive together and
-    something has to say which is which. An answer compiled against the wrong function would
-    either fail to build or, worse, build and assert the wrong thing about code nobody read.
-
-    So the model keys each answer by the index it was given, and an index that is missing,
-    repeated or outside the pack is dropped rather than guessed at. A dropped answer is a gap
-    nobody proposed for, which the sweep already counts; a misplaced one would be a finding
-    about a function nobody read.
-
-    The first answer for an index wins. Two answers for one gap is the model contradicting
-    itself, something has to be kept, and letting the second overwrite the first would be a
-    silent choice rather than a stated one."""
-    if reply["text"] is None:
-        LAST_REFUSAL["reason"] = reply["reason"]
-        LAST_REFUSAL["cause"] = reply["cause"]
-        return [None] * len(gaps)
-    data = read_json_object(reply["text"])
-    if data is None:
-        return [None] * len(gaps)
-    proofs = data.get("proofs")
-    if not isinstance(proofs, list):
-        # A model that answered in a shape nobody asked for is not a model that declined,
-        # and the sweep has to be able to say which it met.
-        LAST_REFUSAL["reason"] = llm.DECLINED
-        LAST_REFUSAL["cause"] = ("the reply carries no proofs list; its keys are "
-                                 f"{sorted(data)[:5]}")
-        return [None] * len(gaps)
-    out: list[Answer | None] = [None] * len(gaps)
-    # Which indices the reply has already spoken for, valid or not. Tracked apart from the
-    # answers themselves so that a second entry for one index is always dropped: an index
-    # answered badly and then answered again is the model contradicting itself, and quietly
-    # taking the second reading would be a choice made rather than stated.
-    spoken: set[int] = set()
-    for entry in proofs:
-        if not isinstance(entry, dict) or not isinstance(entry.get("index"), int):
-            continue
-        at = entry["index"]
-        if not 0 <= at < len(gaps) or at in spoken:
-            continue
-        spoken.add(at)
-        body = entry.get("body")
-        if not isinstance(body, str):
-            continue
-        # Rebuilt field by field rather than handed on whole, so the index the model was
-        # keying by cannot travel any further than this loop.
-        out[at] = _valid({"body": body, "explanation": str(entry.get("explanation", ""))},
-                         body_asserts)
-    return out
 
 
 def propose_many(gaps: list[CoverageGap]) -> list[Answer | None]:
@@ -420,45 +428,8 @@ def repair(gap: CoverageGap, test_source: str, compiler_error: str) -> Answer | 
 
 
 
-def body_asserts(body: str) -> bool:
-    """Whether this proof body will evaluate an assertion when it runs.
-
-    The same hole as Python's, in the language the concurrency sweep runs on: a body
-    defining an `fn` nobody calls compiles, the test passes, and cargo reports nothing
-    wrong. A proof that measured nothing then published a clean bill for its branch.
-
-    An assertion is a macro invocation named assert, assert_eq, assert_ne, or one of their
-    debug_ forms, or a bare `panic!` guarded by a branch. Anything inside a nested
-    `function_item` does not count, because nothing calls it."""
-    from l1_analyzer import (
-        rust_trace,  # noqa: F401 - keeps the tree-sitter import local
-    )
-    from l1_analyzer.indicators import _get_parser
-
-    root = _get_parser("rust").parse(body.encode()).root_node
-
-    # An explicit stack, because this walk refuses to enter a nested function rather than
-    # reading every node, which is the one thing `ts_nodes.descendants` cannot be asked for.
-    # It recursed until 2026-09-05, and parse-tree depth is set by the body being read.
-    stack = [root]
-    while stack:
-        node = stack.pop()
-        for child in node.children:
-            if child.type == "function_item":
-                continue
-            if child.type == "macro_invocation":
-                name = child.child_by_field_name("macro")
-                text = name.text.decode("utf8", errors="ignore") if name is not None and name.text else ""
-                if text in _ASSERT_MACROS:
-                    return True
-            stack.append(child)
-    return False
 
 
-_ASSERT_MACROS = frozenset({
-    "assert", "assert_eq", "assert_ne",
-    "debug_assert", "debug_assert_eq", "debug_assert_ne",
-})
 
 
 # honest-code-allow: L1.21.1 - render_module and _outcome_detail both build one f-string and share nothing else: one wraps a Rust test in a proof module, the other counts what generated tests became. A table of two rows whose only column is the whole body is the body written twice with a lookup in front
@@ -472,39 +443,18 @@ def render_module(body: str) -> str:
     )
 
 
-def _classify_run(output: str, returncode: int) -> str:
-    """pass / fail / error from one in-crate `cargo test`. A failing test and a passing test
-    both print a `test result:` line, so they are checked BEFORE compile errors: cargo prints
-    its own `error: test failed` for a failed assertion, which is a fail, not a build error."""
-    if "test result: FAILED" in output or "1 failed" in output or "panicked" in output:
-        return "fail"
-    if "test result: ok" in output and "1 passed" in output:
-        return "pass"
-    if "could not compile" in output or re.search(r"error\[E\d+\]", output):
-        return "error"
-    # A construction that aborts (mem::zeroed UB) prints no `panicked`, but the crate did
-    # compile and run: a non-zero exit after the test harness started is a failure, not a
-    # build error, so it reaches the gates rather than being counted as did-not-compile.
-    ran = "running " in output or "test result:" in output
-    if returncode != 0:
-        # Nothing ran and the compiler said nothing, so nothing we can see compiled
-        # anything. Called `error` until 2026-09-07, which named every way of failing to
-        # reach cargo after the event cargo would have reported.
-        return "fail" if ran else "unrun"
-    return "pass"
 
 
-def _fail_bucket(output: str, proof_label: str, body: str, return_type: str | None) -> str:
-    """A failing run's retention bucket, from the gates: parse this proof's panic, then
-    classify it as a divergence (retained) or one of the noise classes."""
-    panic = coverage_gates.parse_panic(output, proof_label)
-    return coverage_gates.classify_failure(body, return_type, panic)
 
 
 @boundary
 def _append_and_run(repo: Path, module_relpath: str, test_source: str, test_filter: str, timeout_seconds: float) -> tuple[int, str]:
     """Append a proof module to the file, run `cargo test <filter>`, and restore the file
-    byte-for-byte. Returns (returncode, combined output). The file is always restored."""
+    byte-for-byte. Returns (returncode, combined output). The file is always restored.
+
+    The original bytes are written outside the repository BEFORE the file is touched, so a
+    run killed between the write and the restore can be undone by the next one. See
+    restore_interrupted_proof."""
     cargo = rust_trace._cargo()
     if cargo is None:
         # Said in cargo's own vocabulary of nothing: no test line and no compiler error, so
@@ -513,12 +463,16 @@ def _append_and_run(repo: Path, module_relpath: str, test_source: str, test_filt
         return 1, "cargo is not on PATH, so nothing was compiled and nothing was run"
     module = repo / module_relpath
     original = module.read_bytes()
+    record = recovery_record(repo)
     try:
+        record.write_text(json.dumps(
+            {"path": module_relpath, "original": base64.b64encode(original).decode("ascii")}))
         module.write_bytes(original + test_source.encode("utf8"))
         run = rust_trace._run_untrusted(
             [cargo, "test", "--quiet", test_filter], cwd=repo, env={}, timeout_seconds=timeout_seconds)
     finally:
         module.write_bytes(original)
+        record.unlink(missing_ok=True)
     return run.returncode, (run.stdout or "") + (run.stderr or "")
 
 

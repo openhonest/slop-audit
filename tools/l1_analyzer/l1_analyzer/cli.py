@@ -1005,6 +1005,17 @@ def main(argv: list[str] | None) -> int:
     # Coverage-gap proofs (opt-in): locate -> propose -> render -> run in-crate -> retain.
     # Generates and runs code, so CLI-only and explicit. --prove-coverage-repo sweeps the
     # whole crate; --prove-coverage does one module.
+    #
+    # BEFORE EITHER, put back what an interrupted run left behind. A Rust proof is appended to
+    # the customer's own source file, compiled, and removed; every ordinary path restores it
+    # and a SIGKILL does not. The record written beside that edit is replayed here, and the
+    # restoration is announced rather than done quietly: somebody whose file was modified by
+    # this tool is owed the sentence.
+    if args.prove_coverage_repo or args.prove_coverage:
+        from l1_analyzer import proof_recovery
+        restored = proof_recovery.restore_interrupted_proof(args.repo)
+        if restored:
+            print(f"[prove-coverage] {restored}", file=sys.stderr, flush=True)
     if args.prove_coverage_repo:
         def _cov_progress(relpath: str, n_gaps: int, retained: int) -> None:
             print(f"[prove-coverage] {relpath}: {n_gaps} gap(s), retained so far {retained}",
