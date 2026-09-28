@@ -39,6 +39,7 @@ from l1_analyzer import (
     pytest_trace,
     ruby_trace,
     rust_trace,
+    test_regions,
 )
 from l1_analyzer.boundary import boundary
 from l1_analyzer.disclosure import (
@@ -482,7 +483,15 @@ def _god_files(repo: Path) -> L1Result:
                 if len(src.splitlines()) > 1000:   # raw size: disclose that a large file was scoped out
                     scoped_by_reason[reason] = scoped_by_reason.get(reason, 0) + 1
                 continue
-            code = _code_line_count(src, ext)      # data tables discounted: god-file is a logic pile
+            # A Rust file's own unit tests come out first, for the same reason the tests
+            # directory is not in this count: a 1,500-line file holding 600 lines of test
+            # module is a 900-line production file, and the scope this indicator declares
+            # itself under says so. This reader opens files itself rather than through
+            # scope._read_source_bytes, so it has to ask for the region blanking by name;
+            # that is the one place the declaration and the behaviour can drift apart,
+            # and tests/test_god_file_counts_production_lines.py holds them together.
+            src, region_lines = test_regions.blanked(src, ext)
+            code = _code_line_count(src, ext) - len(region_lines)   # data tables discounted too: a god-file is a logic pile
             prod_files += 1
             if code > 1000:
                 god_files += 1
@@ -841,12 +850,17 @@ def _compute_type_escapes(repo: Path, lang: str) -> L1Result:
     if not cfg["type_escape_patterns"]:
         # Untyped or no configured escape hatch (Ruby, JavaScript, Rust, C).
         return {"value": "n/a", "band": "n/a", "details": f"type-escape density not applicable for {lang}"}
-    files, skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
+    files, skipped, test_lines = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
 
     escape_count = 0
     total_loc = 0
     for path, src in files:
-        total_loc += len(src.decode("utf8", errors="ignore").splitlines())
+        # Minus the file's test region, blanked by the reader above and therefore still
+        # present as spaces, so that line numbers stay the author's. Escapes inside a test
+        # are no longer counted, and counting their lines would deflate the density. No
+        # language that carries an inline test region declares an escape pattern today, so
+        # this subtracts zero on every repository measured; the day one does, it is right.
+        total_loc += len(src.decode("utf8", errors="ignore").splitlines()) - test_lines.get(path, 0)
         escape_count += _count_type_escapes_in_tree(
             parser_for(path.suffix, lang).parse(src).root_node, cfg)
 
@@ -868,7 +882,7 @@ def _compute_decision_space(repo: Path, lang: str) -> L1Result:
     # Subscript, not .get(): a supported language that declares no decision vocabulary
     # is a gap in the table, and a gap must raise rather than enumerate zero.
     decision_types = DECISION_NODE_TYPES[lang]
-    files, skipped = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], scope=PRODUCTION)
+    files, skipped, _test_lines = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], scope=PRODUCTION)
 
     decision_points = 0
     for path, src in files:

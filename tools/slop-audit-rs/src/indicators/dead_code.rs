@@ -490,8 +490,14 @@ pub fn read(repo: &Path, lang: &str) -> DeadCode {
     let mut unreachable: Vec<Site> = Vec::new();
     let mut unparsed = 0usize;
     let mut pasted = 0usize;
-    for (rel, tree, src) in &sources {
-        let lines = crate::py_splitlines(&crate::decode_ignoring_invalid(src)).len();
+    for (rel, tree, src, test_lines) in &sources {
+        // Minus this file's test region, which the reader above replaced with spaces rather
+        // than deleting, so that every line number stays the one the author would see.
+        // `splitlines` counts those spaces back in. A Rust unit test lives in the file it
+        // tests, so counting them here took a crate's tests out of the numerator and left them
+        // under it: 2,532 of uuid-rs/uuid's 9,821 lines are test module, and its dead-code
+        // ratio was a quarter of what it should have read.
+        let lines = crate::py_splitlines(&crate::decode_ignoring_invalid(src)).len() - test_lines;
         production_loc += lines;
         analyzed_loc += lines;
         // A tree the grammar could not parse cannot support a claim about what it contains:

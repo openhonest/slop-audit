@@ -31,7 +31,7 @@ def _tree(tmp_path):
 
 def _read_by_both(repo, named):
     text, _ = scope._read_text_files(repo, frozenset({".py"}), named)
-    raw, _ = scope._read_source_bytes(repo, (".py",), named)
+    raw, _, _test_lines = scope._read_source_bytes(repo, (".py",), named)
     return {p.name for p, _ in text}, {p.name for p, _ in raw}
 
 

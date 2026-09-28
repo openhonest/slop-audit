@@ -288,7 +288,7 @@ def cover_paths(repo: Path, lang: str) -> PathCover:
         return {"value": "n/a", "band": "n/a", "details": f"path cover not implemented for {lang} yet (python only)"}
     cfg = LANG_CFG["python"]
     parser = _get_parser("python")
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
+    files, _skipped, _test_lines = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
 
     total = 0
     functions = 0

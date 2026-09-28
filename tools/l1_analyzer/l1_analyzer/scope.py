@@ -16,6 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TypedDict
 
+from l1_analyzer import test_regions
 from l1_analyzer.boundary import boundary
 
 # The .NET and JVM file convention, in its original casing. Also used by L1.8.
@@ -77,6 +78,14 @@ class Scope(TypedDict):
     excludes: tuple[str, ...]
     buckets: tuple[str, ...]
     indicators: tuple[str, ...]
+    # Whether a REGION of a file can be scoped out, not only a whole file. Rust puts its unit
+    # tests inside the file they test, so no path names them; see l1_analyzer.test_regions.
+    #
+    # False for the whole-repository scope, and that is the interesting half. L1.8 is the ratio
+    # of test lines to production lines and L1.16 asks whether the whitespace is disciplined
+    # anywhere: both want to SEE the test lines, and blanking them there would delete them from
+    # both halves of a ratio that exists to compare them.
+    strip_test_regions: bool
 
 
 SCOPES: dict[str, Scope] = {
@@ -97,6 +106,7 @@ SCOPES: dict[str, Scope] = {
         # measure the fixtures, which repeat by design.
         "indicators": ("L1.12", "L1.13", "L1.14", "L1.15", "L1.18", "L1.19", "path_cover",
                        "absolute_paths", "gate:type-escapes"),
+        "strip_test_regions": True,
     },
     # The same, and conformance/ as well. A conformance directory holds law and spec
     # scaffolding and test doubles (fault-injection markers, failing connections), so it
@@ -113,6 +123,7 @@ SCOPES: dict[str, Scope] = {
         # from conformance suites and from examples demonstrating Django and Pydantic. Its
         # module source has none of either.
         "indicators": ("L1.17", "L1.18b", "L1.21", "thread_surface"),
+        "strip_test_regions": True,
     },
     # Everything, tests included, because for these three the test tree IS the subject:
     # L1.8 is the ratio of test lines to production lines, L1.16 asks whether the
@@ -127,6 +138,10 @@ SCOPES: dict[str, Scope] = {
         # name. This is what the second reader was working around by rewriting the rule.
         "buckets": (),
         "indicators": ("L1.8", "L1.16", "interleaving_robustness"),
+        # The test lines are the subject here, so they stay. L1.8 IS the ratio of test lines to
+        # production lines: blanking a Rust test module would take it out of both halves and
+        # leave the ratio answering a question nobody asked.
+        "strip_test_regions": False,
     },
 }
 
@@ -471,12 +486,28 @@ def _bucket_reason(path: Path, repo: Path, has_packages: bool, scope: str) -> st
     return None
 
 
-def _read_source_bytes(repo: Path, extensions: tuple[str, ...], scope: str) -> tuple[list[tuple[Path, bytes]], int]:
-    """Read every source file with one of `extensions` as bytes, excluding files scoped
-    out under `scope` (see _bucket_reason). Returns the files read and the number
-    unreadable. `scope` is a name from SCOPES, never a tuple: the caller declares which
-    measurement it belongs to and the table records that it does."""
+def _read_source_bytes(repo: Path, extensions: tuple[str, ...],
+                       scope: str) -> tuple[list[tuple[Path, bytes]], int, dict[Path, int]]:
+    """Read every source file with one of `extensions` as bytes, excluding files scoped out
+    under `scope` (see _bucket_reason). Returns the files read, the number unreadable, and how
+    many lines of each file are a test region rather than production code.
+
+    `scope` is a name from SCOPES, never a tuple: the caller declares which measurement it
+    belongs to and the table records that it does.
+
+    THE THIRD VALUE IS A DENOMINATOR CORRECTION, and it is here because the blanking below
+    keeps line numbers. A Rust test region is replaced by spaces rather than deleted, so a
+    reader that says line 391 still means line 391 of what the author wrote; the cost is that
+    counting `splitlines()` counts the emptied lines too. Two readers here divide by a line
+    count, and without this their numerator excluded a crate's tests while their denominator
+    kept them, which on uuid-rs/uuid diluted the dead-code ratio by 26 per cent.
+
+    PER FILE, NOT ONE TOTAL, because a reader that drops a file has to drop that file's
+    correction with it. The dead-code reader subtracts any file the grammar could not parse
+    from the count it published as analyzed; given one total it subtracted that file's emptied
+    lines twice and could reach a negative disclosure. Only the files with a region appear."""
     files: list[tuple[Path, bytes]] = []
+    test_lines: dict[Path, int] = {}
     skipped = 0
     has_packages = _repo_has_packages(repo)
     for ext in extensions:
@@ -484,10 +515,19 @@ def _read_source_bytes(repo: Path, extensions: tuple[str, ...], scope: str) -> t
             if _bucket_reason(f, repo, has_packages, scope) is not None:
                 continue
             try:
-                files.append((f, f.read_bytes()))
+                raw = f.read_bytes()
             except OSError:
                 skipped += 1
-    return files, skipped
+                continue
+            # A REGION of the file, where the scope says one can be scoped out. Rust puts its
+            # unit tests inside the file they test, so no path names them and eight indicators
+            # measured them as production code.
+            if scope_rule(scope)["strip_test_regions"]:
+                raw, region_lines = test_regions.blanked(raw, ext)
+                if region_lines:
+                    test_lines[f] = len(region_lines)
+            files.append((f, raw))
+    return files, skipped, test_lines
 
 
 class BucketedPath(TypedDict):
@@ -533,19 +573,33 @@ def _read_text_files(repo: Path, extensions: frozenset[str], scope: str) -> tupl
     through the same function. The two are separate call sites because this reader
     honours only the scope's ignored directories, where _bucket_reason also buckets
     docs, tooling and loose root scripts; folding them together would change what the
-    whole-repository indicators measure, which is a different question from this one."""
+    whole-repository indicators measure, which is a different question from this one.
+
+    The scope's test REGIONS come out here too, where it declares that they should, because a
+    path is not the only place a test can hide. The readers on this path already dropped a
+    whole file named as a test, and a Rust crate writes its tests inside the file they test:
+    the absolute-path check's own docstring records that this package's tests carried 24 of 57
+    findings before the file-level scope landed, and a crate's test module is the same finding
+    the same rule already excludes. No count is returned, because nothing on this path divides
+    by a line count."""
     files: list[tuple[Path, str]] = []
     skipped = 0
     has_packages = _repo_has_packages(repo)
+    strip = scope_rule(scope)["strip_test_regions"]
     for f in _rglob_files(repo, "*"):
-        if f.suffix.lower() not in extensions:
+        ext = f.suffix.lower()
+        if ext not in extensions:
             continue
         if _bucket_reason(f, repo, has_packages, scope) is not None:
             continue
         try:
-            files.append((f, f.read_text(errors="ignore")))
+            raw = f.read_bytes()
         except OSError:
             skipped += 1
+            continue
+        if strip:
+            raw, _region_lines = test_regions.blanked(raw, ext)
+        files.append((f, raw.decode("utf8", errors="ignore")))
     return files, skipped
 
 # ---------------------------------------------------------------------------

@@ -135,9 +135,9 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
             Some(n) => n,
             None => continue,
         };
-        if !cfg.extensions.iter().any(|ext| name.ends_with(ext)) {
+        let Some(ext) = cfg.extensions.iter().find(|ext| name.ends_with(**ext)) else {
             continue;
-        }
+        };
         if bucket_reason(path, repo, has_packages, crate::PRODUCTION,
                          crate::PRODUCTION_BUCKETS, &disowned).is_some() {
             continue;
@@ -149,6 +149,11 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
                 continue;
             }
         };
+        // A Rust crate's own unit tests come out before the branches are counted. This reader
+        // has its own walk rather than the shared production one, so it asks for the region
+        // blanking by name; without it the port read 139 decision points on uuid-rs/uuid where
+        // the reference read 137, and the two extra were inside a test module.
+        let (src, _region_lines) = crate::test_regions::blanked(&src, ext);
         files += 1;
         if let Some(tree) = parser.parse(&src, None) {
             decision_points += count_decisions(tree.root_node(), types);

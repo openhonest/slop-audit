@@ -622,7 +622,7 @@ pub fn walk(repo: &std::path::Path, lang: &str, facts: &RepoFacts)
     -> Vec<(String, Definition)> {
     let (parsed, _skipped) = crate::indicators::dead_code_grammars::parsed_files(repo, lang);
     let mut out = Vec::new();
-    for (rel, tree, src) in parsed {
+    for (rel, tree, src, _test_lines) in parsed {
         if tree.root_node().has_error() {
             continue;
         }

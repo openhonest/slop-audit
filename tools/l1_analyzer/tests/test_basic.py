@@ -121,7 +121,7 @@ def test_directory_named_like_a_source_file_is_ignored_by_every_reader(tmp_path)
     (tmp_path / "decimal.js").mkdir()
     (tmp_path / "pkg.py").mkdir()
 
-    files, skipped = indicators._read_source_bytes(tmp_path, (".py",), scope.WHOLE_REPO)
+    files, skipped, _test_lines = indicators._read_source_bytes(tmp_path, (".py",), scope.WHOLE_REPO)
     assert skipped == 0
     assert [p.name for p, _ in files] == ["ok.py"]
 
@@ -146,7 +146,7 @@ def test_a_directory_does_not_hide_a_genuinely_unreadable_file(tmp_path):
     blocked.chmod(0o000)
     try:
         god = indicators._god_files(tmp_path)
-        _, skipped = indicators._read_source_bytes(tmp_path, (".py",), scope.WHOLE_REPO)
+        _, skipped, _test_lines = indicators._read_source_bytes(tmp_path, (".py",), scope.WHOLE_REPO)
         _, text_skipped = indicators._read_text_files(tmp_path, frozenset({".py", ".js"}), scope.WHOLE_REPO)
     finally:
         blocked.chmod(0o644)

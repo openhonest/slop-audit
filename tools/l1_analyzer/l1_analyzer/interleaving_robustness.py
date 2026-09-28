@@ -112,7 +112,7 @@ def analyze(repo: Path, lang: str) -> InterleavingRobustnessResult:
                 "details": "no hand-overridden concurrency surface to model"}
 
     cfg = LANG_CFG["rust"]
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=WHOLE_REPO)
+    files, _skipped, _test_lines = _read_source_bytes(repo, cfg["extensions"], scope=WHOLE_REPO)
     modeled_in_file: set[str] = set()
     modeled_chunks: list[str] = []
     for path, src in files:

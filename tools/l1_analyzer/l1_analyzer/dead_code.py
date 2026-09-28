@@ -626,7 +626,7 @@ def analyze(repo: Path, lang: str) -> DeadCodeRow:
         return _na(f"no native dead-code analysis for {lang}; the canon's tool for it is not wired")
 
     extensions = tuple(ext for ext, (_g, key) in _EXT_LANG.items() if key == lang)
-    sources, unreadable = _read_source_bytes(repo, extensions, scope=PRODUCTION)
+    sources, unreadable, test_lines = _read_source_bytes(repo, extensions, scope=PRODUCTION)
     if not sources:
         return _na(f"no production {lang} source in scope")
 
@@ -645,8 +645,15 @@ def analyze(repo: Path, lang: str) -> DeadCodeRow:
     unparsed = pasted = 0
     for path, src in sources:
         relpath = str(path.relative_to(repo)) if repo in path.parents else path.name
-        production_loc += len(src.splitlines())
-        analyzed_loc += len(src.splitlines())
+        # Minus the file's test region, which the reader above replaced with spaces rather
+        # than deleting, so that every line number stays the one the author would see.
+        # `splitlines()` counts those spaces back in. A Rust unit test lives in the file it
+        # tests, so counting them here took a crate's tests out of the numerator and left them
+        # under it: 2,532 of uuid-rs/uuid's 9,821 lines are test module, and its dead-code
+        # ratio was a quarter of what it should have read.
+        code = len(src.splitlines()) - test_lines.get(path, 0)
+        production_loc += code
+        analyzed_loc += code
         grammar, _key = _EXT_LANG[path.suffix.lower()]
         root = parser(grammar).parse(src).root_node
         # A tree the grammar could not parse cannot support a claim about what it
@@ -656,7 +663,7 @@ def analyze(repo: Path, lang: str) -> DeadCodeRow:
         # never condemn one.
         if root.has_error:
             unparsed += 1
-            analyzed_loc -= len(src.splitlines())
+            analyzed_loc -= code
             continue
         # C builds function names with the preprocessor. libuv writes
         # `#define XX(uc, lc) case UV_FS_##uc: fs__##lc(req); break;`, so `fs__rmdir` is

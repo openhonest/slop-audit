@@ -7,6 +7,7 @@ the finite-testability meter uses. What gets scoped out is disclosed (bucketed_l
 never dropped silently. Pure assertions on real files, no mocks.
 """
 
+from l1_analyzer.boundary import boundary
 from l1_analyzer.indicators import _god_files
 from l1_analyzer.scope import _is_generated
 
@@ -20,6 +21,7 @@ _BIG_TABLE = "TABLE = {\n" + "".join(f'    "k{i}": {i},\n' for i in range(1200))
 _BIG_LOGIC = "".join(f"def f{i}(x):\n    return x + {i}\n\n\n" for i in range(400))
 
 
+@boundary
 def _mkrepo(tmp_path, files):
     for rel, content in files.items():
         p = tmp_path / rel
@@ -78,3 +80,24 @@ def test_is_generated_reads_only_the_header_sentinel(tmp_path):
     handwritten.write_text("int x;\n" * 500 + "// note: not @generated, just a comment far below\n")
     assert _is_generated(gen) is True
     assert _is_generated(handwritten) is False   # sentinel past the header window is ignored
+
+
+def test_a_short_container_of_nothing_but_literals_is_a_data_table(tmp_path):
+    """The table rule has two arms, and only one of them is a length.
+
+    A container of twelve lines or more is a table whatever it holds. A SHORTER container every
+    one of whose elements is a literal is also a table. The Rust port carried its own copy of
+    this rule with the second arm missing, so it called 17 of uuid-rs/uuid's lib.rs lines logic
+    where this reader calls them data: 1,005 raw lines became 1,005 rather than 988, the file
+    crossed the thousand-line line, and the port published 3 god-files against this tool's 2.
+
+    The fixture is sized so the answer turns on the table alone: 1,000 lines of logic and a
+    five-line list is over the line raw and exactly on it once the table comes off.
+    """
+    logic = "".join(f"def f{n}():\n    return {n}\n" for n in range(500))
+    table = "ROWS = [\n    1,\n    2,\n    3,\n]\n"
+    repo = _mkrepo(tmp_path, {"pkg/__init__.py": "", "pkg/app.py": logic + table})
+    assert len((logic + table).splitlines()) == 1005
+    r = _god_files(repo)
+    assert r["details"].startswith("0/"), r["details"]
+    assert r["value"] == 0.0

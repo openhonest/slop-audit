@@ -633,7 +633,7 @@ def _walk(repo: Path, lang: str) -> dict[str, set[Site]]:
     files can each declare `Store.cache`, and merging them into one set would count one site
     where two exist and would let a visit to either one cover both."""
     cfg = LANG_CFG[lang]
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
+    files, _skipped, _test_lines = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
     by_file: dict[str, set[Site]] = {}
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)

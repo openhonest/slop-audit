@@ -672,7 +672,7 @@ def _parsed_roots(repo: Path, lang: str, cfg: LangCfg) -> tuple[list[tuple[Node,
     """Every production file of this language, parsed once, with its repo-relative
     path. One reader for the ratio and the two name-listing helpers, so the three
     cannot drift into scanning different file sets."""
-    files, skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
+    files, skipped, _test_lines = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
     roots: list[tuple[Node, str]] = []
     for path, src in files:
         rel = str(path.relative_to(repo)) if (repo in path.parents or path == repo) else str(path)
@@ -772,7 +772,7 @@ def module_mutable_names(repo: Path, lang: str) -> set[str]:
         return set()
     cfg = LANG_CFG[lang]
     parser = _get_parser(lang)
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
+    files, _skipped, _test_lines = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION)
     out: set[str] = set()
     for _path, src in files:
         root = parser.parse(src).root_node

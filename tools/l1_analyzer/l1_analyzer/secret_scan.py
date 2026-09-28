@@ -58,6 +58,7 @@ from pathlib import Path
 from re import Pattern
 from typing import NamedTuple, TypedDict
 
+from l1_analyzer import test_regions
 from l1_analyzer.boundary import boundary
 from l1_analyzer.dead_code import _EXT_LANG, parser
 from l1_analyzer.scope import (
@@ -487,6 +488,14 @@ def analyze(repo: Path, lang: str) -> SecretScanRow:
         scanned += 1
         bucket = _bucket_reason(path, repo, has_packages, PRODUCTION)
         in_tests = bucket in ("tests", "test")
+        # A test can also be a REGION of a production file. Rust writes its unit tests inside
+        # the file they test, so no path names them, and this scanner reported a twenty-
+        # character AWS key written as a fixture in the port's own secret_rules.rs as being in
+        # production code. It is not excluded, because a credential is reported wherever it
+        # sits; it is LABELLED, which is what this indicator does with every other test.
+        region_lines: frozenset[int] = frozenset()
+        if not in_tests:
+            _blanked, region_lines = test_regions.blanked(raw, path.suffix.lower())
         # A specification, a README or a design note is not production code. The scope
         # helper has a docs bucket but it fires only on a directory literally named
         # `docs`, and this repository's specification lives in `spec/`, so a credential in
@@ -500,7 +509,8 @@ def analyze(repo: Path, lang: str) -> SecretScanRow:
         # decode drops it - and then every span tree-sitter returned would be shifted by the
         # dropped bytes against the offsets the regexes below report. Re-encoding costs one
         # pass and makes `_byte_offset` exact by construction rather than by assumption.
-        raw_hits.extend(Hit(rule_id, value, relpath, line, in_tests, in_docs)
+        raw_hits.extend(Hit(rule_id, value, relpath, line,
+                            in_tests or line in region_lines, in_docs)
                         for rule_id, line, value in _scan_text(text, text.encode("utf8"), path.name))
 
     grouped: dict[tuple[str, str], list[Hit]] = {}

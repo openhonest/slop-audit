@@ -386,14 +386,15 @@ pub fn scan_text(text: &str, raw: &[u8], name: &str) -> Vec<(&'static str, usize
 mod tests {
     use super::*;
 
-    /// An AWS key, assembled from pieces rather than written out whole.
+    /// An AWS key, written out whole, which is what a fixture should look like.
     ///
-    /// A Rust unit test lives in the file it tests, so a credential spelled here is a
-    /// credential in a production file: writing this one out raised THIS repository's own
-    /// L1.14 to four secrets, one of them in production, and the scanner tripped over its own
-    /// test. The scope rule cannot help, because there is no test directory to name.
+    /// It was assembled from two pieces at run time for a year, because a Rust unit test lives
+    /// in the file it tests: spelling this key out raised THIS repository's own L1.14 to four
+    /// secrets, one of them reported as production, and the scanner tripped over its own test.
+    /// The scope rule could not help, since there is no test directory to name. The scanner now
+    /// reads the test REGION and labels a hit inside one, so the fixture can say what it means.
     fn aws_key() -> String {
-        format!("AKIA{}", "QWERTYUIOPASDFGH")
+        "AKIAQWERTYUIOPASDFGH".to_string()
     }
 
     #[test]

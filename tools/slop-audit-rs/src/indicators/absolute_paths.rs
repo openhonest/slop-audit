@@ -141,6 +141,12 @@ fn production_files(repo: &Path) -> Vec<(std::path::PathBuf, String)> {
             continue;
         }
         if let Ok(bytes) = std::fs::read(path) {
+            // A test can be a REGION of a production file, not only a file with test in its
+            // path. The docstring above names the reason this check excludes tests at all: a
+            // test that proves a path detector fires has to contain the path it detects. A Rust
+            // crate writes those tests inside the file under test, so no path names them.
+            let (bytes, _region_lines) =
+                crate::test_regions::blanked(&bytes, &format!(".{ext}"));
             out.push((path.to_path_buf(), String::from_utf8_lossy(&bytes).into_owned()));
         }
     }

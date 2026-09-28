@@ -827,7 +827,7 @@ def scan(repo: Path, lang: str) -> SurfaceResult:
     scanner = _SCANNERS[lang]
     spec = LANG_SPEC[lang]
     cfg = LANG_CFG[lang]
-    files, _skipped = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
+    files, _skipped, _test_lines = _read_source_bytes(repo, cfg["extensions"], scope=PRODUCTION_WITHOUT_CONFORMANCE)
     bucketed = bucketed_paths(repo, cfg["extensions"], PRODUCTION_WITHOUT_CONFORMANCE)
 
     findings: list[Finding] = []

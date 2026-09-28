@@ -180,6 +180,18 @@ pub fn walk(repo: &Path) -> (Vec<Hit>, usize, usize, bool) {
         let bucket = crate::bucket_reason(path, repo, has_packages, crate::PRODUCTION,
                                           crate::PRODUCTION_BUCKETS, &disowned);
         let in_tests = matches!(bucket, Some("tests") | Some("test"));
+        // A test can also be a REGION of a production file. Rust writes its unit tests inside
+        // the file they test, so no path names them, and this scanner reported a twenty-
+        // character AWS key written as a fixture in this crate's own secret_rules.rs as being
+        // in production code. It is not excluded, because a credential is reported wherever it
+        // sits; it is LABELLED, which is what this indicator does with every other test.
+        let region_lines = if in_tests {
+            std::collections::BTreeSet::new()
+        } else {
+            let suffix = py_suffix(
+                path.file_name().and_then(|n| n.to_str()).unwrap_or("")).to_lowercase();
+            crate::test_regions::blanked(&raw, &suffix).1
+        };
         // A specification, a README or a design note is not production code. The scope helper
         // has a docs bucket but it fires only on a directory literally named `docs`, and this
         // repository's specification lives in `spec/`, so a credential in a fenced block
@@ -197,7 +209,8 @@ pub fn walk(repo: &Path) -> (Vec<Hit>, usize, usize, bool) {
         // the offsets the patterns report.
         let bytes = text.as_bytes().to_vec();
         for (rule, line, value) in scan_text(&text, &bytes, name) {
-            raw_hits.push(Hit { rule, value, file: relpath.clone(), line, in_tests, in_docs });
+            raw_hits.push(Hit { rule, value, file: relpath.clone(), line,
+                                in_tests: in_tests || region_lines.contains(&line), in_docs });
         }
     }
     (raw_hits, scanned, skipped, tracked.is_some())

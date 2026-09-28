@@ -189,7 +189,7 @@ pub fn walk(repo: &std::path::Path, lang: &str)
     -> std::collections::BTreeMap<String, Vec<Unreachable>> {
     let (parsed, _skipped) = crate::indicators::dead_code_grammars::parsed_files(repo, lang);
     let mut out = std::collections::BTreeMap::new();
-    for (rel, tree, _src) in parsed {
+    for (rel, tree, _src, _test_lines) in parsed {
         if tree.root_node().has_error() {
             continue;
         }

@@ -45,7 +45,16 @@ pub fn parser_for_grammar(grammar: &str) -> tree_sitter::Parser {
 }
 
 /// Every production file whose collector is `lang`, parsed with the grammar its EXTENSION
-/// picks, with the count that could not be read.
+/// picks, with how many of each file's lines are a test region, and the count that could not
+/// be read.
+///
+/// THE TEST-REGION COUNT IS A DENOMINATOR CORRECTION, and it is per file rather than one
+/// total. A Rust test region comes out as spaces of the same length so that line numbers stay
+/// the author's, which means `splitlines` counts the emptied lines back in; the dead-code
+/// ratio divides by that count, so uuid-rs/uuid's 2,532 lines of test module left its
+/// numerator and stayed under it. Per file, because that reader drops a file the grammar could
+/// not parse from the number it publishes as analyzed, and one repository total cannot say
+/// which file's emptied lines to drop with it.
 ///
 /// Its own walk rather than the shared one, and the difference is the grammar: the shared
 /// walk parses every file of a language with that language's parser, and a React component
@@ -53,7 +62,7 @@ pub fn parser_for_grammar(grammar: &str) -> tree_sitter::Parser {
 /// names inside it, so the collectors would find fewer definitions and the corpus fewer
 /// references, both silently.
 pub fn parsed_files(repo: &std::path::Path, lang: &str)
-    -> (Vec<(String, tree_sitter::Tree, Vec<u8>)>, usize) {
+    -> (Vec<(String, tree_sitter::Tree, Vec<u8>, usize)>, usize) {
     let wanted = extensions_for(lang);
     if wanted.is_empty() {
         return (Vec::new(), 0);
@@ -78,12 +87,14 @@ pub fn parsed_files(repo: &std::path::Path, lang: &str)
         }
         let Ok(src) = std::fs::read(path) else { skipped += 1; continue };
         let Some((grammar, _collector)) = for_extension(&ext) else { continue };
+        let (src, region_lines) = crate::test_regions::blanked(&src, &format!(".{ext}"));
+        let test_lines = region_lines.len();
         let Some(tree) = parser_for_grammar(grammar).parse(&src, None) else {
             skipped += 1;
             continue;
         };
         let rel = path.strip_prefix(repo).unwrap_or(path).to_string_lossy().into_owned();
-        out.push((rel, tree, src));
+        out.push((rel, tree, src, test_lines));
     }
     (out, skipped)
 }

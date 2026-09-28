@@ -19,6 +19,7 @@ mod lang_spec_check;
 pub mod nodes;
 pub mod runtime;
 pub mod state;
+pub mod test_regions;
 
 pub use lang::parser_for;
 
@@ -315,6 +316,11 @@ pub fn parsed_files(repo: &Path, lang: &str, extra: &[&'static str])
             continue;
         }
         let Ok(src) = std::fs::read(path) else { skipped += 1; continue };
+        // A REGION of the file, not only a whole file. Rust puts its unit tests inside the
+        // file they test, so no path names them and eight indicators read them as production
+        // code. Parsed AFTER the blanking, so no reader below sees a test at all.
+        let ext = format!(".{}", ext.to_lowercase());
+        let (src, _region_lines) = test_regions::blanked(&src, &ext);
         let Some(tree) = parser.parse(&src, None) else { skipped += 1; continue };
         let rel = path.strip_prefix(repo).unwrap_or(path).to_string_lossy().into_owned();
         out.push((rel, tree, src));
@@ -470,21 +476,27 @@ pub fn bucket_reason(
     None
 }
 
-/// Length of `bytes.splitlines()` in Python: a line closes at each ASCII line
-/// boundary (\n \r \r\n \v \f \x1c \x1d \x1e), with no trailing empty line after a
-/// final boundary.
-pub fn splitlines_len(bytes: &[u8]) -> usize {
+/// `bytes.splitlines()` in Python: every line, without its boundary. A line closes at each
+/// ASCII line boundary (\n \r \r\n \v \f \x1c \x1d \x1e), with no trailing empty line after
+/// a final boundary.
+///
+/// One owner for that boundary set, because the count and the lines themselves are the same
+/// question. `splitlines_len` used to hold its own copy of the rule, and test_regions needs
+/// the lines: two copies would have let a file carrying a lone \r be one length to the line
+/// counter and another to the reader comparing lines.
+pub fn splitlines_bytes(bytes: &[u8]) -> Vec<&[u8]> {
     fn is_boundary(b: u8) -> bool {
         matches!(b, b'\n' | b'\r' | 0x0b | 0x0c | 0x1c | 0x1d | 0x1e)
     }
     let n = bytes.len();
     let mut i = 0;
-    let mut count = 0;
+    let mut lines = Vec::new();
     while i < n {
+        let start = i;
         while i < n && !is_boundary(bytes[i]) {
             i += 1;
         }
-        count += 1;
+        lines.push(&bytes[start..i]);
         if i < n {
             if bytes[i] == b'\r' && i + 1 < n && bytes[i + 1] == b'\n' {
                 i += 2;
@@ -493,7 +505,12 @@ pub fn splitlines_len(bytes: &[u8]) -> usize {
             }
         }
     }
-    count
+    lines
+}
+
+/// Length of `bytes.splitlines()` in Python.
+pub fn splitlines_len(bytes: &[u8]) -> usize {
+    splitlines_bytes(bytes).len()
 }
 
 /// `str.splitlines()` in Python: every line, split on the full Unicode boundary set a

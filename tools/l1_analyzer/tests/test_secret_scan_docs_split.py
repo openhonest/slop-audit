@@ -19,6 +19,7 @@ import pathlib
 import tempfile
 
 from l1_analyzer import secret_scan
+from l1_analyzer.boundary import boundary
 
 # A value with enough entropy to clear the scanner's own screen. My first fixture,
 # "hunter2-not-a-real-credential-9xQ", was rejected by it and every test failed with a
@@ -26,6 +27,7 @@ from l1_analyzer import secret_scan
 _CRED = 'password = "' + "xK7pQ2mZ8vR4tY" + "6wB1nL3jH5" + '"\n'
 
 
+@boundary
 def _analyze(files: dict[str, str]) -> dict:
     with tempfile.TemporaryDirectory() as d:
         p = pathlib.Path(d)

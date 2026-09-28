@@ -232,7 +232,7 @@ def analyze(repo: Path, lang: str, min_tokens: int = MIN_TOKENS) -> L1Result:
 
     if lang not in LANG_CFG:
         return {"value": "n/a", "band": "n/a", "details": f"no tree-sitter config for {lang}"}
-    files, skipped = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], scope=PRODUCTION)
+    files, skipped, _test_lines = _read_source_bytes(repo, LANG_CFG[lang]["extensions"], scope=PRODUCTION)
     if not files:
         # A share of no lines is absent, not zero. Reporting 0.0 here would band Healthy
         # for a repository nobody read, which is the zero-denominator lie this package

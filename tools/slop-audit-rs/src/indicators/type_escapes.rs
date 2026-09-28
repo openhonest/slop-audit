@@ -218,9 +218,9 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
             Some(n) => n,
             None => continue,
         };
-        if !cfg.extensions.iter().any(|ext| name.ends_with(ext)) {
+        let Some(ext) = cfg.extensions.iter().find(|ext| name.ends_with(**ext)) else {
             continue;
-        }
+        };
         if bucket_reason(path, repo, has_packages, crate::PRODUCTION,
                          crate::PRODUCTION_BUCKETS, &disowned).is_some() {
             continue;
@@ -232,7 +232,14 @@ pub fn analyze(repo: &Path, language: &str) -> Indicator {
                 continue;
             }
         };
-        total_loc += splitlines_count_str(&String::from_utf8_lossy(&src));
+        // A test region comes out, and its lines come off the denominator with it. The region
+        // is blanked rather than deleted so line numbers stay the author's, which means
+        // counting lines counts the spaces back in. No language that carries an inline test
+        // region declares an escape pattern today, so this subtracts zero on every repository
+        // measured; the day one does, it is right.
+        let (src, region_lines) = crate::test_regions::blanked(&src, ext);
+        let test_lines = region_lines.len();
+        total_loc += splitlines_count_str(&String::from_utf8_lossy(&src)) - test_lines;
         if let Some(tree) = parser.parse(&src, None) {
             escape_count += count_escapes_in_tree(tree.root_node(), &src, cfg)
                 + count_cast_type_strings(tree.root_node(), &src, cfg);
