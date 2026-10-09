@@ -169,7 +169,7 @@
       <a class="button button--primary" target="_blank" rel="noopener"
          href="https://twitter.com/intent/tweet?text={{ card.share_text | urlencode }}">Share this result</a>
       <a class="button button--ghost" target="_blank" rel="noopener"
-         href="https://github.com/openhonest/slop-audit/blob/main/03-layer1-indicators.md">How each number is measured</a>
+         href="https://github.com/openhonest/slop-audit/blob/main/spec/03-layer1-indicators.md">How each number is measured</a>
     </div>
     <p class="card__fine">{% if not card.ran_tests %}{{ copy['footer.fine'] | safe }}{% elif card.tests_measured %}{{ copy['footer.cli'] | safe }}{% else %}{{ copy['footer.cli_na'] | safe }}{% endif %}</p>
   </footer>
