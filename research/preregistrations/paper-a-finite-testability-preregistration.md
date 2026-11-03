@@ -8,11 +8,15 @@
 
 ---
 
+**Amended 2026-11-03.** Read `AMENDMENT-2026-11-03.md` beside this file first. It records that the per-repository results behind the pilot numbers are lost, that the design below has not yet been run, and what changes before it is.
+
+---
+
 ## 1. What this paper tests
 
 Enterprise software teams report test coverage numbers (typically 70-90% line coverage) as evidence that their code is tested. This paper tests whether that evidence is meaningful by measuring two properties that line coverage does not capture:
 
-1. **What proportion of the code has a mathematically infinite state space** (mutable state ratio), making exhaustive testing impossible regardless of test budget?
+1. **What proportion of the code has a behavior domain that no test budget can cover** (mutable state ratio)? A function that reads only its parameters has a behavior domain its declared types fix. A function that also reads mutable state outside them has a domain that grows with the program's execution history, so the share a suite covers falls as the program runs and a larger budget does not change that. Where the declared domain is itself unbounded, as a `str` or an open mapping is, exhaustive testing of the function as specified is impossible rather than unaffordable, and the impossibility is a property of the signature.
 2. **Of the code whose decision space IS finitely enumerable, what proportion is actually covered by the test suite** (decision-space coverage)?
 
 The hypothesis: most enterprise codebases have a high mutable state ratio (the majority of functions depend on state outside their parameters) and a low decision-space coverage (even the testable portion is mostly untested at the decision level). If confirmed, the finding means that standard test-coverage metrics give enterprises a false sense of verification, and that the actual degree of behavioral verification in enterprise software is far lower than reported.
@@ -104,7 +108,7 @@ Total: 300 unique repositories across three independent samples. Results are rep
 
 If a language-tier cell is empty (e.g., no qualifying C# repos from Goldman Sachs), the cell is reported as empty and the proportional allocation shifts to the next-most-represented tier for that language.
 
-### 2.3 Measurements
+### 2.4 Measurements
 
 Three indicators are computed for every repository in every sample:
 
@@ -114,7 +118,7 @@ Three indicators are computed for every repository in every sample:
 
 **L1.20 Test determinism.** Run the full test suite 5 times with randomized execution order. Count passing runs. Test determinism = passing runs / 5. Repositories where the test suite cannot be run (missing dependencies, broken build) are recorded as "build failed" and excluded from L1.20 analysis but retained for L1.18 and L1.19 (which are static analysis only).
 
-### 2.4 Per-language tool mapping
+### 2.5 Per-language tool mapping
 
 | Language | L1.18 static analysis tool | L1.19 decision enumeration | L1.20 randomized runner |
 |---|---|---|---|
@@ -182,8 +186,6 @@ The tools are published as open-source scripts in the paper's supplementary mate
 
 6. **The overstatement hypothesis** is falsified if decision-space coverage is within **20 percentage points** of reported line coverage for the majority of repos. This would mean line coverage is a reasonable proxy for behavioral verification, undermining the claim that standard metrics give a false sense of security.
 
-5. **The overstatement hypothesis** is falsified if decision-space coverage is within **20 percentage points** of reported line coverage for the majority of repos. This would mean line coverage is a reasonable proxy for behavioral verification, undermining the claim that standard metrics give a false sense of security.
-
 ## 5. What this paper explicitly does NOT test
 
 - Whether Honest Code patterns produce better outcomes (that is Paper B, the controlled AI experiment)
@@ -213,7 +215,7 @@ This paper tests only whether the PROBLEM exists at scale: is enterprise code sy
 
 ## 8. Timestamp anchor
 
-**Timestamp anchor:** [TO ADD: Zenodo DOI or OSF registration ID once minted].
+**Timestamp anchor:** OSF registration `dbsyg`, registered 2026-04-12, at <https://osf.io/dbsyg/overview>. The Internet Archive holds a copy of the registration as it stood at that date, at <https://archive.org/details/osf-registrations-dbsyg-v1>.
 
 ---
 

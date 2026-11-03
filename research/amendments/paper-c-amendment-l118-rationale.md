@@ -1,9 +1,13 @@
 # Paper C Pre-Registration Amendment — Rationale for L1.18 as an Audit Indicator
 
 **Amendment date.** 2026-04-16.
+
 **Original registration date.** 2026-04-10.
+
 **Original document.** `../preregistrations/paper-c-instrument-validation-preregistration.md`.
+
 **Purpose.** To add explicit theoretical justification for why L1.18 (mutable state ratio) is a relevant audit indicator. The original preregistration (§1.1 item 3) describes what L1.18 measures and notes the absence of direct prior art, but does not state the underlying reason the measurement is relevant. This amendment supplies that reasoning.
+
 **Data-collection status.** No data has been collected under Paper C at the time of this amendment. All predictions, falsification criteria, and study design elements in the original preregistration remain unchanged.
 
 ---
@@ -30,11 +34,15 @@ The behavior domain becomes:
 
     Behavior domain of f = D₁ × … × Dₙ × State(S)
 
-where `State(S)` is the set of all values `S` can take across the history of program execution. In the general case, `State(S)` is unbounded: it can include histories of prior calls, accumulated data, heap addresses that vary across runs, timing-dependent values, open file handles, network connection states, and so on. Unbounded state makes `State(S)` infinite.
+where `State(S)` is the set of all values `S` can take across the history of program execution. The code's own declarations leave that set unbounded in the general case. It can include histories of prior calls, accumulated data, heap addresses that vary across runs, timing-dependent values, open file handles and network connection states.
 
-An infinite behavior domain cannot be exhaustively enumerated in finite time. Therefore, the behavior of a function that references unbounded external mutable state cannot be verified by exhaustive testing, regardless of the test budget.
+Two claims follow, and only one of them is about impossibility.
 
-This is a mathematical statement, not a subjective claim about engineering style. It is a direct consequence of the definition of "exhaustive testing" (evaluating every element of the behavior domain) and the elementary property of infinite sets (not enumerable in finite time).
+**The declared domain is the impossibility.** Say `S` has a declared type that admits arbitrarily many values, such as a `str` or an open mapping. The set the function promises to handle is then countably infinite. Exhaustive testing of the function as specified is impossible, not merely unaffordable, and the impossibility is a property of the signature. That is why it is called structural. A machine with finite memory truncates the set at some bound, but nobody chose that bound and the contract does not mention it, so the truncation is a second defect rather than a rescue.
+
+**The growth rate is the infeasibility.** On the running machine `State(S)` is finite, because state is a bit pattern in finite memory. What puts it out of reach is its size and its growth. The domain grows with execution history, so the share a suite covers falls as the program runs, and a larger budget does not change that. Section 5 cites the model-checking literature, which calls this state-space explosion, and explosion describes a rate rather than infinity. A function of two 64-bit parameters already has 3.4 x 10^38 combinations, which no budget reaches.
+
+So we do not claim that a running program has infinitely many states. We claim two narrower things. A function whose declared domain is unbounded cannot be exhaustively tested at all. A function whose state grows with history cannot be exhaustively tested within any budget that exists. Both are statements about the shape of the code rather than about engineering taste.
 
 The mathematical impossibility of exhaustive testing under unbounded mutable state is complemented by a cognitive limitation: humans systematically fail at the conditional logic required to reason about mutable-state transformations. The Wason Selection Task (Wason 1966), replicated across decades with fewer than 10% of participants solving it correctly on first attempt (Evans 2016), demonstrates that humans default to heuristic reasoning (Kahneman's System 1) rather than the formal logical reasoning (System 2) that mutable-state code demands. Mutable state provides "escape hatches from formal reasoning" (Wasserman 2025) — mutation replaces provable transformation with informal assertion, side effects replace explicit dependency tracking with implicit coupling, and procedural sequencing replaces function composition with unchecked state evolution. L1.18 therefore measures the fraction of code subject to both limitations simultaneously: mathematically unverifiable by testing AND cognitively unreliable for human reasoning.
 
@@ -67,7 +75,6 @@ The mathematical claim in §2 is a direct consequence of the finite-state/infini
 - **Golomb 1961**, "A mathematical theory of discrete classification," in *Information Theory: Fourth London Symposium* (C. Cherry, ed.). The canonical early reference for combinatorial explosion as a general property of discrete systems whose state space grows faster than any polynomial budget can enumerate.
 - **Model checking literature** (Clarke & Emerson 1981; Queille & Sifakis 1982). The specialization of Golomb's combinatorial-explosion observation to the verification of concurrent and reactive systems, where it acquired the specific name "state-space explosion."
 - **Hoare logic** (Hoare 1969), which frames program verification in terms of pre- and post-conditions, implicitly over the full behavior domain.
-- **Rice's theorem** (Rice 1953), which bounds what can be decided about program behavior in general.
 - **Unkel & Lam 2008 (POPL)** — the closest prior work on field-level immutability in Java, cited in the original Paper C preregistration §1.1 item 3. They measured the fraction of fields that are stationary after initialization (44-59% in their corpus). L1.18 differs in that it measures functions (not fields) and operationalizes the result as an audit indicator.
 
 The novelty of L1.18 is not in recognizing the mathematical fact that unbounded-state functions are not finitely testable. That is well-established — traceable at least to Golomb 1961 as a general property of discrete systems and specialized to program verification by the model-checking community in the 1980s. The novelty is in operationalizing "what fraction of a given codebase's functions fall into the not-finitely-testable population" as a single number computable from the repository alone, applying it across 200 enterprise codebases, and positioning it as a formal indicator in a compliance-mapped audit instrument.
