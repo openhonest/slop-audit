@@ -50,3 +50,9 @@ cardinality-distribution.json
 research/arms/*/results/
 research/arms/*/results_*/
 research/arms/*/run.log
+
+# Per-machine agent configuration, including hooks that would run on a stranger clone.
+.codex/
+# Per-machine Claude Code configuration. settings.json carries hooks that would run on
+# anyone who opens this repository, so it is local setup rather than project tooling.
+.claude/settings.json
